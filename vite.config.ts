@@ -21,6 +21,8 @@ export default defineConfig({
     ),
   },
   server: {
-    allowedHosts: ["www.perce-eg.com", "perce-eg.com"],
+    // Add this project's own public hostname(s) here when tunnelling/previewing
+    // the dev server from outside localhost.
+    allowedHosts: [],
   },
 });

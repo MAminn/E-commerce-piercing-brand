@@ -1,9 +1,9 @@
 {
-  "name": "lebsy-shop",
+  "name": "piercing-brand-shop",
   "version": "1.0.0",
   "description": "A modern, single-shop e-commerce template built with React 19, Fastify 5, tRPC, and Drizzle ORM. Includes a full template system, admin dashboard, pixel tracking, promo codes, and more.",
   "license": "MIT",
-  "author": "Lebsy",
+  "author": "Piercing Brand",
   "private": true,
   "engines": {
     "node": ">=22"

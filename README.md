@@ -54,9 +54,9 @@ A production-ready, fully-featured single-shop e-commerce template built with **
 ### 1. Clone & install
 
 ```bash
-git clone <your-repo-url>
-cd lebsy-shop
-pnpm install
+git clone https://github.com/MAminn/E-commerce-piercing-brand.git
+cd E-commerce-piercing-brand
+pnpm install --frozen-lockfile
 ```
 
 ### 2. Set up environment
@@ -70,16 +70,16 @@ Edit `.env` with your values:
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `PUBLIC_ORIGIN` | Yes | Public-facing origin URL (e.g. `http://localhost:5173`) |
-| `BASE_URL` | Yes | Internal server base URL (e.g. `http://127.0.0.1:3000`) |
+| `PUBLIC_ORIGIN` | Yes | Public-facing origin URL (e.g. `http://localhost:3000`) |
+| `BASE_URL` | Yes | Origin better-auth signs callbacks against (e.g. `http://localhost:3000`) |
 | `SINGLE_SHOP_MODE` | Yes | Set to `true` |
 | `ADMIN_EMAIL` | Yes | Admin account email |
 | `ADMIN_PASSWORD` | Yes | Admin account password |
-| `JWT_SECRET` | Yes | Secret string for JWT signing (at least 32 characters recommended) |
-| `SMTP_HOST` | Yes | SMTP server (e.g. `smtp.gmail.com`) |
-| `SMTP_PORT` | Yes | SMTP port (e.g. `465`) |
-| `SMTP_USER` | Yes | SMTP username |
-| `SMTP_PASSWORD` | Yes | SMTP password or app password |
+| `BETTER_AUTH_SECRET` | Yes | Session-signing secret — generate a fresh 32-byte random value per environment |
+| `SMTP_HOST` | Optional | SMTP server — outbound email is skipped when unset |
+| `SMTP_PORT` | Optional | SMTP port (e.g. `465`) |
+| `SMTP_USER` | Optional | SMTP username |
+| `SMTP_PASSWORD` | Optional | SMTP password or app password |
 | `FINCART_API_URL` | Optional | Fincart API base URL |
 | `FINCART_API_KEY` | Optional | Fincart shipping API key |
 | `FINCART_WEBHOOK_SECRET` | Optional | Fincart webhook verification secret |
@@ -99,12 +99,18 @@ Edit `.env` with your values:
 docker compose up -d
 ```
 
-### 4. Run migrations
+This starts `piercing-brand-postgres` on host port **8053** (database
+`piercing_brand`, volume `piercing-brand-pgdata`) — isolated from every other
+local project.
 
-```bash
-pnpm drizzle:generate
-pnpm drizzle:migrate
-```
+### 4. Migrations
+
+None to run by hand. The server applies every pending migration in
+`shared/database/migrations` automatically on startup (see
+`shared/database/auto-migrate.ts`), which is also how production deploys.
+
+Only run `pnpm drizzle:generate` when you have deliberately changed
+`shared/database/drizzle/schema.ts` and want a new migration file.
 
 ### 5. Start the dev server
 

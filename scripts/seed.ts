@@ -21,7 +21,7 @@ import {
 } from "#root/shared/database/drizzle/schema.js";
 
 const DATABASE_URL =
-  process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:8051/postgres";
+  process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:8053/piercing_brand";
 
 const VENDOR_ID =
   process.env.STORE_OWNER_ID || "00000000-0000-0000-0000-000000000001";

@@ -1,14 +1,35 @@
+# Local development database for the Piercing Brand shop.
+#
+# Every resource here is namespaced to this project so it can never collide
+# with, or attach to, another brand's stack on the same machine:
+#   compose project : piercing-brand
+#   container       : piercing-brand-postgres
+#   volume          : piercing-brand-pgdata
+#   host port       : 8053 (5432 inside the container)
+#
+# Other local shops already use 8051, so do NOT change the host port back to
+# that without checking `docker ps` first.
+name: piercing-brand
+
 services:
   postgres:
     image: postgres:16
+    container_name: piercing-brand-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: postgres
+      POSTGRES_DB: piercing_brand
     ports:
-      - 8051:5432
+      - "8053:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - piercing-brand-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d piercing_brand"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
-  pgdata:
+  piercing-brand-pgdata:
+    name: piercing-brand-pgdata
