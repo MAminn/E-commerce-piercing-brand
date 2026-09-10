@@ -1,0 +1,1 @@
+ALTER TABLE "product" ADD COLUMN "best_layered_with_ids" jsonb DEFAULT '[]'::jsonb;

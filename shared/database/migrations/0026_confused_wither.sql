@@ -1,0 +1,1 @@
+ALTER TABLE "store_settings" ADD COLUMN "coming_soon_mode" boolean DEFAULT false NOT NULL;

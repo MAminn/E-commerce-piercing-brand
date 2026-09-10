@@ -1,0 +1,1 @@
+ALTER TABLE "product" ADD COLUMN IF NOT EXISTS "deleted" boolean DEFAULT false NOT NULL;

@@ -1,0 +1,1 @@
+ALTER TABLE "order" ADD COLUMN "archived_at" timestamp with time zone;

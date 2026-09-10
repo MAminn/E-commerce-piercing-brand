@@ -1,0 +1,1 @@
+ALTER TABLE "promo_code" ADD COLUMN "show_on_offers_page" boolean DEFAULT false NOT NULL;

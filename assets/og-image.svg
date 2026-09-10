@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="SYNT Perfumes">
+  <rect width="1200" height="630" fill="#ffffff"/>
+  <circle cx="600" cy="265" r="88" fill="none" stroke="#1A1612" stroke-width="2.5"/>
+  <text
+    x="600"
+    y="280"
+    text-anchor="middle"
+    dominant-baseline="middle"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="52"
+    fill="#1A1612"
+  >synt.</text>
+  <text
+    x="600"
+    y="410"
+    text-anchor="middle"
+    font-family="Poppins, Arial, sans-serif"
+    font-size="42"
+    font-weight="600"
+    letter-spacing="12"
+    fill="#1A1612"
+  >SYNT</text>
+</svg>

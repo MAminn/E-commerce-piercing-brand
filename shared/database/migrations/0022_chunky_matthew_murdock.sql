@@ -1,0 +1,1 @@
+ALTER TABLE "store_settings" ADD COLUMN "variant_presets" jsonb DEFAULT '[]'::jsonb;

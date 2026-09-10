@@ -1,0 +1,1 @@
+ALTER TABLE "product" ADD COLUMN "fragrance_info" jsonb;

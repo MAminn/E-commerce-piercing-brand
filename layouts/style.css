@@ -1,0 +1,722 @@
+@import "@fontsource/poppins/400.css";
+@import "@fontsource-variable/roboto-flex";
+@import "@fontsource/rubik/400.css";
+@import "@fontsource/rubik/500.css";
+@import "@fontsource/rubik/600.css";
+@import "@fontsource/rubik/700.css";
+@import "tailwindcss";
+
+@plugin "tailwindcss-animate";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ── LaRojaTV font — minimal template only ── */
+@font-face {
+  font-family: "LaRojaTV";
+  src: url("/assets/fonts/LaRojaTV-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+.minimal-template {
+  font-family: var(--font-heading, "LaRojaTV", "Poppins", sans-serif);
+}
+
+/* ── Admin-configurable typography (Dashboard > Typography) ──────────────
+   Reads the --font-* custom properties emitted by
+   shared/typography/build-head-css.ts (see pages/+Head.tsx). Applied to
+   every storefront-facing page — not scoped to .minimal-template — so an
+   admin's font choice is honored regardless of which template is active,
+   current or future. Scoped under .storefront-shell (set in
+   layouts/LayoutDefault.tsx, excluded for dashboard routes) so an admin's
+   public-site font choice never bleeds into the internal /dashboard tool.
+   Fallback values reproduce this file's original hardcoded fonts exactly,
+   so nothing changes visually until the admin assigns a role. */
+
+.storefront-shell h1, .storefront-shell h2, .storefront-shell h3,
+.storefront-shell h4, .storefront-shell h5, .storefront-shell h6 {
+  font-family: var(--font-heading, "LaRojaTV", "Poppins", sans-serif);
+}
+
+.storefront-shell p, .storefront-shell dd, .storefront-shell li,
+.storefront-shell td, .storefront-shell blockquote, .storefront-shell figcaption {
+  font-family: var(
+    --font-body,
+    "Poppins",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif
+  );
+}
+
+.storefront-shell label, .storefront-shell input,
+.storefront-shell textarea, .storefront-shell select {
+  font-family: var(
+    --font-form-input,
+    "Poppins",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif
+  );
+}
+
+.storefront-shell button, .storefront-shell [type="button"],
+.storefront-shell [type="submit"], .storefront-shell [type="reset"],
+.storefront-shell [data-slot="button"] {
+  font-family: var(--font-buttons, "LaRojaTV", "Poppins", sans-serif);
+}
+
+.storefront-shell nav, .storefront-shell nav a, .storefront-shell footer a {
+  font-family: var(--font-nav, "LaRojaTV", "Poppins", sans-serif);
+}
+
+/* Body/description text in the minimal template uses Poppins instead of LaRojaTV.
+   Headings, buttons, nav links keep the branded font. */
+/* Arabic text uses Rubik for better Arabic readability — enforced on ALL elements */
+/* NOTE: dir="rtl" is set on <html> by MinimalI18nProvider, so selectors must be html[dir="rtl"] */
+/* Deliberately still hardcoded (not admin-configurable) — Arabic typography
+   is out of scope for the Typography feature for now. */
+html[dir="rtl"] .minimal-template,
+html[dir="rtl"] .minimal-template * {
+  font-family: "Rubik", "Poppins", sans-serif !important;
+}
+
+/* Arabic headings always use Rubik medium (500) for optimal readability */
+html[dir="rtl"] .minimal-template h1,
+html[dir="rtl"] .minimal-template h2,
+html[dir="rtl"] .minimal-template h3,
+html[dir="rtl"] .minimal-template h4,
+html[dir="rtl"] .minimal-template h5,
+html[dir="rtl"] .minimal-template h6 {
+  font-weight: 500 !important;
+}
+
+/* Links */
+a:where(:not([class*="text-"])) {
+  text-decoration: none;
+  color: inherit;
+}
+a:where([class*="text-"]) {
+  text-decoration: none;
+}
+#sidebar a {
+  padding: 2px 10px;
+  margin-left: -10px;
+}
+#sidebar a.is-active {
+  background-color: #eee;
+}
+
+/* Reset */
+body {
+  margin: 0;
+  font-family: sans-serif;
+}
+* {
+  box-sizing: border-box;
+}
+
+/* Ensure all interactive elements use pointer cursor */
+a,
+button,
+[role="button"],
+[type="button"],
+[type="submit"],
+[type="reset"],
+select,
+summary,
+label[for] {
+  cursor: pointer;
+}
+
+/* ── Phase 3 — CSS-overlay page transitions ─────────────────────── */
+
+/* Base: invisible, non-interactive overlay covering the viewport */
+.page-transition-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  opacity: 0;
+  background: rgba(250, 250, 249, 0.96);
+  pointer-events: none;
+  transition: opacity 240ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity;
+}
+
+/* Navigation START → fade overlay IN (covers page while Vike swaps content) */
+html[data-page-transition="out"] .page-transition-overlay {
+  opacity: 1;
+  pointer-events: auto; /* block clicks while transitioning */
+}
+
+/* Navigation END → fade overlay OUT (reveal new page) */
+html[data-page-transition="in"] .page-transition-overlay {
+  opacity: 0;
+}
+
+/* Cursor feedback while the overlay is opaque */
+html[data-page-transition="out"] body {
+  cursor: progress;
+}
+
+/* Reduced motion: kill the transition duration so state flips are instant */
+@media (prefers-reduced-motion: reduce) {
+  .page-transition-overlay {
+    transition-duration: 0ms;
+  }
+}
+
+:root {
+  --accent-lb: oklch(41.95% 0.0862 232.96);
+  --background: oklch(100% 0.00011 271.152);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(41.95% 0.0862 232.96);
+  --primary-foreground: oklch(97.69% 0.0105 106.59);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(1 0.0296 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.24 0.078 256.36);
+  --sidebar-foreground: white;
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.145 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.145 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.396 0.141 25.723);
+  --destructive-foreground: oklch(0.637 0.237 25.331);
+  --border: oklch(0.269 0 0);
+  --input: oklch(0.269 0 0);
+  --ring: oklch(0.439 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(97.69% 0.0105 106.59);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.269 0 0);
+  --sidebar-ring: oklch(0.439 0 0);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-lb: var(--accent-lb);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@theme {
+  --font-poppins: "Poppins", sans-serif;
+  --font-roboto-flex: "Roboto Flex Variable", sans-serif;
+
+  /* Smooth accordion open/close (Radix sets --radix-accordion-content-height) */
+  --animate-accordion-down: accordion-down 0.35s cubic-bezier(0.33, 1, 0.68, 1);
+  --animate-accordion-up: accordion-up 0.3s cubic-bezier(0.33, 1, 0.68, 1);
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+      opacity: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+      opacity: 1;
+    }
+  }
+
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+      opacity: 1;
+    }
+    to {
+      height: 0;
+      opacity: 0;
+    }
+  }
+}
+
+.men-section-image {
+  background-image: url("../assets/men-section.webp");
+}
+.women-section-image {
+  background-image: url("../assets/women-section.webp");
+}
+.img1 {
+  background-image: url("../assets/img1.webp");
+}
+
+.header {
+  font-size: 1rem;
+  line-height: 2rem;
+  font-weight: 600;
+  text-align: center;
+
+  @media (min-width: 768px) {
+    font-size: 1.5rem;
+    line-height: 2.5rem;
+  }
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+.navLink {
+  font-size: medium;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+  border-radius: 1.5rem;
+  color: #374151;
+  transition-property: all;
+  transition-duration: 300ms;
+  cursor: pointer;
+}
+.navLink:hover {
+  color: #111827;
+  background-color: #e5e7eb;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom Utilities */
+@layer utilities {
+  /* Hide scrollbar while maintaining scroll functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
+}
+
+/* Skeleton shimmer keyframe */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Editorial chrome toggle — hide global footer when editorial chrome is active */
+html[data-editorial-chrome="true"] #global-footer {
+  display: none !important;
+}
+
+/* Hide footer newsletter when the active template already renders its own */
+html[data-has-template-newsletter] [data-footer-newsletter] {
+  display: none !important;
+}
+
+/*
+ * Hero section height — in @layer components so it's never tree-shaken.
+ * Uses dvh (dynamic viewport height) with vh fallback so mobile browsers
+ * account for the address bar, matching desktop emulator sizing exactly.
+ */
+@layer components {
+  .hero-h {
+    height: 50vh;
+    height: 50dvh;
+  }
+  @media (min-width: 768px) {
+    .hero-h {
+      height: 100vh;
+      height: 100dvh;
+    }
+  }
+}
+
+/* ── Marquee infinite scroll ── */
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+.animate-marquee {
+  animation: marquee var(--marquee-duration, 240s) linear infinite;
+}
+
+/* ── Marquee half — for doubled-item lists (testimonials etc.)
+   Translates only -50% so the loop is seamless with no blank gap ── */
+@keyframes marquee-half {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+.animate-marquee-half {
+  animation: marquee-half var(--marquee-duration, 240s) linear infinite;
+}
+
+/* ── Hero carousel fade ── */
+@keyframes hero-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.animate-hero-fade {
+  animation: hero-fade-in 700ms ease-out forwards;
+}
+
+/* ── Cart toast progress bar ── */
+@keyframes shrink {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+@keyframes slideDown {
+  0% {
+    opacity: 0;
+    transform: translateY(-2rem) scale(0.95);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(0.3rem) scale(1.02);
+  }
+  70% {
+    transform: translateY(-0.15rem) scale(1);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes cartToastPulse {
+  0%,
+  100% {
+    box-shadow: 0 4px 20px rgba(16, 185, 129, 0);
+  }
+  50% {
+    box-shadow: 0 4px 24px rgba(16, 185, 129, 0.25);
+  }
+}
+
+/* ── Sticky offer bar ── */
+@keyframes offer-bar-enter {
+  from {
+    opacity: 0;
+    transform: translateY(calc(100% + 1rem));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes offer-border-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(251, 191, 36, 0.45),
+      0 0 18px rgba(251, 146, 60, 0.25),
+      0 8px 32px rgba(0, 0, 0, 0.35);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(252, 211, 77, 0.85),
+      0 0 28px rgba(251, 146, 60, 0.45),
+      0 8px 32px rgba(0, 0, 0, 0.35);
+  }
+}
+
+@keyframes offer-border-pulse-success {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(52, 211, 153, 0.45),
+      0 0 18px rgba(16, 185, 129, 0.25),
+      0 8px 32px rgba(0, 0, 0, 0.35);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(110, 231, 183, 0.85),
+      0 0 28px rgba(16, 185, 129, 0.4),
+      0 8px 32px rgba(0, 0, 0, 0.35);
+  }
+}
+
+@keyframes offer-sparkle {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.85) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15) rotate(90deg);
+  }
+}
+
+@keyframes offer-cta-shimmer {
+  0% {
+    background-position: 200% center;
+  }
+  100% {
+    background-position: -200% center;
+  }
+}
+
+@keyframes offer-text-glow {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-offer-bar-enter {
+  animation: offer-bar-enter 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.animate-offer-border-pulse {
+  animation: offer-border-pulse 2.4s ease-in-out infinite;
+}
+
+.animate-offer-border-pulse-success {
+  animation: offer-border-pulse-success 2.4s ease-in-out infinite;
+}
+
+.animate-offer-sparkle {
+  animation: offer-sparkle 2.8s ease-in-out infinite;
+}
+
+.animate-offer-sparkle-delayed {
+  animation: offer-sparkle 2.8s ease-in-out infinite;
+  animation-delay: 1.4s;
+}
+
+.animate-offer-cta-shimmer {
+  background-size: 200% auto;
+  animation: offer-cta-shimmer 3s linear infinite;
+}
+
+.animate-offer-text-glow {
+  animation: offer-text-glow 2s ease-in-out infinite;
+}
+
+/* ── Offers page: "you qualified" feedback ── */
+@keyframes offer-card-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(52, 211, 153, 0.35),
+      0 0 16px rgba(16, 185, 129, 0.18);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1.5px rgba(52, 211, 153, 0.65),
+      0 0 26px rgba(16, 185, 129, 0.3);
+  }
+}
+
+@keyframes offer-check-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.4) rotate(-8deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.12) rotate(2deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes offer-card-flash {
+  0% {
+    background-color: rgba(16, 185, 129, 0.22);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.animate-offer-card-glow {
+  animation: offer-card-glow 2.2s ease-in-out infinite;
+}
+
+.animate-offer-check-pop {
+  animation: offer-check-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.animate-offer-card-flash {
+  animation: offer-card-flash 1.1s ease-out both;
+}
+
+/* ── Offers page: "sign in to reveal" promo code overlay ── */
+@keyframes reveal-overlay-in {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes reveal-lock-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.12);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(0, 0, 0, 0);
+  }
+}
+
+.animate-reveal-overlay-in {
+  animation: reveal-overlay-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-reveal-lock-pulse {
+  animation: reveal-lock-pulse 2.4s ease-in-out infinite;
+}
+
+/* ===== NOIR DEMO SCOPE (data-noir-chrome) — added Phase 1 ===== */
+/* Everything below is scoped under html[data-noir-chrome="true"] and
+   affects ONLY the Noir (Demo 5) templates. Do not add unscoped rules. */
+html[data-noir-chrome="true"] {
+  --noir-accent: #e8112d;
+  --noir-card: #141414;
+  --noir-border: rgba(255, 255, 255, 0.1);
+  --noir-font-display: "Oswald", "Poppins", sans-serif;
+  --noir-font-mono: "IBM Plex Mono", monospace;
+  background-color: #000000;
+  color: #ffffff;
+}
+
+/* Noir chrome toggle — hide global footer when noir chrome is active
+   (mirrors the editorial chrome toggle above) */
+html[data-noir-chrome="true"] #global-footer {
+  display: none !important;
+}
+
+/* Phase 2 — hide the global fixed navbar under Noir scope. NoirChrome
+   renders its own NoirNavbar. The GlobalNavbarChrome spacer collapses
+   automatically (ResizeObserver reports 0 height when hidden). */
+html[data-noir-chrome="true"] #global-navbar {
+  display: none !important;
+}
+
+/* Phase 3.5 — hide the page-owned light breadcrumb that renders above
+   the sorting template on /shop?category=… and /categories/@slug. It is
+   light-on-dark and off-brand over the Noir canvas; NoirChrome / the
+   sorting template provide their own dark navigation. Scoped to Noir
+   only, so non-Noir templates keep their breadcrumb untouched. */
+html[data-noir-chrome="true"] [data-shop-breadcrumb] {
+  display: none !important;
+}

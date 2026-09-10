@@ -1,0 +1,1 @@
+ALTER TABLE "store_settings" ADD COLUMN "link_tree_config" jsonb DEFAULT '{}'::jsonb;

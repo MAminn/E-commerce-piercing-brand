@@ -1,0 +1,2 @@
+ALTER TABLE "email_template" ADD COLUMN "promo_code_id" uuid;--> statement-breakpoint
+ALTER TABLE "email_template" ADD CONSTRAINT "email_template_promo_code_id_promo_code_id_fk" FOREIGN KEY ("promo_code_id") REFERENCES "public"."promo_code"("id") ON DELETE set null ON UPDATE no action;

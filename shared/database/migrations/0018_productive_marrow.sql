@@ -1,0 +1,3 @@
+DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'layout_settings_merchant_id_unique') THEN ALTER TABLE "layout_settings" DROP CONSTRAINT "layout_settings_merchant_id_unique"; END IF; END $$;--> statement-breakpoint
+ALTER TABLE "layout_settings" ADD COLUMN IF NOT EXISTS "template_id" text DEFAULT 'default' NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "layout_settings_merchant_template_idx" ON "layout_settings" USING btree ("merchant_id","template_id");

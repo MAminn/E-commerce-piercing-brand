@@ -1,0 +1,596 @@
+{
+  "generatedAt": "2026-03-25",
+  "version": "1.1",
+  "sections": [
+    {
+      "id": "layout-settings",
+      "name": "Layout Settings",
+      "route": "/dashboard/admin/layout-settings",
+      "purpose": "Header and footer CMS configuration",
+      "tabs": ["Header Settings", "Footer Settings"],
+      "tRPC": {
+        "query": "layout.getSettings",
+        "mutation": "layout.updateSettings",
+        "fileUpload": "layout.uploadImage"
+      },
+      "storage": "layoutSettings table (JSONB content column, keyed by merchantId)",
+      "fields": [
+        {
+          "section": "Header",
+          "name": "navbarStyle",
+          "type": "radio-group",
+          "options": ["default", "editorial"],
+          "default": "default",
+          "consumer": "layouts/LayoutDefault.tsx",
+          "status": "fully-working",
+          "notes": "Controls global navbar variant selection"
+        },
+        {
+          "section": "Header",
+          "name": "logoUrl",
+          "type": "image-upload",
+          "default": "",
+          "consumer": "components/globals/HeaderLogo.tsx",
+          "status": "fully-working",
+          "notes": "Max 2MB; JPEG/PNG/WebP/SVG"
+        },
+        {
+          "section": "Header",
+          "name": "logoSize",
+          "type": "number-group",
+          "subFields": [
+            "desktopWidth",
+            "desktopMaxHeight",
+            "mobileWidth",
+            "mobileMaxHeight"
+          ],
+          "default": {
+            "desktopWidth": 140,
+            "desktopMaxHeight": 48,
+            "mobileWidth": 100,
+            "mobileMaxHeight": 36
+          },
+          "consumer": "components/globals/HeaderLogo.tsx",
+          "status": "fully-working"
+        },
+        {
+          "section": "Header",
+          "name": "logoText",
+          "type": "text-input",
+          "default": "",
+          "consumer": "components/globals/HeaderLogo.tsx",
+          "status": "fully-working",
+          "notes": "Fallback to STORE_NAME if empty"
+        },
+        {
+          "section": "Header",
+          "name": "tagline",
+          "type": "text-input",
+          "default": "",
+          "consumer": "components/globals/HeaderLogo.tsx",
+          "status": "fully-working"
+        },
+        {
+          "section": "Header",
+          "name": "announcementBarEnabled",
+          "type": "toggle",
+          "default": false,
+          "consumer": "components/globals/Navbar.tsx, EditorialNavbar.tsx",
+          "status": "fully-working"
+        },
+        {
+          "section": "Header",
+          "name": "announcementBarText",
+          "type": "text-input",
+          "default": "",
+          "consumer": "components/globals/Navbar.tsx, EditorialNavbar.tsx",
+          "status": "fully-working"
+        },
+        {
+          "section": "Header",
+          "name": "navigationLinks",
+          "type": "repeater",
+          "itemFields": ["label (text)", "url (text)"],
+          "default": [{ "label": "Collection", "url": "/shop" }],
+          "consumer": "components/globals/Navbar.tsx, EditorialNavbar.tsx",
+          "status": "partially-wired",
+          "notes": "Default link points to /shop which does NOT exist as a route"
+        },
+        {
+          "section": "Footer",
+          "name": "logoUrl",
+          "type": "image-upload",
+          "default": "",
+          "consumer": "components/globals/FooterLogo.tsx",
+          "status": "fully-working"
+        },
+        {
+          "section": "Footer",
+          "name": "logoText",
+          "type": "text-input",
+          "default": "",
+          "consumer": "components/globals/FooterLogo.tsx",
+          "status": "fully-working",
+          "notes": "Fallback to STORE_NAME if empty"
+        },
+        {
+          "section": "Footer",
+          "name": "logoSize",
+          "type": "number-group",
+          "subFields": [
+            "desktopWidth",
+            "desktopMaxHeight",
+            "mobileWidth",
+            "mobileMaxHeight"
+          ],
+          "default": {
+            "desktopWidth": 120,
+            "desktopMaxHeight": 40,
+            "mobileWidth": 100,
+            "mobileMaxHeight": 36
+          },
+          "consumer": "components/globals/FooterLogo.tsx",
+          "status": "fully-working"
+        },
+        {
+          "section": "Footer",
+          "name": "description",
+          "type": "textarea",
+          "default": "Sculptural piercings & curated jewelry — crafted with intention.",
+          "consumer": "components/globals/Footer.tsx, EditorialFooter.tsx",
+          "status": "fully-working"
+        },
+        {
+          "section": "Footer",
+          "name": "copyright",
+          "type": "text-input",
+          "default": "",
+          "consumer": "components/globals/Footer.tsx, EditorialFooter.tsx",
+          "status": "fully-working",
+          "notes": "Fallback to STORE_NAME if empty"
+        },
+        {
+          "section": "Footer",
+          "name": "showNewsletter",
+          "type": "toggle",
+          "default": true,
+          "consumer": "components/globals/Footer.tsx",
+          "status": "fully-working"
+        },
+        {
+          "section": "Footer",
+          "name": "footerStyle",
+          "type": "schema-only",
+          "options": ["default", "editorial"],
+          "default": "default",
+          "consumer": "NONE",
+          "status": "misleading",
+          "notes": "EXISTS in type definition and Zod schema but is NOT read by any frontend component. Footer variant is controlled by EditorialChrome wrapper, not this field."
+        },
+        {
+          "section": "Footer",
+          "name": "footerLinkGroups",
+          "type": "repeater",
+          "itemFields": ["title (text)", "links[] (label + url)"],
+          "default": [
+            {
+              "title": "Shop",
+              "links": ["All Products → /shop", "New Arrivals → /shop"]
+            },
+            { "title": "Help", "links": ["Contact Us → /contact"] }
+          ],
+          "consumer": "components/globals/Footer.tsx, EditorialFooter.tsx",
+          "status": "partially-wired",
+          "notes": "Default links point to /shop and /contact which don't exist as routes"
+        },
+        {
+          "section": "Footer",
+          "name": "socialLinks",
+          "type": "repeater",
+          "itemFields": ["platform (select: 7 options)", "url (text)"],
+          "default": [],
+          "consumer": "components/globals/Footer.tsx, EditorialFooter.tsx",
+          "status": "fully-working"
+        }
+      ]
+    },
+    {
+      "id": "homepage-cms",
+      "name": "Homepage CMS",
+      "route": "/dashboard/admin/homepage",
+      "purpose": "Edit homepage sections content",
+      "tRPC": {
+        "query": "homepage.getContent",
+        "mutation": "homepage.updateContent",
+        "fileUpload": [
+          "homepage.uploadHeroImage",
+          "homepage.uploadMobileHeroImage"
+        ]
+      },
+      "storage": "homepageContent table (JSONB content column, keyed by merchantId)",
+      "fields": [
+        {
+          "section": "Hero",
+          "name": "hero.enabled",
+          "type": "toggle",
+          "default": true,
+          "consumer": "Landing templates (LandingTemplateModern, etc.)",
+          "status": "fully-working"
+        },
+        {
+          "section": "Hero",
+          "name": "hero.title",
+          "type": "text-input",
+          "default": "Minimal Elegance",
+          "consumer": "Landing templates",
+          "status": "fully-working"
+        },
+        {
+          "section": "Hero",
+          "name": "hero.subtitle",
+          "type": "textarea",
+          "default": "Curated fashion designed for the modern individual.",
+          "consumer": "Landing templates",
+          "status": "fully-working"
+        },
+        {
+          "section": "Hero",
+          "name": "hero.ctaText",
+          "type": "text-input",
+          "default": "Shop Collection",
+          "consumer": "Landing templates",
+          "status": "fully-working"
+        },
+        {
+          "section": "Hero",
+          "name": "hero.ctaLink",
+          "type": "select-or-custom",
+          "default": "/shop",
+          "consumer": "Landing templates",
+          "status": "partially-wired",
+          "notes": "Default /shop route does not exist"
+        },
+        {
+          "section": "Hero",
+          "name": "hero.backgroundImage",
+          "type": "image-upload",
+          "default": "",
+          "consumer": "Landing templates",
+          "status": "fully-working"
+        },
+        {
+          "section": "Hero",
+          "name": "hero.mobileBackgroundImage",
+          "type": "image-upload",
+          "default": "",
+          "consumer": "Landing templates",
+          "status": "fully-working"
+        },
+        {
+          "section": "Promo Banner",
+          "name": "promoBanner.enabled",
+          "type": "toggle",
+          "default": true,
+          "consumer": "Landing templates",
+          "status": "fully-working"
+        },
+        {
+          "section": "Promo Banner",
+          "name": "promoBanner.text",
+          "type": "textarea",
+          "default": "Free shipping on orders over $100",
+          "consumer": "Landing templates",
+          "status": "fully-working"
+        },
+        {
+          "section": "Value Props",
+          "name": "valueProps.items",
+          "type": "repeater",
+          "maxItems": 6,
+          "itemFields": ["icon (select)", "title (text)", "description (text)"],
+          "consumer": "Landing templates",
+          "status": "fully-working"
+        },
+        {
+          "section": "Categories",
+          "name": "categories.enabled",
+          "type": "toggle",
+          "default": true,
+          "consumer": "Landing templates",
+          "status": "fully-working"
+        },
+        {
+          "section": "Featured Products",
+          "name": "featuredProducts.enabled",
+          "type": "toggle",
+          "default": true,
+          "consumer": "Landing templates",
+          "status": "fully-working"
+        },
+        {
+          "section": "Newsletter",
+          "name": "newsletter.enabled",
+          "type": "toggle",
+          "default": true,
+          "consumer": "Landing templates",
+          "status": "ui-only",
+          "notes": "Newsletter UI renders but no actual subscription backend exists"
+        },
+        {
+          "section": "Footer CTA",
+          "name": "footerCta.enabled",
+          "type": "toggle",
+          "default": true,
+          "consumer": "Landing templates",
+          "status": "fully-working"
+        },
+        {
+          "section": "Brand Statement",
+          "name": "brandStatement.enabled",
+          "type": "toggle",
+          "default": true,
+          "consumer": "Landing templates",
+          "status": "fully-working"
+        }
+      ]
+    },
+    {
+      "id": "category-cms",
+      "name": "Category Content CMS",
+      "route": "/dashboard/admin/category-content",
+      "purpose": "Per-category hero and description customization",
+      "tRPC": {
+        "query": "category.getContent",
+        "mutation": "category.updateContent"
+      },
+      "storage": "categoryContent table (JSONB content, keyed by merchantId + categoryId)",
+      "fields": [
+        {
+          "name": "title",
+          "type": "text-input",
+          "default": "Products",
+          "consumer": "Category page templates",
+          "status": "fully-working"
+        },
+        {
+          "name": "description.enabled",
+          "type": "toggle",
+          "default": false,
+          "consumer": "Category page templates",
+          "status": "fully-working"
+        },
+        {
+          "name": "description.text",
+          "type": "textarea",
+          "default": "",
+          "consumer": "Category page templates",
+          "status": "fully-working"
+        },
+        {
+          "name": "hero.enabled",
+          "type": "toggle",
+          "default": false,
+          "consumer": "Category page templates",
+          "status": "partially-wired",
+          "notes": "Hero image URL is text-only input. Image upload not yet implemented (admin says 'coming in future update')."
+        },
+        {
+          "name": "hero.imageUrl",
+          "type": "text-input",
+          "default": "",
+          "consumer": "Category page templates",
+          "status": "partially-wired",
+          "notes": "Must manually paste URL. No file upload."
+        }
+      ]
+    },
+    {
+      "id": "templates",
+      "name": "Template Switcher",
+      "route": "/dashboard/admin/templates",
+      "purpose": "Switch active template per page type",
+      "tRPC": "none (localStorage-based via TemplateContext)",
+      "storage": "localStorage key: template-selection",
+      "fields": [
+        {
+          "name": "Page type selector",
+          "type": "select",
+          "options": [
+            "landing",
+            "home",
+            "productPage",
+            "categoryPage",
+            "searchResults",
+            "sorting",
+            "cartPage",
+            "checkoutPage"
+          ],
+          "status": "fully-working"
+        },
+        {
+          "name": "Template selection per type",
+          "type": "card-grid",
+          "status": "fully-working",
+          "notes": "~30 templates across 8 page types. Preview + Select buttons per template."
+        }
+      ],
+      "concerns": [
+        "Template selection is localStorage-based — not persisted to DB. Different browsers/devices show different templates.",
+        "Two template systems coexist (V1 legacy + V2 new). Admin page exposes both in collapsible sections.",
+        "DB tables (template, templateAssignment, templateAnalytics) exist but are NOT used. Template switching is pure client-side."
+      ]
+    },
+    {
+      "id": "products",
+      "name": "Products Admin",
+      "route": "/dashboard/products",
+      "purpose": "Product CRUD management",
+      "tRPC": {
+        "query": [
+          "product.view",
+          "product.getById",
+          "product.stats",
+          "product.topSelling",
+          "product.revenue"
+        ],
+        "mutation": ["product.create", "product.edit", "product.delete"]
+      },
+      "storage": "product + productImage + productVariant + productCategory tables",
+      "fields": [
+        { "name": "name", "type": "text-input", "status": "fully-working" },
+        {
+          "name": "description",
+          "type": "textarea",
+          "status": "fully-working"
+        },
+        { "name": "price", "type": "number-input", "status": "fully-working" },
+        {
+          "name": "discountPrice",
+          "type": "number-input",
+          "status": "fully-working"
+        },
+        { "name": "stock", "type": "number-input", "status": "fully-working" },
+        {
+          "name": "images",
+          "type": "image-upload-multi",
+          "status": "fully-working"
+        },
+        {
+          "name": "categories",
+          "type": "multi-select",
+          "status": "fully-working"
+        },
+        {
+          "name": "variants",
+          "type": "repeater",
+          "status": "fully-working",
+          "notes": "Name + values array per variant"
+        }
+      ],
+      "concerns": [
+        "Product form still passes vendors prop (unused in single-shop)"
+      ]
+    },
+    {
+      "id": "categories",
+      "name": "Categories Admin",
+      "route": "/dashboard/categories",
+      "purpose": "Category CRUD management",
+      "tRPC": {
+        "query": ["category.view", "category.viewMain"],
+        "mutation": [
+          "category.create",
+          "category.edit",
+          "category.delete",
+          "category.createMain",
+          "category.renameMain",
+          "category.deleteMain"
+        ]
+      },
+      "storage": "category table",
+      "status": "fully-working"
+    },
+    {
+      "id": "orders",
+      "name": "Orders Admin",
+      "route": "/dashboard/orders",
+      "purpose": "Order viewing and status management",
+      "tRPC": {
+        "query": ["order.view", "order.stats"],
+        "mutation": ["order.updateStatus", "order.delete"]
+      },
+      "storage": "order + orderItem + orderLog tables",
+      "status": "fully-working",
+      "concerns": [
+        "orderItem.vendorId is notNull in DB but set to DEFAULT_STORE_ID. Schema remnant."
+      ]
+    },
+    {
+      "id": "promo-codes",
+      "name": "Promo Codes Admin",
+      "route": "/dashboard/promo-codes",
+      "purpose": "Promo code CRUD and validation",
+      "tRPC": {
+        "query": ["promoCode.list", "promoCode.getById"],
+        "mutation": [
+          "promoCode.create",
+          "promoCode.update",
+          "promoCode.delete",
+          "promoCode.validate"
+        ]
+      },
+      "storage": "promoCode + promoCodeProducts + promoCodeCategories tables",
+      "status": "fully-working"
+    },
+    {
+      "id": "pixels",
+      "name": "Pixels & Tracking",
+      "route": "/dashboard/admin/pixels",
+      "purpose": "Ad platform pixel configuration and event tracking",
+      "tRPC": {
+        "query": ["pixelTracking.config.list"],
+        "mutation": [
+          "pixelTracking.config.create",
+          "pixelTracking.config.update",
+          "pixelTracking.config.delete"
+        ]
+      },
+      "storage": "pixelConfig + trackingEvent + trackingEventDelivery + customTrackingEvent tables",
+      "subPages": [
+        "/pixels/events (Event Log)",
+        "/pixels/custom-events (Custom Events)"
+      ],
+      "status": "fully-working",
+      "notes": "Supports Meta, GA4, TikTok, Snapchat, Pinterest, Custom. Server-side delivery pipeline fully wired with 5 CAPI adapters (Meta, Google MP, TikTok, Snapchat, Pinterest). Delivery logged per-event per-platform to trackingEventDelivery table. Pixel readiness panel shows live platform health and commerce event badges."
+    },
+    {
+      "id": "analytics",
+      "name": "Analytics Dashboard",
+      "route": "/dashboard/admin/analytics",
+      "purpose": "Traffic, conversion, and attribution analytics",
+      "tRPC": {
+        "query": [
+          "analytics.overview",
+          "analytics.funnel",
+          "analytics.eventBreakdown",
+          "analytics.platformHealth",
+          "analytics.topTrackedProducts"
+        ]
+      },
+      "storage": "trackingEvent + trackingEventDelivery + pixelConfig + order tables (real DB queries)",
+      "status": "fully-working",
+      "notes": "Replaced hard-coded demo data with real backend queries. Overview shows orders/revenue/AOV/products with 7-day breakdown. Conversion funnel tracks 5 stages from tracking events. Event breakdown lists all event types with session counts. Platform health shows delivery success rates per pixel platform. Top tracked products shows most viewed and most carted (30 days). Best selling products by revenue also displayed."
+    },
+    {
+      "id": "settings",
+      "name": "Settings",
+      "route": "/dashboard/settings",
+      "purpose": "Store-wide configuration",
+      "tRPC": {
+        "query": ["settings.getShippingFee"],
+        "mutation": ["settings.updateShippingFee"]
+      },
+      "storage": "storeSettings table (single row)",
+      "fields": [
+        {
+          "name": "Shipping Fee",
+          "type": "number-input",
+          "default": 0,
+          "status": "fully-working"
+        }
+      ],
+      "concerns": [
+        "Only one setting (shipping fee). No store name, currency, tax, or other settings exposed in admin. These come from env vars only."
+      ]
+    },
+    {
+      "id": "dashboard-overview",
+      "name": "Dashboard Overview",
+      "route": "/dashboard",
+      "purpose": "Admin KPI summary",
+      "tRPC": "useAnalytics hook (product.stats, product.topSelling, product.revenue, order.stats)",
+      "status": "fully-working",
+      "notes": "Shows product stats, order breakdown, revenue, attention alerts. useAnalytics hook has dead vendor code."
+    }
+  ]
+}

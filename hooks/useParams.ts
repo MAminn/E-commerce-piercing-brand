@@ -1,0 +1,6 @@
+import { usePageContext } from "vike-react/usePageContext";
+
+export function useParams<T extends Record<string, string>>() {
+  const { routeParams } = usePageContext();
+  return routeParams as T;
+}

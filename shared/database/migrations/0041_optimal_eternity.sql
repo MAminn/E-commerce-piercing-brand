@@ -1,0 +1,1 @@
+ALTER TABLE "store_settings" ADD COLUMN "product_page_content" jsonb DEFAULT '{}'::jsonb;

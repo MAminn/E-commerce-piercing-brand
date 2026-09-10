@@ -1,0 +1,1 @@
+ALTER TABLE "coming_soon_subscribers" ADD COLUMN "phone" text;
