@@ -327,11 +327,11 @@ export const product = pgTable("product", {
   deleted: boolean("deleted").notNull().default(false),
   /** When true, product is hidden from the public shop */
   hidden: boolean("hidden").notNull().default(false),
-  /** Optional "inspired by" text supporting [color:#hex]text[/color] syntax */
+  /** Legacy (fragrance era): optional "inspired by" text supporting [color:#hex]text[/color] syntax. No longer authored or rendered by ZELI; kept so existing records read back unchanged. */
   inspiredBy: text("inspired_by"),
   /** Display order within a category (lower = shown first, null = default) */
   sortOrder: integer("sort_order"),
-  /** Fragrance details shown on the product page: character, longevity, when to wear, and top/middle/base notes */
+  /** Legacy (fragrance era): character, longevity, when to wear, and top/middle/base notes. No longer authored or rendered by ZELI; kept so existing records read back unchanged. */
   fragranceInfo: jsonb("fragrance_info").$type<{
     tagline?: string;
     taglineAr?: string;
@@ -356,7 +356,7 @@ export const product = pgTable("product", {
     ingredientsAr?: string;
     badges?: string[];
   }>(),
-  /** Admin-picked product IDs shown in the "Best Layered With" carousel on this product's page. Empty/unset falls back to the automatic category-based suggestions. */
+  /** Admin-picked product IDs shown in the "Style It With" carousel on this product's page. Empty/unset hides the section. Column name is the fragrance-era one, kept to avoid a migration. */
   bestLayeredWithIds: jsonb("best_layered_with_ids")
     .default([])
     .$type<string[]>(),

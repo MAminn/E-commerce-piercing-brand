@@ -237,11 +237,13 @@ export function ProductPageMinimal({
       .catch(() => {});
   }, [product?.variants]);
 
-  /* ── "Best Layered With" products ──
+  /* ── "Style It With" products ──
      Strictly the products the admin hand-picked for this product. When the
-     admin hasn't picked any, the accordion shows a "stay tuned" note instead
-     of falling back to automatic category suggestions. */
-  const mergedCategoryProducts: FeaturedProduct[] = product?.bestLayeredWith ?? [];
+     admin hasn't picked any, the section is hidden — no placeholder copy and
+     no automatic category suggestions standing in for a real pick.
+     `bestLayeredWith` is the legacy field name kept for schema compatibility;
+     the customer-facing label is "Style It With". */
+  const styleItWithProducts: FeaturedProduct[] = product?.bestLayeredWith ?? [];
 
   const toggleAddOn = useCallback((productId: string) => {
     setSelectedAddOns((prev) => {
@@ -338,7 +340,7 @@ export function ProductPageMinimal({
     // Also add selected add-on products from inline carousels
     if (selectedAddOns.size > 0) {
       const allCategoryProducts = [
-        ...mergedCategoryProducts,
+        ...styleItWithProducts,
         ...(categoryGroups?.flatMap((g) => g.products) ?? []),
       ];
       for (const addOnId of selectedAddOns) {
@@ -632,17 +634,6 @@ export function ProductPageMinimal({
               </p> */}
             </div>
 
-            {/* Inspired By — directly under price */}
-            {product.inspiredBy && (
-              <div>
-                <p className='text-[10px] text-zeli-ink-muted uppercase tracking-wide mb-0.5'>Inspired by</p>
-                <ColoredDescription
-                  text={product.inspiredBy}
-                  className='text-sm font-semibold text-zeli-ink italic'
-                />
-              </div>
-            )}
-
             {/* Stock status */}
             {product.available ? (
               <p className='text-sm text-zeli-success font-bold flex items-center gap-1'>
@@ -729,159 +720,31 @@ export function ProductPageMinimal({
               )}
             </div>
 
-            {/* ── Product info accordion: Scent Notes / About / Shipping / Returns / FAQs / Details / Best Layered With ── */}
-            <Accordion type='single' collapsible defaultValue='scent-notes' className='pt-2 border-t border-zeli-line'>
+            {/* ── Product info accordion: About / Shipping / Returns / FAQs / Details / Style It With ── */}
+            <Accordion type='single' collapsible defaultValue='about' className='pt-2 border-t border-zeli-line'>
               {(() => {
-                const info = product.fragranceInfo;
-                const tagline = isAr && info?.taglineAr ? info.taglineAr : info?.tagline;
-                const topNotes = toSimpleText(
-                  isAr && info?.topNotesAr ? info.topNotesAr : info?.topNotes,
-                );
-                const middleNotes = toSimpleText(
-                  isAr && info?.middleNotesAr ? info.middleNotesAr : info?.middleNotes,
-                );
-                const baseNotes = toSimpleText(
-                  isAr && info?.baseNotesAr ? info.baseNotesAr : info?.baseNotes,
-                );
-                const ingredients = isAr && info?.ingredientsAr ? info.ingredientsAr : info?.ingredients;
-                const badges = info?.badges ?? [];
-                const hasScentNotes =
-                  tagline || topNotes || middleNotes || baseNotes || ingredients || badges.length > 0;
-
-                const about = isAr && info?.aboutAr ? info.aboutAr : info?.about;
-                const scentIntensity =
-                  isAr && info?.scentIntensityAr ? info.scentIntensityAr : info?.scentIntensity;
-                const gender = isAr && info?.genderAr ? info.genderAr : info?.gender;
-                const hasAbout =
-                  about || product.description || info?.concentration || scentIntensity || gender;
+                // Legacy `fragranceInfo` may still exist on records carried
+                // over from the previous fragrance storefront. ZELI does not
+                // render any of it — the generic description is the source of
+                // truth for this section.
+                const hasAbout = Boolean(product.description);
 
                 return (
                   <>
-                    {hasScentNotes && (
-                      <AccordionItem value='scent-notes'>
-                        <AccordionTrigger className='text-base font-bold'>{isAr ? "نوتات العطر" : "Scent Notes"}</AccordionTrigger>
-                        <AccordionContent>
-                          <div className='bg-zeli-surface p-4 space-y-3'>
-                            {tagline && (
-                              <p className='text-sm text-zeli-ink font-medium'>
-                                <span className='font-bold'>
-                                  {isAr ? "هذا العطر: " : "This perfume is: "}
-                                </span>
-                                {tagline}
-                              </p>
-                            )}
-                            <div className='space-y-1'>
-                              {topNotes && (
-                                <p className='py-1 border-b border-zeli-line'>
-                                  <span className='text-sm font-bold text-zeli-ink'>
-                                    {isAr ? "المقدمة: " : "Top: "}
-                                  </span>
-                                  <span className='text-sm font-light text-zeli-ink-secondary'>{topNotes}</span>
-                                </p>
-                              )}
-                              {middleNotes && (
-                                <p className='py-1 border-b border-zeli-line'>
-                                  <span className='text-sm font-bold text-zeli-ink'>
-                                    {isAr ? "القلب: " : "Middle: "}
-                                  </span>
-                                  <span className='text-sm font-light text-zeli-ink-secondary'>{middleNotes}</span>
-                                </p>
-                              )}
-                              {baseNotes && (
-                                <p className='py-1'>
-                                  <span className='text-sm font-bold text-zeli-ink'>
-                                    {isAr ? "القاعدة: " : "Base: "}
-                                  </span>
-                                  <span className='text-sm font-light text-zeli-ink-secondary'>{baseNotes}</span>
-                                </p>
-                              )}
-                            </div>
-                            {ingredients && (
-                              <p className='text-xs text-zeli-ink-secondary font-medium leading-relaxed border-t border-zeli-line pt-3'>
-                                <span className='font-bold text-lg text-zeli-ink'>
-                                  {isAr ? "المكونات: " : "Ingredients: "}
-                                </span>
-                                <span className='text-sm text-zeli-ink-secondary font-light'>
-                                  {ingredients}
-                                </span>
-                              </p>
-                            )}
-                            {badges.length > 0 && (
-                              <div className='flex flex-wrap gap-2 pt-1'>
-                                {badges.map((badge) => (
-                                  <span
-                                    key={badge}
-                                    className='text-xs font-semibold px-2 py-1 rounded-full bg-zeli-surface-raised border border-zeli-line text-zeli-ink'>
-                                    {badge}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    )}
-
                     {hasAbout && (
                       <AccordionItem value='about'>
-                        <AccordionTrigger className='text-base font-bold'>{isAr ? "عن العطر" : "About"}</AccordionTrigger>
+                        <AccordionTrigger className='text-base font-bold'>{isAr ? "عن المنتج" : "About"}</AccordionTrigger>
                         <AccordionContent>
                           <div className='bg-zeli-surface p-4 space-y-3'>
-                            {(about || product.description) && (
+                            {product.description && (
                               <ColoredDescription
-                                text={about || product.description || ""}
+                                text={product.description}
                                 className='text-sm text-zeli-ink font-medium leading-relaxed whitespace-pre-line'
                               />
                             )}
                             {product.longDescription && (
                               <ExpandableText text={product.longDescription} />
                             )}
-                            <div className='space-y-1 pt-1'>
-                              {scentIntensity && (
-                                <div className='flex justify-between items-baseline py-1 border-b border-zeli-line'>
-                                  <span className='text-sm font-semibold text-black'>
-                                    {isAr ? "شدة العطر" : "Scent Intensity"}
-                                  </span>
-                                  <span className='text-xs  text-zeli-ink-secondary font-bold'>{scentIntensity}</span>
-                                </div>
-                              )}
-                              {info?.concentration && (
-                                <div className='flex justify-between items-baseline py-1 border-b border-zeli-line'>
-                                  <span className='text-sm font-semibold text-black'>
-                                    {isAr ? "التركيز" : "Concentration"}
-                                  </span>
-                                  <span className='text-xs text-zeli-ink-secondary font-bold'>{info.concentration}</span>
-                                </div>
-                              )}
-                              {gender && (
-                                <div className='flex justify-between items-baseline py-1'>
-                                  <span className='text-sm font-semibold text-black'>
-                                    {isAr ? "الفئة" : "Gender"}
-                                  </span>
-                                  <span className='text-xs  text-zeli-ink-secondary font-bold'>{gender}</span>
-                                </div>
-                              )}
-                              {info?.longevity && (
-                                <div className='flex justify-between items-baseline py-1 border-t border-zeli-line'>
-                                  <span className='text-sm font-semibold text-black'>
-                                    {isAr ? "الثبات" : "Longevity"}
-                                  </span>
-                                  <span className='text-xs text-zeli-ink-secondary font-bold'>
-                                    {isAr && info.longevityAr ? info.longevityAr : info.longevity}
-                                  </span>
-                                </div>
-                              )}
-                              {info?.whenToUse && (
-                                <div className='flex justify-between items-baseline py-1'>
-                                  <span className='text-sm font-semibold text-black'>
-                                    {isAr ? "يستخدم في" : "When to Use"}
-                                  </span>
-                                  <span className='text-xs text-right text-zeli-ink-secondary font-bold'>
-                                    {isAr && info.whenToUseAr ? info.whenToUseAr : info.whenToUse}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
                           </div>
                         </AccordionContent>
                       </AccordionItem>
@@ -953,16 +816,17 @@ export function ProductPageMinimal({
                       </AccordionItem>
                     )}
 
-                    {/* Renders only when there are real products to pair
-                        with. It used to render unconditionally and, with
-                        nothing to show, told the shopper to "Stay tuned for
-                        our recommended layering combination.." — an empty
-                        section promising future content, sitting inside the
-                        product information a buyer is reading to decide. */}
-                    {mergedCategoryProducts.length > 0 && (
-                      <AccordionItem value='pairs-with'>
+                    {/* Renders only when the admin has hand-picked real
+                        products to pair with. It used to render
+                        unconditionally and, with nothing to show, told the
+                        shopper to "Stay tuned for our recommended layering
+                        combination.." — an empty section promising future
+                        content, sitting inside the product information a
+                        buyer is reading to decide. */}
+                    {styleItWithProducts.length > 0 && (
+                      <AccordionItem value='style-it-with'>
                         <AccordionTrigger className='text-base font-bold'>
-                          {isAr ? "نسقيه مع" : "Pairs With"}
+                          {isAr ? "نسقيه مع" : "Style It With"}
                         </AccordionTrigger>
                         <AccordionContent>
                           <InlineCategoryCarousel
@@ -970,7 +834,7 @@ export function ProductPageMinimal({
                               carouselTitle ||
                               (isAr ? "منتجات أخرى" : "More Products")
                             }
-                            products={mergedCategoryProducts}
+                            products={styleItWithProducts}
                             currentProductId={product.id}
                             selectedIds={selectedAddOns}
                             onToggle={toggleAddOn}
@@ -1762,21 +1626,6 @@ function ExpandableText({ text }: { text: string }) {
 /* ═══════════════════════════════════════════════════════════════════
    Utility: Resolve image URL from a product
    ═══════════════════════════════════════════════════════════════════ */
-
-/**
- * Renders a fragrance note list as plain sentence-case text.
- * Notes are typically entered in ALL CAPS in the dashboard, which reads as
- * shouting next to the rest of the accordion — this normalises them so they
- * match the Ingredients line. Left untouched for non-Latin text (e.g. Arabic),
- * where casing doesn't apply.
- */
-function toSimpleText(value: string | undefined): string | undefined {
-  if (!value) return value;
-  const trimmed = value.trim();
-  if (!/[A-Za-z]/.test(trimmed)) return trimmed;
-  const lowered = trimmed.toLowerCase();
-  return lowered.charAt(0).toUpperCase() + lowered.slice(1);
-}
 
 function resolveImageUrl(product: FeaturedProduct): string {
   if (product.images && product.images.length > 0) {

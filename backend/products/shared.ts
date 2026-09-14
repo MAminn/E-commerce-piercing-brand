@@ -3,7 +3,12 @@ import type { createProductSchema } from "./create-product/service";
 import { Effect } from "effect";
 import { ServerError } from "#root/shared/error/server";
 
-/** Fragrance details shown on the product page (character, longevity, when to wear, notes) */
+/**
+ * Legacy fragrance payload from the previous perfume storefront. The ZELI
+ * product form no longer sends it, and no active template renders it — the
+ * create/edit contracts still accept it so older clients and existing records
+ * keep working. Omitting it on edit leaves the stored value untouched.
+ */
 export const fragranceInfoSchema = z
   .object({
     tagline: z.string().max(200).optional(),

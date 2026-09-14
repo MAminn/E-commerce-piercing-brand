@@ -107,7 +107,8 @@ export const getProductById = (input: z.infer<typeof getProductByIdSchema>) =>
           .from(productVariant)
           .where(eq(productVariant.productId, foundProduct.id));
 
-        // Fetch the admin-picked "Best Layered With" products, if any.
+        // Fetch the admin-picked "Style It With" products, if any.
+        // (`bestLayeredWith*` is the fragrance-era name, kept for the column.)
         // Falls back to [] when unset — the frontend uses its own
         // category-based suggestions in that case.
         const bestLayeredWithIds = (foundProduct.bestLayeredWithIds ??

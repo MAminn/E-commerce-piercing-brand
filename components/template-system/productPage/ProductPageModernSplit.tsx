@@ -61,6 +61,14 @@ export interface ProductSpecification {
 /**
  * Extended product type for product pages
  */
+
+/**
+ * Legacy fragrance payload from the previous perfume storefront. The ZELI
+ * admin no longer authors it and no active template renders it; the type is
+ * kept so records that still carry `fragrance_info` deserialize without
+ * error. Do not add new fields here — jewelry data belongs in the generic
+ * description/specifications.
+ */
 export interface ProductFragranceInfo {
   tagline?: string;
   taglineAr?: string;
@@ -99,7 +107,11 @@ export interface ProductPageProduct extends FeaturedProduct {
   features?: ProductFeature[];
   variants?: { name: string; values: { value: string; priceModifier?: number; enabledOverride?: boolean }[] }[];
   fragranceInfo?: ProductFragranceInfo | null;
-  /** Admin-picked products for the "Best Layered With" section; empty/absent falls back to automatic category suggestions. */
+  /**
+   * Admin-picked products for the "Style It With" section. Empty/absent hides
+   * the section. `bestLayeredWith` is the legacy field name, kept so the
+   * persisted `best_layered_with_ids` column needs no migration.
+   */
   bestLayeredWith?: FeaturedProduct[];
 }
 

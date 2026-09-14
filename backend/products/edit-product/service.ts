@@ -102,11 +102,23 @@ export const editProduct = (
                 ? data.discountPrice.toString()
                 : null,
               stock: data.stock,
-              inspiredBy: data.inspiredBy || null,
               sortOrder: data.sortOrder ?? 0,
               hidden: data.hidden ?? false,
-              fragranceInfo: data.fragranceInfo ?? null,
-              bestLayeredWithIds: data.bestLayeredWithIds ?? [],
+              // `inspiredBy` and `fragranceInfo` are legacy columns from the
+              // previous fragrance storefront. The ZELI product form no
+              // longer edits them, so an omitted field means "leave alone"
+              // rather than "clear" — otherwise every save of an old record
+              // would wipe data the admin can no longer see or restore. The
+              // API still accepts both for backward compatibility.
+              ...(data.inspiredBy !== undefined
+                ? { inspiredBy: data.inspiredBy || null }
+                : {}),
+              ...(data.fragranceInfo !== undefined
+                ? { fragranceInfo: data.fragranceInfo }
+                : {}),
+              ...(data.bestLayeredWithIds !== undefined
+                ? { bestLayeredWithIds: data.bestLayeredWithIds }
+                : {}),
               updatedAt: new Date(),
             })
             .where(eq(product.id, data.id))
