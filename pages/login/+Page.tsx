@@ -11,6 +11,7 @@ import { Link } from "#root/components/utils/Link";
 import { useLayoutSettings } from "#root/frontend/contexts/LayoutSettingsContext";
 import { MinimalLoginPage } from "#root/components/template-system/minimal/MinimalLoginPage";
 import { authClient } from "#root/lib/auth-client.js";
+import { STORE_NAME } from "#root/shared/config/branding";
 
 const formSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -97,7 +98,7 @@ export default function Page() {
 
         <div className='relative space-y-3'>
           <h1 className='text-[28px] md:text-[32px] text-center font-light tracking-[-0.02em] text-[#2B231D] leading-tight'>
-            Enter Percé
+            Enter {STORE_NAME}
           </h1>
           <p className='text-center text-[13px] text-[#8B7E74] tracking-wide leading-relaxed'>
             Access your private atelier
@@ -188,7 +189,7 @@ export default function Page() {
           <div className='flex items-center justify-center gap-2 mt-4'>
             <div className='h-[1px] flex-1 bg-gradient-to-r from-transparent via-[#D9D3CC] to-transparent opacity-40' />
             <p className='text-center text-[12px] text-[#9C918A] tracking-[0.04em] px-4'>
-              New to Percé?
+              New to {STORE_NAME}?
             </p>
             <div className='h-[1px] flex-1 bg-gradient-to-r from-transparent via-[#D9D3CC] to-transparent opacity-40' />
           </div>

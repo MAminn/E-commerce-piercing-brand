@@ -89,6 +89,7 @@ export const requestPasswordReset = (
               resetUrl,
             })
           : PasswordResetTemplate({
+              storeName: branding.storeName,
               userName: existingUser.name,
               resetUrl,
             }),

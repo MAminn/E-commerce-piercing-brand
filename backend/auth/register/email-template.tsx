@@ -14,22 +14,25 @@ import {
 import * as React from "react";
 
 export const EmailVerificationTemplate = ({
+  storeName,
   userName,
   verificationUrl,
 }: {
+  /** Resolved by backend/emails/branding.ts — never hardcode a brand here. */
+  storeName: string;
   userName: string;
   verificationUrl: string;
 }) => {
   return (
     <Html>
       <Head>
-        <title>Lebsy Account Verification</title>
-        <Preview>Verify your email for Lebsy</Preview>
+        <title>{storeName} Account Verification</title>
+        <Preview>Verify your email for {storeName}</Preview>
       </Head>
       <Body style={main}>
         <Container style={container}>
           <Heading as="h1" style={logo}>
-            Lebsy
+            {storeName}
           </Heading>
 
           <Section style={section}>
@@ -58,9 +61,11 @@ export const EmailVerificationTemplate = ({
 
           <Section style={footer}>
             <Text style={footerText}>
-              If you didn't sign up for Lebsy, please ignore this email.
+              If you didn't sign up for {storeName}, please ignore this email.
             </Text>
-            <Text style={footerText}>© {new Date().getFullYear()} Lebsy</Text>
+            <Text style={footerText}>
+              © {new Date().getFullYear()} {storeName}
+            </Text>
           </Section>
         </Container>
       </Body>

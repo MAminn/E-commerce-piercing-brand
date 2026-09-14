@@ -53,20 +53,14 @@ async function updateFullHomepage(merchantId: string) {
     valueProps: {
       enabled: true,
       items: [
+        // Shipping / returns / guarantee value props removed: this script
+        // writes example homepage content, and those were concrete policy
+        // promises ("Free Shipping on orders over EGP 50", "30-day
+        // money-back guarantee") for policies ZELI has not set.
         {
-          icon: ValuePropIconType.SHIPPING,
-          title: "Free Shipping",
-          description: "On orders over EGP 50",
-        },
-        {
-          icon: ValuePropIconType.RETURNS,
-          title: "Easy Returns",
-          description: "30-day money-back guarantee",
-        },
-        {
-          icon: ValuePropIconType.SUPPORT,
-          title: "24/7 Support",
-          description: "We're here to help anytime",
+          icon: ValuePropIconType.SECURITY,
+          title: "Secure Checkout",
+          description: "Payments processed by our payment provider",
         },
       ],
     },

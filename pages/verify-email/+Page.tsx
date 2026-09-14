@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { authClient } from "#root/lib/auth-client";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { useSearchParams } from "#root/hooks/useSearchParams";
+import { STORE_NAME } from "#root/shared/config/branding";
 
 export default function Page() {
   const [verificationStatus, setVerificationStatus] = useState<
@@ -60,7 +61,7 @@ export default function Page() {
               <h1 className='text-2xl font-bold text-center'>
                 Verifying Your Email
               </h1>
-              <p className='text-gray-500 text-center mt-2'>
+              <p className='text-zeli-ink-muted text-center mt-2'>
                 Please wait while we verify your email address...
               </p>
             </div>
@@ -72,9 +73,9 @@ export default function Page() {
               <h1 className='text-2xl font-bold text-center text-[#1B4571]'>
                 Email Verified Successfully!
               </h1>
-              <p className='text-gray-500 text-center mt-2 mb-6'>
+              <p className='text-zeli-ink-muted text-center mt-2 mb-6'>
                 Your email has been verified. You can now log in to your account
-                and access all features of Percé.
+                and access all features of {STORE_NAME}.
               </p>
               <Button className='w-full bg-[#1B4571] hover:bg-[#1B4571]/90'>
                 <a href='/login'>Continue to Login</a>
@@ -88,7 +89,7 @@ export default function Page() {
               <h1 className='text-2xl font-bold text-center text-red-600'>
                 Verification Failed
               </h1>
-              <p className='text-gray-500 text-center mt-2 mb-6'>
+              <p className='text-zeli-ink-muted text-center mt-2 mb-6'>
                 {errorMessage ||
                   "We couldn't verify your email. The verification link may be invalid or expired."}
               </p>

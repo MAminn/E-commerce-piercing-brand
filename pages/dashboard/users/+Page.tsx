@@ -135,8 +135,40 @@ export default function UsersPage() {
     finally { setIsSubmitting(false); }
   };
 
+  /**
+   * Generates a random temporary password.
+   *
+   * This action used to set every reset account to the literal string
+   * "password12345" and announce it in a toast. Any admin (and anyone who had
+   * ever seen one such toast, or read this file) knew the password of every
+   * account that had been reset, and the value never expired. It is replaced
+   * with a per-reset random value from the Web Crypto API — no new auth
+   * mechanism, the same existing `adminSetPassword` mutation, which still
+   * enforces its own 8-character minimum server-side.
+   */
+  const generateTempPassword = () => {
+    const alphabet =
+      "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+    const bytes = new Uint32Array(16);
+    crypto.getRandomValues(bytes);
+    return Array.from(
+      bytes,
+      (n) => alphabet[n % alphabet.length] as string,
+    ).join("");
+  };
+
   const handleResetPassword = async (u: UserRow) => {
-    try { await trpc.users.adminSetPassword.mutate({ id: u.id, newPassword: "password12345" }); toast.success(`Password reset to "password12345" for ${u.name}`); }
+    const tempPassword = generateTempPassword();
+    try {
+      await trpc.users.adminSetPassword.mutate({ id: u.id, newPassword: tempPassword });
+      // Shown once, and only here — it is never logged or persisted anywhere
+      // this UI can read back, so the admin must hand it over now.
+      toast.success(`Temporary password set for ${u.name}`, {
+        description: `${tempPassword} — copy it now, it will not be shown again. Ask them to change it after signing in.`,
+        duration: Number.POSITIVE_INFINITY,
+        closeButton: true,
+      });
+    }
     catch (err) { toast.error(err instanceof Error ? err.message : "Failed to reset password"); }
   };
 
@@ -238,7 +270,7 @@ export default function UsersPage() {
                             <Button variant="ghost" size="sm" title="Set Password" onClick={() => { setPasswordUser(u); passwordForm.reset(); }}>
                               <KeyRound className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="sm" title='Reset password to "password12345"' onClick={() => handleResetPassword(u)}>
+                            <Button variant="ghost" size="sm" title="Set a random temporary password" onClick={() => handleResetPassword(u)}>
                               <RotateCcw className="h-4 w-4" />
                             </Button>
                             <Button

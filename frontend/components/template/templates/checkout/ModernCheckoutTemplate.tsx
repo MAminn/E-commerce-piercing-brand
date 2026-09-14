@@ -878,23 +878,12 @@ function ModernOrderSummary({
           </div>
         </div>
 
-        {/* Trust Indicators */}
-        <div className='bg-gray-50 border border-gray-200 rounded-none p-4'>
-          <div className='flex items-center justify-center gap-4 text-sm text-gray-600'>
-            <div className='flex items-center gap-1'>
-              <Shield className='h-4 w-4 text-gray-900' />
-              <span className='font-light'>Secure</span>
-            </div>
-            <div className='flex items-center gap-1'>
-              <Star className='h-4 w-4 text-gray-900' />
-              <span className='font-light'>Trusted</span>
-            </div>
-            <div className='flex items-center gap-1'>
-              <Truck className='h-4 w-4 text-gray-900' />
-              <span className='font-light'>Fast Delivery</span>
-            </div>
-          </div>
-        </div>
+        {/* Trust indicators removed: "Secure", "Trusted" and "Fast Delivery"
+            asserted a payment guarantee, a reputation and a delivery time that
+            ZELI has not established. Legacy V1 template — reachable only from
+            the admin Templates screen and the admin-guarded /template-preview,
+            never from a customer route — but it must not carry the claims
+            either. */}
       </div>
     </div>
   );

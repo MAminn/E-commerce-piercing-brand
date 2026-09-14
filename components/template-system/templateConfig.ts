@@ -21,8 +21,8 @@ import { ProductPageTechnical } from "./productPage/ProductPageTechnical";
 import type { ProductPageTechnicalProps } from "./productPage/ProductPageTechnical";
 import { ProductPageMinimal } from "./productPage/ProductPageMinimal";
 import type { ProductPageMinimalProps } from "./productPage/ProductPageMinimal";
-import { ProductPagePerce } from "./productPage/ProductPagePerce";
-import type { ProductPagePerceProps } from "./productPage/ProductPagePerce";
+import { ProductPagePremium } from "./productPage/ProductPagePremium";
+import type { ProductPagePremiumProps } from "./productPage/ProductPagePremium";
 import { CategoryPageGridWithFilters } from "./categoryPage/CategoryPageGridWithFilters";
 import type { CategoryPageGridWithFiltersProps } from "./categoryPage/CategoryPageGridWithFilters";
 import { CategoryGridClassic } from "./categoryPage/CategoryGridClassic";
@@ -77,7 +77,7 @@ import {
   ProductPageTechnicalPreview,
   ProductPageMinimalPreview,
   ProductPageModernSplitPreview,
-  ProductPagePercePreview,
+  ProductPagePremiumPreview,
 } from "./previews/ProductPagePreviews";
 import {
   CategoryGridClassicPreview,
@@ -228,10 +228,16 @@ export const templateConfig: TemplateConfig = {
 
   productPage: [
     {
+      // NOTE: the `product-perce` id is PERSISTED in
+      // store_settings.template_selection and is the default fallback in
+      // pages/featured/products/@productId/+Page.tsx. Renaming it would
+      // silently unselect the template on any store that already chose it,
+      // so the id stays until a data migration is scheduled — see
+      // docs/CURRENT_PROJECT.md. Nothing customer-facing reads it.
       id: "product-perce",
-      label: "Percé (Premium — Default)",
-      component: ProductPagePerce as React.FC<ProductPagePerceProps>,
-      previewComponent: ProductPagePercePreview,
+      label: "Premium (Default)",
+      component: ProductPagePremium as React.FC<ProductPagePremiumProps>,
+      previewComponent: ProductPagePremiumPreview,
     },
     {
       id: "product-classic",

@@ -282,7 +282,7 @@ export const product = pgTable("product", {
     .primaryKey()
     .$defaultFn(() => v7()),
   name: text("name").notNull(),
-  /** URL slug, e.g. /shop/synt-aura — nullable so existing rows can be
+  /** URL slug, e.g. /shop/titanium-labret — nullable so existing rows can be
    * backfilled without blocking the migration; a unique index still allows
    * multiple NULLs under Postgres semantics. */
   slug: text("slug"),

@@ -110,36 +110,12 @@ const ModernBrandsTemplate: React.FC<ModernBrandsTemplateProps> = ({
               Each item represents quality, authenticity, and thoughtful design.
             </p>
 
-            {/* Trust indicators */}
-            <div className='grid grid-cols-1 md:grid-cols-3 gap-8 max-w-2xl mx-auto'>
-              <div className='text-center'>
-                <div className='w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-3'>
-                  <Award className='w-6 h-6 text-gray-600' />
-                </div>
-                <div className='text-2xl font-light text-gray-900 mb-1'>
-                  500+
-                </div>
-                <div className='text-sm text-gray-600'>Quality Products</div>
-              </div>
-              <div className='text-center'>
-                <div className='w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-3'>
-                  <Users className='w-6 h-6 text-gray-600' />
-                </div>
-                <div className='text-2xl font-light text-gray-900 mb-1'>
-                  50K+
-                </div>
-                <div className='text-sm text-gray-600'>Happy Customers</div>
-              </div>
-              <div className='text-center'>
-                <div className='w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-3'>
-                  <TrendingUp className='w-6 h-6 text-gray-600' />
-                </div>
-                <div className='text-2xl font-light text-gray-900 mb-1'>
-                  99%
-                </div>
-                <div className='text-sm text-gray-600'>Satisfaction</div>
-              </div>
-            </div>
+            {/* Trust indicators removed: "500+ Quality Products",
+                "50K+ Happy Customers" and "99% Satisfaction" were three
+                invented figures. The catalogue is empty, the store has taken
+                no orders and there are no reviews. Legacy V1 template —
+                reachable only from the admin Templates screen and the
+                admin-guarded /template-preview. */}
           </div>
         </div>
       </section>

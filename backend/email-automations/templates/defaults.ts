@@ -107,9 +107,14 @@ export const DEFAULT_EMAIL_TEMPLATES: DefaultEmailTemplate[] = [
     content: {
       headlineEn: "Still thinking it over?",
       headlineAr: "ما زلت تفكر؟",
+      // Previously promised "long-lasting, premium ingredients" (fragrance
+      // copy from a previous brand) and "free shipping on every order" — a
+      // policy this store has not set. This email is sent to real customers
+      // once abandoned-cart automation is switched on, so it states only what
+      // is true: their cart is still there.
       bodyEn:
-        "Long-lasting, premium ingredients, and free shipping on every order. Your cart is still waiting for you whenever you're ready.",
-      bodyAr: "مكونات فاخرة، ثبات طويل، وشحن مجاني على كل طلب. سلتك ما زالت بانتظارك متى ما كنت جاهزاً.",
+        "Your cart is still waiting for you whenever you're ready.",
+      bodyAr: "سلتك ما زالت بانتظارك متى ما كنت جاهزاً.",
       ctaLabelEn: "Return to Cart",
       ctaLabelAr: "العودة إلى السلة",
       ctaHref: "/cart",

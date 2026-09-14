@@ -6,13 +6,13 @@ import { Button } from "#root/components/ui/button";
 import { trpc } from "#root/shared/trpc/client";
 import { toast } from "sonner";
 import { useLayoutSettings } from "#root/frontend/contexts/LayoutSettingsContext";
-import soonImage from "#root/assets/soon-website-v2.jpg.jpeg";
+import { STORE_NAME } from "#root/shared/config/branding";
 
 const emailSchema = z.string().email();
 
 export function MinimalComingSoonPage() {
   const layoutSettings = useLayoutSettings();
-  const storeName = layoutSettings.siteTitle || "Our Store";
+  const storeName = layoutSettings.siteTitle || STORE_NAME;
 
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -59,18 +59,18 @@ export function MinimalComingSoonPage() {
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-16 text-center">
-        {/* <p className="text-xs tracking-[0.25em] uppercase text-stone-400 mb-4">Coming Soon</p>
-        <h1 className="text-4xl sm:text-5xl md:text-6xl font-light tracking-tight text-stone-900 mb-10">
-          {storeName}
-        </h1> */}
-
-        {/* Hero image */}
+        {/* The previous hero was a baked-in JPEG carrying another brand's
+            wordmark and a "15% discount" promise. Rendered as type from
+            central brand config instead, so it follows the store name and
+            promises nothing that isn't decided yet. Swap in real launch
+            artwork during the storefront design phase. */}
         <div className="w-full max-w-[460px]">
-          <img
-            src={soonImage}
-            alt={storeName}
-            className="w-full object-cover"
-          />
+          <p className="text-xs tracking-[0.25em] uppercase text-stone-400 mb-4">
+            Coming Soon
+          </p>
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-light tracking-tight text-stone-900 mb-6">
+            {storeName}
+          </h1>
           <p className="text-xs text-stone-600 mb-7">Drop your email — be the first to know when we launch.</p>
         </div>
 

@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { usePageContext } from "vike-react/usePageContext";
 import { trpc } from "#root/shared/trpc/client";
 import { getTemplateComponent } from "#root/components/template-system/templateConfig";
+import { resolveTemplateId } from "#root/shared/config/storefront";
 import { useTemplate } from "#root/frontend/contexts/TemplateContext";
-import { useLayoutSettings } from "#root/frontend/contexts/LayoutSettingsContext";
 import { useCart } from "#root/lib/context/CartContext";
 import { useTracking } from "#root/frontend/contexts/TrackingContext";
 import { TrackingEventName } from "#root/shared/types/pixel-tracking";
@@ -25,7 +25,6 @@ export default function ProductDetailPage() {
   const pageContext = usePageContext();
   const productId = pageContext.routeParams?.productId as string;
   const { getTemplateId } = useTemplate();
-  const layoutSettings = useLayoutSettings();
   const { addItem, items } = useCart();
   const { trackEvent } = useTracking();
   const hasTrackedView = useRef<string | null>(null);
@@ -230,10 +229,15 @@ export default function ProductDetailPage() {
     fetchProductData();
   }, [fetchProductData]);
 
-  const isMinimal = layoutSettings.header.navbarStyle === "minimal";
-  const activeTemplateId = isMinimal
-    ? "product-minimal"
-    : (getTemplateId("productPage") ?? "product-perce");
+  // The DB selection wins, and the ZELI preset (product-minimal) is what an
+  // unconfigured store gets. This used to hard-override to "product-minimal"
+  // whenever the shell was minimal, which silently ignored the admin's own
+  // choice in Dashboard > Templates > Product Page — the picker saved a value
+  // that the storefront then refused to render.
+  const activeTemplateId = resolveTemplateId(
+    "productPage",
+    getTemplateId("productPage"),
+  );
   const TemplateEntry = getTemplateComponent("productPage", activeTemplateId);
 
   if (!TemplateEntry) {

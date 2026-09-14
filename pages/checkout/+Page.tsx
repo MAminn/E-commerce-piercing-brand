@@ -8,6 +8,7 @@ import {
 } from "#root/lib/context/CartContext";
 import { useTemplate } from "#root/frontend/contexts/TemplateContext";
 import { getTemplateComponent } from "#root/components/template-system/templateConfig";
+import { resolveTemplateId } from "#root/shared/config/storefront";
 import { trpc } from "#root/shared/trpc/client";
 import type {
   CheckoutPageModernTemplateProps,
@@ -350,7 +351,7 @@ export default function CheckoutPage() {
   const templateId = getTemplateId("checkoutPage");
   const Template = getTemplateComponent(
     "checkoutPage",
-    templateId || "checkout-modern",
+    resolveTemplateId("checkoutPage", templateId),
   );
 
   if (!Template) {

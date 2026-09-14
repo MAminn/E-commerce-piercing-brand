@@ -144,6 +144,7 @@ export const register = ({
                 verificationUrl,
               })
             : EmailVerificationTemplate({
+                storeName: branding.storeName,
                 userName: newUser.name,
                 verificationUrl,
               })

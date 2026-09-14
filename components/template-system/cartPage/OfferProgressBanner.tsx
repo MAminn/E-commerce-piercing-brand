@@ -148,20 +148,20 @@ export function OfferProgressBanner({
   return (
     <div className="mb-6 space-y-2">
       {latestApplied && (
-        <div className="flex items-center gap-3 border border-emerald-200 bg-emerald-50 px-4 py-3">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+        <div className="flex items-center gap-3 border border-zeli-line-strong bg-zeli-surface px-4 py-3">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zeli-surface">
+            <CheckCircle2 className="h-4 w-4 text-zeli-success" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-semibold leading-snug text-emerald-800">
+            <p className="text-[13px] font-semibold leading-snug text-zeli-ink">
               🎉 <span className="font-bold">{latestApplied.name}</span> unlocked!
             </p>
-            <p className="mt-0.5 text-[12px] text-emerald-700">
+            <p className="mt-0.5 text-[12px] text-zeli-success">
               <strong>{latestRewardLabel}</strong>
               {latestSavingsLabel ? ` — ${latestSavingsLabel}` : ""}
             </p>
           </div>
-          <span className="hidden shrink-0 rounded bg-emerald-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white sm:inline">
+          <span className="hidden shrink-0 rounded bg-zeli-success px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zeli-ink-inverse sm:inline">
             Active
           </span>
         </div>
@@ -175,27 +175,27 @@ export function OfferProgressBanner({
               ? Zap
               : Tag;
         return (
-          <div className="border border-amber-200 bg-amber-50 px-4 py-3.5">
+          <div className="border border-zeli-line-strong bg-zeli-blush-soft px-4 py-3.5">
             <div className="flex items-start gap-3">
-              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-100">
-                <IconComponent className="h-3.5 w-3.5 text-amber-600" />
+              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zeli-blush">
+                <IconComponent className="h-3.5 w-3.5 text-zeli-ink-secondary" />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-medium leading-snug text-amber-900">
+                <p className="text-[13px] font-medium leading-snug text-zeli-ink">
                   {closestPending.message}{" "}
-                  <span className="text-amber-700">
+                  <span className="text-zeli-ink-secondary">
                     — get <strong>{closestPending.rewardLabel}</strong>!
                   </span>
                 </p>
-                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-amber-200">
+                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-zeli-blush">
                   <div
-                    className="h-full rounded-full bg-amber-500 transition-all duration-500"
+                    className="h-full rounded-full bg-zeli-accent transition-all duration-500"
                     style={{
                       width: `${Math.round(closestPending.progress * 100)}%`,
                     }}
                   />
                 </div>
-                <p className="mt-1 text-[11px] text-amber-600">
+                <p className="mt-1 text-[11px] text-zeli-ink-secondary">
                   {Math.round(closestPending.progress * 100)}% of the way there
                 </p>
               </div>

@@ -8,7 +8,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "#root/components/ui/select";
-import { ProductCard } from "#root/components/shop/ProductCard";
+import {
+  MinimalProductCard,
+  type MinimalProduct,
+} from "#root/components/template-system/minimal/MinimalProductCard";
 import {
   Search,
   ChevronLeft,
@@ -22,6 +25,7 @@ import {
  */
 export interface SearchResultProduct {
   id: string;
+  slug?: string | null;
   name: string;
   price: number;
   discountPrice?: number | null;
@@ -68,7 +72,7 @@ export function SearchResultsMinimal({
   isLoading = false,
   searchTerm = "",
   onSearchChange,
-  sortBy = "relevance",
+  sortBy = "newest",
   onSortChange,
   currentPage = 1,
   totalPages = 1,
@@ -100,59 +104,71 @@ export function SearchResultsMinimal({
 
   return (
     <div
-      className={`search-results-minimal bg-white min-h-screen ${className}`}>
-      <div className='container mx-auto max-w-7xl'>
-        {/* Minimal Header */}
-        <div className='py-12 md:py-16 border-b'>
-          <div className='px-4'>
-            {/* Search Title */}
-            <div className='text-center mb-8'>
-              <h1 className='text-5xl lg:text-7xl font-light text-stone-900 leading-[1.05] tracking-tight mb-4'>
-                Search Results
-              </h1>
-              {searchQuery && (
-                <p className='text-base lg:text-lg text-stone-600 font-light leading-relaxed'>
-                  {resultCount} {resultCount === 1 ? "item" : "items"} found for{" "}
-                  <span className='italic'>"{searchQuery}"</span>
-                </p>
-              )}
-            </div>
+      className={`search-results-minimal min-h-screen bg-zeli-bg ${className}`}>
+      <div className='zeli-container'>
+        {/* Header. The title used to be set at text-7xl — a display size that
+            overflowed at 375px and shouted louder than any product on the
+            page. It is a search result header, not the brand statement. */}
+        <div className='border-b border-zeli-line py-10 md:py-14'>
+          <div className='text-center'>
+            <h1 className='zeli-section-title'>Search results</h1>
+            {searchQuery && (
+              <p
+                aria-live='polite'
+                className='mt-2 text-[length:var(--zeli-text-body)] text-zeli-ink-muted'>
+                {resultCount} {resultCount === 1 ? "result" : "results"} for{" "}
+                <span className='text-zeli-ink'>"{searchQuery}"</span>
+              </p>
+            )}
+          </div>
 
-            {/* Search Bar */}
-            <div className='max-w-2xl mx-auto relative'>
-              <Search className='absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400' />
-              <Input
-                type='text'
-                placeholder='Refine your search...'
-                value={localSearchTerm}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                onKeyPress={handleKeyPress}
-                className='pl-12 pr-4 h-12 text-base border-gray-200 focus:border-gray-900 rounded-none'
-              />
-            </div>
+          {/* Search Bar */}
+          <div className='relative mx-auto mt-8 max-w-xl'>
+            <label htmlFor='search-results-refine' className='sr-only'>
+              Refine your search
+            </label>
+            <Search
+              aria-hidden
+              className='pointer-events-none absolute start-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zeli-ink-subtle'
+            />
+            <Input
+              id='search-results-refine'
+              type='search'
+              placeholder='Refine your search…'
+              value={localSearchTerm}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              onKeyDown={handleKeyPress}
+              className='h-12 rounded-none border-zeli-line-strong bg-zeli-surface-raised pe-4 ps-12 text-[length:var(--zeli-text-body)] focus:border-zeli-ink'
+            />
           </div>
         </div>
 
         {/* Toolbar */}
-        <div className='px-4 py-6 border-b'>
-          <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
-            <div className='text-sm text-gray-500 font-light'>
+        <div className='border-b border-zeli-line py-5'>
+          <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4'>
+            <div className='zeli-eyebrow'>
               Viewing {Math.min(products.length, resultCount)} of {resultCount}
             </div>
 
-            <div className='flex items-center gap-3'>
-              <ArrowUpDown className='h-4 w-4 text-gray-400' />
+            <div className='flex min-w-0 items-center gap-3'>
+              <ArrowUpDown aria-hidden className='h-4 w-4 shrink-0 text-zeli-ink-subtle' />
+              {/* Only the three orderings the products.search API accepts.
+                  "Most Relevant", "Name: A to Z" and "Name: Z to A" were also
+                  offered here; product.search validates sortBy against
+                  z.enum(["newest","price-asc","price-desc"]), so picking one
+                  of those three sent a request the server rejected and the
+                  shopper was left looking at the previous results with no
+                  error. */}
               <Select value={sortBy} onValueChange={handleSortChange}>
-                <SelectTrigger className='w-48 border-gray-200 rounded-none font-light'>
+                <SelectTrigger
+                  aria-label='Sort results'
+                  className='min-h-11 w-48 rounded-none border-zeli-line-strong bg-zeli-surface-raised'>
                   <SelectValue placeholder='Sort by' />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value='relevance'>Most Relevant</SelectItem>
-                  <SelectItem value='newest'>Newest First</SelectItem>
+                  <SelectItem value='newest'>New Arrivals</SelectItem>
                   <SelectItem value='price-asc'>Price: Low to High</SelectItem>
                   <SelectItem value='price-desc'>Price: High to Low</SelectItem>
-                  <SelectItem value='name-asc'>Name: A to Z</SelectItem>
-                  <SelectItem value='name-desc'>Name: Z to A</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -160,64 +176,77 @@ export function SearchResultsMinimal({
         </div>
 
         {/* Products */}
-        <div className='px-4 py-12'>
+        <div className='py-10 sm:py-12'>
           {isLoading ? (
-            <div className='flex items-center justify-center py-32'>
+            <div className='flex items-center justify-center py-24'>
               <div className='text-center'>
-                <Loader2 className='h-10 w-10 animate-spin text-gray-400 mx-auto mb-4' />
-                <p className='text-gray-500 font-light'>Searching...</p>
+                <Loader2
+                  aria-hidden
+                  className='mx-auto mb-4 h-8 w-8 animate-spin text-zeli-ink-subtle'
+                />
+                <p role='status' className='text-[length:var(--zeli-text-body)] text-zeli-ink-muted'>
+                  Searching…
+                </p>
               </div>
             </div>
           ) : products.length === 0 ? (
-            <div className='text-center py-32'>
-              <Search className='h-20 w-20 text-gray-200 mx-auto mb-6' />
-              <h3 className='text-2xl font-light text-gray-900 mb-3'>
-                No Results
-              </h3>
-              <p className='text-gray-500 mb-8 font-light max-w-md mx-auto'>
+            <div className='py-24 text-center'>
+              <Search aria-hidden className='mx-auto mb-6 h-12 w-12 text-zeli-ink-subtle' />
+              <h2 className='zeli-section-title'>No results</h2>
+              <p className='mx-auto mt-2 max-w-md text-[length:var(--zeli-text-body)] text-zeli-ink-muted'>
                 {searchQuery
-                  ? `We couldn't find anything matching "${searchQuery}". Try a different search term.`
-                  : "Try searching for products using the search bar above."}
+                  ? `Nothing matches "${searchQuery}".`
+                  : "Enter a search term above to look through the store."}
               </p>
-              <Button
-                variant='outline'
-                onClick={() => {
-                  setLocalSearchTerm("");
-                  if (onSearchChange) onSearchChange("");
-                }}
-                className='rounded-none border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white'>
-                Clear Search
-              </Button>
+              {searchQuery && (
+                <Button
+                  variant='outline'
+                  onClick={() => {
+                    setLocalSearchTerm("");
+                    if (onSearchChange) onSearchChange("");
+                  }}
+                  className='mt-6 min-h-11 rounded-none border-zeli-ink text-zeli-ink hover:bg-zeli-accent hover:text-zeli-ink-inverse'>
+                  Clear search
+                </Button>
+              )}
             </div>
           ) : (
             <>
               {/* Product Grid */}
-              <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 mb-16'>
+              {/* Same card as /shop, /categories and the homepage carousels.
+                  This used to render components/shop/ProductCard, so a
+                  product looked one way in search results and another way
+                  everywhere else in the same store. */}
+              <div className='mb-16 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 sm:gap-x-6 lg:grid-cols-4'>
                 {products.map((product) => (
-                  <ProductCard
+                  <MinimalProductCard
                     key={product.id}
-                    product={{
-                      id: product.id,
-                      name: product.name,
-                      price: product.price,
-                      discountPrice: product.discountPrice ?? undefined,
-                      imageUrl: product.imageUrl,
-                      categoryName: product.categoryName,
-                      available: product.available,
-                    }}
+                    product={
+                      {
+                        id: product.id,
+                        slug: product.slug ?? null,
+                        name: product.name,
+                        price: product.price,
+                        discountPrice: product.discountPrice ?? null,
+                        stock: product.stock ?? 0,
+                        imageUrl: product.imageUrl,
+                        categoryName: product.categoryName,
+                        available: product.available,
+                      } satisfies MinimalProduct
+                    }
                   />
                 ))}
               </div>
 
               {/* Minimal Pagination */}
               {totalPages > 1 && (
-                <div className='border-t pt-12'>
-                  <div className='flex items-center justify-center gap-6'>
+                <nav aria-label='Pagination' className='border-t border-zeli-line pt-12'>
+                  <div className='flex items-center justify-center gap-4 sm:gap-6'>
                     <Button
                       variant='ghost'
                       disabled={currentPage === 1}
                       onClick={() => onPageChange?.(currentPage - 1)}
-                      className='rounded-none text-sm font-light disabled:opacity-30'>
+                      className='min-h-11 rounded-none text-zeli-ink-secondary hover:text-zeli-ink disabled:opacity-30'>
                       <ChevronLeft className='h-4 w-4 mr-1' />
                       Previous
                     </Button>
@@ -235,16 +264,19 @@ export function SearchResultsMinimal({
                         .map((page, idx, arr) => (
                           <React.Fragment key={page}>
                             {idx > 0 && arr[idx - 1] !== page - 1 && (
-                              <span className='px-1 text-gray-300'>•••</span>
+                              <span aria-hidden className='px-1 text-zeli-ink-subtle'>
+                                •••
+                              </span>
                             )}
                             <Button
                               variant='ghost'
                               size='sm'
+                              aria-current={currentPage === page ? "page" : undefined}
                               onClick={() => onPageChange?.(page)}
-                              className={`min-w-[40px] rounded-none font-light ${
+                              className={`h-11 min-w-11 rounded-none ${
                                 currentPage === page
-                                  ? "bg-gray-900 text-white hover:bg-gray-800 hover:text-white"
-                                  : "text-gray-600 hover:text-gray-900"
+                                  ? "bg-zeli-accent text-zeli-ink-inverse hover:bg-zeli-accent-hover hover:text-zeli-ink-inverse"
+                                  : "text-zeli-ink-secondary hover:text-zeli-ink"
                               }`}>
                               {page}
                             </Button>
@@ -256,18 +288,18 @@ export function SearchResultsMinimal({
                       variant='ghost'
                       disabled={currentPage === totalPages}
                       onClick={() => onPageChange?.(currentPage + 1)}
-                      className='rounded-none text-sm font-light disabled:opacity-30'>
+                      className='min-h-11 rounded-none text-zeli-ink-secondary hover:text-zeli-ink disabled:opacity-30'>
                       Next
                       <ChevronRight className='h-4 w-4 ml-1' />
                     </Button>
                   </div>
 
-                  <div className='text-center mt-6'>
-                    <p className='text-sm text-gray-500 font-light'>
+                  <div className='mt-6 text-center'>
+                    <p className='zeli-eyebrow'>
                       Page {currentPage} of {totalPages}
                     </p>
                   </div>
-                </div>
+                </nav>
               )}
             </>
           )}

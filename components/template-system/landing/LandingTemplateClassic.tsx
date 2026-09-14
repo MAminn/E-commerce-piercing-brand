@@ -1,3 +1,9 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Business-promise sweep (Phase 2). This template previously hardcoded
+// shipping / returns / guarantee claims that ZELI has not established. An
+// admin switching to it from the dashboard would have published them to
+// customers instantly. Only claims the store can stand behind remain.
+// ─────────────────────────────────────────────────────────────────────────────
 import type React from "react";
 import { Button } from "#root/components/ui/button";
 import { Card, CardContent } from "#root/components/ui/card";
@@ -173,22 +179,13 @@ export function LandingTemplateClassic({
               </div>
 
               {/* Trust Indicators */}
+              {/* Also removed here: "Trusted by 10,000+ Customers", a
+                  fabricated social-proof figure for a store that has not
+                  launched. */}
               <div className='mt-12 flex flex-wrap justify-center items-center gap-6 text-sm text-gray-600'>
                 <div className='flex items-center gap-2'>
                   <CheckCircle className='w-5 h-5 text-green-600' />
-                  <span>Free Shipping</span>
-                </div>
-                <div className='flex items-center gap-2'>
-                  <CheckCircle className='w-5 h-5 text-green-600' />
                   <span>Secure Payment</span>
-                </div>
-                <div className='flex items-center gap-2'>
-                  <CheckCircle className='w-5 h-5 text-green-600' />
-                  <span>Easy Returns</span>
-                </div>
-                <div className='flex items-center gap-2'>
-                  <Star className='w-5 h-5 text-yellow-500 fill-yellow-500' />
-                  <span>Trusted by 10,000+ Customers</span>
                 </div>
               </div>
             </div>
@@ -455,9 +452,11 @@ export function LandingTemplateClassic({
             <h2 className='text-3xl lg:text-5xl font-light text-stone-50 leading-[1.15] tracking-tight mb-6'>
               {content.footerCta.title}
             </h2>
-            <p className='text-base lg:text-lg text-stone-300 font-light leading-relaxed mb-8 max-w-md mx-auto'>
-              {content.footerCta.subtitle}
-            </p>
+            {content.footerCta.subtitle && (
+              <p className='text-base lg:text-lg text-stone-300 font-light leading-relaxed mb-8 max-w-md mx-auto'>
+                {content.footerCta.subtitle}
+              </p>
+            )}
 
             <Button
               variant='primary-light'

@@ -15,9 +15,6 @@ import {
   Wallet,
   Shield,
   Lock,
-  Truck,
-  RotateCcw,
-  FileText,
   ChevronDown,
 } from "lucide-react";
 import { cn } from "#root/lib/utils";
@@ -115,6 +112,52 @@ export interface CheckoutPageModernTemplateProps {
   onDismissCouponNotice?: () => void;
 }
 
+
+/**
+ * Every input on this form was previously labelled by its placeholder alone.
+ * A placeholder is not a label: it disappears the moment the shopper types,
+ * screen readers are not required to announce it, and autofill has nothing
+ * stable to match. It also meant the inline error text underneath an invalid
+ * field was not associated with it at all, so a screen-reader user tabbing
+ * into "Phone Number" heard no indication that it had been rejected.
+ *
+ * These two wrappers put a real <label htmlFor>, `aria-invalid` and
+ * `aria-describedby` on every field in one place.
+ */
+function FieldLabel({
+  htmlFor,
+  children,
+  optional,
+}: {
+  htmlFor: string;
+  children: React.ReactNode;
+  optional?: boolean;
+}) {
+  return (
+    <label
+      htmlFor={htmlFor}
+      className='block text-[11px] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-zeli-ink-muted'>
+      {children}
+      {optional && (
+        <span className='ms-1 normal-case tracking-normal text-zeli-ink-subtle'>
+          (optional)
+        </span>
+      )}
+    </label>
+  );
+}
+
+function FieldError({ id, message }: { id: string; message?: string }) {
+  // Rendered even when empty so the live region exists before the error does
+  // — a region created at the same moment as its content is not reliably
+  // announced.
+  return (
+    <p id={id} role='alert' className='min-h-0 text-xs text-zeli-sale empty:hidden'>
+      {message ?? ""}
+    </p>
+  );
+}
+
 /**
  * CheckoutPageModernTemplate Component
  *
@@ -174,7 +217,12 @@ export function CheckoutPageModernTemplate({
     address: shippingAddress?.line1 ?? "",
     city: shippingAddress?.city ?? "",
     state: shippingAddress?.state ?? "",
-    postalCode: "00000",
+    // Egyptian addresses are not routed by postal code and no courier
+    // integration here consumes one. `shippingPostalCode` is
+    // `.optional().nullable()` on the order schema, so this stays empty
+    // rather than writing the literal string "00000" onto every order
+    // record — a value that looks like data and is not.
+    postalCode: "",
     // Egypt-only store — no country field shown, always submitted as-is.
     country: "Egypt",
     notes: "",
@@ -252,6 +300,11 @@ export function CheckoutPageModernTemplate({
           },
         ];
 
+  // True only when the server actually offered a gateway other than COD.
+  // `payment.methods` derives its list from configured environment
+  // credentials, so this cannot be true for an unconfigured store.
+  const hasOnlinePaymentMethod = methods.some((m) => m.id !== "cod");
+
   const getPaymentIcon = (id: string) => {
     switch (id) {
       case "stripe":
@@ -283,7 +336,9 @@ export function CheckoutPageModernTemplate({
 
   // Section number component
   const SectionNum = ({ n }: { n: number }) => (
-    <span className='flex items-center justify-center w-7 h-7 rounded-full bg-green-600 text-white text-xs font-bold shrink-0'>
+    <span
+      aria-hidden
+      className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zeli-accent text-xs font-medium text-zeli-ink-inverse'>
       {n}
     </span>
   );
@@ -358,7 +413,7 @@ export function CheckoutPageModernTemplate({
         </span>
       </div>
       {totals.discount !== undefined && totals.discount > 0 && (
-        <div className='flex justify-between text-red-600'>
+        <div className='flex justify-between text-zeli-sale'>
           <span className='font-medium'>
             {t("cart.discount") || "Discount"}
           </span>
@@ -388,8 +443,14 @@ export function CheckoutPageModernTemplate({
   );
 
   // Shared coupon box — used by both the desktop card and the mobile expanded panel
-  const renderCouponBlock = () =>
-    onApplyCoupon ? (
+  const renderCouponBlock = (scope: "desktop" | "mobile") => {
+    // The desktop card and the mobile panel are BOTH in the DOM (one is
+    // hidden with `lg:hidden` / `hidden lg:block`), so a single hardcoded id
+    // produced two elements sharing `checkout-promo-code-feedback` — invalid
+    // HTML, and `aria-describedby` on the input resolved to whichever came
+    // first, which on mobile is the hidden one.
+    const feedbackId = `checkout-promo-code-feedback-${scope}`;
+    return onApplyCoupon ? (
       <div className='space-y-2'>
         <div className='flex gap-2'>
           <Input
@@ -404,11 +465,11 @@ export function CheckoutPageModernTemplate({
             }}
             disabled={isApplyingCoupon}
             aria-invalid={couponFeedback?.success === false}
-            aria-describedby='checkout-promo-code-feedback'
+            aria-describedby={feedbackId}
             className={cn(
               "flex-1 text-sm",
               couponFeedback?.success === false &&
-                "border-red-300 focus-visible:ring-red-300",
+                "border-zeli-sale focus-visible:ring-zeli-sale",
             )}
           />
           <Button
@@ -423,9 +484,9 @@ export function CheckoutPageModernTemplate({
           </Button>
         </div>
 
-        <div id='checkout-promo-code-feedback' aria-live='polite'>
+        <div id={feedbackId} aria-live='polite'>
           {couponNotice && (
-            <p className='text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-3 py-2'>
+            <p className='rounded-md border border-zeli-line bg-zeli-blush-soft px-3 py-2 text-xs text-zeli-ink-secondary'>
               {couponNotice}
             </p>
           )}
@@ -433,7 +494,7 @@ export function CheckoutPageModernTemplate({
             <p
               className={cn(
                 "text-xs",
-                couponFeedback.success ? "text-green-600" : "text-red-600",
+                couponFeedback.success ? "text-zeli-success" : "text-zeli-sale",
               )}>
               {couponFeedback.message}
             </p>
@@ -441,8 +502,8 @@ export function CheckoutPageModernTemplate({
         </div>
 
         {appliedCoupon && (
-          <div className='flex items-center justify-between gap-3 px-3 py-2 rounded-md bg-green-50 border border-green-100'>
-            <p className='text-xs text-green-700 min-w-0'>
+          <div className='flex items-center justify-between gap-3 rounded-md border border-zeli-line bg-zeli-surface px-3 py-2'>
+            <p className='min-w-0 text-xs text-zeli-success'>
               <span className='font-semibold'>{appliedCoupon.code}</span>
               {appliedCoupon.discountLabel ? ` — ${appliedCoupon.discountLabel}` : ""}
             </p>
@@ -450,7 +511,7 @@ export function CheckoutPageModernTemplate({
               <button
                 type='button'
                 onClick={handleRemoveCoupon}
-                className='text-[11px] font-medium uppercase tracking-wide text-green-700 hover:text-green-900 underline shrink-0'>
+                className='shrink-0 text-[11px] font-medium uppercase tracking-wide text-zeli-success underline hover:text-zeli-ink'>
                 {t("cart.remove") || "Remove"}
               </button>
             )}
@@ -458,10 +519,11 @@ export function CheckoutPageModernTemplate({
         )}
       </div>
     ) : null;
+  };
 
   return (
-    <div className='max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-12'>
-      <h1 className='text-2xl sm:text-3xl font-extrabold mb-8'>
+    <div className='zeli-header-offset zeli-container bg-zeli-bg py-10 sm:py-12'>
+      <h1 className='zeli-section-title mb-8'>
         {t("checkout.title") || "Checkout"}
       </h1>
 
@@ -504,10 +566,16 @@ export function CheckoutPageModernTemplate({
               <div className='space-y-4'>
                 <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
                   <div className='space-y-1.5'>
+                    <FieldLabel htmlFor='fullName'>
+                      {t("checkout.full_name") || "Full Name"}
+                    </FieldLabel>
                     <Input
                       id='fullName'
                       name='name'
                       autoComplete='name'
+                      required
+                      aria-invalid={!!fieldErrors.fullName}
+                      aria-describedby='fullName-error'
                       placeholder={t("checkout.full_name") || "Full Name"}
                       value={form.fullName}
                       onChange={(e) => updateField("fullName", e.target.value)}
@@ -515,48 +583,57 @@ export function CheckoutPageModernTemplate({
                         fieldErrors.fullName ? "border-destructive" : ""
                       }
                     />
-                    {fieldErrors.fullName && (
-                      <p className='text-xs text-destructive'>
-                        {fieldErrors.fullName}
-                      </p>
-                    )}
+                    <FieldError id='fullName-error' message={fieldErrors.fullName} />
                   </div>
                   <div className='space-y-1.5'>
+                    <FieldLabel htmlFor='email'>
+                      {t("checkout.email") || "Email Address"}
+                    </FieldLabel>
                     <Input
                       id='email'
                       name='email'
                       type='email'
+                      inputMode='email'
                       autoComplete='email'
+                      required
+                      aria-invalid={!!fieldErrors.email}
+                      aria-describedby='email-error'
                       placeholder={t("checkout.email") || "Email Address"}
                       value={form.email}
                       onChange={(e) => updateField("email", e.target.value)}
                       className={fieldErrors.email ? "border-destructive" : ""}
                     />
-                    {fieldErrors.email && (
-                      <p className='text-xs text-destructive'>
-                        {fieldErrors.email}
-                      </p>
-                    )}
+                    <FieldError id='email-error' message={fieldErrors.email} />
                   </div>
                 </div>
                 <div className='space-y-1.5'>
+                  <FieldLabel htmlFor='phoneNumber'>
+                    {t("checkout.phone") || "Phone Number"}
+                  </FieldLabel>
                   <Input
                     id='phoneNumber'
                     name='tel'
                     type='tel'
+                    /* Egyptian mobile numbers are entered as 01X XXXX XXXX.
+                       `inputMode="tel"` gets the numeric keypad on mobile;
+                       the field stays free-text because the store also has to
+                       accept landlines and +20-prefixed numbers. */
+                    inputMode='tel'
                     autoComplete='tel'
-                    placeholder={t("checkout.phone") || "Phone Number"}
+                    required
+                    aria-invalid={!!fieldErrors.phoneNumber}
+                    aria-describedby='phoneNumber-error'
+                    placeholder='01XXXXXXXXX'
                     value={form.phoneNumber}
                     onChange={(e) => updateField("phoneNumber", e.target.value)}
                     className={
                       fieldErrors.phoneNumber ? "border-destructive" : ""
                     }
                   />
-                  {fieldErrors.phoneNumber && (
-                    <p className='text-xs text-destructive'>
-                      {fieldErrors.phoneNumber}
-                    </p>
-                  )}
+                  <FieldError
+                    id='phoneNumber-error'
+                    message={fieldErrors.phoneNumber}
+                  />
                 </div>
               </div>
             </div>
@@ -574,23 +651,28 @@ export function CheckoutPageModernTemplate({
               </div>
               <div className='space-y-4'>
                 <div className='space-y-1.5'>
+                  <FieldLabel htmlFor='address'>
+                    {t("checkout.street") || "Street Address"}
+                  </FieldLabel>
                   <Input
                     id='address'
                     name='address-line1'
                     autoComplete='address-line1'
+                    required
+                    aria-invalid={!!fieldErrors.address}
+                    aria-describedby='address-error'
                     placeholder={t("checkout.street") || "Street Address"}
                     value={form.address}
                     onChange={(e) => updateField("address", e.target.value)}
                     className={fieldErrors.address ? "border-destructive" : ""}
                   />
-                  {fieldErrors.address && (
-                    <p className='text-xs text-destructive'>
-                      {fieldErrors.address}
-                    </p>
-                  )}
+                  <FieldError id='address-error' message={fieldErrors.address} />
                 </div>
                 <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
                   <div className='space-y-1.5'>
+                    <FieldLabel htmlFor='buildingNumber' optional>
+                      {t("checkout.building_number") || "Building Number"}
+                    </FieldLabel>
                     <Input
                       id='buildingNumber'
                       name='address-line2'
@@ -605,8 +687,12 @@ export function CheckoutPageModernTemplate({
                     />
                   </div>
                   <div className='space-y-1.5'>
+                    <FieldLabel htmlFor='apartment' optional>
+                      {t("checkout.apartment") || "Apartment / Unit"}
+                    </FieldLabel>
                     <Input
                       id='apartment'
+                      name='address-line3'
                       placeholder={t("checkout.apartment") || "Apartment / Unit"}
                       value={form.apartment}
                       onChange={(e) => updateField("apartment", e.target.value)}
@@ -615,22 +701,34 @@ export function CheckoutPageModernTemplate({
                 </div>
                 <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
                   <div className='space-y-1.5'>
+                    <FieldLabel htmlFor='city'>
+                      {t("checkout.city") || "City"}
+                    </FieldLabel>
                     <Input
                       id='city'
                       name='address-level2'
                       autoComplete='address-level2'
+                      required
+                      aria-invalid={!!fieldErrors.city}
+                      aria-describedby='city-error'
                       placeholder={t("checkout.city") || "City"}
                       value={form.city}
                       onChange={(e) => updateField("city", e.target.value)}
                       className={fieldErrors.city ? "border-destructive" : ""}
                     />
-                    {fieldErrors.city && (
-                      <p className='text-xs text-destructive'>
-                        {fieldErrors.city}
-                      </p>
-                    )}
+                    <FieldError id='city-error' message={fieldErrors.city} />
                   </div>
                   <div className='space-y-1.5'>
+                    <FieldLabel htmlFor='state' optional>
+                      {t("checkout.state") || "Governorate"}
+                    </FieldLabel>
+                    {/* Free text with suggestions from Bosta's city list when
+                        Bosta is configured; a plain text input when it is not.
+                        Deliberately not a fixed 27-governorate <select>: the
+                        order schema stores whatever is typed and nothing
+                        downstream validates against a canonical list, so a
+                        closed list here would reject addresses the business
+                        can actually deliver to. */}
                     <CityCombobox
                       id='state'
                       name='address-level1'
@@ -650,19 +748,26 @@ export function CheckoutPageModernTemplate({
                 <button
                   type='button'
                   onClick={() => setNotesOpen(true)}
-                  className='text-sm text-stone-500 hover:text-stone-700 underline underline-offset-4'>
+                  className='min-h-11 text-sm text-zeli-ink-muted underline underline-offset-4 hover:text-zeli-ink'>
                   + Add special instructions (optional)
                 </button>
               ) : (
-                <Textarea
-                  placeholder={
-                    t("checkout.notes_placeholder") ||
-                    "Any special instructions for your order\u2026"
-                  }
-                  value={form.notes}
-                  onChange={(e) => updateField("notes", e.target.value)}
-                  rows={3}
-                />
+                <>
+                  <FieldLabel htmlFor='notes' optional>
+                    {t("checkout.notes") || "Order notes"}
+                  </FieldLabel>
+                  <Textarea
+                    id='notes'
+                    className='mt-1.5'
+                    placeholder={
+                      t("checkout.notes_placeholder") ||
+                      "Any special instructions for your order\u2026"
+                    }
+                    value={form.notes}
+                    onChange={(e) => updateField("notes", e.target.value)}
+                    rows={3}
+                  />
+                </>
               )}
             </div>
 
@@ -690,8 +795,8 @@ export function CheckoutPageModernTemplate({
                       key={method.id}
                       className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all duration-300 ${
                         form.paymentMethod === method.id
-                          ? "border-green-600 bg-muted/40"
-                          : "border-border hover:border-muted-foreground/40"
+                          ? "border-zeli-ink bg-zeli-surface"
+                          : "border-zeli-line hover:border-zeli-line-strong"
                       }`}>
                       <input
                         type='radio'
@@ -716,7 +821,7 @@ export function CheckoutPageModernTemplate({
                         </div>
                       </div>
                       {method.id !== "cod" && (
-                        <div className='flex items-center gap-1 text-xs text-green-600 shrink-0 mt-1'>
+                        <div className='mt-1 flex shrink-0 items-center gap-1 text-xs text-zeli-success'>
                           <Shield className='w-3 h-3' />
                           {t("checkout.secure") || "SECURE"}
                         </div>
@@ -742,50 +847,44 @@ export function CheckoutPageModernTemplate({
 
               {renderTotalsBreakdown()}
 
-              {renderCouponBlock()}
+              {renderCouponBlock("desktop")}
 
               {/* Grand total */}
               <div className='border-t pt-4 flex justify-between items-center'>
                 <span className='font-bold text-base uppercase tracking-wide'>
                   {t("cart.total") || "Total"}
                 </span>
-                <span className='font-extrabold text-xl text-emerald-600'>
+                <span className='text-xl font-semibold text-zeli-ink'>
                   {currency} {totals.grandTotal.toFixed(2)}
                 </span>
               </div>
 
-              {/* Trust badges */}
-              <div className='space-y-2.5 text-sm text-muted-foreground'>
-                <div className='flex items-center gap-2'>
-                  <Lock className='w-4 h-4 shrink-0' />
-                  <div>
-                    <p className='font-medium text-foreground text-xs'>
-                      Secure Checkout
-                    </p>
-                    <p className='text-xs'>
-                      Your payment information is safe with us.
-                    </p>
+              {/* Trust badges.
+                  "Fast Delivery — Quick delivery to your doorstep." is gone:
+                  ZELI has not set a delivery time, no courier integration is
+                  configured, and the claim was made at the exact moment the
+                  shopper decides to pay. "Easy Returns — 14-day return
+                  policy." was removed for the same reason in Phase 2.
+                  What is left is the one statement that is true, and only
+                  when it applies: card details are handled by the gateway's
+                  own hosted page, which does not exist in a COD-only store,
+                  so the line is hidden when COD is the only method. */}
+              {hasOnlinePaymentMethod && (
+                <div className='space-y-2.5 text-sm text-zeli-ink-muted'>
+                  <div className='flex items-center gap-2'>
+                    <Lock aria-hidden className='h-4 w-4 shrink-0' />
+                    <div>
+                      <p className='text-xs font-medium text-zeli-ink'>
+                        Secure payment
+                      </p>
+                      <p className='text-xs'>
+                        Card details are entered on the payment provider's own
+                        page — this store never sees them.
+                      </p>
+                    </div>
                   </div>
                 </div>
-                <div className='flex items-center gap-2'>
-                  <Truck className='w-4 h-4 shrink-0' />
-                  <div>
-                    <p className='font-medium text-foreground text-xs'>
-                      Fast Delivery
-                    </p>
-                    <p className='text-xs'>Quick delivery to your doorstep.</p>
-                  </div>
-                </div>
-                <div className='flex items-center gap-2'>
-                  <RotateCcw className='w-4 h-4 shrink-0' />
-                  <div>
-                    <p className='font-medium text-foreground text-xs'>
-                      Easy Returns
-                    </p>
-                    <p className='text-xs'>14-day return policy.</p>
-                  </div>
-                </div>
-              </div>
+              )}
 
               {/* Submit */}
               <Button
@@ -808,18 +907,18 @@ export function CheckoutPageModernTemplate({
                 )}
               </Button>
 
-              <p className='text-xs text-center text-muted-foreground'>
-                {t("checkout.terms") || (
-                  <>
-                    By placing your order, you agree to our{" "}
-                    <a
-                      href='/links'
-                      className='underline underline-offset-2 text-foreground'>
-                      Terms &amp; Conditions
-                    </a>
-                  </>
-                )}
-              </p>
+              {/* The default read "By placing your order, you agree to our
+                  Terms & Conditions", linking to /links — which is the
+                  link-tree page, not a terms document. ZELI has no published
+                  terms, so the sentence pointed a paying customer at an
+                  agreement that does not exist. It renders only when an admin
+                  has supplied real copy through the `checkout.terms`
+                  translation override. */}
+              {t("checkout.terms") ? (
+                <p className='text-center text-xs text-zeli-ink-muted'>
+                  {t("checkout.terms")}
+                </p>
+              ) : null}
             </div>
 
             {/* Mobile: compact collapsed summary bar */}
@@ -878,7 +977,9 @@ export function CheckoutPageModernTemplate({
               )}
 
               {/* Always visible on mobile, not tucked behind the collapse toggle */}
-              <div className='mt-4 pt-4 border-t'>{renderCouponBlock()}</div>
+              <div className='mt-4 pt-4 border-t'>
+                {renderCouponBlock("mobile")}
+              </div>
             </div>
 
             <div className='lg:hidden space-y-3'>
@@ -902,18 +1003,18 @@ export function CheckoutPageModernTemplate({
                 )}
               </Button>
 
-              <p className='text-xs text-center text-muted-foreground'>
-                {t("checkout.terms") || (
-                  <>
-                    By placing your order, you agree to our{" "}
-                    <a
-                      href='/links'
-                      className='underline underline-offset-2 text-foreground'>
-                      Terms &amp; Conditions
-                    </a>
-                  </>
-                )}
-              </p>
+              {/* The default read "By placing your order, you agree to our
+                  Terms & Conditions", linking to /links — which is the
+                  link-tree page, not a terms document. ZELI has no published
+                  terms, so the sentence pointed a paying customer at an
+                  agreement that does not exist. It renders only when an admin
+                  has supplied real copy through the `checkout.terms`
+                  translation override. */}
+              {t("checkout.terms") ? (
+                <p className='text-center text-xs text-zeli-ink-muted'>
+                  {t("checkout.terms")}
+                </p>
+              ) : null}
             </div>
           </div>
         </div>

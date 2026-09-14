@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { usePageContext } from "vike-react/usePageContext";
 import { trpc } from "#root/shared/trpc/client";
 import { getTemplateComponent } from "#root/components/template-system/templateConfig";
+import { resolveTemplateId } from "#root/shared/config/storefront";
 import { useTemplate } from "#root/frontend/contexts/TemplateContext";
 import { useLayoutSettings } from "#root/frontend/contexts/LayoutSettingsContext";
 import type { SortingPageProduct } from "#root/components/template-system/sorting/SortingMinimalTemplate";
@@ -158,18 +159,16 @@ export default function CategoryPage() {
 
   if (notFound) {
     return (
-      <div className='flex items-center justify-center min-h-[60vh]'>
-        <div className='text-center'>
-          <h2 className='text-2xl font-semibold text-stone-900 mb-2'>
-            Category Not Found
-          </h2>
-          <p className='text-stone-600 mb-6'>
-            The category you're looking for doesn't exist.
+      <div className='zeli-header-offset flex min-h-[60vh] items-center justify-center bg-zeli-bg px-4'>
+        <div className='max-w-md text-center'>
+          <h1 className='zeli-section-title'>Category not found</h1>
+          <p className='mt-2 text-[length:var(--zeli-text-body)] text-zeli-ink-muted'>
+            This collection does not exist, or it is no longer available.
           </p>
           <a
             href='/shop'
-            className='inline-flex items-center px-6 py-3 bg-stone-900 text-white rounded-full text-sm font-medium hover:bg-stone-800 transition-colors'>
-            Browse All Products
+            className='zeli-underline mt-6 inline-flex min-h-11 items-center text-[length:var(--zeli-text-small)] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-zeli-ink'>
+            Browse all products
           </a>
         </div>
       </div>
@@ -197,7 +196,10 @@ export default function CategoryPage() {
   }
 
   /* ── Default / other template path ────────────────────────────────── */
-  const activeTemplateId = getTemplateId("sorting") ?? "sorting-minimal";
+  const activeTemplateId = resolveTemplateId(
+    "sorting",
+    getTemplateId("sorting"),
+  );
   const TemplateEntry = getTemplateComponent("sorting", activeTemplateId);
 
   if (!TemplateEntry) {
@@ -210,17 +212,22 @@ export default function CategoryPage() {
     <div>
       {/* Breadcrumb */}
       {categoryName && (
-        <div
+        <nav
+          aria-label='Breadcrumb'
           data-shop-breadcrumb
-          className='container mx-auto px-4 sm:px-6 lg:px-8 pt-6'>
-          <div className='flex items-center gap-2 text-sm text-stone-600 mb-4'>
-            <a href='/shop' className='hover:text-stone-900 transition-colors'>
+          className='zeli-container pt-6'>
+          <div className='mb-4 flex items-center gap-2 text-[length:var(--zeli-text-small)] text-zeli-ink-muted'>
+            <a
+              href='/shop'
+              className='zeli-underline-hover transition-colors hover:text-zeli-ink'>
               All Products
             </a>
-            <span>/</span>
-            <span className='text-stone-900 font-medium'>{categoryName}</span>
+            <span aria-hidden>/</span>
+            <span aria-current='page' className='truncate text-zeli-ink'>
+              {categoryName}
+            </span>
           </div>
-        </div>
+        </nav>
       )}
       <Template
         products={products}

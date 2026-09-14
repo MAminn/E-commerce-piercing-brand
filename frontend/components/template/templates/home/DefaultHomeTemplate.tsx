@@ -49,24 +49,31 @@ interface DefaultHomeTemplateProps {
 }
 
 // FAQ data
+//
+// Placeholder copy only. The previous entries were a prior brand's real
+// policies — a 14-day return window, a 1-day damage-report deadline, their
+// support inbox and their WhatsApp number. None of that is established for
+// this store, and none of those contacts are ours, so nothing concrete is
+// asserted here. This legacy v1 template is reachable at
+// /template-preview?category=home; real copy belongs in the CMS.
 const faqData = [
   {
-    id: "how-lebsey-works",
+    id: "how-it-works",
     question: "How does our store work?",
     answer:
-      "Browse our curated collections, add items to your cart, and checkout seamlessly. We offer a wide range of products with secure payments and fast shipping.",
+      "Browse our collections, add pieces to your cart, and check out. Store policies are published from the admin dashboard.",
   },
   {
     id: "shipping-time",
     question: "How long does shipping take?",
     answer:
-      "We ship across Egypt, delivering orders within a week (Not including holidays). Shipping costs vary based on order details and location, with support available at cs@Lebsey.com for any issues.",
+      "Shipping times and costs are set from the admin dashboard and shown at checkout.",
   },
   {
     id: "return-policy",
     question: "What is your return policy?",
     answer:
-      "You can return items within 14 days if they are unused and in their original packaging. To start a return, contact us at CS@Lebsey.com or WhatsApp +201507135600. Return fees match the original delivery cost, and refunds are processed within 14 days. Damaged items must be reported within 1 day for a free replacement or refund.",
+      "Our return policy is published from the admin dashboard. See the Return Policy page for current terms.",
   },
 ];
 
@@ -163,7 +170,7 @@ export default function DefaultHomeTemplate({
             <div className='relative rounded-xl overflow-hidden'>
               <img
                 src='/assets/story.webp'
-                alt='About Lebsy - Our fashion story'
+                alt='About our store'
                 className='w-full h-auto rounded-xl'
                 width='500'
                 height='333'
@@ -308,7 +315,7 @@ export default function DefaultHomeTemplate({
         <section id='faq' className='py-20 bg-white'>
           <FAQ
             title='Frequently Asked Questions'
-            description='Find answers to common questions about shopping with Lebsey'
+            description='Find answers to common questions about shopping with us'
             faqs={faqData}
           />
         </section>
@@ -334,9 +341,8 @@ export default function DefaultHomeTemplate({
               Ready to elevate your style?
             </h2>
             <p className='text-white/90 text-lg mb-8 max-w-3xl mx-auto'>
-              Join thousands of satisfied customers who have discovered their
-              perfect style with Lebsy. Browse our collections today and find
-              pieces that speak to you.
+              Browse our collections today and find pieces that speak to
+              you.
             </p>
             <Button
               asChild

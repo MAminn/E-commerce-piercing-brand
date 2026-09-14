@@ -7,44 +7,20 @@ import {
 } from "#root/components/ui/accordion";
 
 // FAQ data structure for easy editing
-const defaultFaqData = [
-  {
-    id: "how-it-works",
-    question: "How does our store work?",
-    answer:
-      "Browse our curated collections, add items to your cart, and checkout seamlessly. We offer a wide range of products with secure payments and fast shipping.",
-  },
-  {
-    id: "payment-methods",
-    question: "What payment methods do you accept?",
-    answer:
-      "We accept all major credit cards, debit cards, PayPal, and Apple Pay. All transactions are secure and encrypted to ensure your financial information is protected.",
-  },
-  {
-    id: "shipping-time",
-    question: "How long does shipping take?",
-    answer:
-      "Shipping times depend on your location. Typically, domestic orders are delivered within 3-5 business days, while international shipping can take 7-14 business days. You can view the estimated shipping time for each product on its page.",
-  },
-  {
-    id: "return-policy",
-    question: "What is your return policy?",
-    answer:
-      "We offer a 30-day return policy for most items. Products must be unworn, unwashed, and in their original packaging with tags attached. Specific return details for each product will be noted on their product pages.",
-  },
-  {
-    id: "track-order",
-    question: "How do I track my order?",
-    answer:
-      "Once your order ships, you'll receive a tracking number via email. You can also track your order in your account dashboard under 'Order History'.",
-  },
-  {
-    id: "international-shipping",
-    question: "Do you ship internationally?",
-    answer:
-      "Yes, we ship to many countries worldwide. International shipping rates and delivery times vary by location. You can view available shipping options during checkout.",
-  },
-];
+/**
+ * No default FAQs.
+ *
+ * These previously answered five questions with invented policy: PayPal and
+ * Apple Pay as accepted payment methods, 3–5 day domestic and 7–14 day
+ * international delivery, a 30-day return window, and "yes, we ship to many
+ * countries worldwide" — which directly contradicts an Egypt-only store.
+ * Every one of those is a business fact ZELI has not established.
+ *
+ * Callers pass real FAQs via the `faqs` prop (the product page reads them
+ * from Dashboard > Settings). With none supplied the section renders nothing.
+ */
+const defaultFaqData: Array<{ id: string; question: string; answer: string }> =
+  [];
 
 interface FAQProps {
   title?: string;
@@ -63,6 +39,10 @@ export const FAQ: React.FC<FAQProps> = ({
   faqs = defaultFaqData,
   backgroundColor = "bg-white",
 }) => {
+  // Nothing to answer — render nothing rather than an empty accordion under
+  // a "Frequently Asked Questions" heading.
+  if (faqs.length === 0) return null;
+
   return (
     <section id='faq' className={`py-20 ${backgroundColor}`}>
       <div className='container mx-auto px-4'>

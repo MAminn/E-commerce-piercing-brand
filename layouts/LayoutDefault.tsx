@@ -39,15 +39,57 @@ import { authClient } from "#root/lib/auth-client.js";
  * EditorialChrome provides its own footer — skip the global one so
  * there's no double-footer flash during SSR/hydration.
  */
-function GlobalFooter() {
+/**
+ * Landing templates that render their own navbar AND footer (EditorialChrome,
+ * NoirChrome). On pages using one of these, the global chrome must not render
+ * at all.
+ *
+ * This used to be handled client-side only: each chrome component set a
+ * `data-*-chrome` attribute on <html> in a `useEffect`, and scoped CSS in
+ * layouts/style.css hid `#global-navbar` / `#global-footer`. Because
+ * `useEffect` never runs during SSR, the server emitted BOTH chromes — two
+ * <nav> landmarks and two footers in the HTML — and one of them vanished on
+ * hydration as a visible flash.
+ *
+ * The template selection is SSR-injected (pages/+config.ts `passToClient`) and
+ * TemplateContext initialises from it synchronously, so the decision can be
+ * made at render time on both server and client — identical markup, no flash,
+ * no hydration mismatch. The CSS rules stay as a harmless backstop.
+ */
+const TEMPLATES_WITH_OWN_CHROME = new Set([
+  "landing-editorial",
+  "landing-noir",
+]);
+
+function useTemplateOwnsChrome(): boolean {
   const { getTemplateId } = useTemplate();
   const { urlPathname } = usePageContext();
-  const isEditorialLandingPage =
-    urlPathname === "/" && getTemplateId("landing") === "landing-editorial";
-  if (isEditorialLandingPage) return null;
+  // These chromes are rendered by the landing template, which only mounts on
+  // the homepage — every other route still needs the global shell.
+  if (urlPathname !== "/") return false;
+  const landing = getTemplateId("landing");
+  return !!landing && TEMPLATES_WITH_OWN_CHROME.has(landing);
+}
+
+/**
+ * The footer follows the same selector as the navbar.
+ *
+ * It used to key off `templateSelection.landing === "landing-minimal"` while
+ * the navbar keyed off `layoutSettings.header.navbarStyle`. Those are two
+ * independent settings, so an admin who left the shell on minimal but chose a
+ * different homepage template got the minimal navbar (Arabic toggle, live
+ * search, bottom nav) above a completely different footer from the old
+ * default shell — two visual families stacked on the same page, on every
+ * route in the buying journey.
+ *
+ * `landing-minimal` is still honoured on its own so nothing regresses for a
+ * store that set the template but not the shell.
+ */
+function GlobalFooter({ isMinimal }: { isMinimal: boolean }) {
+  const { getTemplateId } = useTemplate();
 
   const landingTemplate = getTemplateId("landing");
-  if (landingTemplate === "landing-minimal") {
+  if (isMinimal || landingTemplate === "landing-minimal") {
     return (
       <div id='global-footer'>
         <MinimalFooter />
@@ -183,6 +225,10 @@ function LayoutShell({
   }, [getTemplateId, ssrLayoutSettings]);
 
   const isMinimal = layoutSettings.header.navbarStyle === "minimal";
+  const templateOwnsChrome = useTemplateOwnsChrome();
+  // Suppress the global navbar/footer wherever the active landing template
+  // brings its own — decided at render time so SSR and hydration agree.
+  const showGlobalChrome = !isDashboardRoute && !templateOwnsChrome;
 
   // ── Coming-soon gate (minimal template only) ──────────────────────────────
   const { session } = useContext(AuthContext);
@@ -237,8 +283,14 @@ function LayoutShell({
         <TrackingProvider>
           <main
             id='page-content'
-            className={`bg-background h-full text-foreground w-full font-poppins${!isDashboardRoute ? " storefront-shell" : ""}${isMinimal && !isDashboardRoute ? " minimal-template pb-20 lg:pb-0" : ""}`}>
-            {!isDashboardRoute && (
+            /* Storefront routes inherit their base family from the
+               --font-body custom property (.storefront-shell rule in
+               layouts/style.css) so an admin's Typography choice applies to
+               every element, not just the handful of tags listed there.
+               Dashboard routes keep the fixed Poppins utility — internal
+               tooling must not follow the public brand font. */
+            className={`bg-background h-full text-foreground w-full${isDashboardRoute ? " font-poppins" : " storefront-shell"}${isMinimal && !isDashboardRoute ? " minimal-template pb-20 lg:pb-0" : ""}`}>
+            {showGlobalChrome && (
               <GlobalNavbarChrome navbarMode={navbarMode}>
                 {renderNavbar()}
               </GlobalNavbarChrome>
@@ -250,7 +302,7 @@ function LayoutShell({
             ) : (
               children
             )}
-            {!isDashboardRoute && <GlobalFooter />}
+            {showGlobalChrome && <GlobalFooter isMinimal={isMinimal} />}
             {!isDashboardRoute && <CartToastContainer />}
             {!isDashboardRoute && <EntryPopup />}
             {/* Minimal template: mobile relies on the bottom nav's "Offers" tab
@@ -321,7 +373,17 @@ function GlobalNavbarChrome({
     const el = ref.current;
     if (!el || typeof window === "undefined") return;
 
-    const update = () => setHeight(el.getBoundingClientRect().height);
+    const update = () => {
+      const h = el.getBoundingClientRect().height;
+      setHeight(h);
+      // Publish the real height so overlay-mode pages (the homepage hero)
+      // can clear the fixed chrome with `.zeli-header-offset` instead of a
+      // hardcoded `mt-24` that only happened to match one navbar variant.
+      document.documentElement.style.setProperty(
+        "--zeli-header-measured",
+        `${h}px`,
+      );
+    };
     update();
 
     let ro: ResizeObserver | null = null;
@@ -333,6 +395,7 @@ function GlobalNavbarChrome({
     return () => {
       ro?.disconnect();
       window.removeEventListener("resize", update);
+      document.documentElement.style.removeProperty("--zeli-header-measured");
     };
   }, []);
 
@@ -341,7 +404,8 @@ function GlobalNavbarChrome({
       <div
         ref={ref}
         id='global-navbar'
-        className='fixed inset-x-0 top-0 z-[10000]'>
+        style={{ zIndex: "var(--zeli-z-header)" }}
+        className='fixed inset-x-0 top-0'>
         {/* Slot for page-level promo/announcement banners (portal target).
             Pages render their banner here so it stacks above the navbar
             and the chrome's measured height includes it automatically. */}

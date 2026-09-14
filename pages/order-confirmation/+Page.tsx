@@ -1,12 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { usePageContext } from "vike-react/usePageContext";
 import { Link } from "#root/components/utils/Link";
 import {
   CheckCircle,
   Package,
-  ArrowRight,
   Home,
   ShoppingBag,
   XCircle,
@@ -40,7 +38,6 @@ function getPaymentState(param: string | null): PaymentState {
 }
 
 export default function OrderConfirmationPage() {
-  const pageContext = usePageContext();
   const searchParams =
     typeof window !== "undefined"
       ? new URLSearchParams(window.location.search)
@@ -191,147 +188,145 @@ export default function OrderConfirmationPage() {
   }, [orderId, orderTotal, isPaymentSuccess, trackEvent]);
 
   return (
-    <div className='min-h-screen bg-gray-50 flex items-center justify-center px-4 py-16'>
-      <div
-        className='max-w-2xl w-full bg-white rounded-2xl shadow-sm border border-gray-100 text-center flex flex-col'
-        style={{ padding: '2rem 2rem 3.5rem', }}>
+    <div className='zeli-header-offset flex min-h-screen items-center justify-center bg-zeli-bg px-4 py-12 sm:py-16'>
+      <div className='flex w-full max-w-2xl flex-col border border-zeli-line bg-zeli-surface-raised px-6 pb-12 pt-8 text-center sm:px-8'>
         {/* Icon */}
         {isPaymentSuccess && (
-          <div className='mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-6'>
-            <CheckCircle className='w-8 h-8 text-green-600' />
+          <div className='mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-zeli-surface'>
+            <CheckCircle aria-hidden className='h-7 w-7 text-zeli-success' />
           </div>
         )}
         {isPaymentPending && (
-          <div className='mx-auto w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mb-6'>
-            <Clock className='w-8 h-8 text-amber-600' />
+          <div className='mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-zeli-blush-soft'>
+            <Clock aria-hidden className='h-7 w-7 text-zeli-ink-secondary' />
           </div>
         )}
         {isPaymentFailed && (
-          <div className='mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6'>
-            <XCircle className='w-8 h-8 text-red-600' />
+          <div className='mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-zeli-blush-soft'>
+            <XCircle aria-hidden className='h-7 w-7 text-zeli-sale' />
           </div>
         )}
 
         {/* Heading */}
+        {/* Every sentence below is limited to something this page actually
+            knows: whether the order row was created, and what the payment
+            gateway (or the absence of one) reported. Nothing here states a
+            delivery date, a courier, a confirmation call or a shipping
+            window — ZELI has set none of those. */}
         {isPaymentSuccess && (
           <>
-            <h1 className='text-2xl md:text-3xl font-semibold text-gray-900 mb-2'>
-              Order Confirmed!
-            </h1>
-            <p className='text-gray-500 mb-6'>
-              Thank you for your purchase. Your order has been placed
-              successfully.
-              {paymentState === "success" && verifiedPaymentStatus === "paid" && " Payment received."}
+            <h1 className='zeli-section-title'>Order placed</h1>
+            <p className='mt-2 text-[length:var(--zeli-text-body)] text-zeli-ink-muted'>
+              Your order has been received.
+              {paymentState === "success" &&
+                verifiedPaymentStatus === "paid" &&
+                " Payment received."}
             </p>
           </>
         )}
         {isPaymentPending && (
           <>
-            <h1 className='text-2xl md:text-3xl font-semibold text-gray-900 mb-2'>
-              Payment Pending
-            </h1>
-            <p className='text-gray-500 mb-6'>
-              Your order has been created, but payment is still being processed.
-              You'll receive a confirmation email once payment is complete.
+            <h1 className='zeli-section-title'>Payment pending</h1>
+            <p className='mt-2 text-[length:var(--zeli-text-body)] text-zeli-ink-muted'>
+              Your order has been created. The payment provider has not
+              confirmed the payment yet.
             </p>
           </>
         )}
         {isPaymentFailed && (
           <>
-            <h1 className='text-2xl md:text-3xl font-semibold text-amber-900 mb-2'>
-              Payment {paymentState === "cancelled" ? "Cancelled" : "Failed"}
+            <h1 className='zeli-section-title'>
+              Payment {paymentState === "cancelled" ? "cancelled" : "failed"}
             </h1>
-            <p className='text-gray-500 mb-6'>
+            <p className='mt-2 text-[length:var(--zeli-text-body)] text-zeli-ink-muted'>
               {paymentState === "cancelled"
-                ? "You cancelled the payment. Your order has been saved — you can retry payment or contact support."
-                : "There was an issue processing your payment. Your order has been saved — please try again or contact support."}
+                ? "The payment was cancelled. Your order has been saved and is unpaid."
+                : "The payment did not go through. Your order has been saved and is unpaid."}
             </p>
           </>
         )}
 
         {/* Order Details Card */}
-        <div className='bg-gray-50 rounded-xl p-6 mb-8 text-left space-y-3 overflow-x-auto'>
+        <div className='mt-8 mb-8 space-y-3 overflow-x-auto bg-zeli-surface p-6 text-start'>
           {shortId && (
             <div className='flex justify-between items-center flex-wrap gap-2'>
-              <span className='text-sm text-gray-500'>Order Number</span>
-              <span className='text-sm font-mono font-medium text-gray-900'>
+              <span className='text-sm text-zeli-ink-muted'>Order number</span>
+              <span className='font-mono text-sm font-medium text-zeli-ink'>
                 #{shortId}
               </span>
             </div>
           )}
           {orderTotal && (
             <div className='flex justify-between items-center flex-wrap gap-2'>
-              <span className='text-sm text-gray-500'>Total</span>
-              <span className='text-sm font-semibold text-gray-900'>
+              <span className='text-sm text-zeli-ink-muted'>Total</span>
+              <span className='text-sm font-semibold text-zeli-ink'>
                 {Number.parseFloat(orderTotal).toFixed(2)} EGP
               </span>
             </div>
           )}
           {customerEmail && (
             <div className='flex justify-between items-center flex-wrap gap-2 '>
-              <span className='text-sm text-gray-500'>
-                Confirmation sent to
+              <span className='text-sm text-zeli-ink-muted'>
+                Order email
               </span>
-              <span className='text-sm text-gray-900 whitespace-nowrap '>{customerEmail}</span>
+              <span className='whitespace-nowrap text-sm text-zeli-ink'>{customerEmail}</span>
             </div>
           )}
           <div className='flex justify-between items-center flex-wrap gap-2'>
-            <span className='text-sm text-gray-500'>Status</span>
+            <span className='text-sm text-zeli-ink-muted'>Status</span>
             {isPaymentSuccess && (
-              <span className='inline-flex items-center gap-1.5 text-sm font-medium text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full'>
-                <Package className='w-3.5 h-3.5' />
+              <span className='inline-flex items-center gap-1.5 rounded-full bg-zeli-blush-soft px-2.5 py-0.5 text-sm font-medium text-zeli-ink-secondary'>
+                <Package aria-hidden className='h-3.5 w-3.5' />
                 Processing
               </span>
             )}
             {isPaymentPending && (
-              <span className='inline-flex items-center gap-1.5 text-sm font-medium text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full whitespace-nowrap'>
-                <Clock className='w-3.5 h-3.5' />
-                Awaiting Payment
+              <span className='inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-zeli-blush-soft px-2.5 py-0.5 text-sm font-medium text-zeli-ink-secondary'>
+                <Clock aria-hidden className='h-3.5 w-3.5' />
+                Awaiting payment
               </span>
             )}
             {isPaymentFailed && (
-              <span className='inline-flex items-center gap-1.5 text-sm font-medium text-red-700 bg-red-50 px-2.5 py-0.5 rounded-full'>
-                <AlertTriangle className='w-3.5 h-3.5' />
-                Payment {paymentState === "cancelled" ? "Cancelled" : "Failed"}
+              <span className='inline-flex items-center gap-1.5 rounded-full bg-zeli-blush-soft px-2.5 py-0.5 text-sm font-medium text-zeli-sale'>
+                <AlertTriangle aria-hidden className='h-3.5 w-3.5' />
+                Payment {paymentState === "cancelled" ? "cancelled" : "failed"}
               </span>
             )}
           </div>
         </div>
 
         {/* Info text */}
-        {isPaymentSuccess && (
-          <p className='text-sm text-gray-400 mb-8'>
-            We've sent a confirmation email with your order details. You'll
-            receive shipping updates as your order progresses.
-          </p>
-        )}
+        {/* "We've sent a confirmation email … You'll receive shipping
+            updates as your order progresses" was asserted unconditionally.
+            The email only goes out when SMTP is configured, and there is no
+            shipping-update pipeline at all — so the page promised two things
+            an unconfigured store does not do. "Don't worry — no charges were
+            made" was likewise asserted for a *failed* payment, which this
+            page cannot know. */}
         {isPaymentPending && (
-          <p className='text-sm text-gray-400 mb-8'>
-            If your payment was completed, it may take a few minutes to process.
-            Check your email for updates.
+          <p className='mb-8 text-sm text-zeli-ink-muted'>
+            A completed payment can take a few minutes to show here.
           </p>
         )}
         {isPaymentFailed && (
-          <p className='text-sm text-gray-400 mb-8'>
-            Don't worry — no charges were made. You can contact us at support
-            for help.
+          <p className='mb-8 text-sm text-zeli-ink-muted'>
+            Any amount the provider authorised is released by the provider, not
+            by this store.
           </p>
         )}
 
         {/* Actions */}
-        <div className='flex flex-col sm:flex-row gap-3 justify-center mt-6'>
-          <Button asChild variant='outline' className='gap-2'>
+        <div className='mt-6 flex flex-col justify-center gap-3 sm:flex-row'>
+          <Button asChild variant='outline' className='min-h-11 gap-2'>
             <Link href='/'>
-              <Home className='w-4 h-4' />
-              <span className='text-xs md:text-sm'>Back to Home</span>
+              <Home aria-hidden className='h-4 w-4' />
+              <span className='text-xs md:text-sm'>Back to home</span>
             </Link>
           </Button>
-          <Button
-            asChild
-            className='gap-2 text-white'>
+          <Button asChild className='min-h-11 gap-2'>
             <Link href='/shop'>
-              <ShoppingBag className='w-4 h-4' />
-              <span className='text-xs md:text-sm'>Continue Shopping</span>
+              <ShoppingBag aria-hidden className='h-4 w-4' />
+              <span className='text-xs md:text-sm'>Continue shopping</span>
             </Link>
           </Button>
         </div>

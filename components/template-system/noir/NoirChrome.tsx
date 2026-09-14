@@ -29,7 +29,10 @@ function NoirAnnouncementBar({ text }: { text?: string }) {
   const { locale } = useMinimalI18n();
   const isAr = locale === "ar";
   const effectiveText =
-    text || (isAr ? "شحن وإرجاع مجاني" : "Free shipping & returns");
+    // No default announcement. This used to fall back to "Free shipping &
+    // returns" — a policy claim shown to every visitor of a store that has
+    // set no such policy. An unset announcement bar now shows nothing.
+    text?.trim() || "";
 
   return (
     <div className='w-full bg-[#E8112D] text-white'>

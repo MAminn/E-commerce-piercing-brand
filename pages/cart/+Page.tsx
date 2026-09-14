@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useTemplate } from "#root/frontend/contexts/TemplateContext";
 import { useCart } from "#root/lib/context/CartContext";
 import { getTemplateComponent } from "#root/components/template-system/templateConfig";
+import { resolveTemplateId } from "#root/shared/config/storefront";
 import type {
   CartPageModernTemplateProps,
   CartPageCartItem,
@@ -128,7 +129,7 @@ export default function CartPage() {
   const templateId = getTemplateId("cartPage");
   const Template = getTemplateComponent(
     "cartPage",
-    templateId || "cart-modern",
+    resolveTemplateId("cartPage", templateId),
   );
 
   if (!Template) {

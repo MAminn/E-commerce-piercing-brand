@@ -16,9 +16,6 @@ import type {
 } from "#root/shared/database/drizzle/schema";
 import { AuthContext } from "#root/context/AuthContext.js";
 
-import oneBottle from "#root/assets/1-bottles.jpg.jpeg";
-import twoBottles from "#root/assets/2-bottles.jpg.jpeg";
-import threeBottles from "#root/assets/3-bottles.jpg.jpeg";
 
 interface ActiveOffer {
   id: string;
@@ -40,18 +37,19 @@ interface PublicPromoCode {
 const BADGE_LABELS = ["BEST DEAL", "MOST LOVED", "EVERYDAY DEAL"];
 
 /**
- * Picks the bottle illustration for an offer card based on the quantity it
- * needs. 1 bottle → 1-bottles.jpg, 2 → 2-bottles.jpg, 3+ → 3-bottles.jpg —
- * this way any future offer requiring 4+ items still gets a sensible image
- * without needing new assets.
+ * Offer cards used to show 1/2/3-bottle photographs of a previous brand's
+ * perfume — complete with that brand's logo on the label. Those assets are
+ * not ours to show, so the card now renders a neutral quantity chip until
+ * artwork for this brand exists.
+ *
+ * Replace this with real per-offer imagery (ideally a CMS-uploaded image on
+ * the offer itself) during the storefront design phase.
  */
-function bottleImageFor(condition: OfferCondition): string {
+function offerQuantityFor(condition: OfferCondition): number | null {
   if (condition.type === "quantity_threshold") {
-    if (condition.minQuantity <= 1) return oneBottle;
-    if (condition.minQuantity === 2) return twoBottles;
-    return threeBottles;
+    return Math.max(1, condition.minQuantity);
   }
-  return oneBottle;
+  return null;
 }
 
 export default function OffersPage() {
@@ -150,33 +148,35 @@ export default function OffersPage() {
   if (!isMinimal) {
     return (
       <div className='min-h-[60vh] flex items-center justify-center'>
-        <p className='text-gray-500'>Page not found</p>
+        <p className='text-zeli-ink-muted'>Page not found</p>
       </div>
     );
   }
 
   return (
-    <div className='bg-white pb-24 lg:pb-12 overflow-x-hidden'>
+    <div className='bg-zeli-bg pb-24 lg:pb-12 overflow-x-hidden'>
       <div className='max-w-3xl lg:max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12 lg:py-16'>
         {/* Heading */}
         <div className='mb-8 lg:mb-12'>
-          <h1 className='text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 inline-block relative pb-2'>
+          <h1 className='text-2xl sm:text-3xl lg:text-4xl font-bold text-zeli-ink inline-block relative pb-2'>
             {isAr ? "العروض" : "Offers"}
-            <span className='absolute bottom-0 start-0 w-12 h-[3px] bg-gray-900' />
+            <span className='absolute bottom-0 start-0 w-12 h-[3px] bg-zeli-accent' />
           </h1>
-          <p className='text-sm lg:text-base text-gray-500 mt-3'>
+          <p className='text-sm lg:text-base text-zeli-ink-muted mt-3'>
+            {/* "Exclusive deals on your favorite scents." / "عطورك المفضلة"
+                is perfume copy carried over from the previous brand. */}
             {isAr
-              ? "عروض حصرية على عطورك المفضلة."
-              : "Exclusive deals on your favorite scents."}
+              ? "العروض النشطة حالياً في المتجر."
+              : "Offers currently running in the store."}
           </p>
         </div>
 
         {isLoading ? (
           <div className='flex items-center justify-center py-16'>
-            <Loader2 className='w-6 h-6 animate-spin text-gray-400' />
+            <Loader2 className='w-6 h-6 animate-spin text-zeli-ink-subtle' />
           </div>
         ) : offers.length === 0 ? (
-          <p className='text-sm text-gray-400 py-8'>
+          <p className='text-sm text-zeli-ink-subtle py-8'>
             {isAr ? "لا توجد عروض نشطة حالياً." : "No active offers right now."}
           </p>
         ) : (
@@ -192,18 +192,23 @@ export default function OffersPage() {
                     "relative border rounded-lg p-3 sm:p-4 lg:p-6 flex flex-row items-start gap-3 sm:gap-4 lg:gap-6 transition-colors duration-500",
                     isUnlocked
                       ? "border-emerald-400 bg-emerald-50/60 animate-offer-card-glow"
-                      : "border-gray-200 bg-white",
+                      : "border-zeli-line bg-zeli-bg",
                     isFlashing && "animate-offer-card-flash",
                   )}>
-                  <img
-                    src={bottleImageFor(offer.condition)}
-                    alt=''
-                    className='w-16 h-16 sm:w-24 sm:h-24 lg:w-40 lg:h-40 object-cover rounded-md bg-gray-50 shrink-0 self-start'
-                  />
+                  <div
+                    aria-hidden='true'
+                    className='w-16 h-16 sm:w-24 sm:h-24 lg:w-40 lg:h-40 rounded-md bg-zeli-surface border border-zeli-line shrink-0 self-start flex flex-col items-center justify-center text-zeli-ink-subtle'>
+                    <Tag className='w-5 h-5 lg:w-8 lg:h-8' />
+                    {offerQuantityFor(offer.condition) !== null && (
+                      <span className='mt-1 text-[10px] lg:text-sm font-semibold tracking-wide'>
+                        {offerQuantityFor(offer.condition)}+
+                      </span>
+                    )}
+                  </div>
                   <div className='flex-1 min-w-0'>
                     <div className='flex flex-wrap items-center gap-1.5 lg:gap-3 mb-1.5 lg:mb-3'>
                       {badge && (
-                        <span className='inline-block bg-black text-white text-[9px] sm:text-[10px] lg:text-xs font-bold uppercase tracking-wide px-2 py-0.5 lg:px-3 lg:py-1.5 rounded'>
+                        <span className='inline-block bg-black text-zeli-ink-inverse text-[9px] sm:text-[10px] lg:text-xs font-bold uppercase tracking-wide px-2 py-0.5 lg:px-3 lg:py-1.5 rounded'>
                           {badge}
                         </span>
                       )}
@@ -218,17 +223,17 @@ export default function OffersPage() {
                         </span>
                       )}
                     </div>
-                    <h3 className='text-sm sm:text-base lg:text-2xl font-bold text-gray-900 uppercase'>
+                    <h3 className='text-sm sm:text-base lg:text-2xl font-bold text-zeli-ink uppercase'>
                       {offer.name}
                     </h3>
                     {offer.description && (
-                      <p className='text-xs sm:text-sm lg:text-base text-gray-600 mt-0.5 lg:mt-2 mb-2.5 lg:mb-5'>
+                      <p className='text-xs sm:text-sm lg:text-base text-zeli-ink-secondary mt-0.5 lg:mt-2 mb-2.5 lg:mb-5'>
                         {offer.description}
                       </p>
                     )}
                     <Link
                       href='/shop'
-                      className='inline-flex items-center gap-1.5 bg-black hover:bg-gray-900 text-white text-[11px] sm:text-xs lg:text-sm font-semibold uppercase tracking-wide px-3 py-2 lg:px-6 lg:py-3 rounded-md transition-colors'>
+                      className='inline-flex items-center gap-1.5 bg-black hover:bg-gray-900 text-zeli-ink-inverse text-[11px] sm:text-xs lg:text-sm font-semibold uppercase tracking-wide px-3 py-2 lg:px-6 lg:py-3 rounded-md transition-colors'>
                       {isAr ? "تسوق الآن" : "Shop Now"} →
                     </Link>
                   </div>
@@ -240,14 +245,14 @@ export default function OffersPage() {
 
         {/* Active promo codes */}
         {promoCodes.length > 0 && (
-          <div className='mt-10 lg:mt-14 border border-gray-200 rounded-lg bg-gray-50 p-4 sm:p-5 lg:p-8'>
+          <div className='mt-10 lg:mt-14 border border-zeli-line rounded-lg bg-zeli-surface p-4 sm:p-5 lg:p-8'>
             <div className='flex items-center gap-2 mb-1'>
-              <Tag className='w-4 h-4 lg:w-5 lg:h-5 text-gray-700' />
-              <h4 className='text-sm lg:text-lg font-bold text-gray-900'>
+              <Tag className='w-4 h-4 lg:w-5 lg:h-5 text-zeli-ink-secondary' />
+              <h4 className='text-sm lg:text-lg font-bold text-zeli-ink'>
                 {isAr ? "أكواد الخصم النشطة" : "Active Promo Codes"}
               </h4>
             </div>
-            <p className='text-xs lg:text-sm text-gray-500 mb-4 lg:mb-6'>
+            <p className='text-xs lg:text-sm text-zeli-ink-muted mb-4 lg:mb-6'>
               {isAr ? "استخدم هذه الأكواد عند الدفع." : "Use these codes at checkout."}
             </p>
             {isSignedIn ? (
@@ -255,11 +260,11 @@ export default function OffersPage() {
                 {promoCodes.map((pc) => (
                   <div
                     key={pc.id}
-                    className='bg-white border border-dashed border-gray-300 rounded-lg p-3 text-center'>
-                    <p className='text-sm font-bold tracking-wider text-gray-900'>
+                    className='bg-zeli-bg border border-dashed border-zeli-line-strong rounded-lg p-3 text-center'>
+                    <p className='text-sm font-bold tracking-wider text-zeli-ink'>
                       {pc.code}
                     </p>
-                    <p className='text-xs text-gray-500 mt-1 mb-3'>
+                    <p className='text-xs text-zeli-ink-muted mt-1 mb-3'>
                       {pc.discountType === "percentage"
                         ? `${pc.discountValue}% OFF`
                         : `${pc.discountValue.toFixed(0)} ${STORE_CURRENCY} OFF`}
@@ -272,7 +277,7 @@ export default function OffersPage() {
                     <button
                       type='button'
                       onClick={() => handleCopyCode(pc.code)}
-                      className='inline-flex items-center gap-1.5 text-xs font-semibold text-gray-700 hover:text-black border border-gray-300 rounded-md px-3 py-1.5 transition-colors'>
+                      className='inline-flex items-center gap-1.5 text-xs font-semibold text-zeli-ink-secondary hover:text-black border border-zeli-line-strong rounded-md px-3 py-1.5 transition-colors'>
                       <Copy className='w-3 h-3' />
                       {isAr ? "نسخ" : "Copy"}
                     </button>
@@ -280,18 +285,18 @@ export default function OffersPage() {
                 ))}
               </div>
             ) : (
-              <div className='animate-reveal-overlay-in flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 bg-white border border-gray-200 rounded-lg p-3 sm:p-4'>
+              <div className='animate-reveal-overlay-in flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 bg-zeli-bg border border-zeli-line rounded-lg p-3 sm:p-4'>
                 <div className='flex items-center gap-3 min-w-0'>
                   <span className='animate-reveal-lock-pulse flex items-center justify-center w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-emerald-50 text-emerald-600 shrink-0'>
                     <Percent className='w-4 h-4 sm:w-5 sm:h-5' />
                   </span>
                   <div className='min-w-0'>
-                    <p className='text-sm sm:text-base font-bold text-gray-900'>
+                    <p className='text-sm sm:text-base font-bold text-zeli-ink'>
                       {isAr
                         ? "سجّل الدخول لكشف أكواد الخصم النشطة"
                         : "Sign in to reveal active promo codes"}
                     </p>
-                    <p className='text-xs sm:text-sm text-gray-500 mt-0.5'>
+                    <p className='text-xs sm:text-sm text-zeli-ink-muted mt-0.5'>
                       {isAr
                         ? "أنشئ حسابًا مجانيًا لعرض ونسخ أكواد الخصم الحصرية."
                         : "Create a free account to view and copy exclusive discount codes."}
@@ -300,7 +305,7 @@ export default function OffersPage() {
                 </div>
                 <Link
                   href='/login'
-                  className='shrink-0 inline-flex items-center gap-1.5 bg-black hover:bg-gray-900 text-white text-xs sm:text-sm font-semibold uppercase tracking-wide px-3 py-2 sm:px-4 sm:py-2.5 rounded-md transition-colors'>
+                  className='shrink-0 inline-flex items-center gap-1.5 bg-black hover:bg-gray-900 text-zeli-ink-inverse text-xs sm:text-sm font-semibold uppercase tracking-wide px-3 py-2 sm:px-4 sm:py-2.5 rounded-md transition-colors'>
                   <Lock className='w-3.5 h-3.5' />
                   {isAr ? "دخول" : "Sign In"}
                 </Link>
@@ -310,17 +315,17 @@ export default function OffersPage() {
         )}
 
         {/* Newsletter */}
-        <div className='mt-8 lg:mt-8 border border-gray-200 rounded-lg p-4 sm:p-5 lg:p-8 flex flex-col sm:flex-row items-start sm:items-center gap-4 lg:gap-6'>
+        <div className='mt-8 lg:mt-8 border border-zeli-line rounded-lg p-4 sm:p-5 lg:p-8 flex flex-col sm:flex-row items-start sm:items-center gap-4 lg:gap-6'>
           <div className='flex items-start gap-2 lg:gap-3 flex-1'>
-            <Send className='w-4 h-4 lg:w-5 lg:h-5 text-gray-700 mt-0.5 shrink-0' />
+            <Send className='w-4 h-4 lg:w-5 lg:h-5 text-zeli-ink-secondary mt-0.5 shrink-0' />
             <div>
-              <h4 className='text-sm lg:text-lg font-bold text-gray-900'>
+              <h4 className='text-sm lg:text-lg font-bold text-zeli-ink'>
                 {isAr ? "اشترك لتصلك أحدث العروض" : "Subscribe to receive the latest offers"}
               </h4>
-              <p className='text-xs lg:text-sm text-gray-500 mt-0.5'>
+              <p className='text-xs lg:text-sm text-zeli-ink-muted mt-0.5'>
                 {isAr
-                  ? "كن أول من يعرف عن العطور الجديدة والعروض الحصرية."
-                  : "Be the first to know about new scents and exclusive deals."}
+                  ? "كن أول من يعرف عن المنتجات الجديدة والعروض."
+                  : "Be the first to hear about new pieces and offers."}
               </p>
             </div>
           </div>
@@ -333,12 +338,12 @@ export default function OffersPage() {
               value={newsletterEmail}
               onChange={(e) => setNewsletterEmail(e.target.value)}
               placeholder={isAr ? "بريدك الإلكتروني" : "Enter your email"}
-              className='w-full sm:w-56 lg:w-72 px-3 py-2.5 lg:py-3 text-sm lg:text-base rounded-md border border-gray-300 outline-none focus:border-gray-900 transition-colors bg-white'
+              className='w-full sm:w-56 lg:w-72 px-3 py-2.5 lg:py-3 text-sm lg:text-base rounded-md border border-zeli-line-strong outline-none focus:border-zeli-ink transition-colors bg-zeli-bg'
             />
             <button
               type='submit'
               disabled={isSubscribing}
-              className='w-full sm:w-auto px-4 py-2.5 rounded-md bg-black hover:bg-gray-900 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0'>
+              className='w-full sm:w-auto px-4 py-2.5 rounded-md bg-black hover:bg-gray-900 text-zeli-ink-inverse text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0'>
               {isSubscribing ? (
                 <Loader2 className='w-4 h-4 animate-spin mx-auto' />
               ) : isAr ? (

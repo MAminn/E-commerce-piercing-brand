@@ -13,10 +13,6 @@ import {
   ShoppingCart,
   ArrowRight,
   ArrowLeft,
-  ShieldCheck,
-  Lock,
-  Truck,
-  RotateCcw,
 } from "lucide-react";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 
@@ -532,26 +528,10 @@ export function CartPageModernTemplate({
               )}
             </div>
 
-            {/* ── Trust badges ─────────────────────────────── */}
-            {/* Desktop only — on mobile these are shown after the order summary */}
-            <div className='hidden lg:grid mt-8 pt-6 border-t grid-cols-4 gap-4 text-center text-xs text-muted-foreground'>
-              <div className='flex flex-col items-center gap-1.5'>
-                <ShieldCheck className='w-5 h-5 text-muted-foreground/70' />
-                <span>100% Authentic Products</span>
-              </div>
-              <div className='flex flex-col items-center gap-1.5'>
-                <Lock className='w-5 h-5 text-muted-foreground/70' />
-                <span>Secure Payments</span>
-              </div>
-              <div className='flex flex-col items-center gap-1.5'>
-                <Truck className='w-5 h-5 text-muted-foreground/70' />
-                <span>Fast &amp; Reliable Delivery</span>
-              </div>
-              <div className='flex flex-col items-center gap-1.5'>
-                <RotateCcw className='w-5 h-5 text-muted-foreground/70' />
-                <span>Easy Returns</span>
-              </div>
-            </div>
+            {/* Trust badges removed entirely — "100% Authentic Products",
+                "Secure Payments", "Fast & Reliable Delivery" and "Easy
+                Returns" were four claims the business has not made. The empty
+                grid went with them rather than leaving a bordered blank row. */}
           </div>
 
           {/* ── Order Summary ──────────────────────────────── */}
@@ -617,27 +597,18 @@ export function CartPageModernTemplate({
                 </span>
               </div>
 
-              {/* Trust signals — directly above Proceed to Checkout */}
-              <div className='flex flex-wrap items-center justify-center gap-4 sm:gap-6 border-t border-stone-100 pt-4'>
-                <div className='flex items-center gap-1.5'>
-                  <Lock className='h-3.5 w-3.5 text-stone-400' />
-                  <span className='text-[11px] tracking-wide text-stone-500'>
-                    Secure Checkout
-                  </span>
-                </div>
-                <div className='flex items-center gap-1.5'>
-                  <Truck className='h-3.5 w-3.5 text-stone-400' />
-                  <span className='text-[11px] tracking-wide text-stone-500'>
-                    Fast Delivery
-                  </span>
-                </div>
-                <div className='flex items-center gap-1.5'>
-                  <RotateCcw className='h-3.5 w-3.5 text-stone-400' />
-                  <span className='text-[11px] tracking-wide text-stone-500'>
-                    Easy Returns
-                  </span>
-                </div>
-              </div>
+              {/* Trust signals removed. "Fast Delivery" and "Easy Returns"
+                  were asserted as fact directly above the checkout button —
+                  ZELI has set no delivery time and published no returns
+                  policy, so both were promises the business had not made.
+                  "Secure Checkout" went with them: this store is COD-only
+                  until a gateway is configured, and there is nothing for a
+                  padlock to be securing.
+
+                  This template is not the ZELI production cart (see
+                  ZELI_TEMPLATE_PRESET in shared/config/storefront.ts) but it
+                  remains selectable from Dashboard > Templates, so it must
+                  not carry claims either. */}
 
               {/* Proceed button — hidden on mobile (sticky bar handles it) */}
               <Button
@@ -665,48 +636,21 @@ export function CartPageModernTemplate({
                 {t("cart.continue_shopping") || "Continue Shopping"}
               </Button>
 
-              {/* Payment logos */}
-              <div className='pt-2 border-t flex items-center justify-center gap-2 flex-wrap'>
-                <span className='text-xs text-muted-foreground mr-1'>
-                  We accept
-                </span>
-                <span className='inline-flex items-center px-2 py-0.5 rounded border text-xs font-bold text-blue-700 bg-white border-blue-200'>
-                  VISA
-                </span>
-                <span className='inline-flex items-center px-2 py-0.5 rounded border text-xs font-bold bg-white border-gray-200'>
-                  <span className='text-red-500'>●</span>
-                  <span className='text-yellow-500 -ms-1'>●</span>
-                </span>
-                <span className='inline-flex items-center px-2 py-0.5 rounded border text-xs font-bold text-green-700 bg-white border-green-200'>
-                  meeza
-                </span>
-                <span className='inline-flex items-center px-2 py-0.5 rounded border text-xs font-bold bg-white border-gray-200'>
-                  🍎 Pay
-                </span>
-              </div>
+              {/* Payment logos removed.
+                  This read "We accept" followed by Visa, Mastercard, Meeza
+                  and Apple Pay marks. None of them is accepted: no payment
+                  gateway is configured, the only method `payment.methods`
+                  returns is Cash on Delivery, and Apple Pay has no code path
+                  in this repo at all. It sat in the cart summary, one click
+                  before checkout, telling a shopper they could pay by card.
+
+                  If a gateway is enabled later, the accepted methods are
+                  already listed on the checkout page from the server's own
+                  response — they must never be hardcoded here. */}
             </div>
           </div>
         </div>
 
-        {/* ── Trust badges (mobile only — appears after order summary) ── */}
-        <div className='lg:hidden mt-8 pt-6 border-t grid grid-cols-2 sm:grid-cols-4 gap-4 text-center text-xs text-muted-foreground'>
-          <div className='flex flex-col items-center gap-1.5'>
-            <ShieldCheck className='w-5 h-5 text-muted-foreground/70' />
-            <span>100% Authentic Products</span>
-          </div>
-          <div className='flex flex-col items-center gap-1.5'>
-            <Lock className='w-5 h-5 text-muted-foreground/70' />
-            <span>Secure Payments</span>
-          </div>
-          <div className='flex flex-col items-center gap-1.5'>
-            <Truck className='w-5 h-5 text-muted-foreground/70' />
-            <span>Fast &amp; Reliable Delivery</span>
-          </div>
-          <div className='flex flex-col items-center gap-1.5'>
-            <RotateCcw className='w-5 h-5 text-muted-foreground/70' />
-            <span>Easy Returns</span>
-          </div>
-        </div>
 
       </div>
     </div>

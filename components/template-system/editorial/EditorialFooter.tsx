@@ -1,7 +1,11 @@
 import { useState, type FC } from "react";
 import { Link } from "#root/components/utils/Link";
 import { ArrowRight } from "lucide-react";
-import { STORE_NAME } from "#root/shared/config/branding";
+import {
+  STORE_NAME,
+  STORE_SOCIAL_LINKS,
+  isUsableUrl,
+} from "#root/shared/config/branding";
 import { useLayoutSettings } from "#root/frontend/contexts/LayoutSettingsContext";
 import type { SocialPlatform } from "#root/shared/types/layout-settings";
 import { FooterLogo } from "#root/components/globals/FooterLogo";
@@ -70,11 +74,21 @@ const TikTokIcon = () => (
 /*  Data                                                              */
 /* ------------------------------------------------------------------ */
 
-const DEFAULT_SOCIAL_LINKS = [
-  { id: "facebook", name: "Facebook", url: "#", Icon: FacebookIcon },
-  { id: "instagram", name: "Instagram", url: "#", Icon: InstagramIcon },
-  { id: "tiktok", name: "TikTok", url: "#", Icon: TikTokIcon },
-];
+/**
+ * Social profiles from central brand configuration (VITE_SOCIAL_*). Empty
+ * until the new brand's accounts exist — the previous "#" placeholders were
+ * dead links, and the old brand's real accounts are not being reused.
+ * A function, not a const, so it doesn't depend on `socialIconMap` having
+ * been initialised further down the module.
+ */
+function getConfiguredSocialLinks() {
+  return STORE_SOCIAL_LINKS.map((link) => ({
+    id: link.platform,
+    name: link.platform.charAt(0).toUpperCase() + link.platform.slice(1),
+    url: link.url,
+    Icon: socialIconMap[link.platform as SocialPlatform] ?? FacebookIcon,
+  }));
+}
 
 const DEFAULT_FOOTER_COLUMNS = [
   {
@@ -85,20 +99,10 @@ const DEFAULT_FOOTER_COLUMNS = [
     ],
   },
   {
-    title: "Company",
-    links: [
-      { label: "About", href: "#" },
-      { label: "Sustainability", href: "#" },
-      { label: "Careers", href: "#" },
-    ],
-  },
-  {
     title: "Support",
     links: [
-      { label: "Contact Us", href: "#" },
-      { label: "Shipping & Returns", href: "#" },
-      { label: "FAQ", href: "#" },
-      { label: "Privacy Policy", href: "#" },
+      { label: "Contact Us", href: "/contact" },
+      { label: "My Account", href: "/account" },
     ],
   },
 ] as const;
@@ -140,14 +144,17 @@ export function EditorialFooter() {
 
   // Build social links from CMS if available
   const SOCIAL_LINKS =
-    layoutSettings.footer.socialLinks.length > 0
-      ? layoutSettings.footer.socialLinks.map((sl) => ({
-          id: sl.id,
-          name: sl.platform.charAt(0).toUpperCase() + sl.platform.slice(1),
-          url: sl.url,
-          Icon: socialIconMap[sl.platform] ?? FacebookIcon,
-        }))
-      : DEFAULT_SOCIAL_LINKS;
+    layoutSettings.footer.socialLinks.filter((sl) => isUsableUrl(sl.url))
+      .length > 0
+      ? layoutSettings.footer.socialLinks
+          .filter((sl) => isUsableUrl(sl.url))
+          .map((sl) => ({
+            id: sl.id,
+            name: sl.platform.charAt(0).toUpperCase() + sl.platform.slice(1),
+            url: sl.url,
+            Icon: socialIconMap[sl.platform] ?? FacebookIcon,
+          }))
+      : getConfiguredSocialLinks();
 
   // Build footer columns from CMS if available
   const FOOTER_COLUMNS =
@@ -260,23 +267,11 @@ export function EditorialFooter() {
           <p className='text-[10px] text-white/20 font-light tracking-[0.08em]'>
             &copy; {new Date().getFullYear()} {effectiveCopyright}
           </p>
-          <div className='flex items-center gap-6'>
-            <Link
-              href='#'
-              className='text-[10px] text-white/20 hover:text-white/40 font-light tracking-[0.08em] transition-colors duration-500'>
-              Terms
-            </Link>
-            <Link
-              href='#'
-              className='text-[10px] text-white/20 hover:text-white/40 font-light tracking-[0.08em] transition-colors duration-500'>
-              Privacy
-            </Link>
-            <Link
-              href='#'
-              className='text-[10px] text-white/20 hover:text-white/40 font-light tracking-[0.08em] transition-colors duration-500'>
-              Cookies
-            </Link>
-          </div>
+          {/* Terms / Privacy / Cookies used to sit here as three "#" links.
+              None of those pages exist and none of those policies are
+              published, so linking them was a promise the store could not
+              keep. Add them as a footer link group from Dashboard > Layout
+              Settings once the real pages ship. */}
         </div>
       </div>
     </footer>

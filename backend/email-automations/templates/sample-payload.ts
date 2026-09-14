@@ -18,7 +18,7 @@ export function buildSamplePayload(
     case "review_check":
       return {
         customerName: "Alex",
-        productName: "Oud Royal Eau de Parfum",
+        productName: "Titanium Threadless Labret",
         productImageUrl: "",
         productSubtitle: "100ml · Delivered",
       };
@@ -27,7 +27,7 @@ export function buildSamplePayload(
         step: stepKey,
         items: [
           {
-            name: "Oud Royal Eau de Parfum",
+            name: "Titanium Threadless Labret",
             imageUrl: "",
             subtitle: "100ml",
             priceLabel: "$79.00",

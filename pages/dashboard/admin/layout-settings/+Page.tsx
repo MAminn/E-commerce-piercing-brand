@@ -48,6 +48,7 @@ import {
   templateConfig,
 } from "#root/components/template-system/templateConfig";
 import { useTemplate } from "#root/frontend/contexts/TemplateContext";
+import { resolveTemplateId } from "#root/shared/config/storefront";
 
 const SOCIAL_PLATFORMS: { value: SocialPlatform; label: string }[] = [
   { value: "facebook", label: "Facebook" },
@@ -65,8 +66,20 @@ export default function LayoutSettingsPage() {
   const MERCHANT_ID = getStoreOwnerId();
   const { getTemplateId } = useTemplate();
 
-  // Auto-select the currently active landing template
-  const activeLandingTemplate = getTemplateId("landing") ?? templateConfig.landing[0]?.id ?? "landing-modern";
+  // Auto-select the currently active landing template.
+  //
+  // This was the last literal template-id fallback left in the repo. It
+  // resolved to `templateConfig.landing[0]?.id ?? "landing-modern"`, so on a
+  // store that had never saved a selection the admin edited the layout
+  // settings row scoped to `landing-modern` while the storefront rendered
+  // `landing-minimal` — their changes went to a row nobody was reading.
+  //
+  // Same resolver and the same precedence as every customer-facing route: a
+  // stored selection still wins, the ZELI preset is only the fallback.
+  const activeLandingTemplate = resolveTemplateId(
+    "landing",
+    getTemplateId("landing"),
+  );
 
   const [settings, setSettings] = useState<LayoutSettings>(
     DEFAULT_LAYOUT_SETTINGS,
@@ -542,7 +555,7 @@ export default function LayoutSettingsPage() {
               onChange={(e) =>
                 setSettings((prev) => ({ ...prev, siteTitle: e.target.value }))
               }
-              placeholder='e.g. MATCH Perfumes — Official Store'
+              placeholder='e.g. Your Brand — Official Store'
               className='mt-1'
             />
             <p className='text-xs text-muted-foreground mt-1'>
@@ -898,7 +911,7 @@ export default function LayoutSettingsPage() {
                   id='header-logo-text'
                   value={settings.header.logoText ?? ""}
                   onChange={(e) => updateHeader("logoText", e.target.value)}
-                  placeholder='e.g. LEBSY'
+                  placeholder='e.g. YOUR BRAND'
                   className='mt-1'
                 />
               </div>
@@ -1260,7 +1273,7 @@ export default function LayoutSettingsPage() {
                 id='footer-logo-text'
                 value={settings.footer.logoText ?? ""}
                 onChange={(e) => updateFooter("logoText", e.target.value)}
-                placeholder='e.g. LEBSY'
+                placeholder='e.g. YOUR BRAND'
                 className='mt-1'
               />
               {settings.header.navbarStyle === "minimal" && (

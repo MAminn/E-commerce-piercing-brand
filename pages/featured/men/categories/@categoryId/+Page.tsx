@@ -4,6 +4,7 @@ import { usePageContext } from "vike-react/usePageContext";
 import { trpc } from "#root/shared/trpc/client";
 import { getStoreOwnerId } from "#root/shared/config/store";
 import { getTemplateComponent } from "#root/components/template-system/templateConfig";
+import { resolveTemplateId } from "#root/shared/config/storefront";
 import { useTemplate } from "#root/frontend/contexts/TemplateContext";
 import type {
   CategoryPageProduct,
@@ -92,8 +93,10 @@ const Page = () => {
     return <ErrorSection error={error} />;
   }
 
-  const activeTemplateId =
-    getTemplateId("categoryPage") ?? "category-grid-with-filters";
+  const activeTemplateId = resolveTemplateId(
+    "categoryPage",
+    getTemplateId("categoryPage"),
+  );
   const TemplateEntry = getTemplateComponent("categoryPage", activeTemplateId);
 
   if (!TemplateEntry) {

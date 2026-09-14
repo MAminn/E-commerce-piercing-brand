@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { trpc } from "#root/shared/trpc/client";
 import { getTemplateComponent } from "#root/components/template-system/templateConfig";
+import { resolveTemplateId } from "#root/shared/config/storefront";
 import { useTemplate } from "#root/frontend/contexts/TemplateContext";
 import { useLayoutSettings } from "#root/frontend/contexts/LayoutSettingsContext";
 import type { SortingPageProduct } from "#root/components/template-system/sorting/SortingMinimalTemplate";
@@ -112,7 +113,7 @@ export default function ShopPage() {
         const merchantId = getStoreOwnerId();
         const result = await trpc.homepage.getContent.query({
           merchantId,
-          templateId: getTemplateId("landing") || "landing-minimal",
+          templateId: resolveTemplateId("landing", getTemplateId("landing")),
         });
         if (cancelled) return;
 
@@ -274,7 +275,10 @@ export default function ShopPage() {
   }
 
   /* ── Default / other template path ────────────────────────────────── */
-  const activeTemplateId = getTemplateId("sorting") ?? "sorting-minimal";
+  const activeTemplateId = resolveTemplateId(
+    "sorting",
+    getTemplateId("sorting"),
+  );
   const TemplateEntry = getTemplateComponent("sorting", activeTemplateId);
 
   if (!TemplateEntry) {
@@ -287,17 +291,22 @@ export default function ShopPage() {
     <div>
       {/* Breadcrumb when filtering by category */}
       {categoryName && (
-        <div
+        <nav
+          aria-label='Breadcrumb'
           data-shop-breadcrumb
-          className='container mx-auto px-4 sm:px-6 lg:px-8 pt-6'>
-          <div className='flex items-center gap-2 text-sm text-stone-600 mb-4'>
-            <a href='/shop' className='hover:text-stone-900 transition-colors'>
+          className='zeli-container pt-6'>
+          <div className='mb-4 flex items-center gap-2 text-[length:var(--zeli-text-small)] text-zeli-ink-muted'>
+            <a
+              href='/shop'
+              className='zeli-underline-hover transition-colors hover:text-zeli-ink'>
               All Products
             </a>
-            <span>/</span>
-            <span className='text-stone-900 font-medium'>{categoryName}</span>
+            <span aria-hidden>/</span>
+            <span aria-current='page' className='truncate text-zeli-ink'>
+              {categoryName}
+            </span>
           </div>
-        </div>
+        </nav>
       )}
       <Template
         products={products}

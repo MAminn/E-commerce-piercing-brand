@@ -1,3 +1,8 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Business-promise sweep (Phase 2). Hardcoded shipping / returns / warranty
+// claims removed — ZELI has published no such policies, and switching to this
+// template from the dashboard would have shown them to customers.
+// ─────────────────────────────────────────────────────────────────────────────
 /**
  * @legacy
  * Legacy Template System (v1)
@@ -368,18 +373,11 @@ export const ModernCartTemplate: React.FC<ModernCartTemplateProps> = ({
                     </div>
                   </div>
 
-                  {subtotal < 100 && (
-                    <div className='bg-gray-50 p-4 border border-gray-200 mt-4'>
-                      <p className='text-sm text-gray-700'>
-                        <span className='font-medium'>Free shipping</span> on
-                        orders over EGP 100. Add{" "}
-                        <span className='font-medium'>
-                          EGP {(100 - subtotal).toFixed(2)}
-                        </span>{" "}
-                        more to qualify.
-                      </p>
-                    </div>
-                  )}
+                  {/* A "Free shipping on orders over EGP 100" progress
+                      nudge used to render here against a hardcoded threshold.
+                      Real free-shipping thresholds come from the Offers
+                      system (backend/offers), which drives OfferProgressBanner
+                      on the active cart — this invented its own. */}
 
                   <div className='space-y-3 mt-6'>
                     <Link href='/checkout'>

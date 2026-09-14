@@ -841,6 +841,10 @@ export const createOrder = (
               customerPhone: result.customerPhone,
             })
           : NewOrderEmailTemplate({
+              storeName: branding.storeName,
+              logoUrl: branding.logoUrl,
+              contactEmail: branding.contactEmail,
+              currency: branding.currency,
               items: orderItems,
               shippingFees: Number.parseFloat(result.shipping),
               subTotal: Number.parseFloat(result.subtotal),

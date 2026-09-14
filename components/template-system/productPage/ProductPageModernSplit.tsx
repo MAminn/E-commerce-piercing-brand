@@ -1,3 +1,12 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Business-promise sweep (Phase 2). This template previously hardcoded
+// shipping, returns and guarantee claims. Those are business facts ZELI has
+// not established, and an admin switching to this template in the dashboard
+// would have published them to customers instantly. Only claims the store can
+// actually stand behind (secure checkout — payments run through Paymob/Stripe)
+// remain. Real policy copy belongs in Dashboard > Settings > Product page
+// content, which the active templates already read.
+// ─────────────────────────────────────────────────────────────────────────────
 import type React from "react";
 import { useState } from "react";
 import { VariantSelector } from "#root/components/shop/VariantSelector";
@@ -12,9 +21,7 @@ import {
   Heart,
   Star,
   StarHalf,
-  Truck,
   Shield,
-  RotateCcw,
   Share2,
   Facebook,
   Twitter,
@@ -139,24 +146,9 @@ export interface ProductPageModernSplitProps {
 // Default product features
 const DEFAULT_FEATURES: ProductFeature[] = [
   {
-    icon: "package",
-    title: "Free Shipping",
-    description: "On orders over EGP 50",
-  },
-  {
     icon: "shield",
     title: "Secure Payment",
     description: "100% secure transaction",
-  },
-  {
-    icon: "zap",
-    title: "Fast Delivery",
-    description: "Ships within 24 hours",
-  },
-  {
-    icon: "award",
-    title: "Quality Guaranteed",
-    description: "30-day money back",
   },
 ];
 
@@ -474,21 +466,10 @@ export function ProductPageModernSplit({
                 )}
               </div>
 
-              {/* Trust Badges */}
-              <div className='grid grid-cols-3 gap-4 pt-4'>
-                <div className='flex items-center gap-2 text-sm text-gray-600'>
-                  <Truck className='w-5 h-5 text-purple-600' />
-                  <span>Fast Delivery</span>
-                </div>
-                <div className='flex items-center gap-2 text-sm text-gray-600'>
-                  <Shield className='w-5 h-5 text-purple-600' />
-                  <span>Secure</span>
-                </div>
-                <div className='flex items-center gap-2 text-sm text-gray-600'>
-                  <RotateCcw className='w-5 h-5 text-purple-600' />
-                  <span>Easy Returns</span>
-                </div>
-              </div>
+              {/* Trust badges removed: "Fast Delivery" and "Easy Returns"
+                  state a delivery time and a returns policy that ZELI has not
+                  established. Legacy template, still admin-selectable, so it
+                  must not carry the claims either. */}
 
               {/* Social Share */}
               {showSocialShare && (

@@ -70,7 +70,7 @@ export function AppliedOffersSavings({
     if (totalSavings <= 0) return null;
 
     return (
-      <div className="bg-emerald-600 text-white">
+      <div className="bg-zeli-success text-zeli-ink-inverse">
         <button
           type="button"
           onClick={toggle}
@@ -92,7 +92,7 @@ export function AppliedOffersSavings({
           />
         </button>
         {expanded && (
-          <div className="border-t border-emerald-500/40 px-4 pb-2.5 opacity-95">
+          <div className="border-t border-zeli-ink-inverse/25 px-4 pb-2.5 opacity-95">
             {details}
           </div>
         )}
@@ -103,7 +103,7 @@ export function AppliedOffersSavings({
   if (offersTotal <= 0) return null;
 
   return (
-    <div className="text-[13px] text-red-600">
+    <div className="text-[13px] text-zeli-sale">
       <button
         type="button"
         onClick={toggle}
@@ -127,7 +127,7 @@ export function AppliedOffersSavings({
         </span>
       </button>
       {expanded && (
-        <div className="ml-4 mt-1.5 space-y-1 border-l border-red-200 pl-3 text-[12px] text-red-600/90">
+        <div className="ml-4 mt-1.5 space-y-1 border-l border-zeli-sale/30 pl-3 text-[12px] text-zeli-sale/90">
           {appliedOffers.map((offer) => (
             <div
               key={offer.name}

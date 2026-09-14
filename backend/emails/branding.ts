@@ -3,8 +3,15 @@ import { getTemplateSelectionRaw } from "#root/backend/settings/get-template-sel
 import { getEmailAutomationSettingsRaw } from "#root/backend/email-automations/settings-service";
 import { db } from "#root/shared/database/drizzle/db";
 import { getStoreOwnerId } from "#root/shared/config/store";
-import { STORE_NAME, STORE_CURRENCY } from "#root/shared/config/branding";
+import {
+  STORE_NAME,
+  STORE_CURRENCY,
+  SUPPORT_EMAIL,
+  STORE_SOCIAL_LINKS,
+  isUsableUrl,
+} from "#root/shared/config/branding";
 import { toAbsoluteUrl } from "#root/shared/config/site-url";
+import { resolveLandingTemplateId } from "#root/shared/config/storefront";
 
 export interface EmailBranding {
   storeName: string;
@@ -28,7 +35,7 @@ export async function getEmailBranding(): Promise<EmailBranding> {
     // whenever the admin had a different landing template active, which is
     // why the email logo could differ from (or 404 against) the real site header.
     const templateSelection = await getTemplateSelectionRaw(db());
-    const activeLandingTemplate = templateSelection.landing || "landing-minimal";
+    const activeLandingTemplate = resolveLandingTemplateId(templateSelection);
     const settings = await getLayoutSettings(getStoreOwnerId(), activeLandingTemplate);
     const isMinimal = settings.header.navbarStyle === "minimal";
     const storeName = settings.siteTitle || STORE_NAME || "Store";
@@ -59,21 +66,40 @@ export async function getEmailBranding(): Promise<EmailBranding> {
     return {
       storeName,
       logoUrl,
-      contactEmail: settings.header.contactEmail || undefined,
+      // CMS value first, then the configured support inbox. Stays undefined
+      // when neither exists so templates omit the contact line entirely
+      // rather than printing a previous brand's address.
+      contactEmail:
+        settings.header.contactEmail || SUPPORT_EMAIL || undefined,
       currency: STORE_CURRENCY,
       isMinimal,
-      socialLinks: (settings.footer.socialLinks ?? []).filter(
-        (s) => s.url && s.url !== "#",
-      ),
+      // CMS links win; anything the admin hasn't filled in (empty or the
+      // seeded "#" placeholder) is dropped rather than rendered as a dead
+      // link. Falls back to the env-configured profiles, which are empty
+      // until the new brand's accounts exist.
+      socialLinks: resolveSocialLinks(settings.footer.socialLinks),
     };
   } catch {
     return {
       storeName: STORE_NAME || "Store",
       logoUrl: undefined,
-      contactEmail: undefined,
+      contactEmail: SUPPORT_EMAIL || undefined,
       currency: STORE_CURRENCY,
       isMinimal: false,
-      socialLinks: [],
+      socialLinks: resolveSocialLinks(undefined),
     };
   }
+}
+
+/**
+ * Normalises the two possible sources of social profiles into one list,
+ * discarding placeholders. Returns an empty array when nothing is configured
+ * — callers render no social row at all in that case.
+ */
+function resolveSocialLinks(
+  cmsLinks: Array<{ platform: string; url: string }> | undefined,
+): Array<{ platform: string; url: string }> {
+  const fromCms = (cmsLinks ?? []).filter((s) => isUsableUrl(s.url));
+  if (fromCms.length > 0) return fromCms.map((s) => ({ platform: s.platform, url: s.url }));
+  return STORE_SOCIAL_LINKS.map((s) => ({ platform: s.platform, url: s.url }));
 }

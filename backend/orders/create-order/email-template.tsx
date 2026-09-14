@@ -17,6 +17,10 @@ import {
 import * as React from "react";
 
 export const NewOrderEmailTemplate = ({
+  storeName,
+  logoUrl,
+  contactEmail,
+  currency,
   items,
   shippingFees,
   subTotal,
@@ -30,6 +34,12 @@ export const NewOrderEmailTemplate = ({
   state,
   total,
 }: {
+  /** Resolved by backend/emails/branding.ts — never hardcode a brand here. */
+  storeName: string;
+  logoUrl?: string;
+  /** Omitted entirely when no support inbox is configured. */
+  contactEmail?: string;
+  currency: string;
   items: {
     name: string;
     quantity: number;
@@ -59,7 +69,7 @@ export const NewOrderEmailTemplate = ({
     <Html>
       <Head>
         <title>Your Order Confirmation</title>
-        <Preview>Thank you for your order at Lebsy!</Preview>
+        <Preview>Thank you for your order at {storeName}!</Preview>
       </Head>
       <Body style={main}>
         {/* Header */}
@@ -67,9 +77,18 @@ export const NewOrderEmailTemplate = ({
           <Section style={header}>
             <Row>
               <Column>
-                <Heading as='h1' style={logo}>
-                  Lebsy
-                </Heading>
+                {logoUrl ? (
+                  <Img
+                    src={logoUrl}
+                    alt={storeName}
+                    height='40'
+                    style={{ objectFit: "contain", maxWidth: "180px" }}
+                  />
+                ) : (
+                  <Heading as='h1' style={logo}>
+                    {storeName}
+                  </Heading>
+                )}
               </Column>
               <Column style={headerRight}>
                 <Text style={headerText}>Order Confirmation</Text>
@@ -113,15 +132,15 @@ export const NewOrderEmailTemplate = ({
                             textDecoration: "line-through",
                             color: "#888",
                           }}>
-                          {formatPrice(item.price)} EGP
+                          {formatPrice(item.price)} {currency}
                         </span>
                         <br />
                         <span style={{ color: "#e53e3e" }}>
-                          {formatPrice(item.discountPrice)} EGP
+                          {formatPrice(item.discountPrice)} {currency}
                         </span>
                       </>
                     ) : (
-                      <>{formatPrice(item.price)} EGP</>
+                      <>{formatPrice(item.price)} {currency}</>
                     )}
                   </Column>
                 </Row>
@@ -133,7 +152,7 @@ export const NewOrderEmailTemplate = ({
                 Subtotal
               </Column>
               <Column style={summaryValueCell}>
-                {formatPrice(subTotal)} EGP
+                {formatPrice(subTotal)} {currency}
               </Column>
             </Row>
             <Row style={summaryRow}>
@@ -141,14 +160,14 @@ export const NewOrderEmailTemplate = ({
                 Shipping
               </Column>
               <Column style={summaryValueCell}>
-                {formatPrice(shippingFees)} EGP
+                {formatPrice(shippingFees)} {currency}
               </Column>
             </Row>
             <Row style={totalRow}>
               <Column style={totalLabelCell} colSpan={2}>
                 Total
               </Column>
-              <Column style={totalValueCell}>{formatPrice(total)} EGP</Column>
+              <Column style={totalValueCell}>{formatPrice(total)} {currency}</Column>
             </Row>
           </Section>
 
@@ -206,17 +225,21 @@ export const NewOrderEmailTemplate = ({
 
           {/* Footer */}
           <Section style={footer}>
+            {/* No support address configured → say nothing rather than
+                print an inbox nobody reads. */}
+            {contactEmail && (
+              <Text style={footerText}>
+                If you have any questions about your order, please contact our
+                customer service team at
+                <Link href={`mailto:${contactEmail}`} style={link}>
+                  {" "}
+                  {contactEmail}
+                </Link>
+                .
+              </Text>
+            )}
             <Text style={footerText}>
-              If you have any questions about your order, please contact our
-              customer service team at
-              <Link href='mailto:support@lebsy.com' style={link}>
-                {" "}
-                support@lebsy.com
-              </Link>
-              .
-            </Text>
-            <Text style={footerText}>
-              © {new Date().getFullYear()} Lebsy. All rights reserved.
+              © {new Date().getFullYear()} {storeName}. All rights reserved.
             </Text>
           </Section>
         </Container>

@@ -192,7 +192,7 @@ export default function LinkTreeSettingsPage() {
               onChange={(e) =>
                 setConfig((prev) => ({ ...prev, brandName: e.target.value }))
               }
-              placeholder='e.g. Percée'
+              placeholder='e.g. your brand name'
               maxLength={100}
             />
           </div>

@@ -339,11 +339,20 @@ export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
     title: "Worn with intention. Designed for life.",
     description:
       "Every piercing is an expression of self. Our pieces are crafted to honor that commitment—refined in form, enduring in quality, and timeless in design.",
-    image: "/uploads/homepage/brand-statement.jpg",
+    // No default image. This pointed at "/uploads/homepage/brand-statement.jpg",
+    // a file that does not exist in this repo — so an unconfigured store
+    // rendered a broken-image icon with the heading spilling across it as alt
+    // text, both in the hero and in the editorial block. Admins upload a real
+    // image from Dashboard > Homepage; until then the block hides.
+    image: "",
   },
   promoBanner: {
+    // Ships disabled, but the default text was a concrete discount — "Get
+    // 20% off your first order!" — that no promo code backs. An admin
+    // flipping the toggle on to write their own announcement would have
+    // published that offer verbatim.
     enabled: false,
-    text: "🎉 Special Offer: Get 20% off your first order!",
+    text: "",
     linkText: "Shop Now",
     linkUrl: "/shop",
   },
@@ -362,25 +371,22 @@ export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
     viewAllLink: "/shop",
   },
   valueProps: {
+    // No default value props.
+    //
+    // These were three claims a store made about itself before anyone had
+    // written a word of copy: "Wide Selection — Discover thousands of
+    // products from top brands" (this catalogue has none, and carries no
+    // brands), "Fast Delivery — Get your orders delivered quickly with our
+    // reliable shipping" (no courier is configured and no delivery time has
+    // been set), and "Secure Shopping — Shop with confidence using our secure
+    // payment system" (the only payment method is cash on delivery).
+    //
+    // DEFAULT_HOMEPAGE_CONTENT is merged into whatever the CMS has stored, so
+    // these rendered on landing-modern, -classic, -editorial and -noir for
+    // any store that had not replaced them. Every one of those templates
+    // guards on `items.length > 0`, so an empty list renders nothing at all.
     enabled: true,
-    items: [
-      {
-        icon: ValuePropIconType.SHOPPING,
-        title: "Wide Selection",
-        description: "Discover thousands of products from top brands",
-      },
-      {
-        icon: ValuePropIconType.SHIPPING,
-        title: "Fast Delivery",
-        description:
-          "Get your orders delivered quickly with our reliable shipping",
-      },
-      {
-        icon: ValuePropIconType.SECURITY,
-        title: "Secure Shopping",
-        description: "Shop with confidence using our secure payment system",
-      },
-    ],
+    items: [],
   },
   newsletter: {
     enabled: true,
@@ -393,7 +399,9 @@ export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
   footerCta: {
     enabled: true,
     title: "Ready to Start Shopping?",
-    subtitle: "Join thousands of satisfied customers today",
+    // "Join thousands of satisfied customers today" — the store has taken no
+    // orders and has no reviews.
+    subtitle: "",
     ctaText: "Browse Products",
     ctaLink: "/shop",
   },
@@ -442,69 +450,67 @@ export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
     imageUrl: "",
   },
   returnPolicy: {
-    enabled: true,
+    // Ships DISABLED. Every term below is placeholder scaffolding for the
+    // admin to fill in — the return window, refund timing and exclusions are
+    // business facts this store has not established, so /return-policy shows
+    // "not available yet" until an admin publishes real terms.
+    enabled: false,
     title: "Return Policy",
     titleAr: "سياسة الإرجاع",
     intro:
-      "We want you to love every Synt fragrance. If something's not right, we're here to help.",
+      "Our return policy has not been published yet. Set it from Dashboard > Homepage > Return Policy before enabling this page.",
     introAr:
-      "نريدك أن تحب كل عطر من Synt. إذا كان هناك أي مشكلة، نحن هنا لمساعدتك.",
+      "لم يتم نشر سياسة الإرجاع بعد. يرجى ضبطها من لوحة التحكم قبل تفعيل هذه الصفحة.",
     steps: [
       {
         icon: ValuePropIconType.PACKAGE,
         title: "1. Return Window",
         titleAr: "1. فترة الإرجاع",
-        description: "You may return any item within 14 days of delivery.",
-        descriptionAr: "يمكنك إرجاع أي منتج خلال 14 يوماً من تاريخ التسليم.",
+        description: "Describe your return window here.",
+        descriptionAr: "اكتب هنا فترة الإرجاع المسموح بها.",
       },
       {
         icon: ValuePropIconType.BOTTLE,
         title: "2. Eligible Items",
         titleAr: "2. المنتجات المؤهلة",
-        description:
-          "Items must be unused, unopened, and in original packaging.",
-        descriptionAr:
-          "يجب أن تكون المنتجات غير مستخدمة، غير مفتوحة، وفي عبوتها الأصلية.",
+        description: "Describe which items can be returned.",
+        descriptionAr: "اكتب هنا المنتجات المؤهلة للإرجاع.",
       },
       {
         icon: ValuePropIconType.RECEIPT,
         title: "3. How to Return",
         titleAr: "3. كيفية الإرجاع",
-        description:
-          "Contact our support team via email or phone to initiate a return.",
-        descriptionAr:
-          "تواصل مع فريق الدعم عبر البريد الإلكتروني أو الهاتف لبدء عملية الإرجاع.",
+        description: "Describe how a customer starts a return.",
+        descriptionAr: "اكتب هنا طريقة بدء عملية الإرجاع.",
       },
       {
         icon: ValuePropIconType.PAYMENT,
         title: "4. Refunds",
         titleAr: "4. المبالغ المستردة",
-        description:
-          "Once we receive and inspect your return, we'll process your refund within 5–7 business days.",
-        descriptionAr:
-          "بمجرد استلامنا وفحص المرتجع، سنعالج استرداد المبلغ خلال 5–7 أيام عمل.",
+        description: "Describe how and when refunds are issued.",
+        descriptionAr: "اكتب هنا طريقة وموعد استرداد المبالغ.",
       },
     ],
     detailSections: [
       {
         title: "Non-Returnable Items",
         titleAr: "منتجات غير قابلة للإرجاع",
-        body: "For hygiene and safety reasons, we cannot accept returns on opened fragrance bottles. Gift cards and promotional items are also non-returnable.",
-        bodyAr:
-          "لأسباب صحية وأمنية، لا نقبل إرجاع زجاجات العطور المفتوحة. بطاقات الهدايا والعروض الترويجية غير قابلة للإرجاع أيضاً.",
+        body: "List any items that cannot be returned.",
+        bodyAr: "اكتب هنا المنتجات غير القابلة للإرجاع.",
       },
       {
         title: "Damaged or Wrong Items",
         titleAr: "منتجات تالفة أو خاطئة",
-        body: "If your order arrives damaged or incorrect, please contact us within 48 hours of delivery with photos. We'll arrange a replacement or refund as quickly as possible.",
-        bodyAr:
-          "إذا وصل طلبك تالفاً أو غير صحيح، يرجى التواصل معنا خلال 48 ساعة من التسليم مع صور. سنرتب استبدالاً أو استرداداً في أسرع وقت ممكن.",
+        body: "Describe what a customer should do if an order arrives damaged or incorrect.",
+        bodyAr: "اكتب هنا ما يجب فعله عند وصول طلب تالف أو غير صحيح.",
       },
     ],
     footerPrefix:
       "Need help? We're just an email away. Reach out to us at",
     footerPrefixAr: "تحتاج مساعدة؟ نحن على بعد بريد إلكتروني. تواصل معنا على",
-    supportEmail: "syntperfumes@gmail.com",
+    // Empty on purpose — filled from Dashboard > Homepage, or leave blank.
+    // Never inherit a previous brand's inbox here.
+    supportEmail: "",
     footerMiddle: "or via our",
     footerMiddleAr: "أو عبر",
     contactLinkLabel: "Contact Us page",
@@ -512,64 +518,15 @@ export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
     contactLinkUrl: "/contact",
   },
   testimonials: {
-    enabled: true,
+    // Ships DISABLED with no items. The previous defaults were six invented
+    // reviews under invented customer names — publishing those as genuine
+    // customer feedback for a store that has never shipped an order is not
+    // something we inherit. Admins add real reviews from
+    // Dashboard > Homepage > Testimonials; every consumer of this field
+    // renders nothing while the list is empty.
+    enabled: false,
     title: undefined,
     titleAr: undefined,
-    items: [
-      {
-        name: "Sarah Mitchell",
-        nameAr: "نورة العتيبي",
-        rating: 5,
-        review:
-          "Absolutely love the quality! Fast shipping and the product exceeded my expectations. Will definitely order again.",
-        reviewAr:
-          "من أفضل المنتجات اللي استخدمتها وبصراحة يستاهل أضعاف سعره، جودة عالية وتوصيل سريع.",
-      },
-      {
-        name: "James Cooper",
-        nameAr: "محمد المحسن",
-        rating: 5,
-        review:
-          "Excellent shopping experience from start to finish. Customer service was outstanding and the product looks even better in person.",
-        reviewAr:
-          "تجربة شراء ممتازة من البداية للنهاية، خدمة عملاء رائعة والمنتج طلع أحلى من الصور.",
-      },
-      {
-        name: "Emily Chen",
-        nameAr: "فرح أحمد",
-        rating: 5,
-        review:
-          "The attention to detail is remarkable. Premium packaging and the product itself is simply stunning. Highly recommended!",
-        reviewAr:
-          "تميز وإتقان سواء على مستوى التقديم أو جودة المنتجات، شكراً جزيلاً.",
-      },
-      {
-        name: "David Wilson",
-        nameAr: "مهند المري",
-        rating: 4,
-        review:
-          "Fast delivery and solid quality. Returns were effortless when I needed to swap sizes — customer support made it painless.",
-        reviewAr:
-          "التوصيل سريع والجودة ممتازة، وتجربة الاستبدال كانت سهلة جداً بفضل خدمة العملاء.",
-      },
-      {
-        name: "Olivia Taylor",
-        nameAr: "ريم الشمري",
-        rating: 5,
-        review:
-          "Everything was beautifully packaged and presented. The product quality is exceptional — worth every penny.",
-        reviewAr:
-          "كل شيء كان مرتباً ومغلفاً بشكل أنيق، والمنتج نفسه جودته عالية جداً.",
-      },
-      {
-        name: "Marcus Reyes",
-        nameAr: "خالد السبيعي",
-        rating: 4,
-        review:
-          "Great value for the price. Shipping was a day faster than estimated and the item matched the photos exactly.",
-        reviewAr:
-          "قيمة ممتازة مقابل السعر، الشحن أسرع من المتوقع والمنتج مطابق تماماً للصور.",
-      },
-    ],
+    items: [],
   },
 };

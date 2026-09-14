@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { getProductUrl } from "#root/lib/utils/route-helpers";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { STORE_CURRENCY } from "#root/shared/config/branding";
+import { isUsableHref } from "#root/shared/config/storefront";
 import {
   Sheet,
   SheetTrigger,
@@ -46,7 +47,15 @@ export function MinimalNavbar() {
 
   // Live search state
   const [liveResults, setLiveResults] = useState<{
-    products: { id: string; slug?: string | null; name: string; price: number; imageUrl?: string }[];
+    products: {
+      id: string;
+      slug?: string | null;
+      name: string;
+      price: number;
+      /** Present only when the product is genuinely discounted. */
+      discountPrice?: number | null;
+      imageUrl?: string;
+    }[];
     categories: { id: string; name: string; slug?: string }[];
   }>({ products: [], categories: [] });
   const [isSearching, setIsSearching] = useState(false);
@@ -80,6 +89,13 @@ export function MinimalNavbar() {
               slug: p.slug,
               name: p.name,
               price: Number(p.price),
+              // The dropdown used to print `p.price` unconditionally, so a
+              // discounted product was quoted at its pre-discount price here
+              // and at its real price on every card and on its own page.
+              discountPrice:
+                p.discountPrice != null && Number(p.discountPrice) < Number(p.price)
+                  ? Number(p.discountPrice)
+                  : null,
               imageUrl: p.imageUrl ? `/uploads/${p.imageUrl}` : p.images?.[0]?.url ? `/uploads/${p.images[0].url}` : undefined,
             }))
           : [];
@@ -121,7 +137,13 @@ export function MinimalNavbar() {
     }
   };
 
-  const cmsNavLinks = layoutSettings.header.navigationLinks;
+  // Navigation must only ever point at destinations that exist. A CMS link
+  // left at "#" (or blank) rendered as a real nav item that did nothing —
+  // the same trap the footers had. Dropdown parents are exempt: they open a
+  // category menu rather than navigating themselves.
+  const cmsNavLinks = layoutSettings.header.navigationLinks.filter(
+    (l) => l.isDropdown || isUsableHref(l.url),
+  );
   const links =
     cmsNavLinks.length > 0
       ? cmsNavLinks.map((l) => ({
@@ -161,8 +183,11 @@ export function MinimalNavbar() {
         />
       )}
 
-      <nav className='w-full bg-white border-b border-gray-200' dir={dir === "rtl" ? "ltr" : "rtl"}>
-        <div className='max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8'>
+      <nav
+        aria-label='Main'
+        className='w-full bg-zeli-bg border-b border-zeli-line'
+        dir={dir === "rtl" ? "ltr" : "rtl"}>
+        <div className='zeli-container'>
           <div className='flex items-center justify-between h-16 sm:h-[72px]'>
             {/* ── Left: Action icons ── */}
             <div className='flex items-center gap-1 sm:gap-2'>
@@ -172,7 +197,7 @@ export function MinimalNavbar() {
               {!session ? (
                 <Link
                   href='/login'
-                  className='p-2 text-gray-700 hover:text-black transition-colors'
+                  className='inline-flex items-center justify-center min-w-11 min-h-11 md:min-w-0 md:min-h-0 p-2 text-zeli-ink-secondary hover:text-zeli-ink transition-colors'
                   aria-label={t("nav.login")}>
                   <User className='w-[18px] h-[18px]' />
                 </Link>
@@ -186,7 +211,8 @@ export function MinimalNavbar() {
                       {session.name ? session.name.charAt(0).toUpperCase() : <User className="w-4 h-4" />}
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-52 z-[10001]">
+                  <DropdownMenuContent align="start" style={{ zIndex: "var(--zeli-z-overlay)" }}
+                    className="w-52">
                     <div className="px-3 py-2 border-b border-gray-100">
                       <p className="text-sm font-medium text-gray-900 truncate">{session.name || "Account"}</p>
                       <p className="text-xs text-gray-400 truncate">{session.email}</p>
@@ -228,11 +254,17 @@ export function MinimalNavbar() {
                 {/* Cart */}
               <Link
                 href='/cart'
-                className='relative p-2 text-gray-700 hover:text-black transition-colors'
-                aria-label={t("nav.cart")}>
+                className='relative inline-flex items-center justify-center min-w-11 min-h-11 md:min-w-0 md:min-h-0 p-2 text-zeli-ink-secondary hover:text-zeli-ink transition-colors'
+                aria-label={
+                  totalItems > 0
+                    ? `${t("nav.cart")} (${totalItems})`
+                    : t("nav.cart")
+                }>
                 <ShoppingCart className='w-[18px] h-[18px]' />
                 {totalItems > 0 && (
-                  <span className='absolute -top-0.5 -right-0.5 inline-flex items-center justify-center w-[18px] h-[18px] text-[10px] font-medium leading-none bg-red-600 text-white rounded-full'>
+                  <span
+                    aria-hidden='true'
+                    className='absolute top-1.5 right-1.5 md:-top-0.5 md:-right-0.5 inline-flex items-center justify-center w-[18px] h-[18px] text-[10px] font-medium leading-none bg-zeli-sale text-zeli-ink-inverse rounded-full'>
                     {totalItems}
                   </span>
                 )}
@@ -314,8 +346,23 @@ export function MinimalNavbar() {
                                       <img src={p.imageUrl} alt={p.name} className='w-10 h-10 object-cover bg-gray-50' />
                                     )}
                                     <div className='flex-1 min-w-0'>
-                                      <p className='text-sm text-gray-800 truncate'>{p.name}</p>
-                                      <p className='text-xs text-gray-500'>{p.price.toFixed(2)} {STORE_CURRENCY}</p>
+                                      <p className='truncate text-sm text-zeli-ink'>{p.name}</p>
+                                      <p className='flex items-baseline gap-1.5 text-xs'>
+                                        {p.discountPrice != null && (
+                                          <span className='text-zeli-ink-subtle line-through'>
+                                            {p.price.toFixed(2)}
+                                          </span>
+                                        )}
+                                        <span
+                                          className={
+                                            p.discountPrice != null
+                                              ? "font-medium text-zeli-sale"
+                                              : "text-zeli-ink-muted"
+                                          }>
+                                          {(p.discountPrice ?? p.price).toFixed(2)}{" "}
+                                          {STORE_CURRENCY}
+                                        </span>
+                                      </p>
                                     </div>
                                   </Link>
                                 ))}
@@ -511,8 +558,23 @@ export function MinimalNavbar() {
                                           <img src={p.imageUrl} alt={p.name} className='w-10 h-10 object-cover bg-gray-50' />
                                         )}
                                         <div className='flex-1 min-w-0'>
-                                          <p className='text-sm text-gray-800 truncate'>{p.name}</p>
-                                          <p className='text-xs text-gray-500'>{p.price.toFixed(2)} {STORE_CURRENCY}</p>
+                                          <p className='truncate text-sm text-zeli-ink'>{p.name}</p>
+                                          <p className='flex items-baseline gap-1.5 text-xs'>
+                                            {p.discountPrice != null && (
+                                              <span className='text-zeli-ink-subtle line-through'>
+                                                {p.price.toFixed(2)}
+                                              </span>
+                                            )}
+                                            <span
+                                              className={
+                                                p.discountPrice != null
+                                                  ? "font-medium text-zeli-sale"
+                                                  : "text-zeli-ink-muted"
+                                              }>
+                                              {(p.discountPrice ?? p.price).toFixed(2)}{" "}
+                                              {STORE_CURRENCY}
+                                            </span>
+                                          </p>
                                         </div>
                                       </Link>
                                     ))}

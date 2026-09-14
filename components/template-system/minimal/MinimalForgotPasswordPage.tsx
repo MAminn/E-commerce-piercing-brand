@@ -57,27 +57,27 @@ export function MinimalForgotPasswordPage() {
   };
 
   return (
-    <section className='min-h-screen flex items-center justify-center bg-white px-4 py-12'>
+    <section className='min-h-screen flex items-center justify-center bg-zeli-surface-raised px-4 py-12'>
       <div className='w-full max-w-[420px]'>
         {/* Card */}
-        <div className='border border-stone-200 bg-white p-8 sm:p-10'>
+        <div className='border border-zeli-line bg-zeli-surface-raised p-8 sm:p-10'>
           {isSuccess ? (
             /* Success state */
             <div className='flex flex-col items-center gap-5 text-center py-6'>
               <div className='w-14 h-14 rounded-full bg-green-50 flex items-center justify-center'>
-                <CheckCircle className='w-7 h-7 text-green-600' />
+                <CheckCircle className='w-7 h-7 text-zeli-success' />
               </div>
               <div className='space-y-2'>
-                <h1 className='text-xl sm:text-2xl font-light text-stone-900 tracking-tight'>
+                <h1 className='text-xl sm:text-2xl font-light text-zeli-ink tracking-tight'>
                   {t("forgot.success_title")}
                 </h1>
-                <p className='text-sm text-stone-500 leading-relaxed max-w-xs mx-auto'>
+                <p className='text-sm text-zeli-ink-muted leading-relaxed max-w-xs mx-auto'>
                   {t("forgot.success_message")}
                 </p>
               </div>
               <Link
                 href='/login'
-                className='inline-flex items-center gap-2 text-sm text-stone-900 hover:text-stone-600 transition-colors mt-4'>
+                className='inline-flex items-center gap-2 text-sm text-zeli-ink hover:text-zeli-ink-secondary transition-colors mt-4'>
                 <ArrowLeft className='w-4 h-4' />
                 {t("forgot.back_to_login")}
               </Link>
@@ -86,10 +86,10 @@ export function MinimalForgotPasswordPage() {
             <>
               {/* Header */}
               <div className='text-center mb-8'>
-                <h1 className='text-2xl sm:text-[28px] font-light text-stone-900 tracking-tight mb-2'>
+                <h1 className='text-2xl sm:text-[28px] font-light text-zeli-ink tracking-tight mb-2'>
                   {t("forgot.title")}
                 </h1>
-                <p className='text-sm text-stone-500'>{t("forgot.subtitle")}</p>
+                <p className='text-sm text-zeli-ink-muted'>{t("forgot.subtitle")}</p>
               </div>
 
               <form onSubmit={form.handleSubmit(onSubmit)} className='flex flex-col gap-6'>
@@ -97,19 +97,21 @@ export function MinimalForgotPasswordPage() {
                 <div>
                   <label
                     htmlFor='forgot-email'
-                    className='block text-xs uppercase tracking-widest text-stone-500 mb-2 font-medium'>
+                    className='block text-xs uppercase tracking-widest text-zeli-ink-muted mb-2 font-medium'>
                     {t("forgot.email")}
                   </label>
                   <Input
                     {...form.register("email")}
                     id='forgot-email'
+                aria-invalid={!!form.formState.errors.email}
+                aria-describedby='forgot-email-error'
                     type='email'
                     placeholder={t("forgot.email_placeholder")}
-                    className='border-0 border-b border-stone-300 bg-transparent rounded-none px-0 py-3 text-sm focus:outline-none focus:ring-0 focus:border-stone-900 transition-colors placeholder:text-stone-400 text-stone-900'
+                    className='border-0 border-b border-zeli-line-strong bg-transparent rounded-none px-0 py-3 text-sm focus:outline-none focus:ring-0 focus:border-zeli-ink transition-colors placeholder:text-zeli-ink-subtle text-zeli-ink'
                     disabled={isSubmitting}
                   />
                   {form.formState.errors.email && (
-                    <p className='text-red-500 text-xs mt-2'>
+                    <p id='forgot-email-error' role='alert' className='text-zeli-sale text-xs mt-2'>
                       {form.formState.errors.email.message}
                     </p>
                   )}
@@ -119,14 +121,14 @@ export function MinimalForgotPasswordPage() {
                 <button
                   type='submit'
                   disabled={isSubmitting}
-                  className='w-full py-3 mt-2 bg-stone-900 text-white text-sm font-medium tracking-wide uppercase hover:bg-stone-800 transition-colors disabled:opacity-40'>
+                  className='w-full py-3 mt-2 bg-zeli-accent text-zeli-ink-inverse text-sm font-medium tracking-wide uppercase hover:bg-zeli-accent-hover transition-colors disabled:opacity-40'>
                   {isSubmitting ? t("forgot.submitting") : t("forgot.submit")}
                 </button>
 
                 {/* Back to login */}
                 <Link
                   href='/login'
-                  className='inline-flex items-center justify-center gap-2 text-sm text-stone-900 hover:text-stone-600 transition-colors mt-2'>
+                  className='inline-flex items-center justify-center gap-2 text-sm text-zeli-ink hover:text-zeli-ink-secondary transition-colors mt-2'>
                   <ArrowLeft className='w-4 h-4' />
                   {t("forgot.back_to_login")}
                 </Link>

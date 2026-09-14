@@ -34,6 +34,22 @@
    Fallback values reproduce this file's original hardcoded fonts exactly,
    so nothing changes visually until the admin assigns a role. */
 
+/* Base family for the whole storefront subtree. Previously the shell hard-set
+   a `font-poppins` utility on <main>, which beat --font-body for every
+   element not named in the tag lists below (spans, divs, …) — so an admin's
+   configured body font only half-applied. */
+.storefront-shell {
+  font-family: var(
+    --font-body,
+    "Poppins",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif
+  );
+}
+
 .storefront-shell h1, .storefront-shell h2, .storefront-shell h3,
 .storefront-shell h4, .storefront-shell h5, .storefront-shell h6 {
   font-family: var(--font-heading, "LaRojaTV", "Poppins", sans-serif);
@@ -171,16 +187,362 @@ html[data-page-transition="out"] body {
   }
 }
 
+/* ════════════════════════════════════════════════════════════════════════
+   ZELI DESIGN TOKENS — the single visual source of truth for the
+   customer-facing storefront.
+   ────────────────────────────────────────────────────────────────────────
+   This is NOT a second theming system. The repo already ships Tailwind 4's
+   `@theme` + shadcn CSS custom properties (see `:root` further down); this
+   block extends that same mechanism with the storefront-level tokens the
+   templates were previously hardcoding as magic values (stone-900, py-16,
+   max-w-[1400px], z-[10000], 240ms …).
+
+   HOW TO REBRAND: change the values here. Nothing else should hardcode a
+   storefront colour, gutter, section rhythm, radius, duration or z-index.
+   Fonts are NOT set here — they come from the admin Typography system via
+   the --font-* custom properties (see shared/typography/build-head-css.ts).
+   ════════════════════════════════════════════════════════════════════════ */
+
 :root {
-  --accent-lb: oklch(41.95% 0.0862 232.96);
+  /* ── Colour: surfaces — warm ivory, not clinical white ──
+     The base is a warm off-white (#FBF9F6) rather than #fff so product
+     photography of silver/steel jewelry reads as warm and editorial instead
+     of clinical. `bg` and `surface` are close enough to stack without
+     banding but distinct enough to separate a section from the page. */
+  --zeli-bg: #fbf9f6;
+  --zeli-surface: #f4f0ea;
+  --zeli-surface-raised: #ffffff;
+  --zeli-surface-inverse: #241d19;
+
+  /* ── Colour: text — deep espresso, never pure black ──
+     #241d19 against #fbf9f6 measures ~15.1:1, comfortably AAA. Pure black on
+     warm ivory reads cold and cheap; espresso keeps the warmth of the base. */
+  --zeli-ink: #241d19;
+  --zeli-ink-secondary: #4a3f38;   /* ~9.5:1 on bg */
+  --zeli-ink-muted: #7a6c62;       /* ~4.8:1 on bg — AA for body text */
+  --zeli-ink-subtle: #a1938a;      /* decorative / struck-through only */
+  --zeli-ink-inverse: #fbf9f6;
+
+  /* ── Colour: lines ── */
+  --zeli-border: #e6dfd6;
+  --zeli-border-strong: #d3c8bc;
+
+  /* ── Colour: accent — espresso, used sparingly ──
+     The brand is image-led; the accent is deliberately the type colour so
+     buttons and rules never compete with the jewelry photography. */
+  --zeli-accent: #241d19;
+  --zeli-accent-hover: #3a302a;
+  --zeli-accent-ink: #fbf9f6;
+  --zeli-focus: #241d19;
+
+  /* ── Colour: secondary — muted blush / nude ──
+     Restrained by design. Used for editorial section grounds and a single
+     accent line, never as a fill for large UI. This is the guard against the
+     "pink everything" failure mode. */
+  --zeli-blush: #e9d9d2;
+  --zeli-blush-soft: #f5ebe6;
+  --zeli-nude: #ddcabc;
+
+  /* ── Colour: cool grey + silver/chrome ──
+     A cool counterweight to the warm base, for silver/steel product framing
+     and the chrome hairline used on hover states. */
+  --zeli-cool: #8e9196;
+  --zeli-cool-soft: #eceef0;
+  --zeli-silver: linear-gradient(
+    135deg,
+    #d8dade 0%,
+    #f2f3f5 42%,
+    #b9bdc2 100%
+  );
+
+  /* ── Colour: state ── */
+  --zeli-disabled: #d3c8bc;
+  /* Sale is a warm brick rather than a pure red siren — it has to sit next to
+     jewelry photography without screaming. ~5.3:1 on bg. */
+  --zeli-sale: #9e3b2e;
+  --zeli-success: #3f6b4f;
+  --zeli-danger: #9e3b2e;
+
+  /* ── Typography scale (families come from --font-*) ── */
+  /* Sized with `cqi`/`vw` so a long single word cannot outgrow its column.
+     The heading face is wide, and a 4rem "WELCOME" measured ~430px inside a
+     384px hero column — enough to push the whole page sideways. */
+  --zeli-text-display: clamp(2rem, 5vw, 3.25rem);
+  --zeli-text-h1: clamp(1.625rem, 3.5vw, 2.5rem);
+  --zeli-text-h2: clamp(1.25rem, 2.5vw, 1.875rem);
+  --zeli-text-h3: clamp(1.125rem, 2vw, 1.5rem);
+  --zeli-text-body: 0.9375rem;
+  --zeli-text-small: 0.8125rem;
+  --zeli-text-label: 0.6875rem;
+
+  --zeli-weight-regular: 400;
+  --zeli-weight-medium: 500;
+  --zeli-weight-semibold: 600;
+
+  --zeli-tracking-display: -0.02em;
+  --zeli-tracking-body: 0;
+  --zeli-tracking-label: 0.12em;
+  --zeli-tracking-wide: 0.25em;
+
+  --zeli-leading-display: 1.05;
+  --zeli-leading-heading: 1.2;
+  --zeli-leading-body: 1.65;
+
+  /* ── Spacing: page gutters ── */
+  --zeli-gutter: 1rem;
+  --zeli-gutter-sm: 1.5rem;
+  --zeli-gutter-lg: 2rem;
+
+  /* ── Spacing: vertical section rhythm ── */
+  --zeli-section-y: 3rem;
+  --zeli-section-y-sm: 4rem;
+  --zeli-section-y-lg: 5rem;
+
+  /* ── Spacing: component gaps ── */
+  --zeli-gap-xs: 0.5rem;
+  --zeli-gap-sm: 0.75rem;
+  --zeli-gap: 1rem;
+  --zeli-gap-lg: 1.5rem;
+  --zeli-gap-xl: 2.5rem;
+
+  /* ── Layout widths ── */
+  --zeli-content-max: 1400px;
+  --zeli-content-narrow: 768px;
+  --zeli-content-prose: 65ch;
+
+  /* ── Layout: header heights (mobile-first) ── */
+  /* Matches the minimal navbar's own h-16 / sm:h-[72px] row. The banner and
+     marquee above it are variable-height, which is why the runtime
+     measurement below exists rather than a fixed sum. */
+  --zeli-header-h: 64px;
+  --zeli-header-h-desktop: 72px;
+  /* Offset for content that must clear the fixed header chrome. The shell
+     also measures the real height at runtime (GlobalNavbarChrome); this is
+     the SSR-safe starting value so nothing jumps on first paint. */
+  /* Falls back to 6rem — the value the homepage hero previously hardcoded as
+     `mt-24` — until GlobalNavbarChrome measures the real chrome on mount.
+     Nothing shifts on first paint; the measurement only corrects it. */
+  --zeli-header-offset: var(--zeli-header-measured, 6rem);
+
+  /* ── Shape ── */
+  --zeli-radius-none: 0;
+  --zeli-radius-sm: 2px;
+  --zeli-radius: 4px;
+  --zeli-radius-lg: 8px;
+  --zeli-radius-full: 9999px;
+
+  /* ── Motion ── */
+  --zeli-duration-fast: 150ms;
+  --zeli-duration: 240ms;
+  --zeli-duration-slow: 500ms;
+  --zeli-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --zeli-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ── Layers ──
+     These deliberately reproduce the stacking values already in use across
+     the shell rather than introducing a competing 1/10/100 scale — mixing
+     two scales is how a dropdown ends up behind a fixed header. Names, not
+     new numbers. */
+  --zeli-z-sticky: 9990;        /* StickyCartBar */
+  --zeli-z-bottom-nav: 9995;    /* MinimalMobileBottomNav */
+  --zeli-z-header: 10000;       /* #global-navbar */
+  --zeli-z-overlay: 10001;      /* drawers, dropdowns, toasts above header */
+}
+
+@media (min-width: 640px) {
+  :root {
+    --zeli-gutter: var(--zeli-gutter-sm);
+    --zeli-section-y: var(--zeli-section-y-sm);
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --zeli-gutter: var(--zeli-gutter-lg);
+    --zeli-section-y: var(--zeli-section-y-lg);
+    --zeli-header-offset: var(--zeli-header-measured, 6rem);
+  }
+}
+
+/* Expose the tokens as Tailwind utilities (bg-surface, text-ink,
+   border-line, rounded-zeli, z-header, max-w-content …). */
+@theme inline {
+  --color-zeli-bg: var(--zeli-bg);
+  --color-zeli-surface: var(--zeli-surface);
+  --color-zeli-surface-raised: var(--zeli-surface-raised);
+  --color-zeli-surface-inverse: var(--zeli-surface-inverse);
+  --color-zeli-ink: var(--zeli-ink);
+  --color-zeli-ink-secondary: var(--zeli-ink-secondary);
+  --color-zeli-ink-muted: var(--zeli-ink-muted);
+  --color-zeli-ink-subtle: var(--zeli-ink-subtle);
+  --color-zeli-ink-inverse: var(--zeli-ink-inverse);
+  --color-zeli-line: var(--zeli-border);
+  --color-zeli-line-strong: var(--zeli-border-strong);
+  --color-zeli-accent: var(--zeli-accent);
+  --color-zeli-accent-hover: var(--zeli-accent-hover);
+  --color-zeli-sale: var(--zeli-sale);
+  --color-zeli-disabled: var(--zeli-disabled);
+  --color-zeli-blush: var(--zeli-blush);
+  --color-zeli-blush-soft: var(--zeli-blush-soft);
+  --color-zeli-nude: var(--zeli-nude);
+  --color-zeli-cool: var(--zeli-cool);
+  --color-zeli-cool-soft: var(--zeli-cool-soft);
+
+  --radius-zeli-sm: var(--zeli-radius-sm);
+  --radius-zeli: var(--zeli-radius);
+  --radius-zeli-lg: var(--zeli-radius-lg);
+
+  --container-zeli-content: var(--zeli-content-max);
+  --container-zeli-narrow: var(--zeli-content-narrow);
+}
+
+/* ── Storefront layout primitives ────────────────────────────────────────
+   Use these instead of repeating `px-4 sm:px-6 lg:px-8 max-w-[1400px]
+   py-12 sm:py-16 lg:py-20` in every template section. */
+@layer components {
+  /* Horizontal page gutter + max width. */
+  .zeli-container {
+    width: 100%;
+    max-width: var(--zeli-content-max);
+    margin-inline: auto;
+    padding-inline: var(--zeli-gutter);
+  }
+
+  .zeli-container-narrow {
+    width: 100%;
+    max-width: var(--zeli-content-narrow);
+    margin-inline: auto;
+    padding-inline: var(--zeli-gutter);
+  }
+
+  /* Vertical rhythm for a storefront section. */
+  .zeli-section {
+    padding-block: var(--zeli-section-y);
+  }
+
+  .zeli-section-tight {
+    padding-block: calc(var(--zeli-section-y) * 0.6);
+  }
+
+  /* Clears the fixed header chrome (hero / first-in-flow elements). */
+  .zeli-header-offset {
+    margin-block-start: var(--zeli-header-offset);
+  }
+}
+
+/* ── Editorial typography utilities ──────────────────────────────────────
+   The fashion-magazine register the brand asks for, expressed once. Section
+   headings are set in small, wide, uppercase type (the "eyebrow") with the
+   real weight carried by product photography — not by large headings
+   competing with it. */
+@layer components {
+  .zeli-eyebrow {
+    font-family: var(--font-nav, inherit);
+    font-size: var(--zeli-text-label);
+    font-weight: var(--zeli-weight-medium);
+    letter-spacing: var(--zeli-tracking-label);
+    text-transform: uppercase;
+    color: var(--zeli-ink-muted);
+  }
+
+  .zeli-section-title {
+    font-family: var(--font-heading, inherit);
+    font-size: var(--zeli-text-h2);
+    font-weight: var(--zeli-weight-regular);
+    letter-spacing: var(--zeli-tracking-display);
+    line-height: var(--zeli-leading-heading);
+    color: var(--zeli-ink);
+  }
+
+  .zeli-display {
+    font-family: var(--font-heading, inherit);
+    font-size: var(--zeli-text-display);
+    font-weight: var(--zeli-weight-regular);
+    letter-spacing: var(--zeli-tracking-display);
+    line-height: var(--zeli-leading-display);
+  }
+
+  /* Admins can assign any font in Dashboard > Typography, including a much
+     wider face than the one these sizes were tuned against. This guarantees a
+     long word breaks instead of pushing the page sideways. */
+  .zeli-display,
+  .zeli-section-title {
+    overflow-wrap: break-word;
+    hyphens: auto;
+  }
+
+  /* Underline that draws in from the left on hover — the single link
+     signature used across nav, CTAs and "view all" controls. */
+  .zeli-underline {
+    background-image: linear-gradient(currentColor, currentColor);
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    background-size: 100% 1px;
+    padding-bottom: 2px;
+    transition: background-size var(--zeli-duration) var(--zeli-ease);
+  }
+
+  .zeli-underline-hover {
+    background-image: linear-gradient(currentColor, currentColor);
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    background-size: 0 1px;
+    padding-bottom: 2px;
+    transition: background-size var(--zeli-duration) var(--zeli-ease);
+  }
+
+  .zeli-underline-hover:hover,
+  .zeli-underline-hover:focus-visible {
+    background-size: 100% 1px;
+  }
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────
+   The storefront's motion is decorative (image scale on hover, carousel
+   crossfades, drawer slides). Anyone who has asked for less of it gets
+   none — including the token durations, so components reading
+   var(--zeli-duration) go instant without needing their own media query. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --zeli-duration-fast: 0ms;
+    --zeli-duration: 0ms;
+    --zeli-duration-slow: 0ms;
+  }
+
+  .storefront-shell *,
+  .storefront-shell *::before,
+  .storefront-shell *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Focus visibility baseline ───────────────────────────────────────────
+   Every interactive element in the storefront gets a visible keyboard focus
+   ring. Scoped to .storefront-shell so the dashboard keeps shadcn's ring. */
+@layer base {
+  .storefront-shell :is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--zeli-focus);
+    outline-offset: 2px;
+    border-radius: var(--zeli-radius-sm);
+  }
+}
+
+:root {
+  /* Legacy alias, kept so the ~25 existing `accent-lb` call sites keep
+     resolving — now points at the ZELI accent instead of the previous
+     brand's blue. Migrate those call sites to `zeli-accent` over time. */
+  --accent-lb: var(--zeli-accent);
   --background: oklch(100% 0.00011 271.152);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(41.95% 0.0862 232.96);
-  --primary-foreground: oklch(97.69% 0.0105 106.59);
+  --primary: var(--zeli-accent);
+  --primary-foreground: var(--zeli-accent-ink);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);

@@ -157,35 +157,21 @@ export interface CategoryPageGridWithFiltersProps {
 }
 
 // Mock data
-const MOCK_CATEGORIES = [
-  { id: "electronics", name: "Electronics", count: 45 },
-  { id: "fashion", name: "Fashion", count: 78 },
-  { id: "home", name: "Home & Garden", count: 32 },
-  { id: "sports", name: "Sports", count: 24 },
-];
-
-const MOCK_BRANDS = [
-  { id: "apple", name: "Apple", count: 12 },
-  { id: "samsung", name: "Samsung", count: 18 },
-  { id: "sony", name: "Sony", count: 15 },
-  { id: "lg", name: "LG", count: 10 },
-];
-
-const MOCK_PRODUCTS: CategoryPageProduct[] = Array.from(
-  { length: 12 },
-  (_, i) => ({
-    id: `product-${i + 1}`,
-    name: `Premium Product ${i + 1}`,
-    price: 99.99 + i * 10,
-    discountPrice: i % 3 === 0 ? 79.99 + i * 10 : null,
-    stock: 10 + i,
-    available: true,
-    imageUrl: `https://images.unsplash.com/photo-${1500000000000 + i}?w=400`,
-    brand: MOCK_BRANDS[i % MOCK_BRANDS.length]?.name,
-    rating: 3.5 + (i % 3) * 0.5,
-    reviewCount: 10 + i * 5,
-  }),
-);
+/**
+ * Filter sources default to EMPTY, not to sample data.
+ *
+ * These two used to default to an invented catalogue — Electronics / Fashion /
+ * Home & Garden / Sports and Apple / Samsung / Sony / LG, each with an
+ * invented product count. Every caller that rendered this template without
+ * passing real lists (the /featured/*\/categories routes do exactly that)
+ * therefore showed a piercing-jewelry shopper a filter sidebar for a consumer
+ * electronics store, with counts no product in the database backs.
+ *
+ * Empty arrays mean the filter groups render with nothing in them, which is
+ * the truth for a store that has not supplied them.
+ */
+const NO_CATEGORIES: { id: string; name: string; count: number }[] = [];
+const NO_BRANDS: { id: string; name: string; count: number }[] = [];
 
 /**
  * Category Page Grid with Filters Template
@@ -199,18 +185,25 @@ const MOCK_PRODUCTS: CategoryPageProduct[] = Array.from(
 export function CategoryPageGridWithFilters({
   content,
   categoryName = "All Products",
-  categoryDescription = "Browse our collection of quality products",
-  products = MOCK_PRODUCTS,
+  categoryDescription = "",
+  // Defaulted to twelve fabricated "Premium Product N" entries at invented
+  // prices with Unsplash placeholder photography and invented star ratings.
+  // A caller that forgot to pass products showed a customer a shop full of
+  // things that do not exist and cannot be bought.
+  products = [],
   totalProducts,
   currentPage = 1,
   productsPerPage = 12,
-  availableCategories = MOCK_CATEGORIES,
-  availableBrands = MOCK_BRANDS,
+  availableCategories = NO_CATEGORIES,
+  availableBrands = NO_BRANDS,
   priceRangeLimits = [0, 1000],
   showBanner = false,
   bannerContent = {},
+  // Default SEO blurb removed: "the best deals and exceptional customer
+  // service" is marketing copy about a store nobody has written, published
+  // under the store's own name at the bottom of a category page.
   showSeoText = true,
-  seoText = "Discover our wide selection of quality products. Shop with confidence knowing you're getting the best deals and exceptional customer service.",
+  seoText = "",
   onSortChange,
   onFilterChange,
   onClearFilters,

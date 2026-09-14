@@ -54,6 +54,11 @@ export function MinimalProductCard({
   const { toggle, isWishlisted } = useWishlist();
   const { t } = useMinimalI18n();
   const [isAdding, setIsAdding] = useState(false);
+  // Starts false and flips on load, which fades the image in. A browser that
+  // serves the image from cache can finish decoding before React attaches the
+  // handler, so `onLoad` never fires and the card renders a permanently
+  // invisible product. The ref callback below re-checks `complete` to cover
+  // that case.
   const [imageLoaded, setImageLoaded] = useState(false);
   const cardImageRef = useRef<HTMLImageElement>(null);
   const addToCartBtnRef = useRef<HTMLButtonElement>(null);
@@ -127,10 +132,13 @@ export function MinimalProductCard({
   return (
     <div className={cn("group flex flex-col", className)}>
       {/* Image container */}
-      <div className='relative aspect-square bg-stone-50 overflow-hidden'>
+      <div className='relative aspect-[4/5] overflow-hidden bg-zeli-surface'>
         <Link href={productUrl} className='block w-full h-full'>
           <img
-            ref={cardImageRef}
+            ref={(node) => {
+              cardImageRef.current = node;
+              if (node?.complete) setImageLoaded(true);
+            }}
             src={displayImageUrl}
             alt={product.name}
             className={cn(
@@ -138,15 +146,27 @@ export function MinimalProductCard({
               !imageLoaded && "opacity-0",
             )}
             loading='lazy'
+            decoding='async'
             onLoad={() => setImageLoaded(true)}
+            onError={() => setImageLoaded(true)}
           />
         </Link>
 
         {/* Tag badge (top-right) */}
         {tagText && (
-          <span className='absolute top-3 end-3 bg-stone-900 text-white text-[10px] font-medium px-2.5 py-1 tracking-wide'>
+          <span className='absolute start-3 top-3 bg-zeli-bg/95 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-zeli-ink'>
             {tagText}
           </span>
+        )}
+
+        {/* Sold out — stated on the image itself. Previously the only signal
+            was a disabled button below the fold of the card. */}
+        {!product.available && (
+          <div className='absolute inset-0 flex items-center justify-center bg-zeli-bg/55'>
+            <span className='bg-zeli-bg px-3 py-1.5 text-[10px] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-zeli-ink'>
+              {t("out_of_stock")}
+            </span>
+          </div>
         )}
 
         {/* Action icons (bottom-center, appear on hover) */}
@@ -158,8 +178,8 @@ export function MinimalProductCard({
               e.stopPropagation();
               onQuickView?.(product);
             }}
-            className='w-9 h-9 flex items-center justify-center bg-white rounded-full shadow-md hover:bg-stone-100 transition-colors'
-            aria-label={t("quick_view")}>
+            className='w-11 h-11 md:w-9 md:h-9 flex items-center justify-center bg-white rounded-full shadow-md hover:bg-zeli-surface transition-colors'
+            aria-label={`${t("quick_view")}: ${product.name}`}>
             <Eye className='w-4 h-4 text-stone-700' />
           </button>
           <button
@@ -170,12 +190,13 @@ export function MinimalProductCard({
               toggle(product.id);
             }}
             className={cn(
-              "w-9 h-9 flex items-center justify-center rounded-full shadow-md transition-colors",
+              "w-11 h-11 md:w-9 md:h-9 flex items-center justify-center rounded-full shadow-md transition-colors",
               wishlisted
                 ? "bg-red-50 text-red-500 hover:bg-red-100"
-                : "bg-white text-stone-700 hover:bg-stone-100",
+                : "bg-white text-zeli-ink-secondary hover:bg-zeli-surface",
             )}
-            aria-label={wishlisted ? t("removed_from_wishlist") : t("added_to_wishlist")}>
+            aria-pressed={wishlisted}
+            aria-label={`${t("nav.wishlist")}: ${product.name}`}>
             <Heart
               className={cn("w-4 h-4", wishlisted && "fill-current")}
             />
@@ -184,39 +205,42 @@ export function MinimalProductCard({
       </div>
 
       {/* Product info */}
-      <div className='pt-3 pb-1 text-center'>
+      <div className='pb-1 pt-3 text-start'>
         <Link href={productUrl}>
           <h3
             style={{ fontFamily: "var(--font-product-title)" }}
-            className='text-sm font-normal text-stone-800 line-clamp-1 hover:text-stone-600 transition-colors'>
+            className='line-clamp-1 text-[0.8125rem] font-normal text-zeli-ink transition-colors hover:text-zeli-ink-muted'>
             {product.name}
           </h3>
         </Link>
-        <div className='mt-1 flex items-center justify-center gap-2'>
+        <div className='mt-1.5 flex items-baseline gap-2'>
           {originalPrice !== null && (
             <span
               style={{ fontFamily: "var(--font-price)" }}
-              className='text-sm text-stone-400 line-through'>
+              className='text-sm text-zeli-ink-subtle line-through'>
               {originalPrice} {t("currency")}
             </span>
           )}
           <span
             style={{ fontFamily: "var(--font-price)" }}
-            className={cn("text-sm font-medium", hasDiscount ? "text-red-600" : "text-stone-800")}>
+            className={cn(
+              "text-sm font-medium",
+              hasDiscount ? "text-zeli-sale" : "text-zeli-ink",
+            )}>
             {displayPrice} {t("currency")}
           </span>
         </div>
       </div>
 
-      {/* Add to cart button */}
-      <div className='px-2 sm:px-3'>
+      {/* Add to cart */}
+      <div>
         <button
           ref={addToCartBtnRef}
           type='button'
           onClick={handleAddToCart}
           disabled={!product.available || isAdding}
           data-add-to-cart='true'
-          className='mt-1 w-full py-2.5 px-1.5 flex items-center justify-center gap-1 sm:gap-2 rounded-md border border-stone-900 text-stone-900 text-[10px] sm:text-xs font-medium uppercase hover:bg-stone-900 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap'>
+          className='zeli-underline-hover mt-2 inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap text-[10px] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-zeli-ink-muted transition-colors hover:text-zeli-ink disabled:cursor-not-allowed disabled:opacity-40 sm:text-[11px]'>
           <span className='truncate'>
             {product.available ? t("add_to_cart") : t("out_of_stock")}
           </span>

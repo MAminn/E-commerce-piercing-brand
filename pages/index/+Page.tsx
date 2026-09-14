@@ -8,6 +8,7 @@ import type { HomepageContent } from "#root/shared/types/homepage-content";
 import type { CategoryStripItem } from "#root/components/shop/CategoryStrip";
 import type { NewArrivalProduct } from "#root/components/shop/NewArrivals";
 import { useData } from "vike-react/useData";
+import { DEFAULT_LANDING_TEMPLATE_ID } from "#root/shared/config/storefront";
 import type { Data } from "./+data";
 
 export { Page };
@@ -48,7 +49,8 @@ function Page() {
   const { getTemplateId, isLoading: isTemplateLoading } = useTemplate();
 
   // Resolve the active landing template ID early so we can use it for content fetching
-  const activeLandingTemplateId = getTemplateId("landing") ?? "landing-modern";
+  const activeLandingTemplateId =
+    getTemplateId("landing") ?? DEFAULT_LANDING_TEMPLATE_ID;
 
   // Track which template ID the CMS content was fetched for.
   // Starts with the SSR template so we skip the redundant initial fetch.

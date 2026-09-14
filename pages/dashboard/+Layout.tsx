@@ -137,7 +137,7 @@ function Content({ children }: { children: React.ReactNode }) {
                     </TabsList>
                   </Tabs>
                 </div>
-                {/* Commented out because of conflict between templates and brands Ps: ana 3mltlo comment 3shan msh mohem awe bdl ma SYNT ytl3lo Perce */}
+                {/* Hidden: conflicts with the template/brand selection above. */}
                 {/* <Link href='/' className='text-2xl font-light tracking-tight'>
                   {STORE_NAME}
                 </Link> */}

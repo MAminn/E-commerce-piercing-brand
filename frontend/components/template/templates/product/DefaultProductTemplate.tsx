@@ -1,3 +1,8 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Business-promise sweep (Phase 2). Hardcoded shipping / returns / warranty
+// claims removed — ZELI has published no such policies, and switching to this
+// template from the dashboard would have shown them to customers.
+// ─────────────────────────────────────────────────────────────────────────────
 /**
  * @legacy
  * Legacy Template System (v1)
@@ -372,20 +377,8 @@ const DefaultProductTemplate: React.FC<DefaultProductTemplateProps> = ({
           <div className='border-t pt-6'>
             <div className='grid grid-cols-1 gap-4'>
               <div className='flex items-center space-x-3'>
-                <Truck className='h-5 w-5 text-gray-400' />
-                <span className='text-sm text-gray-600'>
-                  Free shipping on orders over EGP 50
-                </span>
-              </div>
-              <div className='flex items-center space-x-3'>
                 <Shield className='h-5 w-5 text-gray-400' />
-                <span className='text-sm text-gray-600'>2-year warranty</span>
-              </div>
-              <div className='flex items-center space-x-3'>
-                <RotateCcw className='h-5 w-5 text-gray-400' />
-                <span className='text-sm text-gray-600'>
-                  30-day return policy
-                </span>
+                <span className='text-sm text-gray-600'>Secure checkout</span>
               </div>
             </div>
           </div>

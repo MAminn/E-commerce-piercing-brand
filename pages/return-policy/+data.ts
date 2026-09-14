@@ -4,6 +4,7 @@ import {
   DEFAULT_HOMEPAGE_CONTENT,
   type HomepageContent,
 } from "#root/shared/types/homepage-content";
+import { resolveLandingTemplateId } from "#root/shared/config/storefront";
 import { getStoreOwnerId } from "#root/shared/config/store";
 
 export type Data = {
@@ -16,7 +17,7 @@ export const data = async (ctx: PageContext): Promise<Data> => {
   const templateSelection = ctx.templateSelection as
     | Record<string, string>
     | undefined;
-  const activeTemplateId = templateSelection?.landing ?? "landing-modern";
+  const activeTemplateId = resolveLandingTemplateId(templateSelection);
 
   try {
     const homepageContent = await getHomepageContentRaw(

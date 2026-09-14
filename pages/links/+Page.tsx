@@ -1,7 +1,12 @@
 import { useState, useEffect } from "react";
 import { trpc } from "#root/shared/trpc/client";
 import type { LinkTreeConfig } from "#root/shared/types/link-tree";
-import { DEFAULT_LINK_TREE_CONFIG } from "#root/shared/types/link-tree";
+import {
+  STORE_NAME,
+  STORE_SOCIAL_LINKS,
+  STORE_URL,
+  isUsableUrl,
+} from "#root/shared/config/branding";
 
 // ─── Icon Registry ────────────────────────────────────────────────────────────
 // Maps icon keys (stored in DB) to SVG render functions.
@@ -169,41 +174,34 @@ function getIcon(key: string) {
 }
 
 // ─── Fallback data (used when DB has no config yet) ───────────────────────────
+//
+// Built entirely from central brand configuration. There are deliberately no
+// hardcoded profile URLs here: the previous brand's Instagram/Facebook/TikTok
+// accounts are NOT being reused, and the new brand's accounts do not exist
+// yet. Anything unconfigured is simply absent, so this page renders a bare
+// brand header rather than sending visitors to someone else's storefront.
+
+const SOCIAL_LABELS: Record<string, string> = {
+  instagram: "Instagram",
+  facebook: "Facebook",
+  tiktok: "TikTok",
+  youtube: "YouTube",
+  whatsapp: "WhatsApp",
+};
 
 const FALLBACK_CONFIG: LinkTreeConfig = {
-  brandName: "Percée",
+  brandName: STORE_NAME,
   subtitle: "Shop, follow, and connect",
   links: [
-    {
-      label: "Shop",
-      href: "https://perce-eg.com/",
-      icon: "shop",
+    ...(isUsableUrl(STORE_URL)
+      ? [{ label: "Shop", href: STORE_URL, icon: "shop", enabled: true }]
+      : []),
+    ...STORE_SOCIAL_LINKS.map((link) => ({
+      label: SOCIAL_LABELS[link.platform] ?? link.platform,
+      href: link.url,
+      icon: link.platform,
       enabled: true,
-    },
-    {
-      label: "Instagram",
-      href: "https://www.instagram.com/piercingsperce/",
-      icon: "instagram",
-      enabled: true,
-    },
-    {
-      label: "Facebook",
-      href: "https://www.facebook.com/share/1HoGwkYpSK/?mibextid=wwXIfr",
-      icon: "facebook",
-      enabled: true,
-    },
-    {
-      label: "TikTok",
-      href: "https://www.tiktok.com/@piercingsperce",
-      icon: "tiktok",
-      enabled: true,
-    },
-    {
-      label: "WhatsApp",
-      href: "https://wa.me/201033036883",
-      icon: "whatsapp",
-      enabled: true,
-    },
+    })),
   ],
 };
 
@@ -245,7 +243,9 @@ export default function Page() {
     return () => cancelAnimationFrame(raf);
   }, [loading]);
 
-  const visibleLinks = config.links.filter((l) => l.enabled);
+  const visibleLinks = config.links.filter(
+    (l) => l.enabled && isUsableUrl(l.href),
+  );
   const brandName = config.brandName || FALLBACK_CONFIG.brandName;
   const subtitle = config.subtitle || FALLBACK_CONFIG.subtitle;
   const footerText = `© ${new Date().getFullYear()} ${brandName}`;

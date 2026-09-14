@@ -25,10 +25,11 @@ import {
   ZoomIn,
 } from "lucide-react";
 import { showCartToast } from "#root/components/ui/cart-toast";
+import { trpc } from "#root/shared/trpc/client";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-export interface ProductPagePerceProps {
+export interface ProductPagePremiumProps {
   product?: ProductPageProduct;
   relatedProducts?: FeaturedProduct[];
   showWishlist?: boolean;
@@ -46,7 +47,7 @@ export interface ProductPagePerceProps {
 // ─── Mock / Defaults ────────────────────────────────────────────────────────
 
 const DEFAULT_PRODUCT: ProductPageProduct = {
-  id: "perce-mock-1",
+  id: "product-preview-mock-1",
   name: "Lumière Diamond Pendant",
   price: 2450.0,
   discountPrice: 1960.0,
@@ -76,7 +77,10 @@ const DEFAULT_PRODUCT: ProductPageProduct = {
   rating: 4.8,
   reviewCount: 47,
   sku: "LUM-DP-18WG",
-  brand: "Percé",
+  // No brand on the placeholder product: this object also renders on a live
+  // product page for the instant before real data arrives, so it must not
+  // claim a brand name of any kind.
+  brand: undefined,
   categoryName: "Necklaces",
   specifications: [
     { label: "Metal", value: "18k White Gold" },
@@ -473,7 +477,7 @@ function MobileImageCarousel({
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
-export function ProductPagePerce({
+export function ProductPagePremium({
   product = DEFAULT_PRODUCT,
   relatedProducts,
   showWishlist = true,
@@ -482,7 +486,7 @@ export function ProductPagePerce({
   onImageClick,
   isLoading = false,
   className = "",
-}: ProductPagePerceProps) {
+}: ProductPagePremiumProps) {
   // ── Image state
   const images: ProductImage[] = product.images?.length
     ? product.images
@@ -493,6 +497,30 @@ export function ProductPagePerce({
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [quantity, setQuantity] = useState(1);
+
+  // ── Admin-authored shipping/returns copy (Dashboard > Settings).
+  // Both stay empty strings until an admin publishes real policy text; the
+  // Shipping & Returns accordion is omitted entirely while they are.
+  const [shippingText, setShippingText] = useState("");
+  const [returnsText, setReturnsText] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    trpc.settings.getProductPageContent
+      .query()
+      .then((res) => {
+        if (cancelled || !res.success || !res.result) return;
+        setShippingText(res.result.shippingText?.trim() ?? "");
+        setReturnsText(res.result.returnsText?.trim() ?? "");
+      })
+      .catch(() => {
+        // No policy copy available — the section simply stays hidden rather
+        // than falling back to a promise nobody agreed to.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const currentImage = images[selectedIdx] || images[0];
 
@@ -538,7 +566,7 @@ export function ProductPagePerce({
   if (isLoading) return <Skeleton />;
 
   return (
-    <div className={`product-page-perce bg-white ${className}`}>
+    <div className={`product-page-premium bg-white ${className}`}>
       {/* ── Breadcrumb ── */}
       <div className='mx-auto max-w-7xl px-4 sm:px-6 pt-4 sm:pt-6 pb-2 lg:px-10'>
         <nav className='flex items-center gap-1.5 text-[11px] sm:text-[12px] text-stone-400 overflow-x-auto scrollbar-hide'>
@@ -761,24 +789,17 @@ export function ProductPagePerce({
                 )}
               </div>
 
-              {/* Trust indicators */}
+              {/* Trust indicators — only claims this store can actually
+                  stand behind. The row previously also promised "Free
+                  Shipping" and "30-Day Returns"; neither is an established
+                  policy here, and both were inherited template copy. Add
+                  shipping/returns wording from Dashboard > Settings and it
+                  appears in the accordion below instead. */}
               <div className='mb-5 sm:mb-7 flex flex-wrap items-center gap-3 sm:gap-5 border-t border-stone-100 pt-4 sm:pt-5'>
-                <div className='flex items-center gap-1.5'>
-                  <Truck size={13} className='text-stone-400' />
-                  <span className='text-[10px] sm:text-[11px] tracking-wide text-stone-400'>
-                    Free Shipping
-                  </span>
-                </div>
                 <div className='flex items-center gap-1.5'>
                   <Shield size={13} className='text-stone-400' />
                   <span className='text-[10px] sm:text-[11px] tracking-wide text-stone-400'>
                     Secure Checkout
-                  </span>
-                </div>
-                <div className='flex items-center gap-1.5'>
-                  <RotateCcw size={13} className='text-stone-400' />
-                  <span className='text-[10px] sm:text-[11px] tracking-wide text-stone-400'>
-                    30-Day Returns
                   </span>
                 </div>
               </div>
@@ -814,20 +835,23 @@ export function ProductPagePerce({
                     </AccordionSection>
                   )}
 
-                <AccordionSection title='Shipping & Returns'>
-                  <div className='space-y-3'>
-                    <p>
-                      Complimentary standard shipping on all orders. Express
-                      delivery available at checkout.
-                    </p>
-                    <p>
-                      We accept returns of unworn items in original packaging
-                      within 30 days. Contact our care team to initiate a
-                      return.
-                    </p>
-                  </div>
-                </AccordionSection>
+                {/* Shipping & Returns — admin-authored, never invented.
+                    This section used to hardcode "Complimentary standard
+                    shipping on all orders" and a 30-day return window, which
+                    are policies this store has not set. It now renders only
+                    what an admin wrote in Dashboard > Settings > Product page
+                    content, and disappears completely when that is empty. */}
+                {(shippingText || returnsText) && (
+                  <AccordionSection title='Shipping & Returns'>
+                    <div className='space-y-3 whitespace-pre-line'>
+                      {shippingText && <p>{shippingText}</p>}
+                      {returnsText && <p>{returnsText}</p>}
+                    </div>
+                  </AccordionSection>
+                )}
 
+                {/* Care Guide — generic handling advice that makes no claim
+                    about this store's products, materials or durability. */}
                 <AccordionSection title='Care Guide'>
                   <div className='space-y-3'>
                     <p>
@@ -910,4 +934,4 @@ export function ProductPagePerce({
   );
 }
 
-ProductPagePerce.displayName = "ProductPagePerce";
+ProductPagePremium.displayName = "ProductPagePremium";

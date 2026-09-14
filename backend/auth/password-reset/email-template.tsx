@@ -14,9 +14,12 @@ import {
 import * as React from "react";
 
 export const PasswordResetTemplate = ({
+  storeName,
   userName,
   resetUrl,
 }: {
+  /** Resolved by backend/emails/branding.ts — never hardcode a brand here. */
+  storeName: string;
   userName: string;
   resetUrl: string;
 }) => {
@@ -24,12 +27,12 @@ export const PasswordResetTemplate = ({
     <Html>
       <Head>
         <title>Reset Your Password</title>
-        <Preview>Reset your password for Lebsy</Preview>
+        <Preview>Reset your password for {storeName}</Preview>
       </Head>
       <Body style={main}>
         <Container style={container}>
           <Heading as="h1" style={logo}>
-            Lebsy
+            {storeName}
           </Heading>
 
           <Section style={section}>
@@ -62,7 +65,9 @@ export const PasswordResetTemplate = ({
               If you didn&apos;t request a password reset, you can safely ignore this
               email. Your password will not be changed.
             </Text>
-            <Text style={footerText}>© {new Date().getFullYear()} Lebsy</Text>
+            <Text style={footerText}>
+              © {new Date().getFullYear()} {storeName}
+            </Text>
           </Section>
         </Container>
       </Body>

@@ -43,7 +43,7 @@ export async function importFullExport(
     return { success: false, error: "pg_restore is not available on PATH" };
   }
 
-  const workDir = await mkdtemp(path.join(tmpdir(), "synt-env-import-"));
+  const workDir = await mkdtemp(path.join(tmpdir(), "store-env-import-"));
 
   try {
     await zipStream.pipe(unzipper.Extract({ path: workDir })).promise();

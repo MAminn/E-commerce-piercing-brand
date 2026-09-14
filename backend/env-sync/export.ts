@@ -23,7 +23,7 @@ export async function streamFullExport(reply: FastifyReply): Promise<void> {
   }
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const filename = `synt-env-export-${timestamp}.zip`;
+  const filename = `store-env-export-${timestamp}.zip`;
 
   reply.raw.setHeader("Content-Type", "application/zip");
   reply.raw.setHeader("Content-Disposition", `attachment; filename="${filename}"`);

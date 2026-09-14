@@ -1,3 +1,12 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Business-promise sweep (Phase 2). This template previously hardcoded
+// shipping, returns and guarantee claims. Those are business facts ZELI has
+// not established, and an admin switching to this template in the dashboard
+// would have published them to customers instantly. Only claims the store can
+// actually stand behind (secure checkout — payments run through Paymob/Stripe)
+// remain. Real policy copy belongs in Dashboard > Settings > Product page
+// content, which the active templates already read.
+// ─────────────────────────────────────────────────────────────────────────────
 import React, { useState, useMemo, memo } from "react";
 import { Button } from "#root/components/ui/button";
 import { VariantSelector } from "#root/components/shop/VariantSelector";
@@ -93,11 +102,6 @@ const DEFAULT_PRODUCT: ProductPageProduct = {
     { label: "Care", value: "Dry clean only" },
   ],
   features: [
-    {
-      icon: "package",
-      title: "Complimentary Shipping",
-      description: "Free express delivery on all orders",
-    },
     {
       icon: "shield",
       title: "Secure Payment",
@@ -524,16 +528,10 @@ export function ProductPageEditorial({
                           </AccordionContent>
                         </AccordionItem>
                       )}
-                    <AccordionItem value='shipping'>
-                      <AccordionTrigger className='text-sm font-medium text-stone-900 hover:no-underline'>
-                        Shipping &amp; Returns
-                      </AccordionTrigger>
-                      <AccordionContent className='text-sm text-stone-600 leading-relaxed'>
-                        Complimentary standard shipping on orders over EGP
-                        1,000. Express shipping available at checkout. Returns
-                        accepted within 14 days of delivery.
-                      </AccordionContent>
-                    </AccordionItem>
+                    {/* The Shipping & Returns accordion used to hardcode a
+                        free-shipping threshold and a 14-day return window.
+                        Removed rather than replaced: this store has published
+                        no such policy. */}
                   </Accordion>
                 </div>
               </div>

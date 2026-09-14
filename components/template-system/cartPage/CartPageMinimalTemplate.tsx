@@ -63,22 +63,27 @@ export function CartPageMinimalTemplate({
 
   if (isLoading) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="w-5 h-5 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin" />
+      <div
+        role="status"
+        aria-label="Loading cart"
+        className="flex min-h-[60vh] items-center justify-center">
+        <div className="h-5 w-5 animate-spin rounded-full border-2 border-zeli-line-strong border-t-zeli-ink" />
       </div>
     );
   }
 
   if (items.length === 0) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center px-4 text-center">
-        <ShoppingCart className="w-12 h-12 text-gray-200 mb-4" />
-        <h2 className="text-[18px] font-medium text-gray-900 mb-2">Your cart is empty</h2>
-        <p className="text-[14px] text-gray-400 mb-6">Add items to your cart to continue shopping</p>
+      <div className="zeli-header-offset flex min-h-[60vh] flex-col items-center justify-center bg-zeli-bg px-4 text-center">
+        <ShoppingCart aria-hidden className="mb-4 h-10 w-10 text-zeli-ink-subtle" />
+        <h1 className="zeli-section-title">Your cart is empty</h1>
+        <p className="mt-2 text-[length:var(--zeli-text-body)] text-zeli-ink-muted">
+          Nothing added yet.
+        </p>
         <a
           href="/shop"
-          className="inline-flex items-center gap-2 px-6 py-3 rounded-md bg-gray-900 text-white text-[13px] font-medium hover:bg-gray-700 transition-colors">
-          Continue Shopping
+          className="mt-6 inline-flex min-h-11 items-center gap-2 bg-zeli-accent px-6 text-[length:var(--zeli-text-small)] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-zeli-ink-inverse transition-colors hover:bg-zeli-accent-hover">
+          Continue shopping
         </a>
       </div>
     );
@@ -93,12 +98,15 @@ export function CartPageMinimalTemplate({
 
   return (
     <>
-      <div className="min-h-screen bg-white pb-60 sm:pb-0">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+      {/* pb-60 reserves room for the mobile sticky bar below; the page also
+          has to clear the fixed header chrome, which it previously did not —
+          the "Cart" heading started underneath the navbar. */}
+      <div className="zeli-header-offset min-h-screen bg-zeli-bg pb-60 sm:pb-0">
+        <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
 
           {/* Page title */}
-          <h1 className="text-[22px] sm:text-[28px] font-medium text-gray-900 mb-4 sm:mb-6">
-            Cart <span className="text-gray-400 font-normal text-[16px] sm:text-[18px]">({items.length} {items.length === 1 ? "item" : "items"})</span>
+          <h1 className="text-[22px] sm:text-[28px] font-medium text-zeli-ink mb-4 sm:mb-6">
+            Cart <span className="text-zeli-ink-muted font-normal text-[16px] sm:text-[18px]">({items.length} {items.length === 1 ? "item" : "items"})</span>
           </h1>
 
           {/* Offer progress banner */}
@@ -114,7 +122,7 @@ export function CartPageMinimalTemplate({
             {/* ── Left: Items ───────────────────────────────── */}
             <div>
               {/* Column headers (desktop only) */}
-              <div className="hidden sm:grid grid-cols-[1fr_120px_100px_40px] gap-4 pb-3 border-b border-gray-100 text-[11px] uppercase tracking-wider text-gray-400 font-medium">
+              <div className="hidden sm:grid grid-cols-[1fr_120px_100px_40px] gap-4 pb-3 border-b border-zeli-line text-[11px] uppercase tracking-wider text-zeli-ink-muted font-medium">
                 <span>Product</span>
                 <span className="text-center">Quantity</span>
                 <span className="text-right">Price</span>
@@ -122,7 +130,7 @@ export function CartPageMinimalTemplate({
               </div>
 
               {/* Items list */}
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-zeli-line">
                 {items.map((item) => {
                   const lineTotal = item.price * item.quantity;
                   const hasDiscount = item.originalPrice != null && item.originalPrice > item.price;
@@ -134,7 +142,7 @@ export function CartPageMinimalTemplate({
                       {/* Mobile layout */}
                       <div className="flex gap-3 sm:hidden">
                         {/* Image */}
-                        <div className="w-[88px] h-[88px] shrink-0 bg-gray-50 overflow-hidden">
+                        <div className="w-[88px] h-[88px] shrink-0 bg-zeli-surface overflow-hidden">
                           {item.imageUrl ? (
                             <img
                               src={item.imageUrl}
@@ -143,7 +151,7 @@ export function CartPageMinimalTemplate({
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
-                              <ShoppingCart className="w-6 h-6 text-gray-200" />
+                              <ShoppingCart className="w-6 h-6 text-zeli-ink-subtle" />
                             </div>
                           )}
                         </div>
@@ -154,34 +162,34 @@ export function CartPageMinimalTemplate({
                           <div className="flex items-start gap-1">
                             <p
                               className="flex-1 text-[14px] font-medium leading-snug break-words overflow-hidden"
-                              style={{ color: "#111827", fontFamily: "var(--font-product-title)" }}>
+                              style={{ color: "var(--zeli-ink)", fontFamily: "var(--font-product-title)" }}>
                               {item.name}
                             </p>
                             <button
                               type="button"
                               onClick={() => onRemoveItem?.(item.id)}
                               aria-label="Remove item"
-                              className="shrink-0 w-8 h-8 flex items-center justify-center text-gray-300 hover:text-red-500 transition-colors -mr-1">
+                              className="shrink-0 h-11 w-11 flex items-center justify-center text-zeli-ink-subtle hover:text-zeli-sale transition-colors -mr-1">
                               <Trash2 className="w-[15px] h-[15px]" />
                             </button>
                           </div>
 
                           {item.variant && (
-                            <p className="text-[11px] text-gray-400 leading-none">{item.variant}</p>
+                            <p className="text-[11px] text-zeli-ink-muted leading-none">{item.variant}</p>
                           )}
 
                           {/* Unit price */}
                           <div className="flex items-center gap-1.5">
                             {hasDiscount && (
-                              <span className="text-[11px] text-gray-400 line-through">
+                              <span className="text-[11px] text-zeli-ink-muted line-through">
                                 {item.originalPrice!.toFixed(2)} {currency}
                               </span>
                             )}
-                            <span className={`text-[12px] ${hasDiscount ? "text-red-600 font-medium" : "text-gray-400"}`}>
+                            <span className={`text-[12px] ${hasDiscount ? "text-zeli-sale font-medium" : "text-zeli-ink-muted"}`}>
                               {item.price.toFixed(2)} {currency} each
                             </span>
                             {hasDiscount && (
-                              <span className="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 font-medium">
+                              <span className="text-[10px] bg-zeli-blush-soft text-zeli-sale px-1.5 py-0.5 font-medium">
                                 -{Math.round((1 - item.price / item.originalPrice!) * 100)}%
                               </span>
                             )}
@@ -189,25 +197,25 @@ export function CartPageMinimalTemplate({
 
                           {/* Qty + line total */}
                           <div className="flex flex-col items-center mt-auto pt-1">
-                            <div className="flex  items-center border border-gray-200 w-fit">
+                            <div className="flex  items-center border border-zeli-line w-fit">
                               <button
                                 type="button"
                                 onClick={() => onQuantityChange?.(item.id, Math.max(1, item.quantity - 1))}
                                 aria-label="Decrease quantity"
-                                className="w-[38px] h-[38px] flex items-center justify-center text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                                className="h-11 w-11 flex items-center justify-center text-zeli-ink-secondary hover:bg-zeli-surface active:bg-zeli-surface transition-colors"
                                 disabled={item.quantity <= 1}>
                                 <Minus className="w-3 h-3" />
                               </button>
                               <span
                                 className="w-8 text-center text-[13px] font-medium"
-                                style={{ color: "#111827", fontFamily: "var(--font-body)" }}>
+                                style={{ color: "var(--zeli-ink)", fontFamily: "var(--font-body)" }}>
                                 {item.quantity}
                               </span>
                               <button
                                 type="button"
                                 onClick={() => onQuantityChange?.(item.id, item.quantity + 1)}
                                 aria-label="Increase quantity"
-                                className="w-[38px] h-[38px] flex items-center justify-center text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                                className="h-11 w-11 flex items-center justify-center text-zeli-ink-secondary hover:bg-zeli-surface active:bg-zeli-surface transition-colors"
                                 disabled={item.stock != null && item.quantity >= item.stock}>
                                 <Plus className="w-3 h-3" />
                               </button>
@@ -215,17 +223,17 @@ export function CartPageMinimalTemplate({
                             <div className="flex items-baseline gap-1.5 mt-1">
                               {freeQty > 0 ? (
                                 <>
-                                  <span className="text-[12px] text-gray-400 line-through">
+                                  <span className="text-[12px] text-zeli-ink-muted line-through">
                                     {lineTotal.toFixed(2)} {currency}
                                   </span>
                                   {isFullyFree ? (
-                                    <p className="text-[15px] font-semibold text-emerald-600 uppercase" style={{ fontFamily: "var(--font-price)" }}>
+                                    <p className="text-[15px] font-semibold text-zeli-success uppercase" style={{ fontFamily: "var(--font-price)" }}>
                                       Free
                                     </p>
                                   ) : (
-                                    <p className="text-[15px] font-semibold" style={{ color: "#111827", fontFamily: "var(--font-price)" }}>
+                                    <p className="text-[15px] font-semibold" style={{ color: "var(--zeli-ink)", fontFamily: "var(--font-price)" }}>
                                       {(item.price * (item.quantity - freeQty)).toFixed(2)} {currency}
-                                      <span className="ms-1 text-[10px] text-emerald-600 font-semibold">
+                                      <span className="ms-1 text-[10px] text-zeli-success font-semibold">
                                         ({freeQty} free)
                                       </span>
                                     </p>
@@ -234,13 +242,13 @@ export function CartPageMinimalTemplate({
                               ) : (
                                 <>
                                   {hasDiscount && (
-                                    <span className="text-[12px] text-gray-400 line-through">
+                                    <span className="text-[12px] text-zeli-ink-muted line-through">
                                       {(item.originalPrice! * item.quantity).toFixed(2)} {currency}
                                     </span>
                                   )}
                                   <p
-                                    className={`text-[15px] font-semibold ${hasDiscount ? "text-red-600" : ""}`}
-                                    style={{ color: hasDiscount ? undefined : "#111827", fontFamily: "var(--font-price)" }}>
+                                    className={`text-[15px] font-semibold ${hasDiscount ? "text-zeli-sale" : ""}`}
+                                    style={{ color: hasDiscount ? undefined : "var(--zeli-ink)", fontFamily: "var(--font-price)" }}>
                                     {lineTotal.toFixed(2)} {currency}
                                   </p>
                                 </>
@@ -254,53 +262,53 @@ export function CartPageMinimalTemplate({
                       <div className="hidden sm:grid grid-cols-[1fr_120px_100px_40px] gap-4 items-center">
                         <div className="flex items-center gap-4">
                           {item.imageUrl ? (
-                            <img src={item.imageUrl} alt={item.name} className="w-16 h-16 object-cover bg-gray-50 shrink-0" />
+                            <img src={item.imageUrl} alt={item.name} className="w-16 h-16 object-cover bg-zeli-surface shrink-0" />
                           ) : (
-                            <div className="w-16 h-16 bg-gray-50 shrink-0" />
+                            <div className="w-16 h-16 bg-zeli-surface shrink-0" />
                           )}
                           <div className="min-w-0">
                             <p
                               className="text-[14px] font-medium break-words"
-                              style={{ color: "#111827", fontFamily: "var(--font-product-title)" }}>
+                              style={{ color: "var(--zeli-ink)", fontFamily: "var(--font-product-title)" }}>
                               {item.name}
                             </p>
-                            {item.variant && <p className="text-[12px] text-gray-400 mt-0.5">{item.variant}</p>}
+                            {item.variant && <p className="text-[12px] text-zeli-ink-muted mt-0.5">{item.variant}</p>}
                             <div className="flex items-center gap-1.5 mt-0.5">
                               {hasDiscount && (
-                                <span className="text-[11px] text-gray-400 line-through">
+                                <span className="text-[11px] text-zeli-ink-muted line-through">
                                   {item.originalPrice!.toFixed(2)} {currency}
                                 </span>
                               )}
-                              <span className={`text-[12px] ${hasDiscount ? "text-red-600 font-medium" : "text-gray-500"}`}>
+                              <span className={`text-[12px] ${hasDiscount ? "text-zeli-sale font-medium" : "text-zeli-ink-muted"}`}>
                                 {item.price.toFixed(2)} {currency}
                               </span>
                               {hasDiscount && (
-                                <span className="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 font-medium">
+                                <span className="text-[10px] bg-zeli-blush-soft text-zeli-sale px-1.5 py-0.5 font-medium">
                                   -{Math.round((1 - item.price / item.originalPrice!) * 100)}%
                                 </span>
                               )}
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center justify-center border border-gray-200 w-fit mx-auto">
+                        <div className="flex items-center justify-center border border-zeli-line w-fit mx-auto">
                           <button
                             type="button"
                             onClick={() => onQuantityChange?.(item.id, Math.max(1, item.quantity - 1))}
                             aria-label="Decrease quantity"
-                            className="w-9 h-9 flex items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors"
+                            className="w-9 h-9 flex items-center justify-center text-zeli-ink-secondary hover:bg-zeli-surface transition-colors"
                             disabled={item.quantity <= 1}>
                             <Minus className="w-3 h-3" />
                           </button>
                           <span
                             className="w-8 text-center text-[13px] font-medium"
-                            style={{ color: "#111827", fontFamily: "var(--font-body)" }}>
+                            style={{ color: "var(--zeli-ink)", fontFamily: "var(--font-body)" }}>
                             {item.quantity}
                           </span>
                           <button
                             type="button"
                             onClick={() => onQuantityChange?.(item.id, item.quantity + 1)}
                             aria-label="Increase quantity"
-                            className="w-9 h-9 flex items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors"
+                            className="w-9 h-9 flex items-center justify-center text-zeli-ink-secondary hover:bg-zeli-surface transition-colors"
                             disabled={item.stock != null && item.quantity >= item.stock}>
                             <Plus className="w-3 h-3" />
                           </button>
@@ -308,17 +316,17 @@ export function CartPageMinimalTemplate({
                         <div className="text-right">
                           {freeQty > 0 ? (
                             <>
-                              <p className="text-[11px] text-gray-400 line-through">
+                              <p className="text-[11px] text-zeli-ink-muted line-through">
                                 {lineTotal.toFixed(2)} {currency}
                               </p>
                               {isFullyFree ? (
-                                <p className="text-[14px] font-semibold text-emerald-600 uppercase" style={{ fontFamily: "var(--font-price)" }}>
+                                <p className="text-[14px] font-semibold text-zeli-success uppercase" style={{ fontFamily: "var(--font-price)" }}>
                                   Free
                                 </p>
                               ) : (
-                                <p className="text-[14px] font-semibold" style={{ color: "#111827", fontFamily: "var(--font-price)" }}>
+                                <p className="text-[14px] font-semibold" style={{ color: "var(--zeli-ink)", fontFamily: "var(--font-price)" }}>
                                   {(item.price * (item.quantity - freeQty)).toFixed(2)} {currency}
-                                  <span className="ms-1 text-[10px] text-emerald-600 font-semibold">
+                                  <span className="ms-1 text-[10px] text-zeli-success font-semibold">
                                     ({freeQty} free)
                                   </span>
                                 </p>
@@ -327,13 +335,13 @@ export function CartPageMinimalTemplate({
                           ) : (
                             <>
                               {hasDiscount && (
-                                <p className="text-[11px] text-gray-400 line-through">
+                                <p className="text-[11px] text-zeli-ink-muted line-through">
                                   {(item.originalPrice! * item.quantity).toFixed(2)} {currency}
                                 </p>
                               )}
                               <p
-                                className={`text-[14px] font-semibold ${hasDiscount ? "text-red-600" : ""}`}
-                                style={{ color: hasDiscount ? undefined : "#111827", fontFamily: "var(--font-price)" }}>
+                                className={`text-[14px] font-semibold ${hasDiscount ? "text-zeli-sale" : ""}`}
+                                style={{ color: hasDiscount ? undefined : "var(--zeli-ink)", fontFamily: "var(--font-price)" }}>
                                 {lineTotal.toFixed(2)} {currency}
                               </p>
                             </>
@@ -343,7 +351,7 @@ export function CartPageMinimalTemplate({
                           type="button"
                           onClick={() => onRemoveItem?.(item.id)}
                           aria-label="Remove item"
-                          className="w-8 h-8 flex items-center justify-center text-gray-300 hover:text-red-500 transition-colors justify-self-end">
+                          className="w-8 h-8 flex items-center justify-center text-zeli-ink-subtle hover:text-zeli-sale transition-colors justify-self-end">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -354,9 +362,9 @@ export function CartPageMinimalTemplate({
               </div>
 
               {/* Promo code */}
-              <div className="mt-6 lg:mt-8 pt-6 border-t border-gray-100">
+              <div className="mt-6 lg:mt-8 pt-6 border-t border-zeli-line">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-                  <p className="text-[13px] font-medium text-gray-900 shrink-0">
+                  <p className="text-[13px] font-medium text-zeli-ink shrink-0">
                     Apply promo code
                   </p>
                   <div className="flex flex-1 gap-2 min-w-0">
@@ -374,17 +382,17 @@ export function CartPageMinimalTemplate({
                       disabled={isApplyingCoupon}
                       aria-invalid={couponFeedback?.success === false}
                       aria-describedby="promo-code-feedback"
-                      className={`flex-1 px-4 py-2.5 rounded-md border text-[13px] text-gray-900 placeholder-gray-300 outline-none transition-colors bg-white min-w-0 disabled:opacity-60 ${
+                      className={`flex-1 px-4 py-2.5 rounded-md border text-[13px] text-zeli-ink placeholder-zeli-ink-subtle outline-none transition-colors bg-zeli-surface-raised min-w-0 disabled:opacity-60 ${
                         couponFeedback && !couponFeedback.success
-                          ? "border-red-300 focus:border-red-400"
-                          : "border-gray-200 focus:border-gray-400"
+                          ? "border-zeli-sale focus:border-zeli-sale"
+                          : "border-zeli-line focus:border-zeli-ink"
                       }`}
                     />
                     <button
                       type="button"
                       onClick={handleApplyCoupon}
                       disabled={!couponCode.trim() || isApplyingCoupon}
-                      className="px-5 py-2.5 rounded-md bg-gray-900 text-white text-[12px] font-medium uppercase tracking-wide hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0">
+                      className="px-5 py-2.5 rounded-md bg-zeli-accent text-zeli-ink-inverse text-[12px] font-medium uppercase tracking-wide hover:bg-zeli-accent-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0">
                       {isApplyingCoupon ? "Checking…" : "Apply"}
                     </button>
                   </div>
@@ -403,8 +411,8 @@ export function CartPageMinimalTemplate({
                     <p
                       className={`text-[12px] mt-2 ${
                         couponFeedback.success
-                          ? "text-green-600"
-                          : "text-red-600"
+                          ? "text-zeli-success"
+                          : "text-zeli-sale"
                       }`}>
                       {couponFeedback.message}
                     </p>
@@ -413,8 +421,8 @@ export function CartPageMinimalTemplate({
 
                 {/* Currently applied code, with a way to take it off */}
                 {appliedCoupon && (
-                  <div className="flex items-center justify-between gap-3 mt-3 px-3 py-2 rounded-md bg-green-50 border border-green-100">
-                    <p className="text-[12px] text-green-700 min-w-0">
+                  <div className="flex items-center justify-between gap-3 mt-3 px-3 py-2 rounded-md bg-zeli-surface border border-zeli-line">
+                    <p className="text-[12px] text-zeli-success min-w-0">
                       <span className="font-semibold">
                         {appliedCoupon.code}
                       </span>
@@ -429,7 +437,7 @@ export function CartPageMinimalTemplate({
                       <button
                         type="button"
                         onClick={handleRemoveCoupon}
-                        className="text-[11px] font-medium uppercase tracking-wide text-green-700 hover:text-green-900 underline shrink-0">
+                        className="text-[11px] font-medium uppercase tracking-wide text-zeli-success hover:text-zeli-success underline shrink-0">
                         Remove
                       </button>
                     )}
@@ -440,16 +448,16 @@ export function CartPageMinimalTemplate({
 
             {/* ── Right: Order Summary ────────────────────── */}
             <div className="mt-8 lg:mt-0">
-              <div className="bg-gray-50 p-6">
-                <h2 className="text-[15px] font-semibold text-gray-900 mb-5">Order Summary</h2>
+              <div className="bg-zeli-surface p-6">
+                <h2 className="text-[15px] font-semibold text-zeli-ink mb-5">Order Summary</h2>
 
                 <div className="space-y-3">
-                  <div className="flex justify-between text-[13px] text-gray-600">
+                  <div className="flex justify-between text-[13px] text-zeli-ink-secondary">
                     <span>Subtotal</span>
                     <span>{totals.subtotal.toFixed(2)} {currency}</span>
                   </div>
                   {totals.discount != null && totals.discount > 0 && (
-                    <div className="flex justify-between text-[13px] text-green-600">
+                    <div className="flex justify-between text-[13px] text-zeli-success">
                       <span>Discount</span>
                       <span>−{totals.discount.toFixed(2)} {currency}</span>
                     </div>
@@ -458,11 +466,21 @@ export function CartPageMinimalTemplate({
                     appliedOffers={appliedOffers}
                     currency={currency}
                   />
-                  <div className="flex justify-between text-[13px] text-gray-600">
-                    <span>Shipping</span>
-                    <span>{totals.shipping != null && totals.shipping > 0 ? `${totals.shipping.toFixed(2)} ${currency}` : "Calculated at checkout"}</span>
-                  </div>
-                  <div className="pt-3 border-t border-gray-200 flex justify-between text-[15px] font-semibold text-gray-900">
+                  {/* Shown only when the store has a shipping fee configured.
+                      This used to read "Calculated at checkout" whenever the
+                      fee was zero or unknown — but checkout applies the same
+                      single flat fee from store_settings.shipping_fee and
+                      calculates nothing, so the line promised a step that
+                      does not exist. */}
+                  {totals.shipping != null && totals.shipping > 0 && (
+                    <div className="flex justify-between text-[13px] text-zeli-ink-secondary">
+                      <span>Shipping</span>
+                      <span>
+                        {totals.shipping.toFixed(2)} {currency}
+                      </span>
+                    </div>
+                  )}
+                  <div className="pt-3 border-t border-zeli-line flex justify-between text-[15px] font-semibold text-zeli-ink">
                     <span>Total</span>
                     <span>{totals.grandTotal.toFixed(2)} {currency}</span>
                   </div>
@@ -473,13 +491,13 @@ export function CartPageMinimalTemplate({
                   type="button"
                   onClick={onProceedToCheckout}
                   disabled={isUpdating || items.length === 0}
-                  className="mt-6 w-full py-4 rounded-md bg-gray-900 text-white text-[13px] font-medium uppercase tracking-wider hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed hidden sm:block">
+                  className="mt-6 w-full py-4 rounded-md bg-zeli-accent text-zeli-ink-inverse text-[13px] font-medium uppercase tracking-wider hover:bg-zeli-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed hidden sm:block">
                   {isUpdating ? "Updating…" : "Proceed to Checkout"}
                 </button>
 
                 <a
                   href="/shop"
-                  className="mt-3 w-full hidden sm:flex items-center justify-center py-3 text-[12px] text-gray-500 hover:text-gray-800 transition-colors uppercase tracking-wide">
+                  className="mt-3 w-full hidden sm:flex items-center justify-center py-3 text-[12px] text-zeli-ink-muted hover:text-zeli-ink transition-colors uppercase tracking-wide">
                   ← Continue Shopping
                 </a>
               </div>
@@ -490,7 +508,17 @@ export function CartPageMinimalTemplate({
       </div>
 
       {/* ── Mobile sticky checkout bar ─────────────────────────────────────── */}
-      <div className="sm:hidden fixed inset-x-0 z-40 border-t border-gray-100 shadow-[0_-4px_16px_rgba(0,0,0,0.08)]">
+      {/* `fixed inset-x-0` with no `bottom` left this bar at its static
+          position — a "sticky" checkout CTA that scrolled away with the page,
+          while pb-60 above reserved empty space for a bar that was not there.
+          It also has to sit ABOVE the fixed mobile bottom nav (h-16 + safe
+          area, z-index --zeli-z-bottom-nav) rather than behind it. */}
+      <div
+        style={{
+          bottom: "calc(4rem + env(safe-area-inset-bottom))",
+          zIndex: "var(--zeli-z-sticky)",
+        }}
+        className="fixed inset-x-0 border-t border-zeli-line bg-zeli-bg shadow-[0_-4px_16px_rgba(36,29,25,0.08)] sm:hidden">
         <AppliedOffersSavings
           appliedOffers={appliedOffers}
           promoDiscount={totals.discount ?? 0}
@@ -499,14 +527,14 @@ export function CartPageMinimalTemplate({
         />
         <div className="px-4 py-3">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[12px] text-gray-500 uppercase tracking-wide">Total</span>
+            <span className="text-[12px] text-zeli-ink-muted uppercase tracking-wide">Total</span>
             <div className="text-right">
               {totalSavings > 0 && (
-                <p className="text-[10px] font-medium text-emerald-600">
+                <p className="text-[10px] font-medium text-zeli-success">
                   Saving {totalSavings.toFixed(2)} {currency}
                 </p>
               )}
-              <span className="text-[15px] font-semibold text-gray-900">
+              <span className="text-[15px] font-semibold text-zeli-ink">
                 {totals.grandTotal.toFixed(2)} {currency}
               </span>
             </div>
@@ -515,13 +543,13 @@ export function CartPageMinimalTemplate({
             type="button"
             onClick={onProceedToCheckout}
             disabled={isUpdating || items.length === 0}
-            className="flex w-full items-center justify-center gap-2 py-3.5 rounded-md bg-gray-900 text-white text-[13px] font-medium uppercase tracking-wider hover:bg-gray-700 active:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            className="flex w-full items-center justify-center gap-2 py-3.5 rounded-md bg-zeli-accent text-zeli-ink-inverse text-[13px] font-medium uppercase tracking-wider hover:bg-zeli-accent-hover active:bg-zeli-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             {isUpdating ? "Updating…" : "Proceed to Checkout"}
             <ArrowRight className="h-4 w-4" />
           </button>
         <a
           href="/shop"
-          className="mt-2 w-full flex items-center justify-center py-2 text-[11px] text-gray-400 hover:text-gray-700 transition-colors uppercase tracking-wide">
+          className="mt-2 w-full flex items-center justify-center py-2 text-[11px] text-zeli-ink-muted hover:text-zeli-ink transition-colors uppercase tracking-wide">
           ← Continue Shopping
         </a>
         </div>

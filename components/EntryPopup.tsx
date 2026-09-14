@@ -8,8 +8,8 @@ import { Label } from "#root/components/ui/label";
 import { Loader2, X } from "lucide-react";
 import { getCartSessionToken } from "#root/lib/cart-session";
 
-const DISMISSED_AT_KEY = "synt-popup-dismissed-at";
-const CLAIMED_KEY = "synt-popup-claimed";
+const DISMISSED_AT_KEY = "store-popup-dismissed-at";
+const CLAIMED_KEY = "store-popup-claimed";
 
 interface PopupConfig {
   enabled: boolean;

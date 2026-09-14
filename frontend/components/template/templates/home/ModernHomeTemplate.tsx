@@ -21,6 +21,7 @@ import {
   Clock,
 } from "lucide-react";
 import { Footer } from "#root/components/globals/Footer";
+import { STORE_NAME } from "#root/shared/config/branding";
 
 // Lazy load components for better performance
 const FAQ = lazy(() =>
@@ -59,24 +60,31 @@ interface ModernHomeTemplateProps {
 }
 
 // FAQ data
+//
+// Placeholder copy only. The previous entries were a prior brand's real
+// policies — a 14-day return window, a 1-day damage-report deadline, their
+// support inbox and their WhatsApp number. None of that is established for
+// this store, and none of those contacts are ours, so nothing concrete is
+// asserted here. This legacy v1 template is reachable at
+// /template-preview?category=home; real copy belongs in the CMS.
 const faqData = [
   {
-    id: "how-lebsey-works",
+    id: "how-it-works",
     question: "How does our store work?",
     answer:
-      "Browse our curated collections, add items to your cart, and checkout seamlessly. We offer a wide range of products with secure payments and fast shipping.",
+      "Browse our collections, add pieces to your cart, and check out. Store policies are published from the admin dashboard.",
   },
   {
     id: "shipping-time",
     question: "How long does shipping take?",
     answer:
-      "We ship across Egypt, delivering orders within a week (Not including holidays). Shipping costs vary based on order details and location, with support available at cs@Lebsey.com for any issues.",
+      "Shipping times and costs are set from the admin dashboard and shown at checkout.",
   },
   {
     id: "return-policy",
     question: "What is your return policy?",
     answer:
-      "You can return items within 14 days if they are unused and in their original packaging. To start a return, contact us at CS@Lebsey.com or WhatsApp +201507135600. Return fees match the original delivery cost, and refunds are processed within 14 days. Damaged items must be reported within 1 day for a free replacement or refund.",
+      "Our return policy is published from the admin dashboard. See the Return Policy page for current terms.",
   },
 ];
 
@@ -152,7 +160,7 @@ export default function ModernHomeTemplate({ data }: ModernHomeTemplateProps) {
 
               <div className='space-y-6'>
                 <h1 className='text-6xl md:text-8xl font-light text-gray-900 leading-none tracking-tight'>
-                  Lebsy
+                  {STORE_NAME}
                   <span className='block text-4xl md:text-5xl font-normal text-gray-600 mt-2'>
                     Where Style Meets Substance
                   </span>
@@ -254,34 +262,12 @@ export default function ModernHomeTemplate({ data }: ModernHomeTemplateProps) {
                 Authenticated quality
               </div>
             </div>
-            <div className='group text-center p-8 bg-white rounded-2xl border border-gray-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1'>
-              <div className='w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:bg-gray-900 transition-colors duration-300'>
-                <Users className='w-6 h-6 text-gray-600 group-hover:text-white transition-colors duration-300' />
-              </div>
-              <div className='text-2xl font-light text-gray-900 mb-2'>50K+</div>
-              <div className='text-gray-600 font-medium'>Happy Customers</div>
-              <div className='text-sm text-gray-500 mt-1'>
-                Worldwide community
-              </div>
-            </div>
-            <div className='group text-center p-8 bg-white rounded-2xl border border-gray-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1'>
-              <div className='w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:bg-gray-900 transition-colors duration-300'>
-                <Truck className='w-6 h-6 text-gray-600 group-hover:text-white transition-colors duration-300' />
-              </div>
-              <div className='text-2xl font-light text-gray-900 mb-2'>
-                7 Days
-              </div>
-              <div className='text-gray-600 font-medium'>Fast Delivery</div>
-              <div className='text-sm text-gray-500 mt-1'>Across Egypt</div>
-            </div>
-            <div className='group text-center p-8 bg-white rounded-2xl border border-gray-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1'>
-              <div className='w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:bg-gray-900 transition-colors duration-300'>
-                <Award className='w-6 h-6 text-gray-600 group-hover:text-white transition-colors duration-300' />
-              </div>
-              <div className='text-2xl font-light text-gray-900 mb-2'>99%</div>
-              <div className='text-gray-600 font-medium'>Satisfaction</div>
-              <div className='text-sm text-gray-500 mt-1'>Customer rating</div>
-            </div>
+            {/* Statistics removed: "50K+ Happy Customers / Worldwide
+                community", "7 Days Fast Delivery / Across Egypt" and "99%
+                Satisfaction / Customer rating" were three invented numbers
+                presented as the store's record. The store has taken zero
+                orders and has no reviews. Legacy V1 template — admin preview
+                only, never a customer route. */}
           </div>
         </div>
       </section>
@@ -294,7 +280,7 @@ export default function ModernHomeTemplate({ data }: ModernHomeTemplateProps) {
               <div className='relative overflow-hidden rounded-3xl bg-gray-100'>
                 <img
                   src='/assets/story.webp'
-                  alt='About Lebsy - Our fashion story'
+                  alt='About our store'
                   className='w-full h-auto transition-transform duration-700 hover:scale-105'
                   width='500'
                   height='333'
@@ -574,9 +560,13 @@ export default function ModernHomeTemplate({ data }: ModernHomeTemplateProps) {
             <div className='md:col-span-2'>
               <div className='flex items-center mb-6'>
                 <div className='w-8 h-8 bg-gray-900 rounded-lg mr-3 flex items-center justify-center'>
-                  <span className='text-white font-bold text-sm'>L</span>
+                  <span className='text-white font-bold text-sm'>
+                    {STORE_NAME.charAt(0)}
+                  </span>
                 </div>
-                <span className='text-2xl font-light text-gray-900'>Lebsy</span>
+                <span className='text-2xl font-light text-gray-900'>
+                  {STORE_NAME}
+                </span>
               </div>
               <p className='text-gray-600 mb-8 max-w-md leading-relaxed'>
                 Curating exceptional fashion experiences through thoughtful
@@ -708,7 +698,8 @@ export default function ModernHomeTemplate({ data }: ModernHomeTemplateProps) {
           <div className='border-t border-gray-100 pt-8'>
             <div className='flex flex-col md:flex-row justify-between items-center'>
               <p className='text-gray-500 text-sm mb-4 md:mb-0'>
-                © 2024 Lebsy. All rights reserved.
+                © {new Date().getFullYear()} {STORE_NAME}. All rights
+                reserved.
               </p>
               <div className='flex space-x-8 text-sm'>
                 <Link

@@ -25,7 +25,7 @@ function Page() {
   if (!isMinimal) {
     return (
       <div className='min-h-[60vh] flex items-center justify-center'>
-        <p className='text-gray-500'>Page not found</p>
+        <p className='text-zeli-ink-muted'>Page not found</p>
       </div>
     );
   }
@@ -99,7 +99,7 @@ function Page() {
             </h1>
 
             {description && (
-              <p className='mt-6 text-sm sm:text-base text-gray-600 leading-relaxed max-w-md'>
+              <p className='mt-6 text-sm sm:text-base text-zeli-ink-secondary leading-relaxed max-w-md'>
                 {description}
               </p>
             )}
@@ -128,7 +128,7 @@ function Page() {
                     placeholder={isAr ? "الاسم" : "Name"}
                     required
                     maxLength={200}
-                    className='w-full border-b border-gray-300 bg-transparent py-3 text-sm placeholder:text-gray-400 focus:border-black focus:outline-none transition-colors'
+                    className='w-full border-b border-zeli-line-strong bg-transparent py-3 text-sm placeholder:text-gray-400 focus:border-black focus:outline-none transition-colors'
                     dir={dir}
                   />
                 </div>
@@ -140,7 +140,7 @@ function Page() {
                     placeholder={isAr ? "البريد الإلكتروني" : "Email"}
                     required
                     maxLength={200}
-                    className='w-full border-b border-gray-300 bg-transparent py-3 text-sm placeholder:text-gray-400 focus:border-black focus:outline-none transition-colors'
+                    className='w-full border-b border-zeli-line-strong bg-transparent py-3 text-sm placeholder:text-gray-400 focus:border-black focus:outline-none transition-colors'
                     dir={dir}
                   />
                 </div>
@@ -154,7 +154,7 @@ function Page() {
                   required
                   maxLength={5000}
                   rows={6}
-                  className='w-full border-b border-gray-300 bg-transparent py-3 text-sm placeholder:text-gray-400 focus:border-black focus:outline-none transition-colors resize-none'
+                  className='w-full border-b border-zeli-line-strong bg-transparent py-3 text-sm placeholder:text-gray-400 focus:border-black focus:outline-none transition-colors resize-none'
                   dir={dir}
                 />
               </div>

@@ -2,6 +2,7 @@ import type { PageContext } from "vike/types";
 import { getHomepageContentRaw } from "#root/backend/homepage/get-homepage-content/raw";
 import { DEFAULT_HOMEPAGE_CONTENT } from "#root/shared/types/homepage-content";
 import type { HomepageContent } from "#root/shared/types/homepage-content";
+import { resolveLandingTemplateId } from "#root/shared/config/storefront";
 import { getStoreOwnerId } from "#root/shared/config/store";
 
 export type Data = {
@@ -26,7 +27,7 @@ export const data = async (ctx: PageContext): Promise<Data> => {
     | Record<string, string>
     | undefined;
   const activeTemplateId =
-    templateSelection?.landing ?? "landing-modern";
+    resolveLandingTemplateId(templateSelection);
 
   try {
     const homepageContent = await getHomepageContentRaw(

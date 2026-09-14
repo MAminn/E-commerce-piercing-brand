@@ -1,8 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import type React from "react";
 import { Link } from "#root/components/utils/Link";
-import { Button } from "#root/components/ui/button";
-import { HeroCarousel } from "#root/components/ui/hero-carousel";
+import { ZeliHero } from "#root/components/template-system/minimal/ZeliHero";
+import { ZeliEditorialBlock } from "#root/components/template-system/minimal/ZeliEditorialBlock";
 import type { HeroSlide } from "#root/components/ui/hero-carousel";
 import { MinimalProductCarousel } from "#root/components/template-system/minimal/MinimalProductCarousel";
 import { QuickViewDialog } from "#root/components/template-system/minimal/QuickViewDialog";
@@ -17,7 +17,6 @@ import {
   ArrowRight,
   ChevronLeft,
   ChevronRight,
-  ShoppingBag,
 } from "lucide-react";
 import type {
   HomepageContent,
@@ -95,21 +94,30 @@ function CategoryCarousel({ categories }: { categories: CategoryStripItem[] }) {
       <button
         onClick={() => scroll("left")}
         disabled={!canScrollLeft}
-        className='absolute -start-2 top-1/2 -translate-y-1/2 z-10 hidden md:flex w-9 h-9 items-center justify-center border border-stone-200 bg-white hover:border-stone-900 disabled:opacity-20 disabled:cursor-not-allowed transition-colors'
-        aria-label='Scroll left'>
+        tabIndex={-1}
+        aria-hidden='true'
+        className='absolute -start-2 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center border border-zeli-line bg-zeli-bg transition-colors hover:border-zeli-accent disabled:opacity-20 md:flex'>
         <ChevronLeft className='w-4 h-4' />
       </button>
       <button
         onClick={() => scroll("right")}
         disabled={!canScrollRight}
-        className='absolute -end-2 top-1/2 -translate-y-1/2 z-10 hidden md:flex w-9 h-9 items-center justify-center border border-stone-200 bg-white hover:border-stone-900 disabled:opacity-20 disabled:cursor-not-allowed transition-colors'
-        aria-label='Scroll right'>
+        tabIndex={-1}
+        aria-hidden='true'
+        className='absolute -end-2 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center border border-zeli-line bg-zeli-bg transition-colors hover:border-zeli-accent disabled:opacity-20 md:flex'>
         <ChevronRight className='w-4 h-4' />
       </button>
 
+      {/* `justify-center` directly on an overflowing flex scroller clips the
+          leading items and makes them unreachable — you cannot scroll left
+          past the centre point. With more categories than fit (the normal
+          case on a 375px phone) the first category was unreachable. Centring
+          now happens via `w-max mx-auto` on the track, which collapses to
+          normal start-aligned scrolling as soon as the content overflows. */}
       <div
         ref={scrollRef}
-        className='flex justify-center gap-4 sm:gap-6 overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-2 px-4'>
+        className='overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-2'>
+        <div className='flex w-max mx-auto gap-4 sm:gap-6 px-4'>
         {categories.map((cat) => {
           const imgSrc = resolveImageUrl(cat.imageUrl);
           return (
@@ -117,27 +125,39 @@ function CategoryCarousel({ categories }: { categories: CategoryStripItem[] }) {
               key={cat.id}
               href={`/categories/${cat.slug}`}
               data-cat-card
-              className='group text-center flex-none w-[180px] sm:w-[220px] lg:w-[260px] snap-start'>
-              <div className='aspect-[4/5] overflow-hidden bg-stone-50'>
+              className='group relative flex-none w-[168px] sm:w-[232px] lg:w-[288px] snap-start'>
+              {/* Tall portrait crop — a placement shot is a close-up of an
+                  ear, which is a vertical subject. The whole tile is the
+                  link, so there is no separate clickable div. */}
+              <div className='relative aspect-[4/5] overflow-hidden bg-zeli-surface'>
                 {imgSrc ? (
                   <img
                     src={imgSrc}
-                    alt={cat.name}
-                    className='w-full h-full object-cover transition-transform duration-500 group-hover:scale-105'
+                    alt=''
+                    className='h-full w-full object-cover object-center transition-transform ease-out group-hover:scale-[1.04]'
+                    style={{ transitionDuration: "var(--zeli-duration-slow)" }}
                     loading='lazy'
+                    decoding='async'
                   />
                 ) : (
-                  <div className='w-full h-full flex items-center justify-center bg-stone-100'>
-                    <ShoppingBag className='w-12 h-12 text-stone-300' />
-                  </div>
+                  /* No category image uploaded yet: a plain warm ground, not
+                     a placeholder icon pretending to be product imagery. */
+                  <div className='h-full w-full bg-zeli-surface' />
                 )}
+                {/* Bottom scrim so the caption stays legible over any
+                    photograph, without dimming the whole image. */}
+                <div
+                  aria-hidden='true'
+                  className='pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/45 to-transparent'
+                />
+                <h3 className='absolute inset-x-0 bottom-0 p-4 text-left text-[0.8125rem] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-white sm:text-sm'>
+                  {cat.name}
+                </h3>
               </div>
-              <h3 className='mt-3 text-sm sm:text-base font-normal text-stone-800 group-hover:text-stone-600 transition-colors'>
-                {cat.name}
-              </h3>
             </Link>
           );
         })}
+        </div>
       </div>
     </div>
   );
@@ -201,13 +221,9 @@ export function LandingTemplateMinimal({
         alt: content.hero.title,
       });
     }
-    if (content.brandStatement.enabled && content.brandStatement.image) {
-      slides.push({
-        imageUrl: resolveImageUrl(content.brandStatement.image) || "",
-        linkUrl: content.categories.ctaLink || "/shop",
-        alt: content.brandStatement.title,
-      });
-    }
+    // The brand-statement image used to be appended here as a second hero
+    // slide. It now has its own editorial section further down the page, and
+    // borrowing it made a missing brand image render as a broken *hero*.
     return slides;
   })();
 
@@ -261,108 +277,81 @@ export function LandingTemplateMinimal({
     <div className={`landing-template-minimal overflow-x-hidden bg-white ${className}`}>
       <ScrollToProductsButton targetId='home-products' />
       {/* ═══════════════════════════════════════════════
-          2. HERO IMAGE CAROUSEL
-          ═══════════════════════════════════════════════ */}
-      {content.hero.enabled && heroSlides.length > 0 ? (
-        <HeroCarousel slides={heroSlides} interval={5000} className="h-fit mt-24" />
-      ) : content.hero.enabled ? (
-        /* Fallback: text-only hero when no images are uploaded */
-        <section className='relative min-h-[50vh] flex items-center justify-center bg-stone-100'>
-          <div className='max-w-3xl mx-auto text-center px-6'>
-            <h1 className='text-4xl sm:text-5xl lg:text-7xl font-light text-stone-900 mb-6 leading-[1.1] tracking-tight'>
-              {content.hero.title}
-            </h1>
-            <p className='text-lg sm:text-xl text-stone-500 font-light mb-10 leading-relaxed'>
-              {content.hero.subtitle}
-            </p>
-            <Button
-              variant='primary'
-              size='lg'
-              onClick={() => navigate(content.hero.ctaLink)}
-              asChild={!onCtaClick}>
-              {onCtaClick ? (
-                <>{content.hero.ctaText}</>
-              ) : (
-                <a href={content.hero.ctaLink}>{content.hero.ctaText}</a>
-              )}
-            </Button>
-          </div>
-        </section>
-      ) : null}
+          3. HERO — image + campaign copy
+          ═══════════════════════════════════════════════
+          ZeliHero replaces the old HeroCarousel here. That component rendered
+          images only, so on a store with hero images the CMS title, subtitle
+          and CTA never appeared at all and the page opened on a bare 16:9
+          strip. ZeliHero composes image and copy, uses a portrait crop on
+          phones, and still degrades to image-only or text-only. */}
+      <ZeliHero
+        hero={content.hero}
+        slides={heroSlides}
+        onCtaClick={onCtaClick}
+      />
 
       {/* ═══════════════════════════════════════════════
           3. CATEGORY GRID — Clean image + title (matchperfumes style)
           ═══════════════════════════════════════════════ */}
-      {content.categories.enabled && (
-        <section className='py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-8'>
-          <div className='max-w-[1400px] mx-auto'>
-            {/* Centred heading with underline */}
-            <div className='text-center mb-10 sm:mb-14'>
-              <h2 className='text-2xl sm:text-3xl lg:text-4xl font-light text-stone-900 tracking-tight inline-block relative pb-3'>
+      {/* Renders only when the store actually has categories. It previously
+          fell back to four invented tiles so the grid never looked empty;
+          an empty catalogue should show nothing, not fabricated navigation. */}
+      {content.categories.enabled &&
+        (categoriesLoading || categories.length > 0) && (
+        <section className='zeli-section zeli-container'>
+          <div>
+            {/* Left-aligned editorial heading. The previous centred heading
+                with a hard 2px underline bar is the single most template-like
+                element on the page; a quiet left-aligned title lets the
+                photography carry the section. */}
+            <div className='mb-8 sm:mb-10'>
+              <h2 className='zeli-section-title'>
                 {locale === "ar" && content.categories.titleAr
                   ? content.categories.titleAr
                   : content.categories.title}
-                <span className='absolute bottom-0 left-1/4 right-1/4 h-[2px] bg-stone-900' />
               </h2>
+              {content.categories.subtitle?.trim() && (
+                <p className='mt-2 max-w-prose text-sm text-zeli-ink-muted'>
+                  {content.categories.subtitle}
+                </p>
+              )}
             </div>
 
             {categoriesLoading ? (
-              <div className='grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6'>
-                {[...Array(4)].map((_, i) => (
-                  <div key={i}>
-                    <div className='aspect-[4/5] bg-stone-100 animate-pulse' />
-                    <div className='h-4 bg-stone-100 animate-pulse mt-3 mx-auto w-24' />
-                  </div>
-                ))}
-              </div>
-            ) : categories.length > 0 ? (
-              <CategoryCarousel categories={categories} />
-            ) : (
-              <div className='grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6'>
-                {[
-                  t("new_arrivals"),
-                  t("featured"),
-                  t("categories"),
-                  t("on_sale"),
-                ].map((label, i) => (
+              <div className='grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-4'>
+                {["s1", "s2", "s3", "s4"].map((key) => (
                   <div
-                    key={i}
-                    className='group text-center cursor-pointer'
-                    onClick={() => navigate("/shop")}>
-                    <div className='aspect-[4/5] bg-stone-100 flex items-center justify-center'>
-                      <ShoppingBag className='w-12 h-12 text-stone-300' />
-                    </div>
-                    <h3 className='mt-3 text-sm sm:text-base font-normal text-stone-800'>
-                      {label}
-                    </h3>
-                  </div>
+                    key={key}
+                    className='aspect-[4/5] animate-pulse bg-zeli-surface'
+                  />
                 ))}
               </div>
+            ) : (
+              <CategoryCarousel categories={categories} />
             )}
           </div>
         </section>
       )}
 
       {/* ═══════════════════════════════════════════════
-          4. DISCOUNTED / ON-SALE PRODUCTS CAROUSEL
+          7. NEW ARRIVALS — Minimal card carousel
           ═══════════════════════════════════════════════ */}
-      <div id='home-products' className='scroll-mt-24' />
-      {content.discountedProducts?.enabled !== false &&
-        discountedMinimal.length > 0 && (
+      {content.newArrivals?.enabled !== false &&
+        newArrivalProducts.length > 0 && (
           <MinimalProductCarousel
-            products={discountedMinimal}
+            products={newArrivalProducts}
             title={
-              locale === "ar" && content.discountedProducts?.titleAr
-                ? content.discountedProducts.titleAr
-                : content.discountedProducts?.title || t("on_sale")
+              locale === "ar" && content.newArrivals?.titleAr
+                ? content.newArrivals.titleAr
+                : content.newArrivals?.title || t("new_arrivals")
             }
-            viewAllHref={`${content.discountedProducts?.viewAllLink || "/shop"}${(content.discountedProducts?.viewAllLink || "/shop").includes("?") ? "&" : "?"}section=offers`}
+            viewAllHref={`${content.newArrivals?.viewAllLink || "/shop"}${(content.newArrivals?.viewAllLink || "/shop").includes("?") ? "&" : "?"}section=newarrivals`}
             viewAllText={
-              locale === "ar" && content.discountedProducts?.viewAllTextAr
-                ? content.discountedProducts.viewAllTextAr
-                : content.discountedProducts?.viewAllText || t("view_all")
+              locale === "ar" && content.newArrivals?.viewAllTextAr
+                ? content.newArrivals.viewAllTextAr
+                : content.newArrivals?.viewAllText || t("view_all")
             }
-            className='bg-white'
+            className='bg-zeli-surface'
             onQuickView={setQuickViewProduct}
           />
         )}
@@ -384,52 +373,115 @@ export function LandingTemplateMinimal({
               ? content.featuredProducts.viewAllTextAr
               : content.featuredProducts.viewAllText
           }
-          className='bg-stone-50'
+          className='bg-zeli-bg'
           onQuickView={setQuickViewProduct}
         />
       )}
 
       {/* ═══════════════════════════════════════════════
-          7. NEW ARRIVALS — Minimal card carousel
+          6. BRAND / EDITORIAL CAMPAIGN BLOCK
+          ═══════════════════════════════════════════════
+          Driven entirely by the existing `brandStatement` CMS fields, which
+          the template never rendered before. Shows nothing at all until an
+          admin publishes a heading or an image — no placeholder manifesto. */}
+      <ZeliEditorialBlock
+        heading={content.brandStatement?.title}
+        body={content.brandStatement?.description}
+        imageUrl={resolveImageUrl(content.brandStatement?.image)}
+        imageSide='start'
+        tone='surface'
+        onCtaClick={onCtaClick}
+        className={
+          content.brandStatement?.enabled === false ? "hidden" : undefined
+        }
+      />
+
+      {/* ═══════════════════════════════════════════════
+          4. DISCOUNTED / ON-SALE PRODUCTS CAROUSEL
           ═══════════════════════════════════════════════ */}
-      {content.newArrivals?.enabled !== false &&
-        newArrivalProducts.length > 0 && (
+      <div id='home-products' className='scroll-mt-24' />
+      {content.discountedProducts?.enabled !== false &&
+        discountedMinimal.length > 0 && (
           <MinimalProductCarousel
-            products={newArrivalProducts}
+            products={discountedMinimal}
             title={
-              locale === "ar" && content.newArrivals?.titleAr
-                ? content.newArrivals.titleAr
-                : content.newArrivals?.title || t("new_arrivals")
+              locale === "ar" && content.discountedProducts?.titleAr
+                ? content.discountedProducts.titleAr
+                : content.discountedProducts?.title || t("on_sale")
             }
-            viewAllHref={`${content.newArrivals?.viewAllLink || "/shop"}${(content.newArrivals?.viewAllLink || "/shop").includes("?") ? "&" : "?"}section=newarrivals`}
+            viewAllHref={`${content.discountedProducts?.viewAllLink || "/shop"}${(content.discountedProducts?.viewAllLink || "/shop").includes("?") ? "&" : "?"}section=offers`}
             viewAllText={
-              locale === "ar" && content.newArrivals?.viewAllTextAr
-                ? content.newArrivals.viewAllTextAr
-                : content.newArrivals?.viewAllText || t("view_all")
+              locale === "ar" && content.discountedProducts?.viewAllTextAr
+                ? content.discountedProducts.viewAllTextAr
+                : content.discountedProducts?.viewAllText || t("view_all")
             }
-            className='bg-stone-50'
+            className='bg-zeli-bg'
             onQuickView={setQuickViewProduct}
           />
         )}
 
       {/* ═══════════════════════════════════════════════
-          BOTTOM IMAGE CAROUSEL (above testimonials)
-          ═══════════════════════════════════════════════ */}
+          8. STACK INSPIRATION — on-ear editorial imagery
+          ═══════════════════════════════════════════════
+          Reuses the existing `bottomCarousel` CMS slides, which already carry
+          desktop + mobile images, an optional link and alt text. Presented as
+          a full-bleed editorial rail rather than another boxed carousel.
+          No shoppable hotspots and no tagged products — none exist, and
+          inventing them would mean inventing product references. */}
       {(() => {
-        const bottomSlides: HeroSlide[] = (content.bottomCarousel?.slides ?? [])
-          .filter((s) => s.imageUrl)
-          .map((s) => ({
-            imageUrl: resolveImageUrl(s.imageUrl) || "",
-            mobileImageUrl: resolveImageUrl(s.mobileImageUrl),
-            linkUrl: s.linkUrl,
-            alt: s.alt,
-          }));
-        return content.bottomCarousel?.enabled !== false &&
-          bottomSlides.length > 0 ? (
-          <div className='max-w-[1400px] mx-auto '>
-            <HeroCarousel slides={bottomSlides} interval={5000} autoHeight />
-          </div>
-        ) : null;
+        const stackSlides = (content.bottomCarousel?.slides ?? []).filter(
+          (slide) => slide.imageUrl,
+        );
+        if (content.bottomCarousel?.enabled === false) return null;
+        if (stackSlides.length === 0) return null;
+        return (
+          <section className='zeli-section bg-zeli-bg'>
+            <div className='zeli-container'>
+              <h2 className='zeli-eyebrow mb-6'>{t("shop_the_look")}</h2>
+            </div>
+            <div className='overflow-x-auto scrollbar-hide snap-x snap-mandatory'>
+              <div className='flex w-max gap-3 px-[var(--zeli-gutter)] sm:gap-4'>
+                {stackSlides.map((slide, i) => {
+                  const src = resolveImageUrl(slide.imageUrl);
+                  const mobileSrc = resolveImageUrl(slide.mobileImageUrl);
+                  const Frame = slide.linkUrl ? "a" : "div";
+                  return (
+                    <Frame
+                      key={slide.id ?? `${slide.imageUrl}-${i}`}
+                      {...(slide.linkUrl ? { href: slide.linkUrl } : {})}
+                      className='group relative w-[240px] flex-none snap-start overflow-hidden bg-zeli-surface sm:w-[300px] lg:w-[360px]'>
+                      <div className='aspect-[4/5]'>
+                        <picture>
+                          {mobileSrc && (
+                            <source
+                              media='(max-width: 767px)'
+                              srcSet={mobileSrc}
+                            />
+                          )}
+                          <img
+                            src={src}
+                            alt={slide.alt ?? ""}
+                            className='h-full w-full object-cover object-center transition-transform ease-out group-hover:scale-[1.04]'
+                            style={{
+                              transitionDuration: "var(--zeli-duration-slow)",
+                            }}
+                            loading='lazy'
+                            decoding='async'
+                          />
+                        </picture>
+                      </div>
+                      {slide.alt?.trim() && (
+                        <p className='px-1 py-3 text-xs text-zeli-ink-muted'>
+                          {slide.alt}
+                        </p>
+                      )}
+                    </Frame>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+        );
       })()}
 
       {/* ═══════════════════════════════════════════════

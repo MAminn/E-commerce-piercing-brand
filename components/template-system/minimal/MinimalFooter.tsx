@@ -3,7 +3,8 @@ import { usePageContext } from "vike-react/usePageContext";
 import { Link } from "#root/components/utils/Link";
 import { useLayoutSettings } from "#root/frontend/contexts/LayoutSettingsContext";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
-import { STORE_NAME } from "#root/shared/config/branding";
+import { STORE_NAME, isUsableUrl } from "#root/shared/config/branding";
+import { isUsableHref } from "#root/shared/config/storefront";
 import type { SocialPlatform } from "#root/shared/types/layout-settings";
 import { Mail, Phone, Loader2, Send } from "lucide-react";
 import { trpc } from "#root/shared/trpc/client";
@@ -76,8 +77,16 @@ export function MinimalFooter() {
     ? footer.logoTextAr
     : (footer.logoText || STORE_NAME);
   const showLogo = !!footer.logoUrl;
-  const linkGroups = footer.footerLinkGroups ?? [];
-  const socialLinks = footer.socialLinks ?? [];
+  // Drop links pointing at placeholders, then drop any group left empty —
+  // the footer shows fewer columns rather than links that go nowhere.
+  const linkGroups = (footer.footerLinkGroups ?? [])
+    .map((g) => ({ ...g, links: g.links.filter((l) => isUsableHref(l.url)) }))
+    .filter((g) => g.links.length > 0);
+  // Placeholder ("#") and blank URLs are dropped — an unconfigured profile
+  // should be absent, not a dead icon.
+  const socialLinks = (footer.socialLinks ?? []).filter((s) =>
+    isUsableUrl(s.url),
+  );
   const copyright = locale === "ar" && footer.copyrightAr
     ? footer.copyrightAr
     : (footer.copyright || `${STORE_NAME} ${new Date().getFullYear()}`);
@@ -265,16 +274,17 @@ export function MinimalFooter() {
               </div>
             )}
 
-            {/* Payment methods */}
-            <div className='flex items-center gap-3 text-xs text-stone-400'>
-              {["Visa", "Mastercard", "Apple Pay", "Mada"].map((method) => (
-                <span
-                  key={method}
-                  className='px-2 py-1 border border-stone-200 rounded text-[10px] font-medium text-stone-500'>
-                  {method}
-                </span>
-              ))}
-            </div>
+            {/* Payment methods.
+                This used to hardcode Visa / Mastercard / Apple Pay / Mada as
+                accepted methods. Which methods a customer can actually use is
+                decided by what is configured in shared/config/payment.ts
+                (Paymob and/or Stripe, else cash on delivery) — and this store
+                currently has no gateway keys set, so all four badges were a
+                promise checkout could not keep. Mada in particular is a Saudi
+                network, not an Egyptian one.
+
+                Rather than guess, the real accepted methods are shown at
+                checkout where they are derived from live configuration. */}
 
             {/* Copyright */}
             <p className='text-xs text-stone-400'>

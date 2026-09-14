@@ -92,20 +92,20 @@ export function QuickViewDialog({ product, open, onClose }: QuickViewDialogProps
       role='dialog'
       aria-modal='true'>
       <div
-        className='relative bg-white w-[95vw] max-w-[800px] max-h-[90vh] overflow-y-auto shadow-xl'
+        className='relative bg-zeli-surface-raised w-[95vw] max-w-[800px] max-h-[90vh] overflow-y-auto shadow-xl'
         onClick={(e) => e.stopPropagation()}>
         {/* Close button */}
         <button
           type='button'
           onClick={onClose}
-          className='absolute top-3 end-3 z-10 w-8 h-8 flex items-center justify-center bg-white rounded-full shadow hover:bg-stone-100 transition-colors'
+          className='absolute top-3 end-3 z-10 w-8 h-8 flex items-center justify-center bg-zeli-surface-raised rounded-full shadow hover:bg-zeli-surface transition-colors'
           aria-label={t("close")}>
           <X className='w-4 h-4' />
         </button>
 
         <div className='flex flex-col md:flex-row'>
           {/* Image gallery */}
-          <div className='relative md:w-1/2 aspect-square bg-stone-50'>
+          <div className='relative md:w-1/2 aspect-square bg-zeli-surface'>
             <img
               src={images[currentImageIndex] || ""}
               alt={product.name}
@@ -140,7 +140,7 @@ export function QuickViewDialog({ product, open, onClose }: QuickViewDialogProps
 
             {/* Tag */}
             {product.tag || product.isNew ? (
-              <span className='absolute top-3 start-3 bg-stone-900 text-white text-[10px] font-medium px-2.5 py-1 tracking-wide'>
+              <span className='absolute top-3 start-3 bg-zeli-accent text-zeli-ink-inverse text-[10px] font-medium px-2.5 py-1 tracking-wide'>
                 {product.tag || t("new")}
               </span>
             ) : null}
@@ -157,7 +157,7 @@ export function QuickViewDialog({ product, open, onClose }: QuickViewDialogProps
                     navigator.share({ title: product.name, url: window.location.href });
                   }
                 }}
-                className='p-1.5 text-stone-400 hover:text-stone-700 transition-colors'>
+                className='p-1.5 text-zeli-ink-subtle hover:text-zeli-ink transition-colors'>
                 <Share2 className='w-4 h-4' />
               </button>
               <button
@@ -165,35 +165,35 @@ export function QuickViewDialog({ product, open, onClose }: QuickViewDialogProps
                 onClick={() => toggle(product.id)}
                 className={cn(
                   "p-1.5 transition-colors",
-                  wishlisted ? "text-red-500" : "text-stone-400 hover:text-stone-700",
+                  wishlisted ? "text-zeli-sale" : "text-zeli-ink-subtle hover:text-zeli-ink",
                 )}>
                 <Heart className={cn("w-4 h-4", wishlisted && "fill-current")} />
               </button>
             </div>
 
             {/* Name */}
-            <h2 className='text-lg font-normal text-stone-900 mb-1'>
+            <h2 className='text-lg font-normal text-zeli-ink mb-1'>
               {product.name}
             </h2>
 
             {/* Tax note */}
-            {/* <p className='text-xs text-stone-400 mb-2'>{t("price_includes_tax")}</p> */}
+            {/* <p className='text-xs text-zeli-ink-subtle mb-2'>{t("price_includes_tax")}</p> */}
 
             {/* Price */}
             <div className='flex items-center gap-2 mb-4'>
               {hasDiscount && (
-                <span className='text-base text-stone-400 line-through'>
+                <span className='text-base text-zeli-ink-subtle line-through'>
                   {product.price} {t("currency")}
                 </span>
               )}
-              <span className={cn("text-base font-semibold", hasDiscount ? "text-red-600" : "text-stone-900")}>
+              <span className={cn("text-base font-semibold", hasDiscount ? "text-zeli-sale" : "text-zeli-ink")}>
                 {displayPrice} {t("currency")}
               </span>
             </div>
 
             {/* Availability */}
             {product.available && (
-              <div className='flex items-center gap-1.5 text-green-600 text-sm mb-4'>
+              <div className='flex items-center gap-1.5 text-zeli-success text-sm mb-4'>
                 <Check className='w-4 h-4' />
                 {t("in_stock")}
               </div>
@@ -202,29 +202,29 @@ export function QuickViewDialog({ product, open, onClose }: QuickViewDialogProps
             {/* Description (truncated) */}
             {product.description && (
               <div className='mb-4'>
-                <p className='text-sm text-stone-600 leading-relaxed line-clamp-4'>
+                <p className='text-sm text-zeli-ink-secondary leading-relaxed line-clamp-4'>
                   {product.description}
                 </p>
               </div>
             )}
 
             {/* Divider */}
-            <div className='border-t border-stone-100 my-3' />
+            <div className='border-t border-zeli-line my-3' />
 
             {/* Quantity + Add to cart */}
             <div className='flex items-center gap-3 mt-auto'>
-              <div className='flex items-center border border-stone-200'>
+              <div className='flex items-center border border-zeli-line'>
                 <button
                   type='button'
                   onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                  className='w-9 h-9 flex items-center justify-center text-stone-500 hover:text-stone-900 transition-colors'>
+                  className='w-9 h-9 flex items-center justify-center text-zeli-ink-muted hover:text-zeli-ink transition-colors'>
                   −
                 </button>
-                <span className='w-10 text-center text-sm text-stone-900'>{quantity}</span>
+                <span className='w-10 text-center text-sm text-zeli-ink'>{quantity}</span>
                 <button
                   type='button'
                   onClick={() => setQuantity((q) => q + 1)}
-                  className='w-9 h-9 flex items-center justify-center text-stone-500 hover:text-stone-900 transition-colors'>
+                  className='w-9 h-9 flex items-center justify-center text-zeli-ink-muted hover:text-zeli-ink transition-colors'>
                   +
                 </button>
               </div>
@@ -233,7 +233,7 @@ export function QuickViewDialog({ product, open, onClose }: QuickViewDialogProps
                 onClick={handleAddToCart}
                 disabled={!product.available}
                 data-add-to-cart='true'
-                className='flex-1 py-2.5 bg-stone-900 text-white text-xs font-medium tracking-wide uppercase hover:bg-stone-800 transition-colors disabled:opacity-40'>
+                className='flex-1 py-2.5 bg-zeli-accent text-zeli-ink-inverse text-xs font-medium tracking-wide uppercase hover:bg-zeli-accent-hover transition-colors disabled:opacity-40'>
                 {product.available ? t("add_to_cart") : t("out_of_stock")}
               </button>
             </div>

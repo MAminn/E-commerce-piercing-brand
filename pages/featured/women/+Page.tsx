@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { trpc } from "#root/shared/trpc/client";
 import { getTemplateComponent } from "#root/components/template-system/templateConfig";
+import { resolveTemplateId } from "#root/shared/config/storefront";
 import { useTemplate } from "#root/frontend/contexts/TemplateContext";
 import type { SortingPageProduct } from "#root/components/template-system/sorting/SortingMinimalTemplate";
 
@@ -48,7 +49,7 @@ const Page: React.FC = () => {
     fetchProducts();
   }, []);
 
-  const activeTemplateId = getTemplateId("sorting") ?? "sorting-minimal";
+  const activeTemplateId = resolveTemplateId("sorting", getTemplateId("sorting"));
   const TemplateEntry = getTemplateComponent("sorting", activeTemplateId);
 
   if (!TemplateEntry) {

@@ -1,3 +1,9 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Business-promise sweep (Phase 2). This template previously hardcoded
+// shipping / returns / guarantee claims that ZELI has not established. An
+// admin switching to it from the dashboard would have published them to
+// customers instantly. Only claims the store can stand behind remain.
+// ─────────────────────────────────────────────────────────────────────────────
 import React, { useState } from "react";
 import { Button } from "#root/components/ui/button";
 import { Card, CardContent } from "#root/components/ui/card";
@@ -53,19 +59,21 @@ export interface CategoryHeroSplitProps {
   className?: string;
 }
 
-const MOCK_CATEGORIES = [
-  { id: "electronics", name: "Electronics", count: 45 },
-  { id: "fashion", name: "Fashion", count: 78 },
-  { id: "home", name: "Home & Garden", count: 32 },
-  { id: "sports", name: "Sports", count: 24 },
-];
-
-const MOCK_BRANDS = [
-  { id: "apple", name: "Apple", count: 12 },
-  { id: "samsung", name: "Samsung", count: 18 },
-  { id: "sony", name: "Sony", count: 15 },
-  { id: "lg", name: "LG", count: 10 },
-];
+/**
+ * Filter sources default to EMPTY, not to sample data.
+ *
+ * These two used to default to an invented catalogue — Electronics / Fashion /
+ * Home & Garden / Sports and Apple / Samsung / Sony / LG, each with an
+ * invented product count. Every caller that rendered this template without
+ * passing real lists (the /featured/*\/categories routes do exactly that)
+ * therefore showed a piercing-jewelry shopper a filter sidebar for a consumer
+ * electronics store, with counts no product in the database backs.
+ *
+ * Empty arrays mean the filter groups render with nothing in them, which is
+ * the truth for a store that has not supplied them.
+ */
+const NO_CATEGORIES: { id: string; name: string; count: number }[] = [];
+const NO_BRANDS: { id: string; name: string; count: number }[] = [];
 
 /**
  * Category Hero Split Template
@@ -87,8 +95,8 @@ export function CategoryHeroSplit({
   totalProducts,
   currentPage = 1,
   productsPerPage = 12,
-  availableCategories = MOCK_CATEGORIES,
-  availableBrands = MOCK_BRANDS,
+  availableCategories = NO_CATEGORIES,
+  availableBrands = NO_BRANDS,
   priceRangeLimits = [0, 1000],
   onSortChange,
   onFilterChange,
@@ -321,10 +329,6 @@ export function CategoryHeroSplit({
                 )}
                 <div className='flex items-center gap-4 text-sm text-gray-400'>
                   <span>{totalCount} Products</span>
-                  <span>•</span>
-                  <span>Free Shipping</span>
-                  <span>•</span>
-                  <span>Easy Returns</span>
                 </div>
               </div>
             </div>

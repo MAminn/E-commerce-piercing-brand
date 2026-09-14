@@ -1,3 +1,9 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Business-promise sweep (Phase 2). This template previously hardcoded
+// shipping / returns / guarantee claims that ZELI has not established. An
+// admin switching to it from the dashboard would have published them to
+// customers instantly. Only claims the store can stand behind remain.
+// ─────────────────────────────────────────────────────────────────────────────
 import type React from "react";
 import { useState } from "react";
 import { VariantSelector } from "#root/components/shop/VariantSelector";
@@ -368,18 +374,10 @@ export function ProductPageClassic({
             </div>
 
             {/* Trust Signals */}
-            <div className='grid grid-cols-3 gap-4 pt-4 border-t border-gray-200'>
-              <div className='text-center'>
-                <Truck className='w-6 h-6 text-blue-600 mx-auto mb-2' />
-                <p className='text-xs text-gray-600'>Free Shipping</p>
-              </div>
+            <div className='grid grid-cols-1 gap-4 pt-4 border-t border-gray-200'>
               <div className='text-center'>
                 <Shield className='w-6 h-6 text-blue-600 mx-auto mb-2' />
                 <p className='text-xs text-gray-600'>Secure Payment</p>
-              </div>
-              <div className='text-center'>
-                <RotateCcw className='w-6 h-6 text-blue-600 mx-auto mb-2' />
-                <p className='text-xs text-gray-600'>Easy Returns</p>
               </div>
             </div>
           </div>

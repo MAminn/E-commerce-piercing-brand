@@ -13,6 +13,7 @@ import {
 } from "#root/components/template-system/templateConfig";
 import { trpc } from "#root/shared/trpc/client";
 import { usePageContext } from "vike-react/usePageContext";
+import { ZELI_TEMPLATE_PRESET } from "#root/shared/config/storefront";
 
 // Re-export TemplateCategory for convenience
 export type { TemplateCategory } from "#root/components/template-system/templateConfig";
@@ -45,13 +46,28 @@ const TEMPLATE_CACHE_KEY = "template-selection-cache";
 // Legacy V1 localStorage keys (kept for backward compat of legacy panel)
 const TEMPLATE_STORAGE_KEY = "selected-templates";
 
-// Build default selection from templateConfig
+/**
+ * What the storefront renders before an admin has saved anything.
+ *
+ * This used to be "the first entry in each registry category", which is the
+ * quietest fallback in the codebase: an empty `store_settings.
+ * template_selection` produced landing-modern + product-perce +
+ * category-grid-classic + cart-modern + checkout-modern, a mix of three
+ * visual families that no page file mentioned and nobody could grep for. It
+ * now comes from the one documented ZELI preset, like every other fallback.
+ *
+ * Registry order still decides nothing; a preset id that does not exist in
+ * the registry is caught by shared/config/__tests__/storefront.test.ts.
+ */
 function getDefaultSelection(): TemplateSelection {
   const defaultSelection: TemplateSelection = {};
 
   (Object.keys(templateConfig) as TemplateCategory[]).forEach((category) => {
+    const preset = ZELI_TEMPLATE_PRESET[category];
     const templates = templateConfig[category];
-    if (templates && templates.length > 0) {
+    if (preset && templates?.some((t) => t.id === preset)) {
+      defaultSelection[category] = preset;
+    } else if (templates && templates.length > 0) {
       defaultSelection[category] = templates[0]?.id;
     }
   });

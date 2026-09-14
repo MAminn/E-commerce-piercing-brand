@@ -1,3 +1,11 @@
+> ℹ️ **Mixed document.** The setup, scripts, stack and deployment sections
+> below are current and maintained. The project name, brand positioning and
+> "template for sale" framing are inherited from the earlier project this
+> repo was copied from and do **not** describe the current product. For what
+> this repository actually is, read [`docs/CURRENT_PROJECT.md`](docs/CURRENT_PROJECT.md).
+
+---
+
 # Lebsy Shop — Single-Shop E-Commerce Template
 
 A production-ready, fully-featured single-shop e-commerce template built with **React 19**, **Fastify 5**, **tRPC**, **Drizzle ORM**, and **Tailwind CSS 4**. Designed for developers who want a clean, modern, and extensible store — ready to customize and ship.

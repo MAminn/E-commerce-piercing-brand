@@ -350,7 +350,7 @@ function AutomationSettingsCard({
             <Input
               id='automation-test-email'
               type='email'
-              placeholder='you@syntperfumes.com'
+              placeholder='you@your-domain.com'
               value={emailDraft}
               disabled={saving}
               onChange={(e) => setEmailDraft(e.target.value)}

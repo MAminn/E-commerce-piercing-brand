@@ -1,7 +1,12 @@
 import { useState, type FC } from "react";
 import { Link } from "#root/components/utils/Link";
 import { ArrowRight } from "lucide-react";
-import { STORE_NAME } from "#root/shared/config/branding";
+import {
+  STORE_NAME,
+  STORE_SOCIAL_LINKS,
+  isUsableUrl,
+} from "#root/shared/config/branding";
+import { isUsableHref } from "#root/shared/config/storefront";
 import { useLayoutSettings } from "#root/frontend/contexts/LayoutSettingsContext";
 import type { SocialPlatform } from "#root/shared/types/layout-settings";
 import { FooterLogo } from "#root/components/globals/FooterLogo";
@@ -216,24 +221,45 @@ export const Footer: FC<FooterProps> = ({
   const effectiveCopyright =
     layoutSettings.footer.copyright || effectiveBrandName;
 
-  // Build social links from CMS if no prop override
-  const effectiveSocialLinks =
-    socialLinks ??
-    layoutSettings.footer.socialLinks.map((sl) => ({
+  // Build social links from CMS if no prop override. Placeholder/blank URLs
+  // are dropped so a half-configured store shows no icon rather than a dead
+  // one; central brand config (VITE_SOCIAL_*) is the fallback, and it is
+  // empty until the new brand's accounts exist.
+  const cmsSocialLinks = layoutSettings.footer.socialLinks
+    .filter((sl) => isUsableUrl(sl.url))
+    .map((sl) => ({
       id: sl.id,
       name: sl.platform.charAt(0).toUpperCase() + sl.platform.slice(1),
       url: sl.url,
       icon: socialIconMap[sl.platform] ?? FacebookIcon,
     }));
+  const effectiveSocialLinks =
+    socialLinks?.filter((sl) => isUsableUrl(sl.url)) ??
+    (cmsSocialLinks.length > 0
+      ? cmsSocialLinks
+      : STORE_SOCIAL_LINKS.map((link) => ({
+          id: link.platform,
+          name: link.platform.charAt(0).toUpperCase() + link.platform.slice(1),
+          url: link.url,
+          icon:
+            socialIconMap[link.platform as keyof typeof socialIconMap] ??
+            FacebookIcon,
+        })));
 
   // Build footer link groups from CMS if no prop override
-  const effectiveFooterLinks =
+  // Placeholder destinations are dropped, and a group left with no usable
+  // links is dropped with them — so a half-configured footer shows fewer
+  // columns rather than columns of links that go nowhere.
+  const effectiveFooterLinks = (
     footerLinks ??
     layoutSettings.footer.footerLinkGroups.map((g) => ({
       id: g.id,
       title: g.title,
       links: g.links.map((l) => ({ id: l.id, name: l.label, url: l.url })),
-    }));
+    }))
+  )
+    .map((g) => ({ ...g, links: g.links.filter((l) => isUsableHref(l.url)) }))
+    .filter((g) => g.links.length > 0);
 
   const handleSubscribe = (e: React.FormEvent) => {
     e.preventDefault();
@@ -343,23 +369,10 @@ export const Footer: FC<FooterProps> = ({
           <p className='text-[10px] text-[#3A3028] font-light tracking-[0.08em]'>
             &copy; {new Date().getFullYear()} {effectiveCopyright}
           </p>
-          <div className='flex items-center gap-8'>
-            <Link
-              href='#'
-              className='text-[10px] text-[#3A3028] hover:text-[#6B5F52] font-light tracking-[0.08em] transition-colors duration-700'>
-              Terms
-            </Link>
-            <Link
-              href='#'
-              className='text-[10px] text-[#3A3028] hover:text-[#6B5F52] font-light tracking-[0.08em] transition-colors duration-700'>
-              Privacy
-            </Link>
-            <Link
-              href='#'
-              className='text-[10px] text-[#3A3028] hover:text-[#6B5F52] font-light tracking-[0.08em] transition-colors duration-700'>
-              Cookies
-            </Link>
-          </div>
+          {/* Terms / Privacy / Cookies used to sit here as three "#" links —
+              real-looking footer links to pages that do not exist and
+              policies that are not published. Add them as a footer link
+              group from Dashboard > Layout Settings once they ship. */}
         </div>
       </div>
     </footer>

@@ -5,7 +5,7 @@ describe("buildUnsubscribeHeaders", () => {
   const original = process.env.PUBLIC_ORIGIN;
 
   beforeEach(() => {
-    process.env.PUBLIC_ORIGIN = "https://syntperfumes.com";
+    process.env.PUBLIC_ORIGIN = "https://example-store.com";
   });
 
   afterEach(() => {
@@ -14,13 +14,13 @@ describe("buildUnsubscribeHeaders", () => {
 
   it("builds an absolute unsubscribe URL using the site origin", () => {
     const { unsubscribeUrl } = buildUnsubscribeHeaders("abc123");
-    expect(unsubscribeUrl).toBe("https://syntperfumes.com/unsubscribe?token=abc123");
+    expect(unsubscribeUrl).toBe("https://example-store.com/unsubscribe?token=abc123");
   });
 
   it("points List-Unsubscribe at the one-click POST API endpoint, not the human page", () => {
     const { headers } = buildUnsubscribeHeaders("abc123");
     expect(headers["List-Unsubscribe"]).toBe(
-      "<https://syntperfumes.com/api/unsubscribe?token=abc123>",
+      "<https://example-store.com/api/unsubscribe?token=abc123>",
     );
   });
 

@@ -755,9 +755,11 @@ export function LandingTemplateEditorial({
               <div className='mb-10 h-px w-full bg-stone-900/10' />
               <Reveal variant='fadeUp'>
                 <div className='mx-auto max-w-2xl text-center'>
-                  <p className='text-xs tracking-[0.32em] uppercase text-stone-500'>
-                    {content.footerCta.subtitle}
-                  </p>
+                  {content.footerCta.subtitle && (
+                    <p className='text-xs tracking-[0.32em] uppercase text-stone-500'>
+                      {content.footerCta.subtitle}
+                    </p>
+                  )}
                   <h2 className='mt-3 text-3xl sm:text-4xl font-semibold tracking-tight text-stone-900 leading-tight'>
                     {content.footerCta.title}
                   </h2>

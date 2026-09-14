@@ -40,8 +40,11 @@ export const ComingSoonWelcomeTemplate = ({
             <Text style={paragraph}>
               So you're here early, we love that.
             </Text>
+            {/* The old copy promised "your 15% off" — a previous brand's
+                launch offer. No such offer is established here, so this says
+                nothing we can't honour. */}
             <Text style={paragraph}>
-              You just secured your spot .. and your 15% off.
+              You just secured your spot on the list.
             </Text>
             <Text style={paragraph}>
               We're almost ready to show you what we've been building, and honestly we can't wait.
@@ -53,10 +56,10 @@ export const ComingSoonWelcomeTemplate = ({
               So the wait won't be long.
             </Text>
             <Text style={paragraph}>
-              Welcome to synt..
+              Welcome to {storeName}.
             </Text>
             <Text style={signature}>
-              —Synt team
+              — the {storeName} team
             </Text>
           </Section>
 

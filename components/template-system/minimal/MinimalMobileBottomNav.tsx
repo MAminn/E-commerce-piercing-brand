@@ -57,7 +57,8 @@ export function MinimalMobileBottomNav() {
 
   return (
     <nav
-      className='lg:hidden fixed bottom-0 inset-x-0 h-16 z-[9995] bg-white border-t border-gray-200'
+      style={{ zIndex: "var(--zeli-z-bottom-nav)" }}
+      className='lg:hidden fixed bottom-0 inset-x-0 h-16 bg-zeli-bg border-t border-zeli-line pb-[env(safe-area-inset-bottom)]'
       aria-label='Bottom navigation'>
       <div className='grid grid-cols-5 h-full'>
         {tabs.map(({ key, label, href, icon: Icon, count, dot }) => {

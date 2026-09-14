@@ -58,7 +58,7 @@ describe("makeEmailService", () => {
   it("uses fromAddress/fromName from makeEmailService input when provided", async () => {
     const service = await Effect.runPromise(
       makeEmailService(
-        baseInput({ fromAddress: "cr@syntperfumes.com", fromName: "SYNT" }),
+        baseInput({ fromAddress: "cr@example-store.com", fromName: "Example" }),
       ),
     );
     await Effect.runPromise(
@@ -67,7 +67,7 @@ describe("makeEmailService", () => {
 
     expect(sendMailMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        from: '"SYNT" <cr@syntperfumes.com>',
+        from: '"Example" <cr@example-store.com>',
       }),
     );
   });
@@ -75,23 +75,23 @@ describe("makeEmailService", () => {
   it("lets per-call options override the default From address/name", async () => {
     const service = await Effect.runPromise(
       makeEmailService(
-        baseInput({ fromAddress: "cr@syntperfumes.com", fromName: "SYNT" }),
+        baseInput({ fromAddress: "cr@example-store.com", fromName: "Example" }),
       ),
     );
     await Effect.runPromise(
       service.sendEmail("to@example.com", "Subject", "<p>Body</p>", {
-        fromAddress: "orders@syntperfumes.com",
-        fromName: "SYNT Orders",
-        replyTo: "help@syntperfumes.com",
-        headers: { "List-Unsubscribe": "<mailto:unsub@syntperfumes.com>" },
+        fromAddress: "orders@example-store.com",
+        fromName: "Example Orders",
+        replyTo: "help@example-store.com",
+        headers: { "List-Unsubscribe": "<mailto:unsub@example-store.com>" },
       }),
     );
 
     expect(sendMailMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        from: '"SYNT Orders" <orders@syntperfumes.com>',
-        replyTo: "help@syntperfumes.com",
-        headers: { "List-Unsubscribe": "<mailto:unsub@syntperfumes.com>" },
+        from: '"Example Orders" <orders@example-store.com>',
+        replyTo: "help@example-store.com",
+        headers: { "List-Unsubscribe": "<mailto:unsub@example-store.com>" },
       }),
     );
   });

@@ -433,15 +433,11 @@ const DefaultCartTemplate: React.FC<DefaultCartTemplateProps> = ({ data }) => {
             </CardFooter>
           </Card>
 
-          <div className='mt-4 text-sm text-neutral-500'>
-            <p className='mb-2'>We accept:</p>
-            <div className='flex gap-2'>
-              <div className='h-8 w-12 bg-neutral-200 rounded-md'></div>
-              <div className='h-8 w-12 bg-neutral-200 rounded-md'></div>
-              <div className='h-8 w-12 bg-neutral-200 rounded-md'></div>
-              <div className='h-8 w-12 bg-neutral-200 rounded-md'></div>
-            </div>
-          </div>
+          {/* "We accept:" over four blank grey rectangles — placeholder
+              scaffolding for card logos that were never added, implying card
+              payment on a store whose only configured method is Cash on
+              Delivery. The accepted methods are listed at checkout from the
+              server's own `payment.methods` response. */}
         </div>
       </div>
     </div>

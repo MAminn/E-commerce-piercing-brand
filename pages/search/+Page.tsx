@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { trpc } from "#root/shared/trpc/client";
 import { useTemplate } from "#root/frontend/contexts/TemplateContext";
 import { getTemplateComponent } from "#root/components/template-system/templateConfig";
+import { resolveTemplateId } from "#root/shared/config/storefront";
 import type { SearchResultProduct } from "#root/components/template-system";
 import { navigate } from "vike/client/router";
 import { Loader2 } from "lucide-react";
@@ -104,7 +105,7 @@ export default function SearchPage() {
   const templateId = getTemplateId("searchResults");
   const Template = getTemplateComponent(
     "searchResults",
-    templateId || "search-results-grid",
+    resolveTemplateId("searchResults", templateId),
   );
 
   if (!Template) {

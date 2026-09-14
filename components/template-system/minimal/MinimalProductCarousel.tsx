@@ -70,15 +70,21 @@ export function MinimalProductCarousel({
   if (!products.length) return null;
 
   return (
-    <section id={id} className={cn("py-12 sm:py-16 lg:py-20", className)}>
-      <div className='max-w-[1400px] mx-auto'>
-        {/* Section heading with underline */}
+    <section id={id} className={cn("zeli-section", className)}>
+      <div className='mx-auto max-w-[var(--zeli-content-max)]'>
+        {/* Heading row: title left, "view all" right on the same baseline.
+            The previous centred title with a 2px underline bar read as a
+            generic storefront; this reads as an editorial section head. */}
         {title && (
-          <div className='text-center mb-10 sm:mb-14 px-4'>
-            <h2 className='text-2xl sm:text-3xl font-light text-stone-900 tracking-tight inline-block relative pb-3'>
-              {title}
-              <span className='absolute bottom-0 left-1/4 right-1/4 h-[2px] bg-stone-900' />
-            </h2>
+          <div className='mb-7 flex items-baseline justify-between gap-4 px-[var(--zeli-gutter)] sm:mb-9'>
+            <h2 className='zeli-section-title'>{title}</h2>
+            {viewAllHref && (
+              <a
+                href={viewAllHref}
+                className='zeli-underline-hover hidden shrink-0 text-[0.6875rem] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-zeli-ink-muted hover:text-zeli-ink sm:inline-flex'>
+                {viewAllText || t("view_all")}
+              </a>
+            )}
           </div>
         )}
 
@@ -88,27 +94,29 @@ export function MinimalProductCarousel({
           <button
             onClick={() => scroll("left")}
             disabled={!canScrollLeft}
-            className='absolute -start-2 top-1/2 -translate-y-1/2 z-10 hidden md:flex w-9 h-9 items-center justify-center border border-stone-200 bg-white hover:border-stone-900 disabled:opacity-20 disabled:cursor-not-allowed transition-colors'
-            aria-label='Scroll left'>
+            tabIndex={-1}
+            aria-hidden='true'
+            className='absolute -start-2 top-[38%] z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center border border-zeli-line bg-zeli-bg transition-colors hover:border-zeli-accent disabled:opacity-20 md:flex'>
             <ChevronLeft className='w-4 h-4' />
           </button>
           <button
             onClick={() => scroll("right")}
             disabled={!canScrollRight}
-            className='absolute -end-2 top-1/2 -translate-y-1/2 z-10 hidden md:flex w-9 h-9 items-center justify-center border border-stone-200 bg-white hover:border-stone-900 disabled:opacity-20 disabled:cursor-not-allowed transition-colors'
-            aria-label='Scroll right'>
+            tabIndex={-1}
+            aria-hidden='true'
+            className='absolute -end-2 top-[38%] z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center border border-zeli-line bg-zeli-bg transition-colors hover:border-zeli-accent disabled:opacity-20 md:flex'>
             <ChevronRight className='w-4 h-4' />
           </button>
 
           {/* Scrollable track */}
           <div
             ref={scrollRef}
-            className='flex gap-4 sm:gap-6 overflow-x-auto scrollbar-hide snap-x snap-mandatory px-4 sm:px-6 lg:px-8 pb-2'>
+            className='scrollbar-hide flex snap-x snap-mandatory gap-3 overflow-x-auto px-[var(--zeli-gutter)] pb-2 sm:gap-5'>
             {products.map((product) => (
               <div
                 key={product.id}
                 data-card
-                className='flex-none w-[220px] sm:w-[260px] lg:w-[280px] snap-start'>
+                className='w-[168px] flex-none snap-start sm:w-[232px] lg:w-[288px]'>
                 <MinimalProductCard
                   product={product}
                   onQuickView={onQuickView}
@@ -119,9 +127,12 @@ export function MinimalProductCarousel({
           </div>
         </div>
 
-        {/* View all link */}
+        {/* View all — mobile only. From sm up it sits on the heading row
+            beside the title, so rendering both would duplicate the link. */}
         {viewAllHref && (
-          <ViewAllButton href={viewAllHref} text={viewAllText || t("view_all")} />
+          <div className='sm:hidden'>
+            <ViewAllButton href={viewAllHref} text={viewAllText || t("view_all")} />
+          </div>
         )}
       </div>
     </section>

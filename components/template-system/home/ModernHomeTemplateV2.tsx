@@ -1,3 +1,9 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Business-promise sweep (Phase 2). This template previously hardcoded
+// shipping / returns / guarantee claims that ZELI has not established. An
+// admin switching to it from the dashboard would have published them to
+// customers instantly. Only claims the store can stand behind remain.
+// ─────────────────────────────────────────────────────────────────────────────
 import type React from "react";
 import { useState } from "react";
 import { Button } from "#root/components/ui/button";
@@ -154,24 +160,9 @@ const DEFAULT_CATEGORIES: CategoryItem[] = [
 // Default features
 const DEFAULT_FEATURES: FeatureItem[] = [
   {
-    icon: "shipping",
-    title: "Fast & Free Shipping",
-    description: "Free delivery on orders over EGP 50",
-  },
-  {
     icon: "security",
     title: "Secure Payments",
-    description: "100% secure transaction guarantee",
-  },
-  {
-    icon: "support",
-    title: "24/7 Support",
-    description: "Dedicated customer support team",
-  },
-  {
-    icon: "award",
-    title: "Quality Guarantee",
-    description: "30-day money back guarantee",
+    description: "Checkout is processed by our payment provider",
   },
 ];
 
@@ -238,7 +229,9 @@ export function ModernHomeTemplateV2({
 
   const {
     title: footerCtaTitle = "Ready to Start Shopping?",
-    description: footerCtaDesc = "Join thousands of satisfied customers",
+    // Default was "Join thousands of satisfied customers" — invented social
+    // proof for a store that has taken no orders. Blank renders nothing.
+    description: footerCtaDesc = "",
     buttonText: footerCtaButtonText = "Browse Products",
     buttonLink: footerCtaLink = "/shop",
     show: showFooterCta = true,
@@ -494,9 +487,11 @@ export function ModernHomeTemplateV2({
               <h2 className='text-3xl sm:text-4xl lg:text-5xl font-bold mb-4'>
                 {footerCtaTitle}
               </h2>
-              <p className='text-lg sm:text-xl text-purple-100 mb-8'>
-                {footerCtaDesc}
-              </p>
+              {footerCtaDesc && (
+                <p className='text-lg sm:text-xl text-purple-100 mb-8'>
+                  {footerCtaDesc}
+                </p>
+              )}
               <Button
                 size='lg'
                 className='bg-white text-purple-700 hover:bg-purple-50 font-semibold px-8 py-6 text-lg shadow-xl hover:shadow-2xl transition-all duration-300 group'

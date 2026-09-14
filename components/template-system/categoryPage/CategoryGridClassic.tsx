@@ -121,19 +121,21 @@ export interface CategoryGridClassicProps {
 }
 
 // Mock data for filters
-const MOCK_CATEGORIES = [
-  { id: "electronics", name: "Electronics", count: 45 },
-  { id: "fashion", name: "Fashion", count: 78 },
-  { id: "home", name: "Home & Garden", count: 32 },
-  { id: "sports", name: "Sports", count: 24 },
-];
-
-const MOCK_BRANDS = [
-  { id: "apple", name: "Apple", count: 12 },
-  { id: "samsung", name: "Samsung", count: 18 },
-  { id: "sony", name: "Sony", count: 15 },
-  { id: "lg", name: "LG", count: 10 },
-];
+/**
+ * Filter sources default to EMPTY, not to sample data.
+ *
+ * These two used to default to an invented catalogue — Electronics / Fashion /
+ * Home & Garden / Sports and Apple / Samsung / Sony / LG, each with an
+ * invented product count. Every caller that rendered this template without
+ * passing real lists (the /featured/*\/categories routes do exactly that)
+ * therefore showed a piercing-jewelry shopper a filter sidebar for a consumer
+ * electronics store, with counts no product in the database backs.
+ *
+ * Empty arrays mean the filter groups render with nothing in them, which is
+ * the truth for a store that has not supplied them.
+ */
+const NO_CATEGORIES: { id: string; name: string; count: number }[] = [];
+const NO_BRANDS: { id: string; name: string; count: number }[] = [];
 
 /**
  * Category Grid Classic Template
@@ -156,8 +158,8 @@ export function CategoryGridClassic({
   totalProducts,
   currentPage = 1,
   productsPerPage = 12,
-  availableCategories = MOCK_CATEGORIES,
-  availableBrands = MOCK_BRANDS,
+  availableCategories = NO_CATEGORIES,
+  availableBrands = NO_BRANDS,
   priceRangeLimits = [0, 1000],
   onSortChange,
   onFilterChange,

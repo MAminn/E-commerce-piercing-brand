@@ -83,20 +83,34 @@ function CategoryBreadcrumbs({
   const { locale } = useMinimalI18n();
 
   return (
-    <div className="border-b border-stone-200 bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <nav className="flex items-center gap-2 text-sm text-stone-500">
-          <Link href="/" className="hover:text-stone-900 transition-colors">
+    <div className="border-b border-zeli-line bg-zeli-bg">
+      <div className="zeli-container py-4">
+        <nav
+          aria-label="Breadcrumb"
+          className="flex items-center gap-2 text-[length:var(--zeli-text-small)] text-zeli-ink-muted">
+          <Link
+            href="/"
+            className="zeli-underline-hover transition-colors hover:text-zeli-ink">
             {ct("breadcrumb.home")}
           </Link>
-          <ChevronRight className={cn("w-3.5 h-3.5", locale === "ar" && "rotate-180")} />
-          <Link href="/shop" className="hover:text-stone-900 transition-colors">
+          <ChevronRight
+            aria-hidden
+            className={cn("w-3.5 h-3.5 shrink-0", locale === "ar" && "rotate-180")}
+          />
+          <Link
+            href="/shop"
+            className="zeli-underline-hover transition-colors hover:text-zeli-ink">
             {ct("breadcrumb.shop")}
           </Link>
           {categoryName && (
             <>
-              <ChevronRight className={cn("w-3.5 h-3.5", locale === "ar" && "rotate-180")} />
-              <span className="text-stone-900 font-medium">{categoryName}</span>
+              <ChevronRight
+                aria-hidden
+                className={cn("w-3.5 h-3.5 shrink-0", locale === "ar" && "rotate-180")}
+              />
+              <span aria-current="page" className="truncate text-zeli-ink">
+                {categoryName}
+              </span>
             </>
           )}
         </nav>
@@ -136,14 +150,17 @@ function Pagination({
   }
 
   return (
-    <div className="flex items-center justify-center gap-2 pt-12 pb-4">
+    <nav
+      aria-label="Pagination"
+      className="flex items-center justify-center gap-2 pt-12 pb-4">
       {/* Previous */}
       <button
+        type="button"
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage <= 1}
-        className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-stone-700 border border-stone-300 hover:border-stone-900 hover:text-stone-900 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+        className="inline-flex min-h-11 items-center gap-1.5 border border-zeli-line-strong px-4 text-[length:var(--zeli-text-small)] font-medium text-zeli-ink-secondary transition-colors hover:border-zeli-ink hover:text-zeli-ink disabled:cursor-not-allowed disabled:opacity-30"
       >
-        <ChevronLeft className={cn("w-4 h-4", locale === "ar" && "rotate-180")} />
+        <ChevronLeft aria-hidden className={cn("w-4 h-4", locale === "ar" && "rotate-180")} />
         {ct("pagination.previous")}
       </button>
 
@@ -151,18 +168,27 @@ function Pagination({
       <div className="hidden sm:flex items-center gap-1">
         {pages.map((page, idx) =>
           page === "..." ? (
-            <span key={`ellipsis-${idx}`} className="px-2 text-stone-400">
+            <span
+              key={`ellipsis-${idx}`}
+              aria-hidden
+              className="px-2 text-zeli-ink-subtle">
               …
             </span>
           ) : (
             <button
               key={page}
+              type="button"
               onClick={() => onPageChange(page)}
+              aria-current={page === currentPage ? "page" : undefined}
+              aria-label={ct("pagination.page_of", {
+                current: page,
+                total: totalPages,
+              })}
               className={cn(
-                "w-10 h-10 flex items-center justify-center text-sm font-medium transition-colors",
+                "flex h-11 w-11 items-center justify-center text-[length:var(--zeli-text-small)] font-medium transition-colors",
                 page === currentPage
-                  ? "bg-stone-900 text-white"
-                  : "text-stone-600 hover:bg-stone-100",
+                  ? "bg-zeli-accent text-zeli-ink-inverse"
+                  : "text-zeli-ink-secondary hover:bg-zeli-surface",
               )}
             >
               {page}
@@ -172,20 +198,21 @@ function Pagination({
       </div>
 
       {/* Mobile page indicator */}
-      <span className="sm:hidden text-sm text-stone-500">
+      <span className="sm:hidden text-[length:var(--zeli-text-small)] text-zeli-ink-muted">
         {ct("pagination.page_of", { current: currentPage, total: totalPages })}
       </span>
 
       {/* Next */}
       <button
+        type="button"
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage >= totalPages}
-        className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-stone-700 border border-stone-300 hover:border-stone-900 hover:text-stone-900 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+        className="inline-flex min-h-11 items-center gap-1.5 border border-zeli-line-strong px-4 text-[length:var(--zeli-text-small)] font-medium text-zeli-ink-secondary transition-colors hover:border-zeli-ink hover:text-zeli-ink disabled:cursor-not-allowed disabled:opacity-30"
       >
         {ct("pagination.next")}
-        <ChevronRight className={cn("w-4 h-4", locale === "ar" && "rotate-180")} />
+        <ChevronRight aria-hidden className={cn("w-4 h-4", locale === "ar" && "rotate-180")} />
       </button>
-    </div>
+    </nav>
   );
 }
 
@@ -196,11 +223,13 @@ function GridSkeleton() {
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-8 sm:gap-x-6">
       {[...Array(PRODUCTS_PER_PAGE)].map((_, i) => (
         <div key={i} className="flex flex-col">
-          <div className="aspect-square bg-stone-100 animate-pulse" />
-          <div className="pt-3 space-y-2">
-            <div className="h-4 w-3/4 bg-stone-100 rounded animate-pulse mx-auto" />
-            <div className="h-4 w-1/3 bg-stone-100 rounded animate-pulse mx-auto" />
-            <div className="h-10 w-full bg-stone-100 animate-pulse" />
+          {/* 4:5 to match MinimalProductCard. A square skeleton reflowed the
+              whole grid the moment the real cards arrived. */}
+          <div className="aspect-[4/5] animate-pulse bg-zeli-surface" />
+          <div className="space-y-2 pt-3">
+            <div className="h-4 w-3/4 animate-pulse bg-zeli-surface" />
+            <div className="h-4 w-1/3 animate-pulse bg-zeli-surface" />
+            <div className="h-4 w-1/2 animate-pulse bg-zeli-surface" />
           </div>
         </div>
       ))}
@@ -237,32 +266,69 @@ export function MinimalCategoryPage({
     }
   }, [onQuickView]);
 
+  // Two different empty states. A search that matched nothing is the
+  // shopper's problem to fix and gets a control to fix it; a collection with
+  // no products at all is the store's state and gets no advice the shopper
+  // cannot act on.
+  const isFiltering = currentSearch.trim().length > 0;
+
   return (
-    <div className="min-h-screen mt-25">
+    <div className="zeli-header-offset min-h-screen bg-zeli-bg">
       {/* Breadcrumbs */}
       <CategoryBreadcrumbs categoryName={categoryName} />
 
-      <div className="bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="bg-zeli-bg">
+        <div className="zeli-container py-6">
+          {/* Page heading. /shop and /categories/[slug] previously rendered no
+              <h1> at all — the first heading on the page was an <h3> inside a
+              product card, so assistive tech and crawlers had nothing naming
+              the page. Uses the category name when browsing one. */}
+          <div className="mb-6 sm:mb-8">
+            <h1 className="zeli-section-title">
+              {categoryName || ct("breadcrumb.shop")}
+            </h1>
+            {/* Result count is read from the API's own total, never estimated.
+                Hidden while loading so the number never counts up from a
+                stale page. */}
+            {!isLoading && totalProducts > 0 && (
+              <p
+                aria-live="polite"
+                className="zeli-eyebrow mt-2">
+                {ct("results.count", { count: totalProducts })}
+              </p>
+            )}
+          </div>
+
           {/* Toolbar: search + sort */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mb-8">
+          {/* Toolbar. Search and sort only — both are backed by real
+              `product.search` parameters. No price/brand/rating facets: the
+              product schema has no fields behind them, and a filter that
+              filters nothing is worse than no filter. */}
+          <div className="mb-8 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4">
             {/* Search */}
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+            <div className="relative min-w-0 flex-1 sm:max-w-sm">
+              <label htmlFor="minimal-cat-search" className="sr-only">
+                {ct("search.placeholder")}
+              </label>
+              <Search
+                aria-hidden
+                className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zeli-ink-subtle"
+              />
               <input
-                type="text"
+                id="minimal-cat-search"
+                type="search"
                 placeholder={ct("search.placeholder")}
                 value={currentSearch}
                 onChange={(e) => onSearchChange(e.target.value)}
-                className="w-full ps-10 pe-4 py-2.5 text-sm border border-stone-300 bg-white focus:outline-none focus:ring-2 focus:ring-stone-900 focus:border-transparent"
+                className="min-h-11 w-full border border-zeli-line-strong bg-zeli-surface-raised pe-4 ps-10 text-[length:var(--zeli-text-body)] text-zeli-ink placeholder:text-zeli-ink-subtle focus:border-zeli-ink focus:outline-none"
               />
             </div>
 
             {/* Sort */}
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <label
                 htmlFor="minimal-cat-sort"
-                className="text-sm font-medium text-stone-700 whitespace-nowrap"
+                className="zeli-eyebrow whitespace-nowrap"
               >
                 {ct("sort.label")}
               </label>
@@ -270,7 +336,7 @@ export function MinimalCategoryPage({
                 id="minimal-cat-sort"
                 value={currentSort}
                 onChange={(e) => onSortChange(e.target.value)}
-                className="flex-1 sm:flex-none sm:w-52 px-4 py-2.5 text-sm border border-stone-300 bg-white hover:border-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-900 focus:border-transparent"
+                className="min-h-11 min-w-0 flex-1 border border-zeli-line-strong bg-zeli-surface-raised px-3 text-[length:var(--zeli-text-body)] text-zeli-ink focus:border-zeli-ink focus:outline-none sm:flex-none sm:w-52 sm:px-4"
               >
                 {sortOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -286,13 +352,29 @@ export function MinimalCategoryPage({
             <GridSkeleton />
           ) : products.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 lg:py-24">
-              <div className="text-center max-w-md">
-                <h3 className="text-lg font-medium text-stone-900 mb-2">
-                  {ct("empty.title")}
-                </h3>
-                <p className="text-sm text-stone-600">
-                  {ct("empty.subtitle")}
+              <div className="max-w-md text-center">
+                <h2 className="zeli-section-title">
+                  {isFiltering ? ct("empty.title") : ct("empty.catalogue.title")}
+                </h2>
+                <p className="mt-2 text-[length:var(--zeli-text-body)] text-zeli-ink-muted">
+                  {isFiltering
+                    ? ct("empty.subtitle")
+                    : ct("empty.catalogue.subtitle")}
                 </p>
+                {isFiltering ? (
+                  <button
+                    type="button"
+                    onClick={() => onSearchChange("")}
+                    className="zeli-underline mt-6 inline-flex min-h-11 items-center text-[length:var(--zeli-text-small)] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-zeli-ink">
+                    {ct("empty.clear_search")}
+                  </button>
+                ) : (
+                  <Link
+                    href="/"
+                    className="zeli-underline mt-6 inline-flex min-h-11 items-center text-[length:var(--zeli-text-small)] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-zeli-ink">
+                    {ct("empty.catalogue.action")}
+                  </Link>
+                )}
               </div>
             </div>
           ) : (

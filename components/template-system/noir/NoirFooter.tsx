@@ -1,7 +1,11 @@
 import { useState, type FC, type FormEvent } from "react";
 import { Link } from "#root/components/utils/Link";
 import { ArrowRight } from "lucide-react";
-import { STORE_NAME } from "#root/shared/config/branding";
+import {
+  STORE_NAME,
+  STORE_SOCIAL_LINKS,
+  isUsableUrl,
+} from "#root/shared/config/branding";
 import { useLayoutSettings } from "#root/frontend/contexts/LayoutSettingsContext";
 import type { SocialPlatform } from "#root/shared/types/layout-settings";
 import { FooterLogo } from "#root/components/globals/FooterLogo";
@@ -76,11 +80,21 @@ const TikTokIcon = () => (
 /*  Data                                                              */
 /* ------------------------------------------------------------------ */
 
-const DEFAULT_SOCIAL_LINKS = [
-  { id: "facebook", name: "Facebook", url: "#", Icon: FacebookIcon },
-  { id: "instagram", name: "Instagram", url: "#", Icon: InstagramIcon },
-  { id: "tiktok", name: "TikTok", url: "#", Icon: TikTokIcon },
-];
+/**
+ * Social profiles from central brand configuration (VITE_SOCIAL_*). Empty
+ * until the new brand's accounts exist — the previous "#" placeholders were
+ * dead links, and the old brand's real accounts are not being reused.
+ * A function, not a const, so it doesn't depend on `socialIconMap` having
+ * been initialised further down the module.
+ */
+function getConfiguredSocialLinks() {
+  return STORE_SOCIAL_LINKS.map((link) => ({
+    id: link.platform,
+    name: link.platform.charAt(0).toUpperCase() + link.platform.slice(1),
+    url: link.url,
+    Icon: socialIconMap[link.platform as SocialPlatform] ?? FacebookIcon,
+  }));
+}
 
 const socialIconMap: Record<SocialPlatform, FC> = {
   facebook: FacebookIcon,
@@ -132,33 +146,27 @@ export function NoirFooter() {
       ],
     },
     {
-      title: isAr ? "الشركة" : "Company",
-      links: [
-        { label: isAr ? "من نحن" : "About", href: "#" },
-        { label: isAr ? "وظائف" : "Careers", href: "#" },
-      ],
-    },
-    {
       title: isAr ? "الدعم" : "Support",
       links: [
-        { label: isAr ? "اتصل بنا" : "Contact Us", href: "#" },
-        { label: isAr ? "الشحن والإرجاع" : "Shipping & Returns", href: "#" },
-        { label: isAr ? "الأسئلة الشائعة" : "FAQ", href: "#" },
-        { label: isAr ? "سياسة الخصوصية" : "Privacy Policy", href: "#" },
+        { label: isAr ? "اتصل بنا" : "Contact Us", href: "/contact" },
+        { label: isAr ? "حسابي" : "My Account", href: "/account" },
       ],
     },
   ];
 
   // Build social links from CMS if available
   const SOCIAL_LINKS =
-    layoutSettings.footer.socialLinks.length > 0
-      ? layoutSettings.footer.socialLinks.map((sl) => ({
-          id: sl.id,
-          name: sl.platform.charAt(0).toUpperCase() + sl.platform.slice(1),
-          url: sl.url,
-          Icon: socialIconMap[sl.platform] ?? FacebookIcon,
-        }))
-      : DEFAULT_SOCIAL_LINKS;
+    layoutSettings.footer.socialLinks.filter((sl) => isUsableUrl(sl.url))
+      .length > 0
+      ? layoutSettings.footer.socialLinks
+          .filter((sl) => isUsableUrl(sl.url))
+          .map((sl) => ({
+            id: sl.id,
+            name: sl.platform.charAt(0).toUpperCase() + sl.platform.slice(1),
+            url: sl.url,
+            Icon: socialIconMap[sl.platform] ?? FacebookIcon,
+          }))
+      : getConfiguredSocialLinks();
 
   // Build footer columns from CMS if available
   const FOOTER_COLUMNS =
@@ -298,32 +306,9 @@ export function NoirFooter() {
           <p className={cn("text-[10px] text-[#6B6B6B]", trackTight)}>
             &copy; {new Date().getFullYear()} {effectiveCopyright}
           </p>
-          <div className='flex items-center gap-6'>
-            <Link
-              href='#'
-              className={cn(
-                "text-[10px] text-[#6B6B6B] hover:text-[#E8112D] transition-colors duration-300",
-                trackTight,
-              )}>
-              {isAr ? "الشروط" : "Terms"}
-            </Link>
-            <Link
-              href='#'
-              className={cn(
-                "text-[10px] text-[#6B6B6B] hover:text-[#E8112D] transition-colors duration-300",
-                trackTight,
-              )}>
-              {isAr ? "الخصوصية" : "Privacy"}
-            </Link>
-            <Link
-              href='#'
-              className={cn(
-                "text-[10px] text-[#6B6B6B] hover:text-[#E8112D] transition-colors duration-300",
-                trackTight,
-              )}>
-              {isAr ? "ملفات تعريف الارتباط" : "Cookies"}
-            </Link>
-          </div>
+          {/* Terms / Privacy / Cookies used to sit here as three "#" links.
+              None of those pages exist and none of those policies are
+              published — see the same note in EditorialFooter. */}
         </div>
       </div>
     </footer>

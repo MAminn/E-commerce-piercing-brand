@@ -163,10 +163,15 @@ export const DEFAULT_LAYOUT_SETTINGS: LayoutSettings = {
     tagline: "",
     announcementBarEnabled: false,
     announcementBarText: "",
-    navigationLinks: [
-      { id: "nav-collection", label: "Collection", url: "/shop" },
-    ],
-    navbarStyle: "default",
+    // One real destination. Placement/category navigation is added by the
+    // admin once real categories exist (Dashboard > Layout Settings), where a
+    // link can be marked as a dropdown bound to specific category IDs.
+    navigationLinks: [{ id: "nav-shop", label: "Shop", url: "/shop" }],
+    // ZELI's shell. See shared/config/storefront.ts for why minimal is the
+    // foundation and what the alternatives still offer. Kept as a literal
+    // (not an import) so this pure types module stays dependency-free —
+    // DEFAULT_NAVBAR_STYLE is asserted equal to it by a unit test.
+    navbarStyle: "minimal",
     marqueeEnabled: false,
     marqueeText: "",
     marqueeTextAr: "",
@@ -185,30 +190,34 @@ export const DEFAULT_LAYOUT_SETTINGS: LayoutSettings = {
     copyright: "",
     showNewsletter: true,
     footerStyle: "default",
+    // Only routes that actually exist and work on an unconfigured store.
+    // The previous defaults linked "Contact Us", "FAQ" and "Privacy Policy"
+    // at "#" — footer links that looked real and did nothing. Policy and
+    // company pages belong here once they exist; admins add them from
+    // Dashboard > Layout Settings.
     footerLinkGroups: [
       {
         id: "shop",
         title: "Shop",
         links: [
           { id: "all-products", label: "All Products", url: "/shop" },
-          { id: "new-arrivals", label: "New Arrivals", url: "/shop" },
+          { id: "offers", label: "Offers", url: "/offers" },
         ],
       },
       {
         id: "help",
         title: "Help",
         links: [
-          { id: "contact", label: "Contact Us", url: "#" },
-          { id: "faq", label: "FAQ", url: "#faq" },
-          { id: "shipping", label: "Shipping & Returns", url: "/return-policy" },
-          { id: "privacy", label: "Privacy Policy", url: "#" },
+          { id: "contact", label: "Contact Us", url: "/contact" },
+          { id: "account", label: "My Account", url: "/account" },
         ],
       },
     ],
-    socialLinks: [
-      { id: "facebook", platform: "facebook", url: "#" },
-      { id: "instagram", platform: "instagram", url: "#" },
-      { id: "tiktok", platform: "tiktok", url: "#" },
-    ],
+    // Empty on purpose. Seeding "#" placeholders rendered three dead social
+    // icons in every footer; the new brand's accounts don't exist yet and the
+    // previous brand's are not being reused. Admins add real URLs from
+    // Dashboard > Layout Settings, or set VITE_SOCIAL_* (see
+    // shared/config/branding.ts) — until then no social row renders.
+    socialLinks: [],
   },
 };

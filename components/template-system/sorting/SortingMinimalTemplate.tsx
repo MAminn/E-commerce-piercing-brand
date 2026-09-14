@@ -3,7 +3,6 @@ import { Link } from "#root/components/utils/Link";
 import { Search, SlidersHorizontal, X, ChevronRight } from "lucide-react";
 import type { FeaturedProduct } from "../home/HomeFeaturedProducts";
 import { getProductUrl } from "#root/lib/utils/route-helpers";
-import heroImage from "#root/assets/landing.webp";
 
 /**
  * Extended product type for sorting pages
@@ -53,16 +52,11 @@ function ShopHero({
 }) {
   return (
     <section className='relative w-full h-55 sm:h-65 lg:h-80 overflow-hidden'>
-      {/* Background image */}
-      <img
-        src={heroImage}
-        alt=''
-        aria-hidden='true'
-        className='absolute inset-0 w-full h-full object-cover object-center'
-      />
-
-      {/* Dark overlay */}
-      <div className='absolute inset-0 bg-black/60' />
+      {/* Ground. This band used to be a generic clothing stock photo
+          (assets/landing.webp) baked into the template — wrong category for a
+          piercing store, and one dashboard toggle away from being the live
+          /shop header. Real collection imagery belongs in the CMS. */}
+      <div className='absolute inset-0 bg-zeli-surface-inverse' />
 
       {/* Bottom fade into bg-neutral-50 */}
       {/* <div className='absolute bottom-0 left-0 right-0 h-24 bg-linear-to-t from-neutral-50 to-transparent' /> */}
@@ -96,7 +90,7 @@ function ShopHero({
 }
 
 /**
- * Premium ecommerce collection page for Percé.
+ * Premium ecommerce collection page.
  */
 export function SortingMinimalTemplate({
   products = [],

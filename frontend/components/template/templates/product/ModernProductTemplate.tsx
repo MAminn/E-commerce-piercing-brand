@@ -1,3 +1,8 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Business-promise sweep (Phase 2). Hardcoded shipping / returns / warranty
+// claims removed — ZELI has published no such policies, and switching to this
+// template from the dashboard would have shown them to customers.
+// ─────────────────────────────────────────────────────────────────────────────
 /**
  * @legacy
  * Legacy Template System (v1)
@@ -473,34 +478,12 @@ const ModernProductTemplate: React.FC<ModernProductTemplateProps> = ({
               <div className='grid grid-cols-1 gap-4'>
                 <div className='flex items-center space-x-4 p-4 bg-gray-50 border border-gray-200 rounded-none'>
                   <div className='bg-gray-900 p-2 rounded-none'>
-                    <Truck className='h-6 w-6 text-white' />
-                  </div>
-                  <div>
-                    <p className='font-medium text-gray-900'>Free Shipping</p>
-                    <p className='text-sm text-gray-600 font-light'>
-                      On orders over EGP 50
-                    </p>
-                  </div>
-                </div>
-                <div className='flex items-center space-x-4 p-4 bg-gray-50 border border-gray-200 rounded-none'>
-                  <div className='bg-gray-900 p-2 rounded-none'>
                     <Shield className='h-6 w-6 text-white' />
                   </div>
                   <div>
-                    <p className='font-medium text-gray-900'>2-Year Warranty</p>
+                    <p className='font-medium text-gray-900'>Secure Checkout</p>
                     <p className='text-sm text-gray-600 font-light'>
-                      Full coverage included
-                    </p>
-                  </div>
-                </div>
-                <div className='flex items-center space-x-4 p-4 bg-gray-50 border border-gray-200 rounded-none'>
-                  <div className='bg-gray-900 p-2 rounded-none'>
-                    <RotateCcw className='h-6 w-6 text-white' />
-                  </div>
-                  <div>
-                    <p className='font-medium text-gray-900'>30-Day Returns</p>
-                    <p className='text-sm text-gray-600 font-light'>
-                      Hassle-free policy
+                      Processed by our payment provider
                     </p>
                   </div>
                 </div>

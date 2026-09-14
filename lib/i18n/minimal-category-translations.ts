@@ -22,9 +22,19 @@ export const minimalCategoryT = {
     // Search
     "search.placeholder": "Search products...",
 
-    // Empty state
+    // Result count — driven by the API total, never estimated
+    "results.count": "{count} products",
+
+    // Empty state — two distinct cases. "Try adjusting your filters" was the
+    // single message for both, on a page that has no filters, and it was also
+    // what a brand-new store with zero products showed: advice the shopper
+    // cannot act on about controls that are not there.
     "empty.title": "No products found",
-    "empty.subtitle": "Try adjusting your filters or browse our full collection",
+    "empty.subtitle": "No products match this search.",
+    "empty.clear_search": "Clear search",
+    "empty.catalogue.title": "Nothing here yet",
+    "empty.catalogue.subtitle": "This collection has no products at the moment.",
+    "empty.catalogue.action": "Back to home",
 
     // Pagination
     "pagination.previous": "Previous",
@@ -50,9 +60,16 @@ export const minimalCategoryT = {
     // Search
     "search.placeholder": "ابحث عن المنتجات...",
 
+    // Result count
+    "results.count": "{count} منتج",
+
     // Empty state
     "empty.title": "لا توجد منتجات",
-    "empty.subtitle": "حاول تعديل البحث أو تصفح مجموعتنا الكاملة",
+    "empty.subtitle": "لا توجد منتجات تطابق هذا البحث.",
+    "empty.clear_search": "مسح البحث",
+    "empty.catalogue.title": "لا يوجد شيء هنا بعد",
+    "empty.catalogue.subtitle": "لا توجد منتجات في هذه المجموعة حالياً.",
+    "empty.catalogue.action": "العودة للرئيسية",
 
     // Pagination
     "pagination.previous": "السابق",
