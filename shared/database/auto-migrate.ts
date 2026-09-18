@@ -13,6 +13,43 @@ import path from "path";
  * (e.g. new database on a second deployment), we detect the mismatch and
  * re-run all migrations.
  */
+/**
+ * Splits a Drizzle-generated migration into its statements. Exported (pure)
+ * so it can be unit-tested.
+ *
+ * A chunk may START with explanatory `--` comment lines and still hold a real
+ * statement — the 0055 tier backfill is exactly that. The old filter dropped
+ * any chunk whose first character was `-`, which silently skipped such a
+ * statement while still marking the file applied. Leading comment lines are
+ * stripped first; a chunk that is nothing but comments is still discarded.
+ */
+export function splitMigrationStatements(migrationSQL: string): string[] {
+  return migrationSQL
+    .split("--> statement-breakpoint")
+    .map((chunk) =>
+      chunk
+        .split(/\r?\n/)
+        .filter((line, index, lines) => {
+          // Drop leading comment/blank lines only; comments inside a
+          // statement (after SQL has started) are left for Postgres to ignore.
+          const sqlStartedBefore = lines.slice(0, index).some((l) => l.trim() !== "" && !l.trim().startsWith("--"));
+          const t = line.trim();
+          return sqlStartedBefore || (t !== "" && !t.startsWith("--"));
+        })
+        .join("\n")
+        .trim(),
+    )
+    .filter((s) => s.length > 0)
+    .map((s) => {
+      // Only strip trailing semicolons for simple statements, not DO blocks
+      if (s.endsWith(";") && !s.includes("$$")) {
+        return s.slice(0, -1).trim();
+      }
+      return s;
+    })
+    .filter((s) => s.length > 0);
+}
+
 export async function runMigrations(): Promise<void> {
   const dbUrl = process.env.DATABASE_URL;
 
@@ -123,18 +160,7 @@ export async function runMigrations(): Promise<void> {
 
       let statements: string[];
       if (usesBreakpoints) {
-        statements = migrationSQL
-          .split("--> statement-breakpoint")
-          .map((s) => s.trim())
-          .filter((s) => s.length > 0)
-          .map((s) => {
-            // Only strip trailing semicolons for simple statements, not DO blocks
-            if (s.endsWith(";") && !s.includes("$$")) {
-              return s.slice(0, -1).trim();
-            }
-            return s;
-          })
-          .filter((s) => s.length > 0 && !s.startsWith("--"));
+        statements = splitMigrationStatements(migrationSQL);
 
         // Drizzle generates ALTER COLUMN TYPE statements alphabetically by table name.
         // This breaks FK constraints: PostgreSQL requires the referenced (parent) column

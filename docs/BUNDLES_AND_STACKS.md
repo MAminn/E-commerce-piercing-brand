@@ -1275,45 +1275,50 @@ pre-Phase-7 line and reads as such.
 
 ### Applying the bundle migrations (closeout audit, 2026-09-18)
 
-The Bundles work is migrations `0051`–`0057`, all additive, journaled in
-order with snapshots. They were verified two ways on disposable Postgres:
+**In deployment, migrations are applied by the app itself.** On every boot
+`shared/database/auto-migrate.ts` (see `DEPLOYMENT.md`) applies each `.sql`
+file in `shared/database/migrations` in filename order that is not yet
+recorded in `public.__drizzle_migrations` (one row per file name), running
+each statement individually. That is the mechanism a Coolify deploy uses —
+not `drizzle-kit migrate` — so `0051`–`0057` are applied automatically by the
+first start of a build that contains them, and nothing has to be run by hand.
 
-- **Upgrade path.** A database at the committed pre-bundle state (`0050`),
-  seeded at the `0054` state with a legacy single-price Build Your Stack, a
-  curated campaign whose line points at an option product, a product with
-  option groups, an ordinary order and a bundle order, then migrated
-  `0055 → 0057` with `drizzle-orm`'s migrator. Result: the `0055` backfill
-  created exactly one tier (`2 × 120`) for the legacy BYS, none for the
-  curated campaign and none for an unpriced draft; the option columns are
-  nullable; all legacy rows read back unchanged; the resulting schema is
-  identical (modulo column order) to a fresh `drizzle-kit push` of the current
-  schema; and the full integration suite passes against it.
-- **Clean replay from `0000` does not work — and never did.** The historical
-  chain contains hand-written files that are not in the journal
-  (`0001_add_homepage_content`, `0004_fincart_integration`,
-  `0018_layout_settings_template_scope`), so the migrator fails at `0017`
-  ("homepage_content" does not exist) long before any bundle migration and
-  rolls everything back. This predates Bundles and was left untouched: rewriting
-  history would change what existing databases believe they have applied.
+Verified on disposable Postgres with that exact migrator:
 
-Operationally: a database that has a `drizzle.__drizzle_migrations` table
-(was ever migrated with `drizzle-kit migrate`) takes `0051`–`0057` with
-`pnpm drizzle:migrate`. A database built with `drizzle-kit push` (no
-migrations table) is brought up to date with `drizzle-kit push` again — it is
-additive here (two new tables' worth of columns, one enum value, indexes) and
-the `0055` tier backfill must then be run by hand, since `push` does not
-execute migration SQL:
+- **Clean replay from `0000`:** 61 files applied, 0 failed, all bundle tables,
+  the two nullable `selected_options` columns, the analytics indexes, the tier
+  indexes and the `curated_stack` enum value present. The schema matches a
+  `drizzle-kit push` of the current `schema.ts` except for one pre-existing,
+  unrelated gap: `category_content` has never had a migration file (its
+  readers fall back to defaults when the table is missing).
+- **Upgrade path:** a database at the committed pre-bundle (`0050`) state,
+  seeded at `0054` with a legacy single-price Build Your Stack, a curated
+  campaign, an option product and orders, then booted: `0055`–`0057` applied,
+  the `0055` backfill created exactly one tier (`2 × 120`) for the legacy BYS,
+  none for the curated campaign or an unpriced draft, and every legacy row
+  read back unchanged.
 
-```sql
-INSERT INTO bundle_campaign_tier (id, bundle_campaign_id, quantity, price, sort_order)
-SELECT gen_random_uuid(), id, required_quantity, fixed_bundle_price, 0
-FROM bundle_campaign
-WHERE type = 'build_your_stack' AND fixed_bundle_price IS NOT NULL AND required_quantity >= 1
-ON CONFLICT (bundle_campaign_id, quantity) DO NOTHING;
-```
+That second check found a bug in the migrator: its statement splitter dropped
+any chunk that *began* with `--` comment lines — which is what the `0055`
+backfill is — while still marking the file applied. The runtime never
+noticed, because a Build Your Stack campaign with no tier rows is priced from
+its legacy `required_quantity` / `fixed_bundle_price` pair by design, but the
+backfill would have silently never run anywhere. The splitter now strips
+leading comment lines and keeps the statement (`splitMigrationStatements`,
+unit-tested against the committed migration folder). A database whose
+`0055` was applied by the old migrator can be backfilled by deleting its
+`0055_colorful_dazzler.sql` row from `public.__drizzle_migrations` and
+restarting (the file is idempotent: `ON CONFLICT DO NOTHING`, and the
+migrator skips "already exists" DDL).
 
-(Only relevant if Build Your Stack campaigns were created before `0055` on
-that database; a store that first deploys Bundles at `0057` has none.)
+`drizzle-kit migrate` (the `pnpm drizzle:migrate` script) is **not** the
+deployment path and cannot replay this repository from `0000`: three
+hand-written files are not in Drizzle's journal
+(`0001_add_homepage_content`, `0004_fincart_integration`,
+`0018_layout_settings_template_scope`), so it fails at `0017` and rolls back.
+The boot migrator reads the folder, not the journal, which is why it works.
+`drizzle-kit generate` (drift check) and the journal/snapshots remain correct
+for `0051`–`0057`.
 
 ## Not built (genuinely post-Bundles work)
 
