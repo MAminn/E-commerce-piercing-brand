@@ -10,6 +10,7 @@ import type {
   CartPageCartItem,
   CartPageTotals,
 } from "#root/components/template-system";
+import type { CartPageBundleGroup } from "#root/components/template-system/cartPage/CartBundleGroup";
 import { navigate } from "vike/client/router";
 
 export default function CartPage() {
@@ -29,6 +30,9 @@ export default function CartPage() {
     shipping,
     appliedOffers,
     freeQuantities,
+    bundles,
+    removeBundle,
+    bundleSavings,
   } = useCart();
   const { getTemplateId } = useTemplate();
   const [isLoading, setIsLoading] = useState(false);
@@ -68,6 +72,31 @@ export default function CartPage() {
     return items.find((item) => getCartItemKey(item) === cartItemKey);
   };
 
+  // Completed stacks, as grouped units — never flattened into `cartItems`.
+  const bundleGroups: CartPageBundleGroup[] = useMemo(
+    () =>
+      bundles.map((b) => ({
+        instanceId: b.instanceId,
+        campaignTitle: b.campaignTitle,
+        campaignSlug: b.campaignSlug,
+        requiredQuantity: b.requiredQuantity,
+        bundlePrice: b.bundlePrice,
+        regularTotal: b.regularTotal,
+        items: b.items.map((item) => ({
+          productId: item.productId,
+          name: item.name,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          imageUrl: item.imageUrl,
+          variant:
+            Object.entries(item.selectedOptions)
+              .map(([key, value]) => `${key}: ${value}`)
+              .join(", ") || undefined,
+        })),
+      })),
+    [bundles],
+  );
+
   // Build totals object
   const totals: CartPageTotals = useMemo(() => {
     return {
@@ -76,8 +105,9 @@ export default function CartPage() {
       shipping: shipping > 0 ? shipping : undefined,
       grandTotal: total,
       appliedOffers: appliedOffers.length > 0 ? appliedOffers : undefined,
+      bundleSavings: bundleSavings !== 0 ? bundleSavings : undefined,
     };
-  }, [subtotal, discount, shipping, total, appliedOffers]);
+  }, [subtotal, discount, shipping, total, appliedOffers, bundleSavings]);
 
   // Handle quantity change
   const handleQuantityChange = (
@@ -138,6 +168,8 @@ export default function CartPage() {
 
   const templateProps: CartPageModernTemplateProps = {
     items: cartItems,
+    bundles: bundleGroups,
+    onRemoveBundle: removeBundle,
     totals,
     isLoading,
     isUpdating,

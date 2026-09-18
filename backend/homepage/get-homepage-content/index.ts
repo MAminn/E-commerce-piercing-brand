@@ -134,6 +134,7 @@ function mergeWithDefaults(
     discountedProducts:
       clean.discountedProducts ?? DEFAULT_HOMEPAGE_CONTENT.discountedProducts,
     newArrivals: clean.newArrivals ?? DEFAULT_HOMEPAGE_CONTENT.newArrivals,
+    bundles: clean.bundles ?? DEFAULT_HOMEPAGE_CONTENT.bundles,
     marquee: clean.marquee ?? DEFAULT_HOMEPAGE_CONTENT.marquee,
     promoLine: clean.promoLine ?? DEFAULT_HOMEPAGE_CONTENT.promoLine,
     contactBanner:

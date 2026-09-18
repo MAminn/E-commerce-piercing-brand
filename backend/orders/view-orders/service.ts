@@ -2,12 +2,14 @@ import { query } from "#root/shared/database/drizzle/db";
 import {
   file,
   order,
+  orderBundle,
   orderItem,
   product,
   user,
 } from "#root/shared/database/drizzle/schema";
 import {
   and,
+  asc,
   count,
   desc,
   eq,
@@ -170,34 +172,103 @@ export const viewOrders = (
             .offset(offset)
             .execute();
 
+          const orderIds = orders.map((o) => o.id);
+
+          // Items and bundle snapshots for the whole page in ONE query each.
+          // (Previously one items query per order — an N+1 that grew with the
+          // page size; adding bundles per order would have doubled it.)
+          const allItems =
+            orderIds.length === 0
+              ? []
+              : await tx
+                  .select({
+                    id: orderItem.id,
+                    orderId: orderItem.orderId,
+                    productId: orderItem.productId,
+                    vendorId: orderItem.vendorId, // Keep for DB schema compatibility
+                    quantity: orderItem.quantity,
+                    price: orderItem.price,
+                    discountPrice: orderItem.discountPrice,
+                    name: orderItem.name,
+                    /**
+                     * Links this line to its `order_bundle` snapshot. The line
+                     * stays a normal, individually pickable SKU — this only
+                     * tells the admin UI which visual group it belongs to.
+                     */
+                    orderBundleId: orderItem.orderBundleId,
+                    /** Phase 7 option snapshot (`{ Color: "Gold" }`); null on simple/legacy lines. */
+                    selectedOptions: orderItem.selectedOptions,
+                    productImageDiskname: file.diskname,
+                  })
+                  .from(orderItem)
+                  .leftJoin(product, eq(orderItem.productId, product.id))
+                  .leftJoin(file, eq(product.imageId, file.id))
+                  .where(inArray(orderItem.orderId, orderIds))
+                  .orderBy(asc(orderItem.createdAt), asc(orderItem.id))
+                  .execute();
+
+          const itemsByOrder = new Map<string, typeof allItems>();
+          for (const it of allItems) {
+            const list = itemsByOrder.get(it.orderId) ?? [];
+            list.push(it);
+            itemsByOrder.set(it.orderId, list);
+          }
+
+          /**
+           * Purchased bundle snapshots. Read ONLY from `order_bundle` — never
+           * from the live `bundle_campaign` — so editing or deleting a
+           * campaign can never rewrite what a historical order shows. Every
+           * money field here is what the shopper was actually charged.
+           */
+          const allBundles =
+            orderIds.length === 0
+              ? []
+              : await tx
+                  .select({
+                    id: orderBundle.id,
+                    orderId: orderBundle.orderId,
+                    instanceId: orderBundle.instanceId,
+                    campaignId: orderBundle.campaignId,
+                    campaignSlug: orderBundle.campaignSlug,
+                    campaignTitle: orderBundle.campaignTitle,
+                    campaignType: orderBundle.campaignType,
+                    tierId: orderBundle.tierId,
+                    requiredQuantity: orderBundle.requiredQuantity,
+                    regularTotal: orderBundle.regularTotal,
+                    bundleTotal: orderBundle.bundleTotal,
+                    offerStacking: orderBundle.offerStacking,
+                    createdAt: orderBundle.createdAt,
+                  })
+                  .from(orderBundle)
+                  .where(inArray(orderBundle.orderId, orderIds))
+                  .orderBy(asc(orderBundle.createdAt), asc(orderBundle.id))
+                  .execute();
+
+          const bundlesByOrder = new Map<string, typeof allBundles>();
+          for (const b of allBundles) {
+            const list = bundlesByOrder.get(b.orderId) ?? [];
+            list.push(b);
+            bundlesByOrder.set(b.orderId, list);
+          }
+
           const ordersWithItems = await Promise.all(
             orders.map(async (orderData) => {
               // Single-shop mode: No vendor data needed
-              const items = await tx
-                .select({
-                  id: orderItem.id,
-                  productId: orderItem.productId,
-                  vendorId: orderItem.vendorId, // Keep for DB schema compatibility
-                  quantity: orderItem.quantity,
-                  price: orderItem.price,
-                  discountPrice: orderItem.discountPrice,
-                  name: orderItem.name,
-                  productImageDiskname: file.diskname,
-                })
-                .from(orderItem)
-                .leftJoin(product, eq(orderItem.productId, product.id))
-                .leftJoin(file, eq(product.imageId, file.id))
-                .where(eq(orderItem.orderId, orderData.id))
-                .execute();
+              const items = itemsByOrder.get(orderData.id) ?? [];
 
               const itemsWithImage = items.map((it) => {
-                const { productImageDiskname, ...rest } = it;
+                const { productImageDiskname, orderId: _orderId, ...rest } = it;
                 return {
                   ...rest,
                   productImage: productImageDiskname
                     ? `/uploads/${productImageDiskname}`
                     : null,
                 };
+              });
+
+              const bundles = (bundlesByOrder.get(orderData.id) ?? []).map((b) => {
+                const { orderId: _orderId, ...rest } = b;
+                return rest;
               });
 
               const isOnlinePayment =
@@ -214,6 +285,12 @@ export const viewOrders = (
               return {
                 ...orderData,
                 items: itemsWithImage,
+                /**
+                 * One entry per purchased bundle INSTANCE. Two stacks from the
+                 * same campaign are two entries with different ids, so the
+                 * admin never merges them into one group.
+                 */
+                bundles,
                 hasPaymentIssue,
               };
             }),

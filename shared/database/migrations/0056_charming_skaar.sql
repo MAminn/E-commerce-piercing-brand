@@ -1,0 +1,2 @@
+CREATE INDEX "order_created_at_idx" ON "order" USING btree ("created_at");--> statement-breakpoint
+CREATE INDEX "order_item_order_bundle_idx" ON "order_item" USING btree ("order_bundle_id") WHERE "order_item"."order_bundle_id" is not null;

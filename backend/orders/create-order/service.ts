@@ -9,8 +9,9 @@ import {
   promoCodeProducts,
   promoCodeCategories,
   cartOffer,
+  orderBundle,
 } from "#root/shared/database/drizzle/schema";
-import { and, asc, eq, gte, inArray, isNull, lte, or } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import { z } from "zod";
 import type { ClientSession } from "#root/backend/auth/shared/entities";
@@ -23,19 +24,85 @@ import { getEmailBranding } from "#root/backend/emails/branding";
 import axios from "axios";
 import { validatePromoCode } from "#root/backend/promo-codes/validate-promo-code/validate-promo-code";
 import { applyOffersToCart } from "#root/backend/offers/service";
-import { computePromoDiscount } from "#root/shared/pricing/cart-math";
+import {
+  buildOfferInputs,
+  computeCartTotals,
+  type PricingBundle,
+  type PricingRegularLine,
+} from "#root/shared/bundles/cart-pricing";
+import {
+  loadAndValidateBundleSelection,
+  type ValidatedBundle,
+} from "#root/backend/bundles/selection";
 import { getStoreOwnerId } from "#root/shared/config/store";
+import {
+  type SelectedOptions,
+  formatSelectedOptions,
+  normalizeSelectedOptionsInput,
+  resolvePurchasableLinePrice,
+  resolveSelectedOptions,
+} from "#root/shared/products/options";
+import { loadPurchasableOptionGroups } from "#root/backend/products/option-groups";
 import { getShippingFeeRaw } from "#root/backend/settings/get-shipping-fee";
 import { createBostaDelivery, isBostaEnabled } from "#root/backend/orders/bosta/service";
 import { persistBostaSyncStatus } from "#root/backend/orders/bosta/sync-status";
 import { isFincartEnabled } from "#root/backend/orders/fincart/config";
 import { logOrderEvent } from "#root/backend/orders/order-log";
 
+/**
+ * The chosen option configuration. New clients send the map itself
+ * (`{ Color: "Gold" }`); the legacy checkout sent the display label
+ * ("Color: Gold, Size: 8mm"), which is still accepted and parsed. Either way
+ * the server resolves it against the product's CURRENT option groups — the
+ * client's copy is a request, never the answer.
+ */
+const SelectedOptionsInputSchema = z.union([
+  z.record(z.string().max(100), z.string().max(200)),
+  z.string().max(2000),
+]);
+
 const OrderItemSchema = z.object({
   productId: z.string().uuid(),
-  quantity: z.number().min(1),
-  selectedOptions: z.string().optional(),
+  // Whole units only: `product.stock` is an integer column and is decremented
+  // by this value in SQL, so a fractional quantity would corrupt inventory.
+  quantity: z.number().int().min(1),
+  selectedOptions: SelectedOptionsInputSchema.optional(),
 });
+
+/** Customer-safe wording for an option that no longer resolves at checkout. */
+function optionRejection(
+  code: "option_required" | "option_not_found" | "option_unavailable",
+  productName: string,
+  optionName: string,
+): ServerError<"ProductOptionInvalid"> {
+  const clientMessage =
+    code === "option_required"
+      ? `Please choose ${optionName} for ${productName} before checking out.`
+      : code === "option_not_found"
+        ? `The ${optionName} you chose for ${productName} is no longer available. Please choose another option.`
+        : `The ${optionName} you chose for ${productName} is currently unavailable. Please choose another option.`;
+  return new ServerError({
+    tag: "ProductOptionInvalid",
+    message: `${code}: ${productName} / ${optionName}`,
+    statusCode: 400,
+    clientMessage,
+  });
+}
+
+/**
+ * A Build Your Stack instance from the cart. Only identities and quantities
+ * are trusted; the server re-derives every price. `expectedBundleTotal` is
+ * the figure the shopper saw and is used solely to detect a price change.
+ */
+const OrderBundleSchema = z.object({
+  instanceId: z.string().min(1).max(64),
+  campaignId: z.string().uuid(),
+  /** Build Your Stack: the chosen units. Curated stacks may send nothing — the server uses the composition. */
+  items: z.array(OrderItemSchema).max(100).default([]),
+  expectedBundleTotal: z.number().nonnegative().optional(),
+});
+
+export type CreateOrderBundleInput = z.infer<typeof OrderBundleSchema>;
 
 export const createOrderSchema = z.object({
   customerName: z.string().min(1),
@@ -43,12 +110,30 @@ export const createOrderSchema = z.object({
   customerPhone: z.string().min(1),
   shippingAddress: z.string().min(1),
   shippingCity: z.string().min(1),
-  shippingState: z.string().optional().nullable(),
-  /** Free-text district hint — fuzzy-matched against Bosta's district list server-side */
+  /**
+   * `order.shipping_state` / `shipping_postal_code` / `shipping_country` are
+   * NOT NULL with no database default, so these keys must be PRESENT — an
+   * absent or null value used to pass validation and then blow up as a
+   * Postgres not-null violation (a 500 for what is really a bad request).
+   *
+   * Presence is all that is enforced for state and postal code: both are
+   * legitimately EMPTY in this store. The Governorate input is explicitly
+   * marked optional in the checkout templates and the Bosta mapping falls back
+   * to the city when it is blank, and Egyptian addresses carry no postal code
+   * at all, so checkout deliberately submits "" rather than inventing a
+   * placeholder like "00000". Requiring `.min(1)` here would reject every
+   * real checkout. `.trim()` normalises whitespace-only input to "" instead of
+   * storing spaces.
+   */
+  shippingState: z.string().trim(),
+  /** Free-text district hint — fuzzy-matched against Bosta's district list server-side. Column has a DB default, so it stays optional. */
   shippingDistrict: z.string().optional().nullable(),
-  shippingPostalCode: z.string().optional().nullable(),
-  shippingCountry: z.string().optional().nullable(),
-  items: z.array(OrderItemSchema).min(1),
+  shippingPostalCode: z.string().trim(),
+  /** Always populated by checkout (the store is Egypt-only), and a blank country is meaningless — so this one is non-empty. */
+  shippingCountry: z.string().trim().min(1),
+  /** Ordinary lines. May be empty when the order is bundles only. */
+  items: z.array(OrderItemSchema),
+  bundles: z.array(OrderBundleSchema).max(20).default([]),
   notes: z.string().optional(),
   promoCodeId: z.string().uuid().optional(),
   paymentMethod: z.enum(["cod", "stripe", "paymob"]).optional().default("cod"),
@@ -57,6 +142,9 @@ export const createOrderSchema = z.object({
   bostaDistrictId: z.string().min(1).optional(),
   buildingNumber: z.string().trim().optional(),
   apartment: z.string().trim().optional(),
+}).refine((data) => data.items.length + data.bundles.length > 0, {
+  message: "An order needs at least one item",
+  path: ["items"],
 });
 
 // Manually define the insert type matching the schema's nullability
@@ -67,9 +155,9 @@ type OrderInsertData = {
   customerPhone: string;
   shippingAddress: string;
   shippingCity: string;
-  shippingState: string | null;
-  shippingPostalCode: string | null;
-  shippingCountry: string | null;
+  shippingState: string;
+  shippingPostalCode: string;
+  shippingCountry: string;
   subtotal: string;
   shipping: string;
   tax: string;
@@ -389,21 +477,24 @@ export const createOrder = (
           const productIds = input.items.map((item) => item.productId);
 
           // Fetch products (single-shop mode: no vendor data needed)
-          const products = await tx
-            .select({
-              id: product.id,
-              price: product.price,
-              discountPrice: product.discountPrice,
-              name: product.name,
-              stock: product.stock,
-              hidden: product.hidden,
-              categoryId: product.categoryId,
-            })
-            .from(product)
-            .where(inArray(product.id, productIds))
-            .execute();
+          const products =
+            productIds.length === 0
+              ? []
+              : await tx
+                  .select({
+                    id: product.id,
+                    price: product.price,
+                    discountPrice: product.discountPrice,
+                    name: product.name,
+                    stock: product.stock,
+                    hidden: product.hidden,
+                    categoryId: product.categoryId,
+                  })
+                  .from(product)
+                  .where(inArray(product.id, productIds))
+                  .execute();
 
-          if (!products || products.length === 0) {
+          if (productIds.length > 0 && products.length === 0) {
             throw new ServerError({
               tag: "ProductNotFound",
               message: "No products found for this order",
@@ -442,17 +533,160 @@ export const createOrder = (
             }
           }
 
-          const subtotal = input.items.reduce((acc, item) => {
+          // ─── Options ("variants") on ordinary lines ─────────────────────
+          // One batched read of the products' option groups, then each line's
+          // configuration is resolved against them (shared/products/options):
+          // the canonical map is what gets priced and stored, and the chosen
+          // values' modifiers are folded into the unit price — the same
+          // helper the bundle path and the product page use.
+          const optionGroups = await loadPurchasableOptionGroups(tx, productIds);
+          const resolvedLines = input.items.map((item) => {
             const productData = products.find((p) => p.id === item.productId);
-            if (!productData) return acc;
-
-            // Use discount price if available
-            const priceToUse = productData.discountPrice
+            if (!productData) {
+              throw new ServerError({
+                tag: "ProductNotFound",
+                message: `Product with ID ${item.productId} not found`,
+                statusCode: 404,
+                clientMessage: "Some products in your order could not be found",
+              });
+            }
+            // An ordinary line that names NO option at all is the storefront's
+            // long-standing quick-add (product cards, quick view, search
+            // results add a product without a configuration) and is accepted
+            // exactly as before Phase 7: base price, no snapshot. Once the
+            // client names an option, the configuration must resolve —
+            // partial, unknown or unavailable values are refused. Bundle
+            // children never get this leniency (see selection.ts): a stack
+            // unit must be a resolvable variant.
+            const requestedOptions = normalizeSelectedOptionsInput(item.selectedOptions);
+            const resolved =
+              Object.keys(requestedOptions).length === 0
+                ? { ok: true as const, selectedOptions: {}, priceModifier: 0 }
+                : resolveSelectedOptions(optionGroups.get(item.productId) ?? [], requestedOptions);
+            if (!resolved.ok) throw optionRejection(resolved.code, productData.name, resolved.optionName);
+            const selectedOptions: SelectedOptions | null =
+              Object.keys(resolved.selectedOptions).length > 0 ? resolved.selectedOptions : null;
+            const basePrice = Number.parseFloat(productData.price.toString());
+            const baseDiscount = productData.discountPrice
               ? Number.parseFloat(productData.discountPrice.toString())
-              : Number.parseFloat(productData.price.toString());
+              : null;
+            return {
+              productId: item.productId,
+              quantity: item.quantity,
+              product: productData,
+              selectedOptions,
+              // Regular price and discount of THIS configuration.
+              price: resolvePurchasableLinePrice(basePrice, resolved.priceModifier),
+              discountPrice: baseDiscount === null ? null : resolvePurchasableLinePrice(baseDiscount, resolved.priceModifier),
+              unitPrice: resolvePurchasableLinePrice(baseDiscount ?? basePrice, resolved.priceModifier),
+            };
+          });
 
-            return acc + priceToUse * item.quantity;
-          }, 0);
+          // ─── Bundles: server-authoritative revalidation ───────────────────
+          // Every stack is re-priced from the live campaign + product rows
+          // inside this transaction. The client's totals are never used;
+          // `expectedBundleTotal` only lets us tell the shopper the price
+          // changed instead of silently charging something else.
+          const validatedBundles: (ValidatedBundle & { instanceId: string })[] = [];
+          const instancesPerCampaign = new Map<string, number>();
+          for (const bundleInput of input.bundles) {
+            const check = await loadAndValidateBundleSelection(tx, {
+              campaignId: bundleInput.campaignId,
+              requested: bundleInput.items.map((item) => ({
+                productId: item.productId,
+                quantity: item.quantity,
+                // Resolved server-side against the live option groups; the
+                // validated bundle carries the canonical map, not this one.
+                selectedOptions: normalizeSelectedOptionsInput(item.selectedOptions),
+              })),
+              expectedBundleTotal: bundleInput.expectedBundleTotal ?? null,
+            });
+            if (!check.ok) {
+              throw new ServerError({
+                tag: "BundleValidationFailed",
+                message: `Bundle ${bundleInput.instanceId} rejected: ${check.code}`,
+                statusCode: 400,
+                clientMessage: check.message,
+              });
+            }
+            const count = (instancesPerCampaign.get(check.bundle.campaignId) ?? 0) + 1;
+            instancesPerCampaign.set(check.bundle.campaignId, count);
+            if (count > 1 && !check.bundle.isRepeatable) {
+              throw new ServerError({
+                tag: "BundleValidationFailed",
+                message: `Campaign ${check.bundle.campaignId} is not repeatable`,
+                statusCode: 400,
+                clientMessage: `"${check.bundle.campaignTitle}" can only be added once per order. Please remove the extra stack.`,
+              });
+            }
+            // Every child line — its options, its label, its regular price —
+            // is what the SERVER resolved. For a curated stack the server
+            // replaced the item list with the stored composition (fixed
+            // variants included); for Build Your Stack it resolved each line's
+            // options against the live product. Nothing the client labelled
+            // reaches the order.
+            validatedBundles.push({ ...check.bundle, instanceId: bundleInput.instanceId });
+          }
+
+          // ─── Stock: one aggregate check per product across ordinary lines
+          // and every bundle child, so two stacks (or a stack plus a loose
+          // unit) of the same product can't each pass individually. ───────
+          const stockByProduct = new Map<string, { name: string; stock: number }>();
+          for (const p of products) stockByProduct.set(p.id, { name: p.name, stock: p.stock });
+          for (const b of validatedBundles) {
+            for (const item of b.items) {
+              if (!stockByProduct.has(item.productId)) {
+                stockByProduct.set(item.productId, { name: item.name, stock: item.stock });
+              }
+            }
+          }
+          const requestedByProduct = new Map<string, number>();
+          for (const item of input.items) {
+            requestedByProduct.set(item.productId, (requestedByProduct.get(item.productId) ?? 0) + item.quantity);
+          }
+          for (const b of validatedBundles) {
+            for (const item of b.items) {
+              requestedByProduct.set(item.productId, (requestedByProduct.get(item.productId) ?? 0) + item.quantity);
+            }
+          }
+          for (const [productId, requested] of requestedByProduct) {
+            const known = stockByProduct.get(productId);
+            if (known && known.stock < requested) {
+              throw new ServerError({
+                tag: "InsufficientStock",
+                message: `Insufficient combined stock for product ${known.name}`,
+                statusCode: 400,
+                clientMessage: `Sorry, there's not enough stock available for ${known.name}`,
+              });
+            }
+          }
+
+          // ─── Pricing inputs (see shared/bundles/cart-pricing.ts) ──────────
+          const regularLines: PricingRegularLine[] = [];
+          for (const line of resolvedLines) {
+            regularLines.push({
+              id: line.productId,
+              name: line.product.name,
+              quantity: line.quantity,
+              // Effective price of the chosen configuration (modifiers in).
+              price: line.unitPrice,
+              categoryIds: line.product.categoryId ? [line.product.categoryId] : undefined,
+            });
+          }
+
+          const pricingBundles: PricingBundle[] = validatedBundles.map((b) => ({
+            instanceId: b.instanceId,
+            offerStacking: b.offerStacking,
+            regularTotal: b.regularTotal,
+            bundleTotal: b.bundleTotal,
+            items: b.items.map((item) => ({
+              productId: item.productId,
+              name: item.name,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              categoryIds: item.categoryId ? [item.categoryId] : undefined,
+            })),
+          }));
 
           const shipping = await getShippingFeeRaw(tx);
 
@@ -460,6 +694,8 @@ export const createOrder = (
           // Evaluated before the promo code discount below so the promo code's
           // percentage/fixed discount applies to what's left *after* automatic
           // offers, not the raw subtotal (matches the shopper-facing cart math).
+          // Exclusive bundles are invisible to the engine; stackable bundles
+          // appear as their children at bundle-share prices.
           const now = new Date();
           const activeOffers = await tx
             .select()
@@ -474,27 +710,19 @@ export const createOrder = (
             .orderBy(asc(cartOffer.priority))
             .execute();
 
-          const cartItemsForOffers = input.items
-            .map((item) => {
-              const p = products.find((prod) => prod.id === item.productId);
-              if (!p) return null;
-              const price = p.discountPrice
-                ? Number.parseFloat(p.discountPrice.toString())
-                : Number.parseFloat(p.price.toString());
-              return { id: item.productId, name: p.name, quantity: item.quantity, price };
-            })
-            .filter(
-              (i): i is { id: string; name: string; quantity: number; price: number } =>
-                i !== null,
-            );
+          const offerInputs = buildOfferInputs(regularLines, pricingBundles);
+          const cartItemsForOffers = offerInputs.cartItems;
 
-          const appliedOffers = applyOffersToCart(activeOffers, cartItemsForOffers, subtotal);
+          const appliedOffers = applyOffersToCart(activeOffers, cartItemsForOffers, offerInputs.subtotal);
           const offerDiscount = appliedOffers.reduce((s, o) => s + o.discountAmount, 0);
           const hasFreeShippingFromOffer = appliedOffers.some((o) => o.freeShipping);
-          const effectiveShipping = hasFreeShippingFromOffer ? 0 : shipping;
+
+          // Promo-code minimum-purchase and applicability checks look at the
+          // same value/items offers do — an exclusive bundle counts toward
+          // neither, a stackable one toward both.
+          const subtotal = offerInputs.subtotal;
 
           // Check if a promo code is applied
-          let discount = 0;
           let promoCodeData = null;
 
           if (input.promoCodeId) {
@@ -595,7 +823,7 @@ export const createOrder = (
             // Product / category applicability — this was previously skipped
             // at order time, letting a restricted code through on any cart.
             if (!promoCodeData.appliesToAllProducts) {
-              const cartProductIds = input.items.map((item) => item.productId);
+              const cartProductIds = [...new Set(cartItemsForOffers.map((item) => item.id))];
 
               const applicableProducts = await tx
                 .select({ productId: promoCodeProducts.productId })
@@ -608,9 +836,9 @@ export const createOrder = (
                 )
                 .execute();
 
-              const cartCategoryIds = products
-                .map((p) => p.categoryId)
-                .filter((id): id is string => !!id);
+              const cartCategoryIds = [
+                ...new Set(cartItemsForOffers.flatMap((item) => item.categoryIds ?? [])),
+              ];
 
               const applicableCategories =
                 cartCategoryIds.length > 0
@@ -642,13 +870,8 @@ export const createOrder = (
               }
             }
 
-            // Calculate discount from the code's own values, never the client's.
-            discount = computePromoDiscount(
-              promoCodeData.discountType,
-              Number(promoCodeData.discountValue),
-              subtotal,
-              offerDiscount,
-            );
+            // The discount itself is computed by computeCartTotals below from
+            // the code's own values, never the client's.
 
             // Increment used count for the promo code
             await tx
@@ -665,10 +888,27 @@ export const createOrder = (
               .where(eq(promoCode.id, promoCodeData.id));
           }
 
-          const combinedDiscount = discount + offerDiscount;
-          const discountedSubtotal = subtotal - combinedDiscount;
+          // ─── Totals — single source of truth shared with the cart UI ───────
+          const pricing = computeCartTotals({
+            regularLines,
+            bundles: pricingBundles,
+            offerDiscount,
+            promo: promoCodeData
+              ? {
+                  discountType: promoCodeData.discountType,
+                  discountValue: Number(promoCodeData.discountValue),
+                }
+              : null,
+            baseShippingFee: shipping,
+            freeShipping: hasFreeShippingFromOffer,
+          });
+          const effectiveShipping = pricing.shipping;
+          // order.subtotal = Σ regular line values (incl. bundle children at
+          // regular price); order.discount = bundle savings + offers + promo.
+          const orderSubtotal = pricing.subtotal;
+          const combinedDiscount = pricing.bundleSavings + pricing.offerDiscount + pricing.promoDiscount;
           // Ensure shipping is included in the total (no tax)
-          const total = Math.max(0, discountedSubtotal) + effectiveShipping;
+          const total = pricing.total;
 
           // Only include fields directly provided or calculated
           const isOnlinePayment =
@@ -689,12 +929,12 @@ export const createOrder = (
             shippingDistrict: input.shippingDistrict,
             shippingPostalCode: input.shippingPostalCode,
             shippingCountry: input.shippingCountry,
-            subtotal: subtotal.toString(),
-            discount: combinedDiscount > 0 ? combinedDiscount.toString() : null,
+            subtotal: orderSubtotal.toFixed(2),
+            discount: combinedDiscount > 0 ? combinedDiscount.toFixed(2) : null,
             promoCodeId: input.promoCodeId || null,
-            shipping: effectiveShipping.toString(),
+            shipping: effectiveShipping.toFixed(2),
             tax: "0",
-            total: total.toString(),
+            total: total.toFixed(2),
             notes: input.notes,
             paymentMethod: input.paymentMethod ?? "cod",
             paymentStatus: isOnlinePayment ? "pending" : "not_required",
@@ -730,27 +970,26 @@ export const createOrder = (
           }
 
           const orderItems = await Promise.all(
-            input.items.map(async (item) => {
-              const productData = products.find((p) => p.id === item.productId);
-              if (!productData) {
-                throw new ServerError({
-                  tag: "ProductNotFound",
-                  message: `Product with ID ${item.productId} not found`,
-                  statusCode: 404,
-                  clientMessage:
-                    "Some products in your order could not be found",
-                });
-              }
+            resolvedLines.map(async (item) => {
+              const productData = item.product;
 
+              // Decrement in SQL rather than from the loaded snapshot, so
+              // several lines of one product (variants, a stack plus a loose
+              // unit) each subtract their own quantity. Stock is product-level:
+              // options never own inventory in this store.
               await tx
                 .update(product)
                 .set({
-                  stock: productData.stock - item.quantity,
+                  stock: sql`${product.stock} - ${item.quantity}`,
                 })
                 .where(eq(product.id, item.productId));
 
+              // The label is built from the CANONICAL options, and the
+              // snapshot prices already include the chosen modifiers, so the
+              // line reads correctly forever — whatever happens to the
+              // product's options later.
               const itemName = item.selectedOptions
-                ? `${productData.name} (${item.selectedOptions})`
+                ? `${productData.name} (${formatSelectedOptions(item.selectedOptions)})`
                 : productData.name;
 
               const orderItemInsert = await tx
@@ -760,10 +999,11 @@ export const createOrder = (
                   productId: item.productId,
                   vendorId: getStoreOwnerId(), // Single-shop: use default store owner ID
                   quantity: item.quantity,
-                  price: productData.price.toString(),
-                  discountPrice: productData.discountPrice?.toString() || null,
+                  price: item.price.toFixed(2),
+                  discountPrice: item.discountPrice === null ? null : item.discountPrice.toFixed(2),
                   name: itemName,
                   vendorName: null, // Single-shop: no vendor names
+                  selectedOptions: item.selectedOptions,
                 })
                 .returning();
 
@@ -781,9 +1021,80 @@ export const createOrder = (
             }),
           );
 
+          // ─── Bundle snapshots + child lines ──────────────────────────────
+          const bundleOrderItems: typeof orderItems = [];
+          for (const b of validatedBundles) {
+            const [snapshot] = await tx
+              .insert(orderBundle)
+              .values({
+                orderId: newOrder.id,
+                instanceId: b.instanceId,
+                campaignId: b.campaignId,
+                campaignSlug: b.campaignSlug,
+                campaignTitle: b.campaignTitle,
+                campaignType: b.campaignType,
+                // Tier identity as a plain snapshot: the merchant may delete
+                // this tier tomorrow and the order must still read correctly.
+                tierId: b.tierId,
+                requiredQuantity: b.tierQuantity,
+                regularTotal: b.regularTotal.toFixed(2),
+                bundleTotal: b.bundleTotal.toFixed(2),
+                offerStacking: b.offerStacking,
+              })
+              .returning();
+            if (!snapshot) {
+              throw new ServerError({
+                tag: "OrderCreationFailed",
+                message: "Failed to snapshot bundle",
+                statusCode: 500,
+                clientMessage: "Failed to create order. Please try again.",
+              });
+            }
+
+            for (const item of b.items) {
+              // Same inventory unit as an ordinary line: the product's stock.
+              await tx
+                .update(product)
+                .set({ stock: sql`${product.stock} - ${item.quantity}` })
+                .where(eq(product.id, item.productId));
+
+              // Regular price snapshot of THIS configuration, from the rows
+              // the validation read inside this transaction — no re-read.
+              const baseName = item.optionsLabel ? `${item.name} (${item.optionsLabel})` : item.name;
+              const hasOptions = Object.keys(item.selectedOptions).length > 0;
+              const [row] = await tx
+                .insert(orderItem)
+                .values({
+                  orderId: newOrder.id,
+                  productId: item.productId,
+                  vendorId: getStoreOwnerId(),
+                  quantity: item.quantity,
+                  price: resolvePurchasableLinePrice(item.price, item.priceModifier).toFixed(2),
+                  discountPrice:
+                    item.discountPrice === null
+                      ? null
+                      : resolvePurchasableLinePrice(item.discountPrice, item.priceModifier).toFixed(2),
+                  name: `${baseName} — ${b.campaignTitle}`,
+                  vendorName: null,
+                  orderBundleId: snapshot.id,
+                  selectedOptions: hasOptions ? item.selectedOptions : null,
+                })
+                .returning();
+              if (!row) {
+                throw new ServerError({
+                  tag: "OrderItemCreationFailed",
+                  message: "Failed to create bundle order item",
+                  statusCode: 500,
+                  clientMessage: "Failed to create order item. Please try again.",
+                });
+              }
+              bundleOrderItems.push(row);
+            }
+          }
+
           return {
             ...newOrder,
-            items: orderItems,
+            items: [...orderItems, ...bundleOrderItems],
           };
         });
       }),

@@ -11,7 +11,8 @@ import { ValuePropIconType, type HomepageContent } from "#root/shared/types/home
 import { Effect } from "effect";
 
 // Zod schema for validating homepage content
-const HomepageContentSchema = z.object({
+/** Exported for the schema contract test — the CMS payload must round-trip every field the type declares. */
+export const HomepageContentSchema = z.object({
   meta: z.object({
     enabled: z.boolean(),
     pageTitle: z.string(),
@@ -112,6 +113,24 @@ const HomepageContentSchema = z.object({
       viewAllTextAr: z.string().nullish(),
       viewAllLink: z.string(),
       productIds: z.array(z.string().uuid()).nullish(),
+    })
+    .nullish(),
+  bundles: z
+    .object({
+      enabled: z.boolean(),
+      title: z.string(),
+      titleAr: z.string().nullish(),
+      subtitle: z.string().nullish(),
+      subtitleAr: z.string().nullish(),
+      viewAllText: z.string(),
+      viewAllTextAr: z.string().nullish(),
+      viewAllLink: z.string(),
+      campaignIds: z.array(z.string().uuid()).nullish(),
+      limit: z.number().int().min(1).max(50).nullish(),
+      // Phase 6. Zod strips keys it does not know, so these MUST be listed
+      // or the CMS's "Best selling" choice silently never saves.
+      source: z.enum(["manual", "best_selling"]).nullish(),
+      bestSellingPeriodDays: z.number().int().min(1).max(365).nullish(),
     })
     .nullish(),
   marquee: z

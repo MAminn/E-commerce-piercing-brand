@@ -69,6 +69,18 @@ export function MinimalNavbar() {
     }).catch(() => {});
   }, []);
 
+  // Bundles & Stacks becomes a nav destination on its own once at least one
+  // campaign is live — no CMS step needed, and nothing to click into while
+  // the store has no bundles. A merchant who adds their own /bundles link in
+  // Layout Settings (custom label, position) takes precedence.
+  const [hasLiveBundles, setHasLiveBundles] = useState(false);
+  useEffect(() => {
+    trpc.bundle.listLive
+      .query({ limit: 1 })
+      .then((res) => setHasLiveBundles(!!(res.success && res.result && res.result.length > 0)))
+      .catch(() => {});
+  }, []);
+
   // Live search with debounce
   useEffect(() => {
     if (!searchQuery.trim() || searchQuery.trim().length < 2) {
@@ -144,7 +156,7 @@ export function MinimalNavbar() {
   const cmsNavLinks = layoutSettings.header.navigationLinks.filter(
     (l) => l.isDropdown || isUsableHref(l.url),
   );
-  const links =
+  const baseLinks =
     cmsNavLinks.length > 0
       ? cmsNavLinks.map((l) => ({
           id: l.id,
@@ -154,6 +166,11 @@ export function MinimalNavbar() {
           categoryIds: l.categoryIds ?? [],
         }))
       : [{ id: "default-shop", label: "Shop", to: "/shop", isDropdown: false, categoryIds: [] as string[] }];
+  const cmsLinksToBundles = baseLinks.some((l) => l.to.split("?")[0]?.replace(/\/$/, "") === "/bundles");
+  const links =
+    hasLiveBundles && !cmsLinksToBundles
+      ? [...baseLinks, { id: "auto-bundles", label: t("nav.bundles"), to: "/bundles", isDropdown: false, categoryIds: [] as string[] }]
+      : baseLinks;
 
   const handleCloseSheet = () => setIsSheetOpen(false);
 

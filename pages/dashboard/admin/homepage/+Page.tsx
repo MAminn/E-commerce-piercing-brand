@@ -49,6 +49,8 @@ import {
 } from "#root/components/template-system/templateConfig";
 import { useTemplate } from "#root/frontend/contexts/TemplateContext";
 import { HomepageProductPicker } from "#root/components/admin/HomepageProductPicker";
+import { HomepageBundlePicker } from "#root/components/admin/HomepageBundlePicker";
+import { DEFAULT_HOMEPAGE_CONTENT as HOMEPAGE_DEFAULTS } from "#root/shared/types/homepage-content";
 import { translations as staticTranslations } from "#root/lib/i18n/translations";
 import type { TranslationOverrides } from "#root/shared/types/layout-settings";
 
@@ -2830,6 +2832,127 @@ export default function HomepageAdminPage() {
             />
           </CardContent>
         </Card>
+
+        {/* ── Bundles & Stacks rail (Minimal only) ────────────────────────── */}
+        {isMinimal && (() => {
+          const bundles = content.bundles ?? HOMEPAGE_DEFAULTS.bundles!;
+          const isBestSelling = bundles.source === "best_selling";
+          const update = (patch: Partial<typeof bundles>) =>
+            setContent((prev) => ({
+              ...prev,
+              bundles: { ...(prev.bundles ?? HOMEPAGE_DEFAULTS.bundles!), ...patch },
+            }));
+          return (
+            <Card>
+              <CardHeader>
+                <div className='flex items-center justify-between'>
+                  <div>
+                    <CardTitle className='text-base'>Bundles &amp; Stacks</CardTitle>
+                    <p className='text-xs text-muted-foreground mt-1'>
+                      Shows live bundle campaigns as a rail. Campaign content, prices and order are managed under
+                      Bundles &amp; Stacks; this only controls the section.
+                    </p>
+                  </div>
+                  <div className='flex items-center gap-2'>
+                    <Label htmlFor='bundles-enabled'>Enabled</Label>
+                    <Switch id='bundles-enabled' checked={bundles.enabled} onCheckedChange={(checked) => update({ enabled: checked })} />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className='space-y-4'>
+                <div className='grid grid-cols-1 gap-4 md:grid-cols-2'>
+                  <div className='space-y-2'>
+                    <Label>Section title</Label>
+                    <Input value={bundles.title} onChange={(e) => update({ title: e.target.value })} disabled={!bundles.enabled} />
+                  </div>
+                  <div className='space-y-2'>
+                    <Label>Section title (Arabic)</Label>
+                    <Input dir='rtl' value={bundles.titleAr ?? ""} onChange={(e) => update({ titleAr: e.target.value })} disabled={!bundles.enabled} />
+                  </div>
+                  <div className='space-y-2'>
+                    <Label>Subtitle</Label>
+                    <Input value={bundles.subtitle ?? ""} onChange={(e) => update({ subtitle: e.target.value })} disabled={!bundles.enabled} placeholder='Optional line under the title' />
+                  </div>
+                  <div className='space-y-2'>
+                    <Label>Subtitle (Arabic)</Label>
+                    <Input dir='rtl' value={bundles.subtitleAr ?? ""} onChange={(e) => update({ subtitleAr: e.target.value })} disabled={!bundles.enabled} />
+                  </div>
+                  <div className='space-y-2'>
+                    <Label>View all text</Label>
+                    <Input value={bundles.viewAllText} onChange={(e) => update({ viewAllText: e.target.value })} disabled={!bundles.enabled} />
+                  </div>
+                  <div className='space-y-2'>
+                    <Label>View all text (Arabic)</Label>
+                    <Input dir='rtl' value={bundles.viewAllTextAr ?? ""} onChange={(e) => update({ viewAllTextAr: e.target.value })} disabled={!bundles.enabled} />
+                  </div>
+                  <div className='space-y-2'>
+                    <Label>View all link</Label>
+                    <Input value={bundles.viewAllLink} onChange={(e) => update({ viewAllLink: e.target.value })} disabled={!bundles.enabled} placeholder='/bundles' />
+                  </div>
+                  <div className='space-y-2'>
+                    <Label>Source</Label>
+                    <Select
+                      value={bundles.source ?? "manual"}
+                      onValueChange={(value) => update({ source: value as "manual" | "best_selling" })}
+                      disabled={!bundles.enabled}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value='manual'>Manual campaigns</SelectItem>
+                        <SelectItem value='best_selling'>Best selling bundles</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className='text-xs text-muted-foreground'>
+                      Best selling ranks live campaigns by bundles actually sold. Your manual picks below are kept
+                      either way.
+                    </p>
+                  </div>
+                  <div className='space-y-2'>
+                    <Label>{isBestSelling ? "Max campaigns" : "Max campaigns (automatic mode)"}</Label>
+                    <Input
+                      type='number'
+                      min={1}
+                      max={50}
+                      value={bundles.limit ?? 6}
+                      onChange={(e) => update({ limit: Math.max(1, Math.min(50, Number(e.target.value) || 6)) })}
+                      disabled={!bundles.enabled || (!isBestSelling && (bundles.campaignIds?.length ?? 0) > 0)}
+                    />
+                  </div>
+                  {isBestSelling && (
+                    <div className='space-y-2'>
+                      <Label>Sales period (days)</Label>
+                      <Input
+                        type='number'
+                        min={1}
+                        max={365}
+                        value={bundles.bestSellingPeriodDays ?? 30}
+                        onChange={(e) =>
+                          update({
+                            bestSellingPeriodDays: Math.max(1, Math.min(365, Number(e.target.value) || 30)),
+                          })
+                        }
+                        disabled={!bundles.enabled}
+                      />
+                      <p className='text-xs text-muted-foreground'>
+                        Ranked by bundle instances sold in this window, then by bundle revenue. Only campaigns that
+                        are live right now can appear.
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <div className='space-y-2'>
+                  <Label>Campaigns{isBestSelling ? " (saved for Manual mode)" : ""}</Label>
+                  <HomepageBundlePicker
+                    selectedIds={bundles.campaignIds ?? []}
+                    onChange={(ids) => update({ campaignIds: ids.length > 0 ? ids : undefined })}
+                    disabled={!bundles.enabled || isBestSelling}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         {/* ── Bottom Carousel (above testimonials, Minimal only) ──────────── */}
         {isMinimal && (

@@ -10,6 +10,7 @@ import { useTemplate } from "#root/frontend/contexts/TemplateContext";
 import { getTemplateComponent } from "#root/components/template-system/templateConfig";
 import { resolveTemplateId } from "#root/shared/config/storefront";
 import { trpc } from "#root/shared/trpc/client";
+import { formatSelectedOptionValues } from "#root/shared/products/options";
 import type {
   CheckoutPageModernTemplateProps,
   CheckoutCustomerInfo,
@@ -76,6 +77,9 @@ export default function CheckoutPage() {
     removePromoCode,
     promoCodeNotice,
     clearPromoCodeNotice,
+    bundles,
+    merchandiseSubtotal,
+    bundleChargedValue,
   } = useCart();
   const { getTemplateId } = useTemplate();
   const { trackEvent } = useTracking();
@@ -128,11 +132,13 @@ export default function CheckoutPage() {
   // Uses sessionStorage with a cart fingerprint to avoid re-firing on refresh
   // while still firing if the user returns with a meaningfully different cart.
   useEffect(() => {
-    if (hasTrackedCheckoutStart.current || items.length === 0) return;
+    if (hasTrackedCheckoutStart.current || (items.length === 0 && bundles.length === 0)) return;
 
-    // Build a simple fingerprint: sorted item IDs + quantities
-    const fingerprint = items
-      .map((item) => `${item.id}:${item.quantity}`)
+    // Build a simple fingerprint: sorted item IDs + quantities (+ stack ids)
+    const fingerprint = [
+      ...items.map((item) => `${item.id}:${item.quantity}`),
+      ...bundles.map((b) => `stack:${b.instanceId}`),
+    ]
       .sort()
       .join(",");
     const storageKey = "tracked_checkout_started";
@@ -155,21 +161,61 @@ export default function CheckoutPage() {
       ecommerce: {
         currency: STORE_CURRENCY,
         value: total,
-        items: items.map((item) => ({
-          itemId: item.id,
-          itemName: item.name,
-          price: item.price,
-          quantity: item.quantity,
-          category: item.categoryName ?? undefined,
-        })),
+        // Bundle children are sent as the real products they are (catalog
+        // matching keeps working); the stack itself is only metadata.
+        items: [
+          ...items.map((item) => ({
+            itemId: item.id,
+            itemName: item.name,
+            price: item.price,
+            quantity: item.quantity,
+            category: item.categoryName ?? undefined,
+          })),
+          ...bundles.flatMap((b) =>
+            b.items.map((item) => ({
+              itemId: item.productId,
+              itemName: item.name,
+              price: item.unitPrice,
+              quantity: item.quantity,
+              category: item.categoryName ?? undefined,
+            })),
+          ),
+        ],
         coupon: promoCode?.code ?? undefined,
       },
+      customProperties:
+        bundles.length > 0
+          ? { bundles: bundles.map((b) => ({ campaignSlug: b.campaignSlug, bundlePrice: b.bundlePrice })) }
+          : undefined,
     });
-  }, [items, total, promoCode, trackEvent]);
+  }, [items, bundles, total, promoCode, trackEvent]);
 
-  // Convert cart items to checkout order summary items
+  // Convert cart items to checkout order summary items. Each stack is ONE
+  // summary line at its fixed price (regular value struck through), listing
+  // its pieces in the variant slot — the checkout summary is read-only, so
+  // no grouped controls are needed here.
   const orderItems: CheckoutOrderSummaryItem[] = useMemo(() => {
-    return items.map((item: ContextCartItem) => ({
+    const stackLines: CheckoutOrderSummaryItem[] = bundles.map((b) => {
+      const pieceCount = b.items.reduce((s, i) => s + i.quantity, 0);
+      const pieces = b.items
+        .map((i) => {
+          // "Flower Stud (Gold)" — the chosen variant travels with the piece.
+          const options = formatSelectedOptionValues(i.selectedOptions);
+          const label = options ? `${i.name} (${options})` : i.name;
+          return i.quantity > 1 ? `${label} x${i.quantity}` : label;
+        })
+        .join(", ");
+      return {
+        id: `stack:${b.instanceId}`,
+        name: b.campaignTitle,
+        price: b.bundlePrice,
+        originalPrice: b.regularTotal > b.bundlePrice ? b.regularTotal : undefined,
+        quantity: 1,
+        imageUrl: b.items[0]?.imageUrl ?? undefined,
+        variant: `${pieceCount} pieces: ${pieces}`,
+      };
+    });
+    const lines = items.map((item: ContextCartItem) => ({
       id: item.id,
       name: item.name,
       price: item.price,
@@ -182,18 +228,21 @@ export default function CheckoutPage() {
             .join(", ") || undefined
         : undefined,
     }));
-  }, [items]);
+    return [...stackLines, ...lines];
+  }, [items, bundles]);
 
-  // Build totals object
+  // Build totals object. The summary lines above show stacks at their fixed
+  // price, so the subtotal shown here is merchandise + charged stack value
+  // (bundle savings already applied) — it then reconciles line by line.
   const totals: CheckoutTotals = useMemo(() => {
     return {
-      subtotal,
+      subtotal: bundles.length > 0 ? merchandiseSubtotal + bundleChargedValue : subtotal,
       discount: discount > 0 ? discount : undefined,
       shipping: shipping > 0 ? shipping : undefined,
       grandTotal: total,
       appliedOffers: appliedOffers.length > 0 ? appliedOffers : undefined,
     };
-  }, [subtotal, discount, shipping, total, appliedOffers]);
+  }, [subtotal, merchandiseSubtotal, bundleChargedValue, bundles.length, discount, shipping, total, appliedOffers]);
 
   // Handle form submit
   const handleSubmit = async (
@@ -208,25 +257,37 @@ export default function CheckoutPage() {
 
     try {
       // Validate cart has items
-      if (items.length === 0) {
+      if (items.length === 0 && bundles.length === 0) {
         throw new Error(
           "Your cart is empty. Please add items before placing an order.",
         );
       }
 
-      // Prepare order items
-      const orderItemsPayload = items.map((item) => {
-        const variantStr = item.selectedOptions
-          ? Object.entries(item.selectedOptions)
-              .map(([k, v]) => `${k}: ${v}`)
-              .join(", ")
-          : "";
-        return {
-          productId: item.id,
+      // Stacks: identities + quantities only. `expectedBundleTotal` is the
+      // price shown in the cart so the server can refuse (with a clear
+      // message) if the campaign changed — it is never used for pricing.
+      // Options travel as the map itself (`{ Color: "Gold" }`), never as a
+      // display string: the server resolves each line against the product's
+      // current option groups and re-derives the price from that.
+      const optionsPayload = (selected: Record<string, string> | undefined) =>
+        selected && Object.keys(selected).length > 0 ? selected : undefined;
+      const bundlesPayload = bundles.map((b) => ({
+        instanceId: b.instanceId,
+        campaignId: b.campaignId,
+        expectedBundleTotal: b.bundlePrice,
+        items: b.items.map((item) => ({
+          productId: item.productId,
           quantity: item.quantity,
-          selectedOptions: variantStr || undefined,
-        };
-      });
+          selectedOptions: optionsPayload(item.selectedOptions),
+        })),
+      }));
+
+      // Prepare order items
+      const orderItemsPayload = items.map((item) => ({
+        productId: item.id,
+        quantity: item.quantity,
+        selectedOptions: optionsPayload(item.selectedOptions),
+      }));
 
       // Submit order via tRPC (with paymentMethod)
       const result = await trpc.order.create.mutate({
@@ -239,6 +300,7 @@ export default function CheckoutPage() {
         shippingPostalCode: formValues.postalCode ?? "",
         shippingCountry: formValues.country || "Egypt",
         items: orderItemsPayload,
+        bundles: bundlesPayload,
         notes: formValues.notes || undefined,
         promoCodeId: promoCode?.id,
         paymentMethod: selectedPaymentMethod as "cod" | "stripe" | "paymob",
@@ -269,15 +331,24 @@ export default function CheckoutPage() {
       try {
         sessionStorage.setItem(
           `checkout_items:${orderId}`,
-          JSON.stringify(
-            items.map((item) => ({
+          JSON.stringify([
+            ...items.map((item) => ({
               itemId: item.id,
               itemName: item.name,
               price: item.price,
               quantity: item.quantity,
               category: item.categoryName ?? undefined,
             })),
-          ),
+            ...bundles.flatMap((b) =>
+              b.items.map((item) => ({
+                itemId: item.productId,
+                itemName: item.name,
+                price: item.unitPrice,
+                quantity: item.quantity,
+                category: item.categoryName ?? undefined,
+              })),
+            ),
+          ]),
         );
       } catch {
         /* best-effort — tracking still works with value/transactionId */

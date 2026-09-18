@@ -4,7 +4,37 @@ import type { Product } from "../mock-data/products";
 import { trpc } from "#root/shared/trpc/client";
 import type { AppliedOffer } from "#root/backend/offers/service";
 import { getCartSessionToken } from "#root/lib/cart-session";
-import { computePromoDiscount, deriveEffectiveShipping, computeFreeItemQuantities } from "#root/shared/pricing/cart-math";
+import { deriveEffectiveShipping, computeFreeItemQuantities } from "#root/shared/pricing/cart-math";
+import {
+  addBundleInstance,
+  bundleRegularTotal,
+  bundleUnitCount,
+  newBundleInstanceId,
+  parseStoredBundleInstances,
+  removeBundleInstance,
+  type CartBundleInstance,
+} from "#root/shared/bundles/cart-instance";
+import {
+  buildOfferInputs,
+  computeCartTotals,
+  type PricingBundle,
+  type PricingRegularLine,
+} from "#root/shared/bundles/cart-pricing";
+
+const CART_STORAGE_KEY = "cart";
+/** Separate key from the legacy "cart" array so pre-Phase-2 carts parse unchanged. */
+const BUNDLES_STORAGE_KEY = "cartBundles";
+
+/** What the builder hands to `addBundle` — ids/timestamps are assigned here. */
+export type NewCartBundle = Omit<CartBundleInstance, "instanceId" | "addedAt" | "regularTotal">;
+
+export interface AddBundleResult {
+  success: boolean;
+  instanceId?: string;
+  /** True when a non-repeatable campaign's existing stack was swapped for this one. */
+  replaced?: boolean;
+  message?: string;
+}
 
 export interface CartItem extends Product {
   quantity: number;
@@ -63,6 +93,17 @@ interface CartContextType {
   ) => CartItem | undefined;
   appliedOffers: AppliedOffer[];
   offerDiscount: number;
+  /** Completed Build Your Stack instances — grouped units, never flattened into `items`. */
+  bundles: CartBundleInstance[];
+  addBundle: (bundle: NewCartBundle) => AddBundleResult;
+  removeBundle: (instanceId: string) => void;
+  /** Σ ordinary line prices (excludes bundles). */
+  merchandiseSubtotal: number;
+  /** What the bundle children would cost bought separately. */
+  bundleRegularValue: number;
+  /** What the bundles actually cost (fixed campaign prices). */
+  bundleChargedValue: number;
+  bundleSavings: number;
   /** How many units of each cart item (by index, same order as `items`) an
    * offer made free — e.g. [0, 1, 0] means the second item has 1 free unit. */
   freeQuantities: number[];
@@ -89,6 +130,10 @@ function promoErrorMessage(result: unknown): string | null {
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [bundles, setBundles] = useState<CartBundleInstance[]>([]);
+  // localStorage is read in an effect (SSR-safe); until then `bundles` is
+  // empty and must not be written back, or a refresh would wipe the stacks.
+  const [bundlesHydrated, setBundlesHydrated] = useState(false);
   const [promoCode, setPromoCode] = useState<PromoCodeInfo | null>(null);
   const [promoCodeNotice, setPromoCodeNotice] = useState<string | null>(null);
   // The store's configured shipping fee, fetched once. Never mutate this
@@ -100,16 +145,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [offerDiscount, setOfferDiscount] = useState<number>(0);
 
   useEffect(() => {
-    const savedCart = localStorage.getItem("cart");
+    const savedCart = localStorage.getItem(CART_STORAGE_KEY);
     if (savedCart) {
       try {
         const parsedCart = JSON.parse(savedCart);
         setItems(parsedCart);
       } catch (error) {
         console.error("Failed to parse cart from localStorage");
-        localStorage.removeItem("cart");
+        localStorage.removeItem(CART_STORAGE_KEY);
       }
     }
+
+    // Tolerant parse: a legacy browser has no key at all, a malformed value
+    // yields [] — never a crash.
+    try {
+      setBundles(parseStoredBundleInstances(localStorage.getItem(BUNDLES_STORAGE_KEY)));
+    } catch {
+      setBundles([]);
+    }
+    setBundlesHydrated(true);
 
     const savedPromoCode = localStorage.getItem("promoCode");
     if (savedPromoCode) {
@@ -174,45 +228,85 @@ export function CartProvider({ children }: { children: ReactNode }) {
       });
   }, []);
 
-  // Calculate subtotal
-  const subtotal = items.reduce(
-    (total, item) => total + item.price * item.quantity,
-    0,
+  // ─── Pricing inputs (shared with the server: shared/bundles/cart-pricing.ts) ──
+  const regularLines = useMemo<PricingRegularLine[]>(
+    () => items.map((item) => ({ id: item.id, name: item.name, quantity: item.quantity, price: item.price })),
+    [items],
   );
+  const pricingBundles = useMemo<PricingBundle[]>(
+    () =>
+      bundles.map((b) => ({
+        instanceId: b.instanceId,
+        offerStacking: b.offerStacking,
+        regularTotal: b.regularTotal,
+        bundleTotal: b.bundlePrice,
+        items: b.items.map((i) => ({ productId: i.productId, name: i.name, quantity: i.quantity, unitPrice: i.unitPrice })),
+      })),
+    [bundles],
+  );
+  // What the offers engine / promo validation may see: ordinary lines plus
+  // stackable bundle children at bundle-share prices. Exclusive bundles are
+  // invisible here by design.
+  const offerInputs = useMemo(() => buildOfferInputs(regularLines, pricingBundles), [regularLines, pricingBundles]);
 
   // Derived, not state: recomputes from current offers every render, so it
   // can never get stuck at 0 after a free-shipping offer stops applying.
   const shipping = deriveEffectiveShipping(baseShippingFee, appliedOffers);
 
-  // Derived, not state — see shared/pricing/cart-math.ts for why.
-  const discount = promoCode
-    ? computePromoDiscount(promoCode.discountType, promoCode.discountValue, subtotal, offerDiscount)
-    : 0;
+  // Derived, not state — see shared/bundles/cart-pricing.ts for the order of operations.
+  const totals = useMemo(
+    () =>
+      computeCartTotals({
+        regularLines,
+        bundles: pricingBundles,
+        offerDiscount,
+        promo: promoCode ? { discountType: promoCode.discountType, discountValue: promoCode.discountValue } : null,
+        baseShippingFee,
+        freeShipping: appliedOffers.some((o) => o.freeShipping),
+      }),
+    [regularLines, pricingBundles, offerDiscount, promoCode, baseShippingFee, appliedOffers],
+  );
+  const subtotal = totals.subtotal;
+  const discount = totals.promoDiscount;
 
   // Which specific cart line(s) an offer made free, so the UI can show a
   // "FREE" badge on the exact item instead of only an aggregate savings line.
+  // Offer inputs list ordinary lines first, so the first `items.length`
+  // entries line up with `items`; a free unit that lands on a stackable
+  // bundle child is still counted in the discount, just not badged.
   const freeQuantities = useMemo(
-    () => computeFreeItemQuantities(items, appliedOffers),
-    [items, appliedOffers],
+    () => computeFreeItemQuantities(offerInputs.cartItems, appliedOffers).slice(0, items.length),
+    [offerInputs, appliedOffers, items.length],
   );
 
   useEffect(() => {
-    localStorage.setItem("cart", JSON.stringify(items));
+    if (bundlesHydrated) localStorage.setItem(BUNDLES_STORAGE_KEY, JSON.stringify(bundles));
+  }, [bundles, bundlesHydrated]);
+
+  useEffect(() => {
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
 
     // Re-check the applied promo code against the new cart. Editing the cart
     // can invalidate a code (dropping below its minimum, or removing the only
     // eligible product), and it's far better to surface that here than to let
     // checkout fail. Only failures act, so this can't loop.
-    if (promoCode && items.length > 0) {
-      const promoCartItems = items.map((item) => ({
+    const offerVisible = buildOfferInputs(
+      items.map((item) => ({ id: item.id, name: item.name, quantity: item.quantity, price: item.price })),
+      bundles.map((b) => ({
+        instanceId: b.instanceId,
+        offerStacking: b.offerStacking,
+        regularTotal: b.regularTotal,
+        bundleTotal: b.bundlePrice,
+        items: b.items.map((i) => ({ productId: i.productId, name: i.name, quantity: i.quantity, unitPrice: i.unitPrice })),
+      })),
+    );
+    if (promoCode && offerVisible.cartItems.length > 0) {
+      const promoCartItems = offerVisible.cartItems.map((item) => ({
         id: item.id,
         quantity: item.quantity,
         price: item.price,
       }));
-      const promoSubtotal = items.reduce(
-        (t, i) => t + i.price * i.quantity,
-        0,
-      );
+      const promoSubtotal = offerVisible.subtotal;
       trpc.promoCode.validate
         .query({
           code: promoCode.code,
@@ -236,13 +330,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
 
     // Re-evaluate automatic offers when cart changes
-    const cartItems = items.map((item) => ({
-      id: item.id,
-      name: item.name,
-      quantity: item.quantity,
-      price: item.price,
-    }));
-    const currentSubtotal = items.reduce((t, i) => t + i.price * i.quantity, 0);
+    const cartItems = offerVisible.cartItems;
+    const currentSubtotal = offerVisible.subtotal;
     if (cartItems.length > 0) {
       trpc.offer.evaluate
         .query({ cartItems, subtotal: currentSubtotal })
@@ -266,7 +355,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       setAppliedOffers([]);
       setOfferDiscount(0);
     }
-  }, [items, promoCode]);
+  }, [items, bundles, promoCode]);
 
   // Server-side cart capture — debounced, purely additive, mirrors the
   // localStorage cart into captured_cart so abandoned-cart emails have
@@ -274,18 +363,31 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // failure here is swallowed server-side (syncCart never throws) and
   // simply means this snapshot is missed, not a broken cart.
   useEffect(() => {
-    if (items.length === 0) return; // nothing to abandon yet
+    if (items.length === 0 && bundles.length === 0) return; // nothing to abandon yet
     const timeoutId = window.setTimeout(() => {
       trpc.cartCapture.sync
         .mutate({
           sessionToken: getCartSessionToken(),
-          items: items.map((item) => ({
-            id: item.id,
-            name: item.name,
-            quantity: item.quantity,
-            price: item.price,
-            imageUrl: item.imageUrl,
-          })),
+          items: [
+            ...items.map((item) => ({
+              id: item.id,
+              name: item.name,
+              quantity: item.quantity,
+              price: item.price,
+              imageUrl: item.imageUrl,
+            })),
+            // Bundle children flattened — the abandoned-cart email only needs
+            // real products to show; grouping is irrelevant there.
+            ...bundles.flatMap((b) =>
+              b.items.map((item) => ({
+                id: item.productId,
+                name: item.name,
+                quantity: item.quantity,
+                price: item.unitPrice,
+                imageUrl: item.imageUrl ?? undefined,
+              })),
+            ),
+          ],
           subtotal,
         })
         .catch(() => {
@@ -293,7 +395,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         });
     }, 3000);
     return () => window.clearTimeout(timeoutId);
-  }, [items, subtotal]);
+  }, [items, bundles, subtotal]);
 
   useEffect(() => {
     if (promoCode) {
@@ -420,7 +522,32 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clearCart = () => {
     setItems([]);
+    setBundles([]);
     removePromoCode();
+  };
+
+  /**
+   * Adds a completed stack as ONE grouped unit. A non-repeatable campaign can
+   * hold a single instance per cart: adding again replaces the earlier stack
+   * (the shopper rebuilt it) rather than silently merging or duplicating.
+   */
+  const addBundle = (bundle: NewCartBundle): AddBundleResult => {
+    if (bundle.items.length === 0) {
+      return { success: false, message: "Your stack is empty." };
+    }
+    const instance: CartBundleInstance = {
+      ...bundle,
+      instanceId: newBundleInstanceId(),
+      regularTotal: bundleRegularTotal(bundle.items),
+      addedAt: new Date().toISOString(),
+    };
+    const { next, replaced } = addBundleInstance(bundles, instance);
+    setBundles(next);
+    return { success: true, instanceId: instance.instanceId, replaced };
+  };
+
+  const removeBundle = (instanceId: string) => {
+    setBundles((prev) => removeBundleInstance(prev, instanceId));
   };
 
   const applyPromoCode = async (
@@ -445,7 +572,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           "Promo codes only contain letters, numbers, hyphens and underscores.",
       };
     }
-    if (items.length === 0) {
+    if (items.length === 0 && bundles.length === 0) {
       return {
         success: false,
         message: "Add something to your cart before applying a promo code.",
@@ -459,8 +586,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      // Convert cart items to the format expected by the validatePromoCode endpoint
-      const cartItems = items.map((item) => ({
+      // The code is validated against what it may discount: ordinary lines
+      // plus stackable bundle children (exclusive bundles are excluded).
+      const cartItems = offerInputs.cartItems.map((item) => ({
         id: item.id,
         quantity: item.quantity,
         price: item.price,
@@ -470,7 +598,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const result = await trpc.promoCode.validate.query({
         code,
         cartItems,
-        subtotal,
+        subtotal: offerInputs.subtotal,
       });
 
       if (result.success && result.result) {
@@ -510,10 +638,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clearPromoCodeNotice = () => setPromoCodeNotice(null);
 
-  const totalItems = items.reduce((total, item) => total + item.quantity, 0);
+  const totalItems =
+    items.reduce((total, item) => total + item.quantity, 0) +
+    bundles.reduce((total, b) => total + bundleUnitCount(b), 0);
 
-  // Total: subtotal minus promo discount, minus offer discount, plus shipping
-  const total = Math.max(0, subtotal - discount - offerDiscount + shipping);
+  const total = totals.total;
 
   return (
     <CartContext.Provider
@@ -537,6 +666,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
         appliedOffers,
         offerDiscount,
         freeQuantities,
+        bundles,
+        addBundle,
+        removeBundle,
+        merchandiseSubtotal: totals.merchandiseSubtotal,
+        bundleRegularValue: totals.bundleRegularValue,
+        bundleChargedValue: totals.bundleChargedValue,
+        bundleSavings: totals.bundleSavings,
       }}>
       {children}
     </CartContext.Provider>

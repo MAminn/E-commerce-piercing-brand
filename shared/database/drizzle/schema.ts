@@ -11,6 +11,7 @@ import {
   uuid,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { v7 } from "uuid";
 
 export const userRole = pgEnum("user_role", ["admin", "vendor", "user", "superadmin"]);
@@ -362,6 +363,8 @@ export const product = pgTable("product", {
     .$type<string[]>(),
 }, (table) => ({
   slugUnique: uniqueIndex("product_slug_idx").on(table.slug),
+  /** Backs category browsing and the Phase 4 dynamic bundle-eligibility scan. */
+  categoryIdx: index("product_category_idx").on(table.categoryId),
 }));
 
 export const productVariant = pgTable("product_variant", {
@@ -507,6 +510,16 @@ export const order = pgTable("order", {
   }),
   /** True once the reserved stock for this order's items has been restored (on cancel/delete), so it's never restored twice */
   stockRestored: boolean("stock_restored").notNull().default(false),
+}, (table) => {
+  return {
+    /**
+     * Every dated report — store revenue and, since Phase 6, all bundle
+     * analytics — drives off a `created_at` range on this table and then joins
+     * outwards. `status`/`archived_at` are low-selectivity (nearly every row
+     * passes), so the date alone is the useful key.
+     */
+    createdAtIdx: index("order_created_at_idx").on(table.createdAt),
+  };
 });
 
 export const orderItem = pgTable("order_item", {
@@ -548,7 +561,40 @@ export const orderItem = pgTable("order_item", {
   })
     .defaultNow()
     .notNull(),
+  /**
+   * Set when this line was bought as part of a Build Your Stack bundle —
+   * points at the order's bundle snapshot (see `orderBundle`). `price` /
+   * `discountPrice` still hold the product's REGULAR prices; the bundle's
+   * fixed charge lives on the snapshot and the difference is in
+   * `order.discount`, so inventory/fulfilment/edit-order keep treating the
+   * row like any other item.
+   */
+  orderBundleId: uuid("order_bundle_id").references(() => orderBundle.id, {
+    onDelete: "set null",
+    onUpdate: "cascade",
+  }),
+  /**
+   * Phase 7: the option configuration bought, as the server resolved it
+   * (`{ "Color": "Gold" }`), so the line is readable long after the product's
+   * options are renamed or removed. `price` / `discount_price` already
+   * include the chosen values' modifiers. Null for simple products and for
+   * lines placed before Phase 7 (their `name` still carries the label).
+   */
+  selectedOptions: jsonb("selected_options").$type<Record<string, string>>(),
+}, (table) => {
+  return {
+    /**
+     * Phase 6 product-selection analytics walks order → order_bundle →
+     * order_item by this column; without it that last hop is a sequential
+     * scan of every line the shop ever sold. Partial (bundle children are a
+     * minority of order lines) so it stays small.
+     */
+    orderBundleIdx: index("order_item_order_bundle_idx")
+      .on(table.orderBundleId)
+      .where(sql`${table.orderBundleId} is not null`),
+  };
 });
+
 
 export const productReview = pgTable("product_review", {
   id: uuid("id")
@@ -1588,6 +1634,378 @@ export type OfferReward =
   | { type: "fixed_off"; amountOff: number }
   | { type: "free_shipping" }
   | { type: "free_items"; quantity: number; which: "cheapest" | "most_expensive" };
+
+// ─── Bundles & Stacks ───────────────────────────────────────────────────────
+// A bundle campaign is a merchandised, customer-facing promotion the shopper
+// deliberately enters ("Build Your Stack: choose any 6 for 480"). It is NOT a
+// generic cart rule — those stay in `cart_offer` above. Campaigns have their
+// own identity (slug, title, image), an explicit eligible-product pool, and a
+// pricing model that prices N qualifying units as a whole rather than
+// subtracting a fixed amount. See shared/bundles/evaluate.ts for the
+// qualification/pricing rules and docs/BUNDLES_AND_STACKS.md for the design.
+
+export const bundleCampaignType = pgEnum("bundle_campaign_type", [
+  /** Shopper picks `requiredQuantity` units from the eligible pool. */
+  "build_your_stack",
+  /**
+   * Merchant-fixed composition: the pool rows ARE the stack (each with a
+   * `quantity`), the shopper buys exactly that set. `requiredQuantity` is
+   * kept equal to the composition's unit count by the service.
+   */
+  "curated_stack",
+]);
+
+export const bundleCampaignPricingType = pgEnum("bundle_campaign_pricing_type", [
+  /** Exactly `requiredQuantity` qualifying units cost `fixedBundlePrice` in total. */
+  "fixed_total",
+]);
+
+/**
+ * How a completed bundle interacts with the generic promotions engine
+ * (`cart_offer` rows and promo codes) once bundles reach the cart.
+ *   exclusive  — the bundle's units are priced by the bundle only; no cart
+ *                offer or promo code discount applies on top of them.
+ *   stackable  — cart offers / promo codes may still apply to the bundle total.
+ * An enum (not a boolean) so finer policies (e.g. promo codes only) can be
+ * added later without a destructive migration.
+ */
+export const bundleCampaignOfferStacking = pgEnum("bundle_campaign_offer_stacking", [
+  "exclusive",
+  "stackable",
+]);
+
+/**
+ * Phase 4: how a Build Your Stack campaign decides which products a shopper
+ * may pick. `curated_stack` ignores it (its composition is exact).
+ *   manual  — only `bundle_campaign_product` rows (every pre-Phase-4 campaign).
+ *   dynamic — only products matching `bundle_campaign_eligibility_*` rules.
+ *   hybrid  — the union of both, deduplicated.
+ * See shared/bundles/eligibility.ts for the semantics.
+ */
+export const bundleCampaignEligibilityMode = pgEnum("bundle_campaign_eligibility_mode", [
+  "manual",
+  "dynamic",
+  "hybrid",
+]);
+
+export const bundleCampaign = pgTable(
+  "bundle_campaign",
+  {
+    id: uuid("id")
+      .$defaultFn(() => v7())
+      .primaryKey(),
+    /** Admin-only label shown in the dashboard list. */
+    internalName: text("internal_name").notNull(),
+    /** Customer-facing title used by the bundle builder / merchandising. */
+    title: text("title").notNull(),
+    /** URL slug for the campaign's public page, e.g. /bundles/build-your-stack. */
+    slug: text("slug").notNull(),
+    /** One-line merchandising hook shown on cards/hero under the title, e.g. "Mix it your way". */
+    subtitle: text("subtitle"),
+    description: text("description"),
+    /** Optional merchandising badge, e.g. "Save 20%". Free text, admin-authored. */
+    badgeText: text("badge_text"),
+    imageId: uuid("image_id").references(() => file.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+    type: bundleCampaignType("type").notNull().default("build_your_stack"),
+    /**
+     * Master switch. Campaigns start inactive (draft) so a half-configured
+     * campaign is never public by accident. Effective visibility also depends
+     * on startsAt/endsAt — see getBundleCampaignState().
+     */
+    isActive: boolean("is_active").notNull().default(false),
+    /** Number of qualifying UNITS (not distinct products) that form one bundle. */
+    requiredQuantity: integer("required_quantity").notNull(),
+    pricingType: bundleCampaignPricingType("pricing_type").notNull().default("fixed_total"),
+    /** Total price of one complete bundle. Required when pricingType = fixed_total. */
+    fixedBundlePrice: decimal("fixed_bundle_price", { precision: 10, scale: 2 }),
+    /** When false, each eligible product can fill at most one slot in a bundle. */
+    allowDuplicates: boolean("allow_duplicates").notNull().default(false),
+    /** Upper bound of units per product in one bundle when duplicates are allowed. Null = no cap. */
+    maxPerProduct: integer("max_per_product"),
+    /** When true, a cart may contain several complete bundles from this campaign. */
+    isRepeatable: boolean("is_repeatable").notNull().default(false),
+    offerStacking: bundleCampaignOfferStacking("offer_stacking").notNull().default("exclusive"),
+    /**
+     * Build Your Stack only. Existing campaigns default to `manual`, which is
+     * exactly their Phase 1-3 behaviour.
+     */
+    eligibilityMode: bundleCampaignEligibilityMode("eligibility_mode").notNull().default("manual"),
+    /**
+     * Dynamic price filter, inclusive, compared against the product's EFFECTIVE
+     * price (discountPrice ?? price). Null = unbounded on that side. Single
+     * valued, so plain columns rather than a rule table.
+     */
+    eligibilityMinPrice: decimal("eligibility_min_price", { precision: 10, scale: 2 }),
+    eligibilityMaxPrice: decimal("eligibility_max_price", { precision: 10, scale: 2 }),
+    /** Merchandising display order (lower = shown first). */
+    sortOrder: integer("sort_order").notNull().default(0),
+    startsAt: timestamp("starts_at", { withTimezone: true, mode: "date" }),
+    endsAt: timestamp("ends_at", { withTimezone: true, mode: "date" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => {
+    return {
+      slugIdx: uniqueIndex("bundle_campaign_slug_idx").on(table.slug),
+      activeScheduleIdx: index("bundle_campaign_active_schedule_idx").on(
+        table.isActive,
+        table.startsAt,
+        table.endsAt,
+      ),
+    };
+  },
+);
+
+/**
+ * Manually curated eligible-product pool of a campaign. Normalized (one row
+ * per product) rather than a JSON array on the campaign so it can be joined,
+ * indexed and cleaned up by FK. Dynamic eligibility (by category/tag) would
+ * be an additional rule table beside this one, not a replacement.
+ *
+ * For `curated_stack` campaigns the same rows are the fixed composition and
+ * `quantity` says how many units of each product the stack contains. For
+ * `build_your_stack` it is always 1 (a pool membership, not a quantity).
+ */
+export const bundleCampaignProduct = pgTable(
+  "bundle_campaign_product",
+  {
+    id: uuid("id")
+      .$defaultFn(() => v7())
+      .primaryKey(),
+    bundleCampaignId: uuid("bundle_campaign_id")
+      .notNull()
+      .references(() => bundleCampaign.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => product.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
+    /** Display order inside the bundle builder (lower = shown first). */
+    sortOrder: integer("sort_order").notNull().default(0),
+    /** Units of this product in a curated stack; 1 for build-your-stack pool rows. */
+    quantity: integer("quantity").notNull().default(1),
+    /**
+     * Phase 7, CURATED composition lines only: the exact option configuration
+     * the merchant fixed for this line, e.g. `{ "Color": "Gold" }`, validated
+     * against the product's option groups on save. Null for a product without
+     * options and for every Build Your Stack pool row — BYS eligibility stays
+     * product-level and the shopper picks the options in the builder.
+     */
+    selectedOptions: jsonb("selected_options").$type<Record<string, string>>(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => {
+    return {
+      campaignProductUnique: uniqueIndex("bundle_campaign_product_unique_idx").on(
+        table.bundleCampaignId,
+        table.productId,
+      ),
+      productIdx: index("bundle_campaign_product_product_idx").on(table.productId),
+    };
+  },
+);
+
+/**
+ * Merchandising placement only: which category pages may surface this
+ * campaign. Never consulted for eligibility or pricing — the merchant decides
+ * where a stack is promoted independently of which products it contains.
+ */
+export const bundleCampaignCategory = pgTable(
+  "bundle_campaign_category",
+  {
+    id: uuid("id")
+      .$defaultFn(() => v7())
+      .primaryKey(),
+    bundleCampaignId: uuid("bundle_campaign_id")
+      .notNull()
+      .references(() => bundleCampaign.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => category.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => {
+    return {
+      campaignCategoryUnique: uniqueIndex("bundle_campaign_category_unique_idx").on(
+        table.bundleCampaignId,
+        table.categoryId,
+      ),
+      categoryIdx: index("bundle_campaign_category_category_idx").on(table.categoryId),
+    };
+  },
+);
+
+export type BundleCampaignCategoryRow = typeof bundleCampaignCategory.$inferSelect;
+
+/**
+ * Phase 5 pricing tiers: quantity -> price steps of a Build Your Stack
+ * campaign ("3 for 270, 4 for 340, 6 for 480"). One campaign, several price
+ * points — never one campaign per tier.
+ *
+ * Canonical pricing for `build_your_stack`. The legacy
+ * `bundle_campaign.required_quantity` / `fixed_bundle_price` columns are kept
+ * (migration 0055 backfills one tier row per existing campaign from them) but
+ * are no longer independently editable: the service rewrites them from the
+ * LOWEST tier on every save, so the two can never disagree. See
+ * docs/BUNDLES_AND_STACKS.md.
+ *
+ * `curated_stack` campaigns store NO rows here — their composition is one
+ * quantity at one price, which stays on `fixed_bundle_price`. The domain
+ * evaluates them through a synthesised single tier so both types share one
+ * pricing path (see curatedEvaluationConfig).
+ */
+export const bundleCampaignTier = pgTable(
+  "bundle_campaign_tier",
+  {
+    id: uuid("id")
+      .$defaultFn(() => v7())
+      .primaryKey(),
+    bundleCampaignId: uuid("bundle_campaign_id")
+      .notNull()
+      .references(() => bundleCampaign.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    /** Qualifying UNITS this tier prices. A selection must match it exactly. */
+    quantity: integer("quantity").notNull(),
+    /** Total charged for those units. */
+    price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+    /** Display position. Tiers are authored and shown ascending by quantity; this keeps that order explicit and stable. */
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => {
+    return {
+      /** Two tiers of one campaign can never claim the same quantity — that would make tier resolution ambiguous. */
+      campaignQuantityUnique: uniqueIndex("bundle_campaign_tier_quantity_idx").on(
+        table.bundleCampaignId,
+        table.quantity,
+      ),
+      campaignIdx: index("bundle_campaign_tier_campaign_idx").on(table.bundleCampaignId),
+    };
+  },
+);
+
+export type BundleCampaignTierRow = typeof bundleCampaignTier.$inferSelect;
+
+/**
+ * Phase 4 dynamic eligibility: the categories a Build Your Stack campaign
+ * accepts products from. DISTINCT from `bundle_campaign_category`, which is
+ * merchandising placement ("show this campaign on the Ear page") and never
+ * decides what is buyable. Kept as its own table for the same reasons the
+ * manual pool is normalized: joinable, indexable, FK-cleaned.
+ *
+ * Multiple rows are OR'd; the price bounds on `bundle_campaign` are AND'd on
+ * top. Categories in this repository are flat (no parent column), so a rule
+ * matches products assigned directly to the category — the same thing a
+ * category page lists.
+ */
+export const bundleCampaignEligibilityCategory = pgTable(
+  "bundle_campaign_eligibility_category",
+  {
+    id: uuid("id")
+      .$defaultFn(() => v7())
+      .primaryKey(),
+    bundleCampaignId: uuid("bundle_campaign_id")
+      .notNull()
+      .references(() => bundleCampaign.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => category.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => {
+    return {
+      campaignCategoryUnique: uniqueIndex("bundle_campaign_eligibility_category_unique_idx").on(
+        table.bundleCampaignId,
+        table.categoryId,
+      ),
+      categoryIdx: index("bundle_campaign_eligibility_category_category_idx").on(table.categoryId),
+    };
+  },
+);
+
+export type BundleCampaignEligibilityCategoryRow =
+  typeof bundleCampaignEligibilityCategory.$inferSelect;
+
+
+/**
+ * Snapshot of one bundle instance as it was purchased. Independent of the
+ * live campaign (FK is SET NULL) so history survives campaign edits/deletes.
+ */
+export const orderBundle = pgTable(
+  "order_bundle",
+  {
+    id: uuid("id")
+      .$defaultFn(() => v7())
+      .primaryKey(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => order.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    /** Client-generated instance id from the cart — lets support match a receipt to what the shopper built. */
+    instanceId: text("instance_id").notNull(),
+    campaignId: uuid("campaign_id").references(() => bundleCampaign.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+    campaignSlug: text("campaign_slug").notNull(),
+    campaignTitle: text("campaign_title").notNull(),
+    /**
+     * Snapshotted campaign type, so the admin can label a historical group
+     * "Curated Stack" / "Build Your Stack" without reading the live campaign
+     * (which may since have been edited or deleted). Pre-Phase-4 rows default
+     * to build_your_stack, which is what Phase 2 could produce.
+     */
+    campaignType: bundleCampaignType("campaign_type").notNull().default("build_your_stack"),
+    /**
+     * Which pricing tier was bought, as a PLAIN id with no foreign key: a
+     * merchant may delete a tier tomorrow and this order must still render
+     * exactly as it was sold. Purely a reference for support; nothing in the
+     * admin display depends on the row still existing. Null for orders placed
+     * before Phase 5 and for curated stacks.
+     */
+    tierId: uuid("tier_id"),
+    /** Units in one bundle — i.e. the purchased tier's quantity. Snapshotted, never re-read from the campaign. */
+    requiredQuantity: integer("required_quantity").notNull(),
+    /** Σ regular prices of the children at purchase. */
+    regularTotal: decimal("regular_total", { precision: 10, scale: 2 }).notNull(),
+    /** What the shopper was charged for the bundle. */
+    bundleTotal: decimal("bundle_total", { precision: 10, scale: 2 }).notNull(),
+    offerStacking: bundleCampaignOfferStacking("offer_stacking").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => {
+    return {
+      orderIdx: index("order_bundle_order_idx").on(table.orderId),
+    };
+  },
+);
+
+export type OrderBundleRow = typeof orderBundle.$inferSelect;
+
+export type BundleCampaignRow = typeof bundleCampaign.$inferSelect;
+export type BundleCampaignProductRow = typeof bundleCampaignProduct.$inferSelect;
 
 // ─── Email Automation Queue ─────────────────────────────────────────────────
 // Backs the marketing-automation suite (welcome, abandoned cart, win-back,

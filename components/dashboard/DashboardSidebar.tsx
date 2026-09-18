@@ -18,6 +18,7 @@ import {
   Mail,
   Gift,
   Type,
+  Layers,
 } from "lucide-react";
 
 import {
@@ -60,6 +61,7 @@ export function DashboardSidebar() {
     { label: "Orders", href: "/dashboard/orders", icon: ShoppingCart },
     { label: "Promo Codes", href: "/dashboard/promo-codes", icon: TicketPercent },
     { label: "Offers", href: "/dashboard/offers", icon: Tag },
+    { label: "Bundles & Stacks", href: "/dashboard/bundles", icon: Layers },
     { label: "Reviews", href: "/dashboard/reviews", icon: Star },
   ];
 

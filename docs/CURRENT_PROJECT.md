@@ -126,6 +126,74 @@ if an admin switches the shell away from minimal.
 Launch prerequisites that are configuration rather than code are tracked in
 [`docs/ZELI_LAUNCH_CONFIGURATION.md`](ZELI_LAUNCH_CONFIGURATION.md).
 
+## Bundles & Stacks
+
+Merchant-managed bundle campaigns sold for one price, in two models:
+**Build Your Stack** (the shopper picks N units from an eligible pool) and
+**Curated Stack** (the merchant fixes the exact products and quantities).
+
+They live in their own domain beside the Offers engine — `bundle_campaign`,
+`bundle_campaign_product`, `bundle_campaign_category` and
+`bundle_campaign_eligibility_category` tables, `shared/bundles/` for the pure
+qualification, pricing, eligibility and cart rules, `backend/bundles/` for the
+tRPC API and the authoritative eligibility resolver, and `/dashboard/bundles`
+for the CMS. Customers reach them at `/bundles` and `/bundles/[slug]`, plus the
+homepage rail, any category the merchant places them on, and the navbar.
+
+A Build Your Stack campaign prices through **quantity tiers** (3 for 270, 4 for
+340, 6 for 480). A selection buys the tier it matches exactly — a count between
+rungs is not a bundle and is never rounded down. Campaign availability means
+"at least one tier can currently be completed", so a campaign stays sellable at
+its smaller sizes when the largest is out of stock. Pre-Phase-5 campaigns were
+backfilled with a single equivalent tier and behave exactly as before.
+
+A Build Your Stack pool can be **manual**, **dynamic** (rules over product
+category and price, re-evaluated on every request so new matching products join
+the campaign with no CMS edit) or **hybrid**. One server-side resolver answers
+eligibility for every surface — storefront, builder, cart, checkout and the CMS
+preview — and checkout always re-resolves rather than trusting what the cart
+captured. Curated stacks ignore eligibility rules entirely.
+
+Stacks travel through the cart as grouped **bundle instances**
+(`localStorage["cartBundles"]`), are re-validated and re-priced by the server
+at add-to-cart and again at order creation, and are snapshotted onto orders in
+`order_bundle`. The admin order detail groups each purchased instance from that
+snapshot alone, so editing or deleting a campaign never rewrites history.
+
+Two category relations exist and are deliberately independent: placement
+(merchandising — where a campaign is shown) never affects eligibility or
+pricing; eligibility categories decide which products a shopper may pick.
+
+**Bundle sales analytics** live at `/dashboard/bundles/analytics` and are
+derived entirely from placed orders and their `order_bundle` snapshots — never
+from tracking events, and never from current campaign pricing. An order counts
+unless it was cancelled or archived, the same rule the store-wide revenue
+figures use. Revenue is the sum of charged bundle totals, so a bundle's
+children (which carry regular prices the shopper did not pay) are never
+counted a second time. The same figures drive the storefront **Best Selling
+Bundles** source for the homepage rail, which ranks live campaigns by bundle
+instances sold over a trailing 30-day window; the merchant's manual campaign
+picks are preserved when switching between Manual and Best Selling.
+
+Bundles are **variant-aware**. This store's variants are option groups on a
+product (`product_variant` = `{ name, values[{ value, priceModifier }] }`),
+so a variant's identity is the canonical `{ Color: "Gold" }` map, its price is
+the effective product price plus modifiers, and its stock is the product's.
+Build Your Stack shoppers pick the configuration in the builder; curated lines
+fix it in the CMS (`bundle_campaign_product.selected_options`); the server
+re-resolves every line against the live option groups at add-to-cart and at
+checkout (a removed or struck-through value is refused, never substituted);
+order lines snapshot the canonical options and modifier-inclusive prices
+(`order_item.selected_options`, migration `0057`). Eligibility, duplicate and
+max-per-product rules stay product-level, and product analytics still
+aggregate by product. The same resolver now prices ordinary cart lines, fixing
+the pre-existing gap where the product page showed a modifier-inclusive price
+that checkout did not charge. `shared/products/options.ts` is the one place
+these rules live.
+
+Design, semantics, metric definitions and the Offers/promo coexistence rule are
+in [`docs/BUNDLES_AND_STACKS.md`](BUNDLES_AND_STACKS.md).
+
 ## Known internal legacy identifiers (deliberately retained)
 
 | Identifier | Where | Why it stays |

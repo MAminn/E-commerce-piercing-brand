@@ -1,3 +1,4 @@
+import type { BundleCardCampaign } from "#root/components/bundles/BundleCampaignCard";
 import React, { useState, useEffect, useRef } from "react";
 import { trpc } from "#root/shared/trpc/client";
 import { getStoreOwnerId } from "#root/shared/config/store";
@@ -42,6 +43,7 @@ function Page() {
   );
   const [categories, setCategories] = useState<CategoryStripItem[]>([]);
   const [newArrivals, setNewArrivals] = useState<NewArrivalProduct[]>([]);
+  const [bundleCampaigns, setBundleCampaigns] = useState<BundleCardCampaign[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [newArrivalsLoading, setNewArrivalsLoading] = useState(true);
@@ -219,6 +221,53 @@ function Page() {
     fetchNewArrivals();
   }, [homepageContent.newArrivals?.productIds]);
 
+  // Fetch live bundle campaigns for the Bundles & Stacks rail. Summary data
+  // only (no compositions) — cards never need the products.
+  useEffect(() => {
+    const config = homepageContent.bundles;
+    if (config?.enabled === false) {
+      setBundleCampaigns([]);
+      return;
+    }
+    let cancelled = false;
+    const limit = config?.limit ?? 6;
+    // Best Selling mode asks the server to rank the live campaigns by real
+    // bundle sales. The merchant's manual `campaignIds` are deliberately NOT
+    // sent — they stay saved, untouched, ready for a switch back to Manual.
+    const bestSelling = config?.source === "best_selling";
+    const ids = bestSelling ? [] : (config?.campaignIds?.filter(Boolean) ?? []);
+    trpc.bundle.listLive
+      .query(
+        bestSelling
+          ? {
+              sort: "best_selling" as const,
+              periodDays: config?.bestSellingPeriodDays ?? 30,
+              limit,
+            }
+          : {
+              ids: ids.length > 0 ? ids : undefined,
+              limit: ids.length > 0 ? undefined : limit,
+            },
+      )
+      .then((result) => {
+        if (cancelled) return;
+        setBundleCampaigns(result.success && result.result ? result.result : []);
+      })
+      .catch((err) => {
+        console.error("Error loading bundle campaigns:", err);
+        if (!cancelled) setBundleCampaigns([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    homepageContent.bundles?.enabled,
+    homepageContent.bundles?.campaignIds,
+    homepageContent.bundles?.limit,
+    homepageContent.bundles?.source,
+    homepageContent.bundles?.bestSellingPeriodDays,
+  ]);
+
   // Fetch discounted products (products with discountPrice < price)
   useEffect(() => {
     const fetchDiscounted = async () => {
@@ -290,6 +339,7 @@ function Page() {
     categoriesLoading,
     newArrivals,
     newArrivalsLoading,
+    bundleCampaigns,
     onCtaClick: (link: string) => {
       window.location.href = link;
     },

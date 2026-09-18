@@ -5,6 +5,8 @@ import { ZeliHero } from "#root/components/template-system/minimal/ZeliHero";
 import { ZeliEditorialBlock } from "#root/components/template-system/minimal/ZeliEditorialBlock";
 import type { HeroSlide } from "#root/components/ui/hero-carousel";
 import { MinimalProductCarousel } from "#root/components/template-system/minimal/MinimalProductCarousel";
+import { MinimalBundleSection } from "#root/components/bundles/MinimalBundleSection";
+import type { BundleCardCampaign } from "#root/components/bundles/BundleCampaignCard";
 import { QuickViewDialog } from "#root/components/template-system/minimal/QuickViewDialog";
 import { TestimonialsSection } from "#root/components/template-system/shared/TestimonialsSection";
 import type { MinimalProduct } from "#root/components/template-system/minimal/MinimalProductCard";
@@ -37,6 +39,7 @@ export interface LandingTemplateMinimalProps {
     categories?: { id: string; name: string }[];
   })[];
   newArrivalsLoading?: boolean;
+  bundleCampaigns?: BundleCardCampaign[];
   className?: string;
   onCtaClick?: (link: string) => void;
 }
@@ -183,6 +186,7 @@ export function LandingTemplateMinimal({
   categoriesLoading = false,
   newArrivals = [],
   newArrivalsLoading = false,
+  bundleCampaigns = [],
   className = "",
   onCtaClick,
 }: LandingTemplateMinimalProps) {
@@ -355,6 +359,40 @@ export function LandingTemplateMinimal({
             onQuickView={setQuickViewProduct}
           />
         )}
+
+      {/* ═══════════════════════════════════════════════
+          7b. BUNDLES & STACKS — campaign rail (CMS: content.bundles)
+          Not a product carousel: these are sets with their own purchase
+          model, so they get wider cards and no quick view.
+          ═══════════════════════════════════════════════ */}
+      {content.bundles?.enabled !== false && bundleCampaigns.length > 0 && (
+        <MinimalBundleSection
+          id='bundles'
+          campaigns={bundleCampaigns}
+          title={
+            locale === "ar" && content.bundles?.titleAr
+              ? content.bundles.titleAr
+              : content.bundles?.title ||
+                t(
+                  content.bundles?.source === "best_selling"
+                    ? "bundles.best_selling_title"
+                    : "bundles.section_default_title",
+                )
+          }
+          subtitle={
+            locale === "ar" && content.bundles?.subtitleAr
+              ? content.bundles.subtitleAr
+              : content.bundles?.subtitle
+          }
+          viewAllHref={content.bundles?.viewAllLink || "/bundles"}
+          viewAllText={
+            locale === "ar" && content.bundles?.viewAllTextAr
+              ? content.bundles.viewAllTextAr
+              : content.bundles?.viewAllText || t("bundles.view_all")
+          }
+          className='bg-zeli-bg'
+        />
+      )}
 
       {/* ═══════════════════════════════════════════════
           5. FEATURED PRODUCTS — Minimal card carousel

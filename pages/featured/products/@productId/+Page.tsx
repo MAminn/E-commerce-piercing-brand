@@ -11,6 +11,11 @@ import { useTracking } from "#root/frontend/contexts/TrackingContext";
 import { TrackingEventName } from "#root/shared/types/pixel-tracking";
 import { STORE_CURRENCY } from "#root/shared/config/branding";
 import type { ProductPageProduct } from "#root/components/template-system/productPage/ProductPageModernSplit";
+import {
+  resolvePurchasableLinePrice,
+  resolveSelectedOptions,
+  toPurchasableOptionGroups,
+} from "#root/shared/products/options";
 import type { FeaturedProduct } from "#root/components/template-system/home/HomeFeaturedProducts";
 
 /** A group of products belonging to a single category type */
@@ -268,30 +273,43 @@ export default function ProductDetailPage() {
         product: ProductPageProduct,
         selectedOptions?: Record<string, string>,
       ) => {
+        // The cart line's price is the chosen configuration's price — the
+        // effective price plus the selected option modifiers — resolved with
+        // the same helper checkout charges by (shared/products/options). The
+        // Minimal template does this itself; every other template hands its
+        // selection here. A selection that does not resolve (a template that
+        // lets a group stay unchosen) falls back to the base price and is
+        // refused at checkout with a "choose an option" message.
+        const base = Number(product.discountPrice ?? product.price);
+        const resolved = resolveSelectedOptions(
+          toPurchasableOptionGroups(product.variants ?? []),
+          selectedOptions,
+        );
+        const linePrice = resolved.ok ? resolvePurchasableLinePrice(base, resolved.priceModifier) : base;
         const success = addItem(
           {
             id: product.id,
             name: product.name,
-            price: Number(product.discountPrice ?? product.price),
+            price: linePrice,
             stock: product.stock,
             imageUrl: product.imageUrl,
             categoryName: product.categoryName ?? undefined,
             available: product.available,
           },
           1, // quantity
-          selectedOptions || {}, // selectedOptions
+          resolved.ok ? resolved.selectedOptions : selectedOptions || {},
         );
 
         if (success) {
           trackEvent(TrackingEventName.PRODUCT_ADDED_TO_CART, {
             ecommerce: {
               currency: STORE_CURRENCY,
-              value: Number(product.discountPrice ?? product.price),
+              value: linePrice,
               items: [
                 {
                   itemId: product.id,
                   itemName: product.name,
-                  price: Number(product.discountPrice ?? product.price),
+                  price: linePrice,
                   quantity: 1,
                   category: product.categoryName ?? undefined,
                 },

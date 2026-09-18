@@ -218,10 +218,10 @@ export function CheckoutPageModernTemplate({
     city: shippingAddress?.city ?? "",
     state: shippingAddress?.state ?? "",
     // Egyptian addresses are not routed by postal code and no courier
-    // integration here consumes one. `shippingPostalCode` is
-    // `.optional().nullable()` on the order schema, so this stays empty
-    // rather than writing the literal string "00000" onto every order
-    // record — a value that looks like data and is not.
+    // integration here consumes one. The order schema requires
+    // `shippingPostalCode` to be PRESENT but allows it to be empty, so this
+    // stays "" rather than writing the literal string "00000" onto every
+    // order record — a value that looks like data and is not.
     postalCode: "",
     // Egypt-only store — no country field shown, always submitted as-is.
     country: "Egypt",

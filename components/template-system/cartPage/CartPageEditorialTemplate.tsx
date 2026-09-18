@@ -16,6 +16,7 @@ import type {
   CartPageTotals,
 } from "./CartPageModernTemplate";
 import { EditorialChrome } from "../editorial/EditorialChrome";
+import { CartBundleGroup, type CartPageBundleGroup } from "./CartBundleGroup";
 import { Reveal } from "../motion/Reveal";
 import { StaggerContainer, StaggerItem } from "../motion/Stagger";
 
@@ -25,6 +26,8 @@ import { StaggerContainer, StaggerItem } from "../motion/Stagger";
 
 export interface CartPageEditorialTemplateProps {
   items: CartPageCartItem[];
+  bundles?: CartPageBundleGroup[];
+  onRemoveBundle?: (instanceId: string) => void;
   totals: CartPageTotals;
   isLoading?: boolean;
   isUpdating?: boolean;
@@ -49,6 +52,8 @@ function formatPrice(v: number, currency = "EGP"): string {
 
 export function CartPageEditorialTemplate({
   items = [],
+  bundles = [],
+  onRemoveBundle,
   totals,
   isLoading = false,
   isUpdating = false,
@@ -90,7 +95,7 @@ export function CartPageEditorialTemplate({
   }
 
   /* ---- Empty State ---- */
-  if (items.length === 0) {
+  if (items.length === 0 && bundles.length === 0) {
     return (
       <div className="min-h-screen bg-stone-50">
         <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:px-10">
@@ -143,6 +148,16 @@ export function CartPageEditorialTemplate({
           {/*  Items List                                               */}
           {/* -------------------------------------------------------- */}
           <StaggerContainer className="lg:col-span-8 space-y-0 divide-y divide-stone-200">
+            {bundles.map((bundle) => (
+              <StaggerItem key={bundle.instanceId}>
+                <CartBundleGroup
+                  bundle={bundle}
+                  currency={currency}
+                  onRemove={onRemoveBundle}
+                  disabled={isUpdating}
+                />
+              </StaggerItem>
+            ))}
             {items.map((item) => (
               <StaggerItem key={item.id}>
               <div
@@ -254,6 +269,14 @@ export function CartPageEditorialTemplate({
                   <span>Subtotal</span>
                   <span>{formatPrice(totals.subtotal, currency)}</span>
                 </div>
+                {totals.bundleSavings != null && totals.bundleSavings > 0 && (
+                  <div className="flex justify-between text-stone-600">
+                    <span>Stack savings</span>
+                    <span className="text-green-700">
+                      −{formatPrice(totals.bundleSavings, currency)}
+                    </span>
+                  </div>
+                )}
                 {totals.discount != null && totals.discount > 0 && (
                   <div className="flex justify-between text-stone-600">
                     <span>Discount</span>

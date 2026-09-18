@@ -1,5 +1,6 @@
 import React from "react";
 import { OfferProgressBanner } from "./OfferProgressBanner";
+import { CartBundleGroup, type CartPageBundleGroup } from "./CartBundleGroup";
 import {
   AppliedOffersSavings,
   computeOfferSavingsTotal,
@@ -38,10 +39,13 @@ export interface CartPageCartItem {
  * Cart totals interface
  */
 export interface CartPageTotals {
+  /** Ordinary lines + bundle children at regular prices. */
   subtotal: number;
   discount?: number;
   shipping?: number;
   grandTotal: number;
+  /** Σ (regular value − fixed price) over the bundle instances in the cart. */
+  bundleSavings?: number;
   appliedOffers?: Array<{
     name: string;
     discountAmount: number;
@@ -54,6 +58,9 @@ export interface CartPageTotals {
  */
 export interface CartPageModernTemplateProps {
   items: CartPageCartItem[];
+  /** Completed Build Your Stack instances, rendered as grouped units. */
+  bundles?: CartPageBundleGroup[];
+  onRemoveBundle?: (instanceId: string) => void;
   totals: CartPageTotals;
   isLoading?: boolean;
   isUpdating?: boolean;
@@ -84,6 +91,8 @@ export interface CartPageModernTemplateProps {
  */
 export function CartPageModernTemplate({
   items = [],
+  bundles = [],
+  onRemoveBundle,
   totals,
   isLoading = false,
   isUpdating = false,
@@ -140,7 +149,7 @@ export function CartPageModernTemplate({
     );
   }
 
-  if (items.length === 0) {
+  if (items.length === 0 && bundles.length === 0) {
     return (
       <div className='min-h-[60vh] flex flex-col items-center justify-center gap-4 px-4 text-center'>
         <ShoppingCart className='w-14 h-14 text-muted-foreground/40' />
@@ -200,6 +209,15 @@ export function CartPageModernTemplate({
 
             {/* Items */}
             <div className='divide-y'>
+              {bundles.map((bundle) => (
+                <CartBundleGroup
+                  key={bundle.instanceId}
+                  bundle={bundle}
+                  currency={currency}
+                  onRemove={onRemoveBundle}
+                  disabled={isUpdating}
+                />
+              ))}
               {items.map((item) => (
                 <div
                   key={item.id}
@@ -553,6 +571,16 @@ export function CartPageModernTemplate({
                   </span>
                 </div>
 
+                {totals.bundleSavings !== undefined && totals.bundleSavings > 0 && (
+                  <div className='flex justify-between text-red-600'>
+                    <span className='font-medium'>Stack savings</span>
+                    <span className='font-semibold'>
+                      -{currency}
+                      {totals.bundleSavings.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+
                 {/* Promo code discount */}
                 {totals.discount !== undefined && totals.discount > 0 && (
                   <div className='flex justify-between text-red-600'>
@@ -615,7 +643,7 @@ export function CartPageModernTemplate({
                 className='w-full font-bold tracking-wide uppercase hidden sm:flex'
                 size='lg'
                 onClick={onProceedToCheckout}
-                disabled={isUpdating || items.length === 0}>
+                disabled={isUpdating || (items.length === 0 && bundles.length === 0)}>
                 {t("cart.proceed_to_checkout") || "Proceed to Checkout"}
                 <ArrowRight className='w-4 h-4 ms-2' />
               </Button>
@@ -677,7 +705,7 @@ export function CartPageModernTemplate({
           className='w-full font-bold tracking-wide text-xs uppercase'
           size='lg'
           onClick={onProceedToCheckout}
-          disabled={isUpdating || items.length === 0}>
+          disabled={isUpdating || (items.length === 0 && bundles.length === 0)}>
           {t("cart.proceed_to_checkout") || "Proceed to Checkout"}
           <ArrowRight className='w-4 h-4 ms-2' />
         </Button>

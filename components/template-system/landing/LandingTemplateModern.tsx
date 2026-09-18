@@ -1,3 +1,4 @@
+import type { BundleCardCampaign } from "#root/components/bundles/BundleCampaignCard";
 import { useEffect, useState, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { HomeFeaturedProducts } from "../home/HomeFeaturedProducts";
@@ -56,6 +57,11 @@ export interface LandingTemplateModernProps {
    * Loading state for new arrivals
    */
   newArrivalsLoading?: boolean;
+
+  /**
+   * Live bundle campaigns for the Bundles & Stacks section (minimal template)
+   */
+  bundleCampaigns?: BundleCardCampaign[];
 
   /**
    * Additional CSS classes

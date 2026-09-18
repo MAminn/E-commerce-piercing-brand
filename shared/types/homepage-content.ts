@@ -173,6 +173,40 @@ export interface HomepageNewArrivalsContent {
 }
 
 /**
+ * Bundles & Stacks section content. Campaigns themselves (title, price,
+ * image, order) live in the Bundles CMS; this only decides whether and how
+ * the homepage surfaces them. `campaignIds` empty = all live campaigns in
+ * their merchandising order, capped by `limit`.
+ */
+export interface HomepageBundlesContent {
+  enabled: boolean;
+  title: string;
+  titleAr?: string;
+  subtitle?: string;
+  subtitleAr?: string;
+  viewAllText: string;
+  viewAllTextAr?: string;
+  viewAllLink: string;
+  /** Manually selected campaign IDs (when set, only these are shown, in this order) */
+  campaignIds?: string[];
+  /** Max campaigns rendered when campaignIds is empty */
+  limit?: number;
+  /**
+   * Where the rail's campaigns come from.
+   *   manual       — the merchant's `campaignIds`, in their order (or, when
+   *                  empty, every live campaign in CMS merchandising order).
+   *                  This is the Phase 5 behaviour and stays the default.
+   *   best_selling — the server ranks live campaigns by bundle instances
+   *                  actually sold over `bestSellingPeriodDays`.
+   * Switching to `best_selling` does NOT clear `campaignIds`: the manual
+   * selection is kept verbatim so switching back restores it untouched.
+   */
+  source?: "manual" | "best_selling";
+  /** Trailing sales window for `best_selling`, in days. Defaults to 30. */
+  bestSellingPeriodDays?: number;
+}
+
+/**
  * Marquee announcement bar content (minimal template)
  */
 export interface HomepageMarqueeContent {
@@ -285,6 +319,8 @@ export interface HomepageContent {
   footerCta: HomepageFooterCtaContent;
   discountedProducts?: HomepageDiscountedProductsContent;
   newArrivals?: HomepageNewArrivalsContent;
+  /** Bundles & Stacks rail (minimal template) */
+  bundles?: HomepageBundlesContent;
   marquee?: HomepageMarqueeContent;
   promoLine?: HomepagePromoLineContent;
   contactBanner?: HomepageContactBannerContent;
@@ -416,6 +452,22 @@ export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
     title: "New Arrivals",
     viewAllText: "View All",
     viewAllLink: "/shop",
+  },
+  bundles: {
+    // Enabled by default but renders nothing until a live campaign exists,
+    // so an unconfigured store shows no empty section. Copy is generic —
+    // no brand name, no savings claims.
+    enabled: true,
+    title: "Bundles & Stacks",
+    titleAr: "الباقات والأطقم",
+    subtitle: "",
+    subtitleAr: "",
+    viewAllText: "View all bundles",
+    viewAllTextAr: "عرض كل الباقات",
+    viewAllLink: "/bundles",
+    limit: 6,
+    source: "manual",
+    bestSellingPeriodDays: 30,
   },
   marquee: {
     enabled: false,

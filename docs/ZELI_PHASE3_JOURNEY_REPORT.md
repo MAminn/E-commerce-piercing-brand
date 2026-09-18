@@ -370,6 +370,21 @@ Reviewed against the actual order schema — nothing migrated, nothing invented.
   single most operationally important address field for an Egyptian courier.
   Marking it required is a schema decision, not a UI one.
 
+> **Update (2026-09-17).** The input-schema half of the last point was fixed.
+> `order.shipping_state`, `shipping_postal_code` and `shipping_country` are all
+> NOT NULL columns, but `createOrderSchema` accepted them as
+> `.optional().nullable()`, so an API request that omitted them passed
+> validation and then failed inside Postgres as a 500. They are now required
+> **keys** (`z.string().trim()`), rejected at the tRPC input boundary before
+> any order transaction opens. Presence only: state and postal code may still
+> be `""`, because the Governorate input is optional in the checkout templates
+> and this market has no postal codes — so the two observations above about
+> empty values being accepted still hold. `shippingCountry` additionally
+> requires a non-empty value, since checkout always sends "Egypt". No
+> migration was needed; the database was already correct. See
+> `backend/orders/create-order/__tests__/validation.test.ts` and
+> `address-contract.integration.test.ts`.
+
 ---
 
 ## J. Order confirmation

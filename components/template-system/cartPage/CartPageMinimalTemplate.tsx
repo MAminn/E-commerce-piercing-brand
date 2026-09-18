@@ -2,6 +2,7 @@ import React from "react";
 import { Trash2, Plus, Minus, ShoppingCart, ArrowRight } from "lucide-react";
 import type { CartPageModernTemplateProps } from "./CartPageModernTemplate";
 import { OfferProgressBanner } from "./OfferProgressBanner";
+import { CartBundleGroup } from "./CartBundleGroup";
 import {
   AppliedOffersSavings,
   computeOfferSavingsTotal,
@@ -14,6 +15,8 @@ import {
  */
 export function CartPageMinimalTemplate({
   items = [],
+  bundles = [],
+  onRemoveBundle,
   totals,
   isLoading = false,
   isUpdating = false,
@@ -72,7 +75,7 @@ export function CartPageMinimalTemplate({
     );
   }
 
-  if (items.length === 0) {
+  if (items.length === 0 && bundles.length === 0) {
     return (
       <div className="zeli-header-offset flex min-h-[60vh] flex-col items-center justify-center bg-zeli-bg px-4 text-center">
         <ShoppingCart aria-hidden className="mb-4 h-10 w-10 text-zeli-ink-subtle" />
@@ -91,10 +94,10 @@ export function CartPageMinimalTemplate({
 
   const cartSubtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
   const appliedOffers = totals.appliedOffers ?? [];
-  const totalSavings = computeOfferSavingsTotal(
-    appliedOffers,
-    totals.discount ?? 0,
-  );
+  const bundleSavings = totals.bundleSavings ?? 0;
+  const totalSavings =
+    computeOfferSavingsTotal(appliedOffers, totals.discount ?? 0) + Math.max(0, bundleSavings);
+  const lineCount = items.length + bundles.length;
 
   return (
     <>
@@ -106,7 +109,7 @@ export function CartPageMinimalTemplate({
 
           {/* Page title */}
           <h1 className="text-[22px] sm:text-[28px] font-medium text-zeli-ink mb-4 sm:mb-6">
-            Cart <span className="text-zeli-ink-muted font-normal text-[16px] sm:text-[18px]">({items.length} {items.length === 1 ? "item" : "items"})</span>
+            Cart <span className="text-zeli-ink-muted font-normal text-[16px] sm:text-[18px]">({lineCount} {lineCount === 1 ? "item" : "items"})</span>
           </h1>
 
           {/* Offer progress banner */}
@@ -129,8 +132,17 @@ export function CartPageMinimalTemplate({
                 <span />
               </div>
 
-              {/* Items list */}
+              {/* Items list — stacks first, as grouped units */}
               <div className="divide-y divide-zeli-line">
+                {bundles.map((bundle) => (
+                  <CartBundleGroup
+                    key={bundle.instanceId}
+                    bundle={bundle}
+                    currency={currency}
+                    onRemove={onRemoveBundle}
+                    disabled={isUpdating}
+                  />
+                ))}
                 {items.map((item) => {
                   const lineTotal = item.price * item.quantity;
                   const hasDiscount = item.originalPrice != null && item.originalPrice > item.price;
@@ -456,6 +468,12 @@ export function CartPageMinimalTemplate({
                     <span>Subtotal</span>
                     <span>{totals.subtotal.toFixed(2)} {currency}</span>
                   </div>
+                  {bundleSavings > 0 && (
+                    <div className="flex justify-between text-[13px] text-zeli-success">
+                      <span>Stack savings</span>
+                      <span>−{bundleSavings.toFixed(2)} {currency}</span>
+                    </div>
+                  )}
                   {totals.discount != null && totals.discount > 0 && (
                     <div className="flex justify-between text-[13px] text-zeli-success">
                       <span>Discount</span>
@@ -490,7 +508,7 @@ export function CartPageMinimalTemplate({
                 <button
                   type="button"
                   onClick={onProceedToCheckout}
-                  disabled={isUpdating || items.length === 0}
+                  disabled={isUpdating || lineCount === 0}
                   className="mt-6 w-full py-4 rounded-md bg-zeli-accent text-zeli-ink-inverse text-[13px] font-medium uppercase tracking-wider hover:bg-zeli-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed hidden sm:block">
                   {isUpdating ? "Updating…" : "Proceed to Checkout"}
                 </button>
@@ -542,7 +560,7 @@ export function CartPageMinimalTemplate({
           <button
             type="button"
             onClick={onProceedToCheckout}
-            disabled={isUpdating || items.length === 0}
+            disabled={isUpdating || lineCount === 0}
             className="flex w-full items-center justify-center gap-2 py-3.5 rounded-md bg-zeli-accent text-zeli-ink-inverse text-[13px] font-medium uppercase tracking-wider hover:bg-zeli-accent-hover active:bg-zeli-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             {isUpdating ? "Updating…" : "Proceed to Checkout"}
             <ArrowRight className="h-4 w-4" />

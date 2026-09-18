@@ -12,6 +12,14 @@ export interface CategoryImageUploadProps {
   label?: string;
   required?: boolean;
   disabled?: boolean;
+  /**
+   * Public URL of the already-saved image, for the initial preview. `value`
+   * is a `file.id`, which is not itself a servable path — callers that know
+   * the stored `diskname` pass `/uploads/<diskname>` here.
+   */
+  previewUrl?: string | null;
+  /** DOM id for the hidden file input; override when two uploaders share a page. */
+  inputId?: string;
 }
 
 /**
@@ -26,10 +34,12 @@ export function CategoryImageUpload({
   label = "Category Image",
   required = false,
   disabled = false,
+  previewUrl: initialPreviewUrl,
+  inputId = "category-image",
 }: CategoryImageUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(
-    value ? `/uploads/${value}` : null,
+    initialPreviewUrl ?? (value ? `/uploads/${value}` : null),
   );
 
   const handleUpload = async (file: File) => {
@@ -83,7 +93,7 @@ export function CategoryImageUpload({
 
   return (
     <div className='space-y-3'>
-      <Label htmlFor='category-image'>
+      <Label htmlFor={inputId}>
         {label}
         {required && <span className='text-red-500 ml-1'>*</span>}
       </Label>
@@ -111,7 +121,7 @@ export function CategoryImageUpload({
       ) : (
         <div className='w-full max-w-xs'>
           <label
-            htmlFor='category-image'
+            htmlFor={inputId}
             className={cn(
               "flex flex-col items-center justify-center w-full aspect-video",
               "border-2 border-dashed rounded-lg cursor-pointer",
@@ -134,7 +144,7 @@ export function CategoryImageUpload({
               </p>
             </div>
             <Input
-              id='category-image'
+              id={inputId}
               type='file'
               className='hidden'
               accept='image/*'

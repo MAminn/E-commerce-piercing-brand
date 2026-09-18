@@ -1,3 +1,4 @@
+import { CategoryBundlesSection } from "#root/components/bundles/CategoryBundlesSection";
 import { useState, useMemo, useCallback } from "react";
 import { Search, ChevronRight, ChevronLeft } from "lucide-react";
 import { Link } from "#root/components/utils/Link";
@@ -21,6 +22,8 @@ export interface MinimalCategoryProduct extends MinimalProduct {}
 export interface MinimalCategoryPageProps {
   products: MinimalCategoryProduct[];
   categoryName?: string;
+  /** When known, live bundle campaigns placed on this category render below the grid. */
+  categoryId?: string;
   isLoading?: boolean;
   totalProducts: number;
   currentPage: number;
@@ -242,6 +245,7 @@ function GridSkeleton() {
 export function MinimalCategoryPage({
   products,
   categoryName,
+  categoryId,
   isLoading,
   totalProducts,
   currentPage,
@@ -399,6 +403,9 @@ export function MinimalCategoryPage({
           )}
         </div>
       </div>
+
+      {/* Bundles placed on this category (merchant-controlled) */}
+      {categoryId && <CategoryBundlesSection categoryId={categoryId} />}
 
       {/* Testimonials */}
       <MinimalTestimonialsSection />

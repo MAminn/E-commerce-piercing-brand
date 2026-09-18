@@ -182,6 +182,7 @@ export default function CategoryPage() {
       <MinimalCategoryPage
         products={products as MinimalCategoryProduct[]}
         categoryName={categoryName}
+        categoryId={categoryId}
         isLoading={isLoading}
         totalProducts={totalProducts}
         currentPage={currentPage}

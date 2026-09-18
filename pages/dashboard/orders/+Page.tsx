@@ -75,6 +75,9 @@ import { useToast } from "#root/components/ui/use-toast";
 import { Pagination } from "#root/components/utils/Pagination";
 import { OrderEditPanel } from "./OrderEditPanel";
 import { OrderActivityLog } from "./OrderActivityLog";
+import { OrderItemsList, OrderItemsTable } from "./OrderItemsPanel";
+import type { OrderBundleSnapshot } from "#root/shared/bundles/order-grouping";
+import { groupOrderLines, totalUnits } from "#root/shared/bundles/order-grouping";
 
 interface OrderItem {
   id: string;
@@ -84,6 +87,14 @@ interface OrderItem {
   name: string;
   discountPrice?: string | null;
   productImage?: string | null;
+  /** Phase 7 snapshot of the bought options; null on simple and pre-Phase-7 lines. */
+  selectedOptions?: Record<string, string> | null;
+  /**
+   * Set on a line bought as part of a bundle; points at the order's
+   * `order_bundle` snapshot. The line stays an individual, pickable SKU —
+   * this only decides which group it renders under.
+   */
+  orderBundleId?: string | null;
 }
 
 interface Order {
@@ -115,6 +126,12 @@ interface Order {
   createdAt: Date;
   updatedAt: Date | null;
   items: OrderItem[];
+  /**
+   * One entry per purchased bundle INSTANCE, straight from `order_bundle`.
+   * Historical and self-contained: the live campaign is never read, so
+   * editing or deleting a campaign cannot alter a past order's display.
+   */
+  bundles?: OrderBundleSnapshot[];
   // Bosta fields (present only when SYN_BOSTA_KEY is configured)
   bostaDeliveryId?: string | null;
   bostaTrackingNumber?: string | null;
@@ -879,11 +896,12 @@ export default function Orders() {
                       </div>
                       <div className='mt-1 text-sm text-muted-foreground'>
                         {(() => {
-                          const totalQty =
-                            order.items?.reduce(
-                              (sum, it) => sum + (it.quantity ?? 1),
-                              0,
-                            ) ?? 0;
+                          // Units shipped, bundle children included — they are
+                          // real SKUs to pick. The money beside it stays the
+                          // order's own authoritative total.
+                          const totalQty = totalUnits(
+                            groupOrderLines(order.items ?? [], order.bundles ?? []),
+                          );
                           return (
                             <>
                               {totalQty} item{totalQty === 1 ? "" : "s"}
@@ -1049,76 +1067,10 @@ export default function Orders() {
                       </Button>
                     )}
                   </div>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Product</TableHead>
-                        <TableHead>Quantity</TableHead>
-                        <TableHead>Price</TableHead>
-                        <TableHead>Total</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {selectedOrder.items?.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell>
-                            <div className='flex items-center gap-3'>
-                              <div className='h-12 w-12 rounded-md overflow-hidden bg-stone-100 flex items-center justify-center text-sm font-medium text-stone-600 shrink-0'>
-                                {item.productImage ? (
-                                  <img
-                                    src={item.productImage}
-                                    alt={item.name}
-                                    className='h-full w-full object-cover'
-                                  />
-                                ) : (
-                                  <span>
-                                    {(item.name || "?").charAt(0).toUpperCase()}
-                                  </span>
-                                )}
-                              </div>
-                              <span>{item.name}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>{item.quantity}</TableCell>
-                          <TableCell>
-                            {item.discountPrice ? (
-                              <>
-                                <span className='line-through text-gray-500'>
-                                  {Number.parseFloat(item.price).toFixed(2)} EGP
-                                </span>
-                                <span className='text-red-600 block'>
-                                  {Number.parseFloat(
-                                    item.discountPrice,
-                                  ).toFixed(2)}{" "}
-                                  EGP
-                                </span>
-                              </>
-                            ) : (
-                              <>
-                                {Number.parseFloat(item.price).toFixed(2)} EGP
-                              </>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {(
-                              Number.parseFloat(
-                                item.discountPrice || item.price,
-                              ) * item.quantity
-                            ).toFixed(2)}{" "}
-                            EGP
-                          </TableCell>
-                        </TableRow>
-                      )) || (
-                        <TableRow>
-                          <TableCell
-                            colSpan={isAdmin ? 5 : 4}
-                            className='text-center text-muted-foreground'>
-                            No items found for this order.
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
+                  <OrderItemsTable
+                    items={selectedOrder.items}
+                    bundles={selectedOrder.bundles}
+                  />
                 </div>
 
                 <div className='flex justify-between items-start my-4'>
@@ -1469,45 +1421,10 @@ export default function Orders() {
                         </Button>
                       )}
                     </div>
-                    <div className='space-y-3'>
-                      {selectedOrder.items?.map((item) => {
-                        const unit = Number.parseFloat(
-                          item.discountPrice || item.price,
-                        );
-                        return (
-                          <div
-                            key={item.id}
-                            className='flex items-center gap-3'>
-                            <div className='h-14 w-14 rounded-md overflow-hidden bg-stone-100 flex items-center justify-center text-sm font-medium text-stone-600 shrink-0'>
-                              {item.productImage ? (
-                                <img
-                                  src={item.productImage}
-                                  alt={item.name}
-                                  className='h-full w-full object-cover'
-                                />
-                              ) : (
-                                <span>
-                                  {(item.name || "?").charAt(0).toUpperCase()}
-                                </span>
-                              )}
-                            </div>
-                            <div className='min-w-0 flex-1'>
-                              <p className='text-sm font-medium truncate'>
-                                {item.name}
-                              </p>
-                              <p className='text-xs text-muted-foreground'>
-                                {item.quantity} × {unit.toFixed(2)} ={" "}
-                                {(unit * item.quantity).toFixed(2)} EGP
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      }) || (
-                        <p className='text-sm text-muted-foreground text-center'>
-                          No items found for this order.
-                        </p>
-                      )}
-                    </div>
+                    <OrderItemsList
+                      items={selectedOrder.items}
+                      bundles={selectedOrder.bundles}
+                    />
                   </div>
 
                   <div>
