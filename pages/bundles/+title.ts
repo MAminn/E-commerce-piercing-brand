@@ -3,5 +3,5 @@ import { STORE_NAME } from "#root/shared/config/branding";
 
 export default function title(pageContext: PageContext) {
   const brand = pageContext.brandName || STORE_NAME;
-  return `Bundles & Stacks | ${brand}`;
+  return `Sets | ${brand}`;
 }

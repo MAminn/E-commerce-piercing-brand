@@ -4,12 +4,19 @@
  * interpolation and image resolution can't drift between placements.
  */
 
+import { formatMoney as formatStoreMoney } from "#root/shared/pricing/format-money";
+
 export function fillTemplate(template: string, values: Record<string, string | number>): string {
   return template.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key] ?? `{${key}}`));
 }
 
+/**
+ * Bundle surfaces format money exactly like the rest of the storefront.
+ * Kept as a named export so the existing call sites (which pass the store
+ * currency explicitly) do not change.
+ */
 export function formatMoney(amount: number, currency: string): string {
-  return `${amount.toFixed(2)} ${currency}`;
+  return formatStoreMoney(amount, { currency });
 }
 
 /** Uploads are stored as bare disknames; anything already absolute is left alone. */

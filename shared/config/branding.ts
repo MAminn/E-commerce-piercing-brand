@@ -19,7 +19,12 @@
  * are the fallback used whenever the CMS field is empty, plus the source for
  * anything the CMS doesn't model (support email, social profiles).
  *
- * Working brand name: ZELI (see docs/CURRENT_PROJECT.md).
+ * Brand: Percé (see docs/CURRENT_PROJECT.md and the Percé Brand Source of
+ * Truth). Two spellings, deliberately:
+ *   - "Percé"  — customer-facing (headings, metadata, emails, About copy)
+ *   - "percé"  — the lowercase typographic wordmark
+ *   - "perce"  — operational / ASCII-safe (slugs, keys, URLs, handles, files)
+ * The misspelling with a trailing "e" is never correct anywhere.
  */
 
 function readEnv(...keys: string[]): string | undefined {
@@ -39,21 +44,57 @@ function readEnv(...keys: string[]): string | undefined {
 
 // ─── Core identity ──────────────────────────────────────────────────────────
 
-/** Display name of the store. Override with VITE_STORE_NAME. */
+/** Customer-facing brand name, with the accent. Override with VITE_STORE_NAME. */
 export const STORE_NAME =
-  readEnv("VITE_STORE_NAME", "STORE_NAME") ?? "ZELI";
+  readEnv("VITE_STORE_NAME", "STORE_NAME") ?? "Percé";
 
 /**
- * Default meta description / social preview copy. Deliberately generic: it
- * makes no claim about materials, delivery, returns or hypoallergenic
- * properties, none of which are established yet. Override with
- * VITE_STORE_DESCRIPTION once the brand copy is finalised.
+ * The typographic wordmark — lowercase, no icon, no monogram. Used wherever
+ * the brand is *drawn* rather than *named* (header, footer, coming-soon,
+ * email masthead when no logo image is uploaded).
+ */
+export const BRAND_WORDMARK =
+  readEnv("VITE_BRAND_WORDMARK", "BRAND_WORDMARK") ?? "percé";
+
+/**
+ * ASCII-safe operational form for identifiers, config keys, filenames,
+ * URLs, handles and code symbols. Never shown to customers as the brand.
+ */
+export const BRAND_SLUG = "perce";
+
+/** Brand line. Not a slogan to repeat everywhere — one line, used sparingly. */
+export const BRAND_LINE =
+  readEnv("VITE_BRAND_LINE", "BRAND_LINE") ?? "Made to mix.";
+
+/** Market. The store sells in and delivers across Egypt only. */
+export const STORE_COUNTRY_CODE = "EG";
+export const STORE_COUNTRY_NAME = "Egypt";
+
+/**
+ * BCP-47 locale used for number/currency formatting. Prices are formatted
+ * through shared/pricing/format-money.ts — never by hand.
+ */
+export const STORE_LOCALE = "en-EG";
+
+/**
+ * Default meta description / social preview copy.
+ *
+ * This is the Brand Source of Truth's *safer* subheading. The preferred one
+ * ("Piercing jewellery, photographed properly, delivered across Egypt.")
+ * claims photography coverage that has not been verified against the live
+ * catalogue — switch to it via VITE_STORE_DESCRIPTION once it is. It makes
+ * no claim about materials, returns, or hypoallergenic properties.
  */
 export const STORE_DESCRIPTION =
   readEnv("VITE_STORE_DESCRIPTION", "STORE_DESCRIPTION") ??
-  "Piercing jewelry, curated in Egypt.";
+  "Piercing jewellery, delivered across Egypt.";
 
-/** ISO-ish currency label used across pricing UI. Override with VITE_CURRENCY. */
+/**
+ * ISO 4217 currency code. Egyptian pound. Catalogue prices are stored and
+ * charged as EGP amounts — this is the label, never an FX conversion.
+ * Override with VITE_CURRENCY only for a store that genuinely trades in
+ * another currency.
+ */
 export const STORE_CURRENCY = readEnv("VITE_CURRENCY", "CURRENCY") ?? "EGP";
 
 /**

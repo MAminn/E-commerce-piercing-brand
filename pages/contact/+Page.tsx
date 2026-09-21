@@ -25,7 +25,7 @@ function Page() {
   if (!isMinimal) {
     return (
       <div className='min-h-[60vh] flex items-center justify-center'>
-        <p className='text-zeli-ink-muted'>Page not found</p>
+        <p className='text-perce-ink-muted'>Page not found</p>
       </div>
     );
   }
@@ -94,12 +94,12 @@ function Page() {
         <div className='grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20'>
           {/* ── Left Column: Heading + Description ── */}
           <div className='flex flex-col justify-center'>
-            <h1 className='text-3xl sm:text-4xl lg:text-[42px] font-bold uppercase leading-tight tracking-tight'>
+            <h1 className='text-3xl sm:text-4xl lg:text-[42px] font-bold leading-tight tracking-tight'>
               {heading}
             </h1>
 
             {description && (
-              <p className='mt-6 text-sm sm:text-base text-zeli-ink-secondary leading-relaxed max-w-md'>
+              <p className='mt-6 text-sm sm:text-base text-perce-ink-secondary leading-relaxed max-w-md'>
                 {description}
               </p>
             )}
@@ -109,7 +109,7 @@ function Page() {
                 href={directionsUrl}
                 target='_blank'
                 rel='noopener noreferrer'
-                className='inline-flex items-center gap-1.5 mt-8 text-xs font-semibold uppercase tracking-widest hover:opacity-70 transition-opacity'>
+                className='inline-flex items-center gap-1.5 mt-8 text-xs font-semibold hover:opacity-70 transition-opacity'>
                 {isAr ? "احصل على الاتجاهات" : "Get Directions"}
                 <ArrowUpRight className='w-3.5 h-3.5' />
               </a>
@@ -128,7 +128,7 @@ function Page() {
                     placeholder={isAr ? "الاسم" : "Name"}
                     required
                     maxLength={200}
-                    className='w-full border-b border-zeli-line-strong bg-transparent py-3 text-sm placeholder:text-gray-400 focus:border-black focus:outline-none transition-colors'
+                    className='w-full border-b border-perce-line-strong bg-transparent py-3 text-sm placeholder:text-gray-400 focus:border-black focus:outline-none transition-colors'
                     dir={dir}
                   />
                 </div>
@@ -140,7 +140,7 @@ function Page() {
                     placeholder={isAr ? "البريد الإلكتروني" : "Email"}
                     required
                     maxLength={200}
-                    className='w-full border-b border-zeli-line-strong bg-transparent py-3 text-sm placeholder:text-gray-400 focus:border-black focus:outline-none transition-colors'
+                    className='w-full border-b border-perce-line-strong bg-transparent py-3 text-sm placeholder:text-gray-400 focus:border-black focus:outline-none transition-colors'
                     dir={dir}
                   />
                 </div>
@@ -154,7 +154,7 @@ function Page() {
                   required
                   maxLength={5000}
                   rows={6}
-                  className='w-full border-b border-zeli-line-strong bg-transparent py-3 text-sm placeholder:text-gray-400 focus:border-black focus:outline-none transition-colors resize-none'
+                  className='w-full border-b border-perce-line-strong bg-transparent py-3 text-sm placeholder:text-gray-400 focus:border-black focus:outline-none transition-colors resize-none'
                   dir={dir}
                 />
               </div>
@@ -163,7 +163,7 @@ function Page() {
                 <button
                   type='submit'
                   disabled={isSubmitting}
-                  className='inline-flex items-center justify-center gap-2 border border-black bg-transparent px-8 py-3 text-xs font-semibold uppercase tracking-widest hover:bg-black hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed'>
+                  className='inline-flex items-center justify-center gap-2 border border-black bg-transparent px-8 py-3 text-xs font-semibold hover:bg-black hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed'>
                   {isSubmitting && <Loader2 className='w-3.5 h-3.5 animate-spin' />}
                   {isSubmitting
                     ? (isAr ? "جاري الإرسال..." : "Sending...")

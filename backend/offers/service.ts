@@ -9,6 +9,7 @@ import { ServerError } from "#root/shared/error/server";
 import { and, asc, eq, isNull, lte, gte, or } from "drizzle-orm";
 import { Effect } from "effect";
 import { z } from "zod";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 // ─── Input schemas ────────────────────────────────────────────────────────────
 
@@ -203,7 +204,7 @@ function computeDiscount(reward: OfferReward, cartItems: CartItemInput[], subtot
 function rewardLabel(reward: OfferReward): string {
   switch (reward.type) {
     case "percentage_off": return `${reward.percentOff}% off`;
-    case "fixed_off": return `${reward.amountOff} off`;
+    case "fixed_off": return `${formatMoney(reward.amountOff)} off`;
     case "free_shipping": return "Free shipping";
     case "free_items": return `${reward.quantity} item${reward.quantity > 1 ? "s" : ""} free`;
     default: return "Discount applied";

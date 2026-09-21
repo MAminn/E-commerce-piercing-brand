@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "#root/components/ui/select";
 import { Loader2, Save, ImageIcon } from "lucide-react";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 interface PopupConfigForm {
   enabled: boolean;
@@ -398,7 +399,7 @@ export default function PopupSettingsPage() {
                     {pc.code} (
                     {pc.discountType === "percentage"
                       ? `${pc.discountValue}%`
-                      : `$${pc.discountValue}`}
+                      : formatMoney(pc.discountValue)}
                     )
                   </SelectItem>
                 ))}

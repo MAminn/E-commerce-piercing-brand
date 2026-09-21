@@ -1,6 +1,7 @@
 import { Card, CardContent } from "#root/components/ui/card.jsx";
 import { Badge } from "#root/components/ui/badge.jsx";
 import { DollarSign } from "lucide-react";
+import { formatMoneyCompact } from "#root/shared/pricing/format-money";
 
 interface RevenueStatsProps {
   totalRevenue: number;
@@ -52,13 +53,10 @@ export const RevenueStatsCard = ({
     );
   }
 
-  // Format revenue as $X.XK if ≥ 1000, otherwise as $XXX
+  // Compact above a thousand (EGP 12.4K), exact below.
   // Ensure totalRevenue is a valid finite number for SSR safety
   const safeRevenue = Number.isFinite(totalRevenue) ? totalRevenue : 0;
-  const formattedRevenue =
-    safeRevenue >= 1000
-      ? `${(safeRevenue / 1000).toFixed(1)}K EGP`
-      : `${safeRevenue.toFixed(2)} EGP`;
+  const formattedRevenue = formatMoneyCompact(safeRevenue);
 
   return (
     <Card>

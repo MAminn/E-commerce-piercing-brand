@@ -1,4 +1,5 @@
 import type { EmailAutomationType } from "../queue/service";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 /**
  * Realistic placeholder data for admin preview/test-send — never used for
@@ -18,26 +19,26 @@ export function buildSamplePayload(
     case "review_check":
       return {
         customerName: "Alex",
-        productName: "Titanium Threadless Labret",
+        productName: "Threadless labret",
         productImageUrl: "",
-        productSubtitle: "100ml · Delivered",
+        productSubtitle: "Gold · Delivered",
       };
     case "abandoned_cart":
       return {
         step: stepKey,
         items: [
           {
-            name: "Titanium Threadless Labret",
+            name: "Threadless labret",
             imageUrl: "",
-            subtitle: "100ml",
-            priceLabel: "$79.00",
+            subtitle: "Gold",
+            priceLabel: formatMoney(270),
           },
         ],
-        cartTotal: "$79.00",
+        cartTotal: formatMoney(270),
       };
     case "abandoned_browse":
       return {
-        productName: "Amber Nights",
+        productName: "Flat back stud",
         productImageUrl: "",
         productSubtitle: "50ml",
       };

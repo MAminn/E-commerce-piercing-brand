@@ -57,8 +57,8 @@ export function MinimalMobileBottomNav() {
 
   return (
     <nav
-      style={{ zIndex: "var(--zeli-z-bottom-nav)" }}
-      className='lg:hidden fixed bottom-0 inset-x-0 h-16 bg-zeli-bg border-t border-zeli-line pb-[env(safe-area-inset-bottom)]'
+      style={{ zIndex: "var(--perce-z-bottom-nav)" }}
+      className='lg:hidden fixed bottom-0 inset-x-0 h-16 bg-perce-ground text-perce-frame-ink border-t border-perce-frame-line pb-[env(safe-area-inset-bottom)]'
       aria-label='Bottom navigation'>
       <div className='grid grid-cols-5 h-full'>
         {tabs.map(({ key, label, href, icon: Icon, count, dot }) => {
@@ -69,23 +69,23 @@ export function MinimalMobileBottomNav() {
               href={href}
               className={cn(
                 "flex flex-col items-center justify-center gap-0.5 h-full relative",
-                active ? "text-gray-900" : "text-gray-400",
+                active ? "text-perce-frame-ink" : "text-perce-frame-ink-muted",
               )}>
               <span className='relative'>
                 <Icon className='w-5 h-5' strokeWidth={active ? 2.25 : 1.75} />
                 {typeof count === "number" && count > 0 && (
-                  <span className='absolute -top-1.5 -end-2 min-w-[16px] h-4 px-1 rounded-full bg-gray-900 text-white text-[9px] font-medium flex items-center justify-center'>
+                  <span className='absolute -top-1.5 -end-2 min-w-[16px] h-4 px-1 rounded-full bg-perce-accent text-perce-accent-ink text-[9px] font-medium flex items-center justify-center'>
                     {count > 99 ? "99+" : count}
                   </span>
                 )}
                 {dot && (
                   <span className='absolute -top-0.5 -end-0.5 flex h-2.5 w-2.5'>
-                    <span className='absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75' />
-                    <span className='relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500' />
+                    <span className='absolute inline-flex h-full w-full animate-ping rounded-full bg-perce-accent opacity-75' />
+                    <span className='relative inline-flex h-2.5 w-2.5 rounded-full bg-perce-accent' />
                   </span>
                 )}
               </span>
-              <span className='text-[10px] font-medium tracking-wide'>{label}</span>
+              <span className='text-[10px] font-medium'>{label}</span>
             </Link>
           );
         })}

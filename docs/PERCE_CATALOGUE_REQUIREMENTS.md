@@ -1,4 +1,4 @@
-# ZELI catalogue requirements
+# Percé catalogue requirements
 
 > Derived by reading the live schema and the admin create/edit paths, not from
 > assumption. Sources:
@@ -7,7 +7,7 @@
 > [`backend/products/create-product/service.ts`](../backend/products/create-product/service.ts),
 > [`pages/dashboard/products/components.tsx`](../pages/dashboard/products/components.tsx).
 >
-> This document lists **what the system requires**. It contains no example ZELI
+> This document lists **what the system requires**. It contains no example Percé
 > products, prices, categories or copy — none exist yet, and inventing them is
 > exactly what this document is meant to prevent.
 
@@ -108,14 +108,14 @@ Table `product`. Created via **Dashboard → Products**.
 - **No per-product SEO fields** (no meta title/description/OG image column).
 - **No weight/dimensions, no cost price, no barcode.**
 - **`fragranceInfo`** exists (a perfume-era JSON column: scent notes,
-  longevity, concentration). **Leave it empty for every ZELI product.** Filling
+  longevity, concentration). **Leave it empty for every Percé product.** Filling
   it makes a "Scent Notes" accordion appear on the product page.
 
 ### Price cap
 
 `price` and `discountPrice` are validated as `0–10000` in
 `createProductSchema`. In EGP that caps a product at **10,000 EGP**. If any
-ZELI piece is priced above that, the limit must be raised before load — it is a
+Percé piece is priced above that, the limit must be raised before load — it is a
 Zod bound in application code, not a DB constraint, so it is a small change and
 **not** a migration.
 
@@ -187,4 +187,4 @@ then it should call the existing tRPC mutations rather than write SQL.
 - [ ] Which products carry a genuine discount, and the discounted price
 - [ ] Product photography, portrait, consistent crop (1400×1750)
 - [ ] Which products are Featured on the homepage
-- [ ] Confirm no ZELI product exceeds the 10,000 EGP validation cap
+- [ ] Confirm no Percé product exceeds the 10,000 EGP validation cap

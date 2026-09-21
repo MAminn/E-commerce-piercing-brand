@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Business-promise sweep (Phase 2). This template previously hardcoded
-// shipping, returns and guarantee claims. Those are business facts ZELI has
+// shipping, returns and guarantee claims. Those are business facts Percé has
 // not established, and an admin switching to this template in the dashboard
 // would have published them to customers instantly. Only claims the store can
 // actually stand behind (secure checkout — payments run through Paymob/Stripe)
@@ -63,7 +63,7 @@ export interface ProductSpecification {
  */
 
 /**
- * Legacy fragrance payload from the previous perfume storefront. The ZELI
+ * Legacy fragrance payload from the previous perfume storefront. The Percé
  * admin no longer authors it and no active template renders it; the type is
  * kept so records that still carry `fragrance_info` deserialize without
  * error. Do not add new fields here — jewelry data belongs in the generic
@@ -479,7 +479,7 @@ export function ProductPageModernSplit({
               </div>
 
               {/* Trust badges removed: "Fast Delivery" and "Easy Returns"
-                  state a delivery time and a returns policy that ZELI has not
+                  state a delivery time and a returns policy that Percé has not
                   established. Legacy template, still admin-selectable, so it
                   must not carry the claims either. */}
 

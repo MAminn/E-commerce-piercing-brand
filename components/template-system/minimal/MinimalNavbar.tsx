@@ -12,7 +12,6 @@ import { trpc } from "#root/shared/trpc/client";
 import { toast } from "sonner";
 import { getProductUrl } from "#root/lib/utils/route-helpers";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
-import { STORE_CURRENCY } from "#root/shared/config/branding";
 import { isUsableHref } from "#root/shared/config/storefront";
 import {
   Sheet,
@@ -26,10 +25,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "#root/components/ui/dropdown-menu";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 /**
- * Minimal Navbar — clean design inspired by matchperfumes.com.
- * Layout: [icons (left)]  ·  [nav links (centre-right)]  ·  [LOGO (far right)]
+ * Percé navbar — the dark brand frame.
+ *
+ * Ground (#0E0E0E) bar, Paper type, one hairline. The only accent on the
+ * bar is the cart count. Search results and the mobile drawer open as light
+ * "windows" over it, like every product surface.
+ *
+ * Layout: [icons (left)]  ·  [nav links (centre-right)]  ·  [wordmark (far right)]
  * Flips naturally with RTL via the i18n dir attribute.
  */
 export function MinimalNavbar() {
@@ -190,7 +195,7 @@ export function MinimalNavbar() {
           text={marqueeText}
           repeat={14}
           duration={240}
-          className='bg-white text-black'
+          className='bg-perce-ground text-perce-frame-ink border-b border-perce-frame-line'
           style={{
             ...(marqueeBackgroundColor
               ? { backgroundColor: marqueeBackgroundColor }
@@ -202,9 +207,9 @@ export function MinimalNavbar() {
 
       <nav
         aria-label='Main'
-        className='w-full bg-zeli-bg border-b border-zeli-line'
+        className='w-full bg-perce-ground text-perce-frame-ink border-b border-perce-frame-line'
         dir={dir === "rtl" ? "ltr" : "rtl"}>
-        <div className='zeli-container'>
+        <div className='perce-container'>
           <div className='flex items-center justify-between h-16 sm:h-[72px]'>
             {/* ── Left: Action icons ── */}
             <div className='flex items-center gap-1 sm:gap-2'>
@@ -214,7 +219,7 @@ export function MinimalNavbar() {
               {!session ? (
                 <Link
                   href='/login'
-                  className='inline-flex items-center justify-center min-w-11 min-h-11 md:min-w-0 md:min-h-0 p-2 text-zeli-ink-secondary hover:text-zeli-ink transition-colors'
+                  className='inline-flex items-center justify-center min-w-11 min-h-11 md:min-w-0 md:min-h-0 p-2 text-perce-frame-ink-muted hover:text-perce-frame-ink transition-colors'
                   aria-label={t("nav.login")}>
                   <User className='w-[18px] h-[18px]' />
                 </Link>
@@ -223,12 +228,12 @@ export function MinimalNavbar() {
                   <DropdownMenuTrigger asChild>
                     <button
                       type="button"
-                      className='p-1.5 w-8 h-8 rounded-full bg-gray-900 text-white text-xs font-medium flex items-center justify-center hover:bg-gray-700 transition-colors'
+                      className='p-1.5 w-8 h-8 rounded-full bg-perce-paper text-perce-ground text-xs font-medium flex items-center justify-center hover:bg-white transition-colors'
                       aria-label="Account menu">
                       {session.name ? session.name.charAt(0).toUpperCase() : <User className="w-4 h-4" />}
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" style={{ zIndex: "var(--zeli-z-overlay)" }}
+                  <DropdownMenuContent align="start" style={{ zIndex: "var(--perce-z-overlay)" }}
                     className="w-52">
                     <div className="px-3 py-2 border-b border-gray-100">
                       <p className="text-sm font-medium text-gray-900 truncate">{session.name || "Account"}</p>
@@ -271,7 +276,7 @@ export function MinimalNavbar() {
                 {/* Cart */}
               <Link
                 href='/cart'
-                className='relative inline-flex items-center justify-center min-w-11 min-h-11 md:min-w-0 md:min-h-0 p-2 text-zeli-ink-secondary hover:text-zeli-ink transition-colors'
+                className='relative inline-flex items-center justify-center min-w-11 min-h-11 md:min-w-0 md:min-h-0 p-2 text-perce-frame-ink-muted hover:text-perce-frame-ink transition-colors'
                 aria-label={
                   totalItems > 0
                     ? `${t("nav.cart")} (${totalItems})`
@@ -281,7 +286,7 @@ export function MinimalNavbar() {
                 {totalItems > 0 && (
                   <span
                     aria-hidden='true'
-                    className='absolute top-1.5 right-1.5 md:-top-0.5 md:-right-0.5 inline-flex items-center justify-center w-[18px] h-[18px] text-[10px] font-medium leading-none bg-zeli-sale text-zeli-ink-inverse rounded-full'>
+                    className='absolute top-1.5 right-1.5 md:-top-0.5 md:-right-0.5 inline-flex items-center justify-center w-[18px] h-[18px] text-[10px] font-medium leading-none bg-perce-accent text-perce-accent-ink rounded-full'>
                     {totalItems}
                   </span>
                 )}
@@ -293,7 +298,7 @@ export function MinimalNavbar() {
                   <div className='flex items-center'>
                     <form onSubmit={handleSearchSubmit} className='flex items-center'>
                       <div className='relative'>
-                        <Search className='absolute start-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400' />
+                        <Search className='absolute start-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-perce-frame-ink-muted' />
                         <input
                           ref={searchInputRef}
                           type='text'
@@ -301,7 +306,7 @@ export function MinimalNavbar() {
                           onChange={(e) => setSearchQuery(e.target.value)}
                           placeholder={t("nav.search")}
                           autoFocus
-                          className='w-48 ps-8 pe-8 py-1.5 text-sm border border-gray-200 outline-none focus:border-gray-900 transition-colors bg-white'
+                          className='w-48 ps-8 pe-8 py-1.5 text-sm border border-perce-frame-line bg-transparent text-perce-frame-ink placeholder:text-perce-frame-ink-muted outline-none focus:border-perce-frame-ink transition-colors'
                         />
                         <button
                           type='button'
@@ -310,7 +315,7 @@ export function MinimalNavbar() {
                             setSearchQuery("");
                             setLiveResults({ products: [], categories: [] });
                           }}
-                          className='absolute end-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black'>
+                          className='absolute end-2 top-1/2 -translate-y-1/2 text-perce-frame-ink-muted hover:text-perce-frame-ink'>
                           <X className='w-3.5 h-3.5' />
                         </button>
                       </div>
@@ -326,7 +331,7 @@ export function MinimalNavbar() {
                           <>
                             {liveResults.categories.length > 0 && (
                               <div className='px-3 py-2 border-b border-gray-100'>
-                                <p className='text-[10px] uppercase tracking-wider text-gray-400 mb-1'>
+                                <p className='text-xs text-gray-400 mb-1'>
                                   {locale === "ar" ? "الأقسام" : "Categories"}
                                 </p>
                                 {liveResults.categories.map((cat) => (
@@ -346,7 +351,7 @@ export function MinimalNavbar() {
                             )}
                             {liveResults.products.length > 0 && (
                               <div className='px-3 py-2'>
-                                <p className='text-[10px] uppercase tracking-wider text-gray-400 mb-1'>
+                                <p className='text-xs text-gray-400 mb-1'>
                                   {locale === "ar" ? "المنتجات" : "Products"}
                                 </p>
                                 {liveResults.products.map((p) => (
@@ -363,21 +368,20 @@ export function MinimalNavbar() {
                                       <img src={p.imageUrl} alt={p.name} className='w-10 h-10 object-cover bg-gray-50' />
                                     )}
                                     <div className='flex-1 min-w-0'>
-                                      <p className='truncate text-sm text-zeli-ink'>{p.name}</p>
+                                      <p className='truncate text-sm text-perce-ink'>{p.name}</p>
                                       <p className='flex items-baseline gap-1.5 text-xs'>
                                         {p.discountPrice != null && (
-                                          <span className='text-zeli-ink-subtle line-through'>
-                                            {p.price.toFixed(2)}
+                                          <span className='text-perce-ink-subtle line-through'>
+                                            {formatMoney(p.price)}
                                           </span>
                                         )}
                                         <span
                                           className={
                                             p.discountPrice != null
-                                              ? "font-medium text-zeli-sale"
-                                              : "text-zeli-ink-muted"
+                                              ? "font-medium text-perce-sale"
+                                              : "text-perce-ink-muted"
                                           }>
-                                          {(p.discountPrice ?? p.price).toFixed(2)}{" "}
-                                          {STORE_CURRENCY}
+                                          {formatMoney((p.discountPrice ?? p.price))}
                                         </span>
                                       </p>
                                     </div>
@@ -412,7 +416,7 @@ export function MinimalNavbar() {
                       setIsSearchOpen(true);
                       setTimeout(() => searchInputRef.current?.focus(), 100);
                     }}
-                    className='p-2 text-gray-700 hover:text-black transition-colors'
+                    className='p-2 text-perce-frame-ink-muted hover:text-perce-frame-ink transition-colors'
                     aria-label={t("nav.search")}>
                     <Search className='w-[18px] h-[18px]' />
                   </button>
@@ -430,8 +434,11 @@ export function MinimalNavbar() {
               </button> */}
             </div>
 
-            {/* ── Center / Right: Navigation Links (desktop) ── */}
-            <div className='hidden lg:flex items-center gap-1'>
+            {/* ── Center / Right: Navigation Links (desktop) ──
+                The <nav> flips its direction to put the wordmark at the far
+                end; restore the reading direction here so the links keep
+                their CMS order (Shop All · New In · Sets), not the reverse. */}
+            <div className='hidden lg:flex items-center gap-1' dir={dir}>
               {links.map((link) => {
                 if (link.isDropdown && link.categoryIds.length > 0) {
                   // Desktop: hover dropdown listing the categories.
@@ -442,8 +449,8 @@ export function MinimalNavbar() {
                     <div key={link.id} className='relative group'>
                       <button
                         type='button'
-                        style={{ fontFamily: "var(--font-nav, 'LaRojaTV', 'Poppins', sans-serif)" }}
-                        className='px-2 xl:px-3 py-1.5 text-sm xl:text-[15px] font-semibold text-gray-800 hover:text-black transition-colors tracking-wide whitespace-nowrap flex items-center gap-1'>
+                        style={{ fontFamily: "var(--font-nav)" }}
+                        className='px-2 xl:px-3 py-1.5 text-sm xl:text-[15px] font-medium text-perce-frame-ink-muted hover:text-perce-frame-ink transition-colors whitespace-nowrap flex items-center gap-1'>
                         {link.label}
                         <ChevronDown className='w-3.5 h-3.5 transition-transform duration-150 group-hover:rotate-180' />
                       </button>
@@ -466,7 +473,7 @@ export function MinimalNavbar() {
                   <Link
                     key={link.id}
                     href={link.to}
-                    className='px-3 py-1.5 text-[15px] font-semibold text-gray-800 hover:text-black transition-colors tracking-wide'>
+                    className='px-3 py-1.5 text-[15px] font-medium text-perce-frame-ink-muted hover:text-perce-frame-ink transition-colors'>
                     {link.label}
                   </Link>
                 );
@@ -478,7 +485,7 @@ export function MinimalNavbar() {
               {/* Desktop Logo */}
               <HeaderLogo
                 variant='desktop'
-                textClassName='text-2xl sm:text-[28px] font-normal tracking-[0.22em] text-gray-900 uppercase hover:text-gray-600 transition-colors'
+                textClassName='perce-wordmark text-2xl sm:text-[28px] text-perce-frame-ink hover:text-perce-frame-ink-muted transition-colors'
               />
 
               {/* Mobile hamburger */}
@@ -487,7 +494,7 @@ export function MinimalNavbar() {
                   <SheetTrigger asChild>
                     <button
                       type='button'
-                      className='p-2 text-gray-700 hover:text-black transition-colors'
+                      className='p-2 text-perce-frame-ink-muted hover:text-perce-frame-ink transition-colors'
                       aria-label={t("nav.menu")}>
                       <Menu className='w-5 h-5' />
                     </button>
@@ -502,7 +509,7 @@ export function MinimalNavbar() {
                             handleCloseSheet();
                             navigate('/');
                           }}
-                          textClassName='text-xl font-normal tracking-[0.2em] text-gray-900 uppercase'
+                          textClassName='perce-wordmark text-xl text-perce-ink'
                         />
                         <button
                           type='button'
@@ -538,7 +545,7 @@ export function MinimalNavbar() {
                               <>
                                 {liveResults.categories.length > 0 && (
                                   <div className='px-3 py-2 border-b border-gray-100'>
-                                    <p className='text-[10px] uppercase tracking-wider text-gray-400 mb-1'>
+                                    <p className='text-xs text-gray-400 mb-1'>
                                       {locale === "ar" ? "الأقسام" : "Categories"}
                                     </p>
                                     {liveResults.categories.map((cat) => (
@@ -558,7 +565,7 @@ export function MinimalNavbar() {
                                 )}
                                 {liveResults.products.length > 0 && (
                                   <div className='px-3 py-2'>
-                                    <p className='text-[10px] uppercase tracking-wider text-gray-400 mb-1'>
+                                    <p className='text-xs text-gray-400 mb-1'>
                                       {locale === "ar" ? "المنتجات" : "Products"}
                                     </p>
                                     {liveResults.products.map((p) => (
@@ -575,21 +582,20 @@ export function MinimalNavbar() {
                                           <img src={p.imageUrl} alt={p.name} className='w-10 h-10 object-cover bg-gray-50' />
                                         )}
                                         <div className='flex-1 min-w-0'>
-                                          <p className='truncate text-sm text-zeli-ink'>{p.name}</p>
+                                          <p className='truncate text-sm text-perce-ink'>{p.name}</p>
                                           <p className='flex items-baseline gap-1.5 text-xs'>
                                             {p.discountPrice != null && (
-                                              <span className='text-zeli-ink-subtle line-through'>
-                                                {p.price.toFixed(2)}
+                                              <span className='text-perce-ink-subtle line-through'>
+                                                {formatMoney(p.price)}
                                               </span>
                                             )}
                                             <span
                                               className={
                                                 p.discountPrice != null
-                                                  ? "font-medium text-zeli-sale"
-                                                  : "text-zeli-ink-muted"
+                                                  ? "font-medium text-perce-sale"
+                                                  : "text-perce-ink-muted"
                                               }>
-                                              {(p.discountPrice ?? p.price).toFixed(2)}{" "}
-                                              {STORE_CURRENCY}
+                                              {formatMoney((p.discountPrice ?? p.price))}
                                             </span>
                                           </p>
                                         </div>
@@ -621,7 +627,7 @@ export function MinimalNavbar() {
                                 <Link
                                   key={cat.id}
                                   href={`/shop?category=${cat.slug || cat.id}`}
-                                  className='text-sm font-normal text-gray-800 hover:text-black transition-colors tracking-wide'
+                                  className='text-[15px] font-medium text-perce-ink hover:text-perce-ink-muted transition-colors'
                                   onClick={handleCloseSheet}>
                                   {cat.name}
                                 </Link>
@@ -631,7 +637,7 @@ export function MinimalNavbar() {
                               <Link
                                 key={link.id}
                                 href={link.to}
-                                className='text-sm font-normal text-gray-800 hover:text-black transition-colors tracking-wide'
+                                className='text-[15px] font-medium text-perce-ink hover:text-perce-ink-muted transition-colors'
                                 onClick={handleCloseSheet}>
                                 {link.label}
                               </Link>

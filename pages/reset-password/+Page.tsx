@@ -76,7 +76,7 @@ export default function Page() {
             <AlertCircle className='w-8 h-8 text-[#E65100]' />
           </div>
           <div className='space-y-3 text-center'>
-            <h1 className='text-[24px] font-light tracking-[-0.02em] text-[#2B231D]'>
+            <h1 className='text-[24px] font-medium tracking-[-0.02em] text-[#2B231D]'>
               Invalid link
             </h1>
             <p className='text-[14px] text-[#8B7E74] leading-relaxed'>
@@ -86,7 +86,7 @@ export default function Page() {
           </div>
           <Link
             href='/forgot-password'
-            className='text-[13px] text-[#2B231D] hover:text-[#C4A574] transition-all duration-500 tracking-[0.04em] font-light'>
+            className='text-[13px] text-[#2B231D] hover:text-[#C4A574] transition-all duration-500 font-light'>
             Request a new reset link
           </Link>
         </div>
@@ -116,7 +116,7 @@ export default function Page() {
               <CheckCircle className='w-8 h-8 text-[#4CAF50]' />
             </div>
             <div className='space-y-3'>
-              <h1 className='text-[24px] md:text-[28px] font-light tracking-[-0.02em] text-[#2B231D] leading-tight'>
+              <h1 className='text-[24px] md:text-[28px] font-medium tracking-[-0.02em] text-[#2B231D] leading-tight'>
                 Password updated
               </h1>
               <p className='text-[14px] text-[#8B7E74] leading-relaxed max-w-[300px]'>
@@ -125,7 +125,7 @@ export default function Page() {
               </p>
             </div>
             <Button
-              className='w-full bg-[#2B231D] hover:bg-[#3A3028] text-[#F8F6F3] font-normal text-[14px] tracking-[0.04em] py-7 rounded-[14px] transition-all duration-500 shadow-[0_4px_16px_rgba(43,35,29,0.12)] hover:shadow-[0_6px_24px_rgba(43,35,29,0.18)] uppercase mt-2'
+              className='w-full bg-[#2B231D] hover:bg-[#3A3028] text-[#F8F6F3] font-normal text-[14px] py-7 rounded-[14px] transition-all duration-500 shadow-[0_4px_16px_rgba(43,35,29,0.12)] hover:shadow-[0_6px_24px_rgba(43,35,29,0.18)] uppercase mt-2'
               onClick={() => { window.location.href = "/login"; }}>
               Go to Login
             </Button>
@@ -133,7 +133,7 @@ export default function Page() {
         ) : (
           <>
             <div className='relative space-y-3'>
-              <h1 className='text-[28px] md:text-[32px] text-center font-light tracking-[-0.02em] text-[#2B231D] leading-tight'>
+              <h1 className='text-[28px] md:text-[32px] text-center font-medium tracking-[-0.02em] text-[#2B231D] leading-tight'>
                 New password
               </h1>
               <p className='text-center text-[13px] text-[#8B7E74] tracking-wide leading-relaxed'>
@@ -148,7 +148,7 @@ export default function Page() {
               <div className='relative'>
                 <label
                   htmlFor='password'
-                  className='block text-[10px] uppercase tracking-[0.12em] text-[#8B7E74] mb-3 font-medium'>
+                  className='block text-[10px] text-[#8B7E74] mb-3 font-medium'>
                   New Password
                 </label>
                 <div className='relative'>
@@ -183,7 +183,7 @@ export default function Page() {
               <div className='relative'>
                 <label
                   htmlFor='confirmPassword'
-                  className='block text-[10px] uppercase tracking-[0.12em] text-[#8B7E74] mb-3 font-medium'>
+                  className='block text-[10px] text-[#8B7E74] mb-3 font-medium'>
                   Confirm Password
                 </label>
                 <div className='relative'>
@@ -215,7 +215,7 @@ export default function Page() {
               </div>
 
               <Button
-                className='w-full bg-[#2B231D] hover:bg-[#3A3028] text-[#F8F6F3] font-normal text-[14px] tracking-[0.04em] mt-4 py-7 rounded-[14px] transition-all duration-500 shadow-[0_4px_16px_rgba(43,35,29,0.12)] hover:shadow-[0_6px_24px_rgba(43,35,29,0.18)] uppercase'
+                className='w-full bg-[#2B231D] hover:bg-[#3A3028] text-[#F8F6F3] font-normal text-[14px] mt-4 py-7 rounded-[14px] transition-all duration-500 shadow-[0_4px_16px_rgba(43,35,29,0.12)] hover:shadow-[0_6px_24px_rgba(43,35,29,0.18)] uppercase'
                 type='submit'
                 disabled={isSubmitting}>
                 {isSubmitting ? "Resetting..." : "Reset Password"}

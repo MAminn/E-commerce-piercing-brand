@@ -10,6 +10,7 @@ import { useCart } from "#root/lib/context/CartContext";
 import { useTracking } from "#root/frontend/contexts/TrackingContext";
 import { TrackingEventName } from "#root/shared/types/pixel-tracking";
 import { STORE_CURRENCY } from "#root/shared/config/branding";
+import { ProductJsonLd } from "#root/components/shop/ProductJsonLd";
 import type { ProductPageProduct } from "#root/components/template-system/productPage/ProductPageModernSplit";
 import {
   resolvePurchasableLinePrice,
@@ -234,7 +235,7 @@ export default function ProductDetailPage() {
     fetchProductData();
   }, [fetchProductData]);
 
-  // The DB selection wins, and the ZELI preset (product-minimal) is what an
+  // The DB selection wins, and the Percé preset (product-minimal) is what an
   // unconfigured store gets. This used to hard-override to "product-minimal"
   // whenever the shell was minimal, which silently ignored the admin's own
   // choice in Dashboard > Templates > Product Page — the picker saved a value
@@ -263,6 +264,9 @@ export default function ProductDetailPage() {
   }
 
   return (
+    <>
+      {/* Product structured data (schema.org), priced in EGP. */}
+      {productData && <ProductJsonLd product={productData} />}
     <Template
       product={productData ?? undefined}
       relatedProducts={relatedProducts}
@@ -325,5 +329,6 @@ export default function ProductDetailPage() {
         console.log("Image clicked:", url, index)
       }
     />
+    </>
   );
 }

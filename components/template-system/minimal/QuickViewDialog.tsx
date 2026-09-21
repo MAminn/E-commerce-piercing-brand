@@ -8,6 +8,7 @@ import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { cn } from "#root/lib/utils";
 import { showCartToast } from "#root/components/ui/cart-toast";
 import type { MinimalProduct } from "./MinimalProductCard";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 interface QuickViewDialogProps {
   product: MinimalProduct | null;
@@ -25,7 +26,7 @@ export function QuickViewDialog({ product, open, onClose }: QuickViewDialogProps
   const { addItem } = useCart();
   const { trackEvent } = useTracking();
   const { toggle, isWishlisted } = useWishlist();
-  const { t } = useMinimalI18n();
+  const { t, locale } = useMinimalI18n();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
 
@@ -92,20 +93,20 @@ export function QuickViewDialog({ product, open, onClose }: QuickViewDialogProps
       role='dialog'
       aria-modal='true'>
       <div
-        className='relative bg-zeli-surface-raised w-[95vw] max-w-[800px] max-h-[90vh] overflow-y-auto shadow-xl'
+        className='relative bg-perce-surface-raised w-[95vw] max-w-[800px] max-h-[90vh] overflow-y-auto shadow-xl'
         onClick={(e) => e.stopPropagation()}>
         {/* Close button */}
         <button
           type='button'
           onClick={onClose}
-          className='absolute top-3 end-3 z-10 w-8 h-8 flex items-center justify-center bg-zeli-surface-raised rounded-full shadow hover:bg-zeli-surface transition-colors'
+          className='absolute top-3 end-3 z-10 w-8 h-8 flex items-center justify-center bg-perce-surface-raised rounded-full shadow hover:bg-perce-surface transition-colors'
           aria-label={t("close")}>
           <X className='w-4 h-4' />
         </button>
 
         <div className='flex flex-col md:flex-row'>
           {/* Image gallery */}
-          <div className='relative md:w-1/2 aspect-square bg-zeli-surface'>
+          <div className='relative md:w-1/2 aspect-square bg-perce-surface'>
             <img
               src={images[currentImageIndex] || ""}
               alt={product.name}
@@ -140,7 +141,7 @@ export function QuickViewDialog({ product, open, onClose }: QuickViewDialogProps
 
             {/* Tag */}
             {product.tag || product.isNew ? (
-              <span className='absolute top-3 start-3 bg-zeli-accent text-zeli-ink-inverse text-[10px] font-medium px-2.5 py-1 tracking-wide'>
+              <span className='absolute top-3 start-3 bg-perce-cta text-perce-ink-inverse text-[10px] font-medium px-2.5 py-1 tracking-wide'>
                 {product.tag || t("new")}
               </span>
             ) : null}
@@ -157,7 +158,7 @@ export function QuickViewDialog({ product, open, onClose }: QuickViewDialogProps
                     navigator.share({ title: product.name, url: window.location.href });
                   }
                 }}
-                className='p-1.5 text-zeli-ink-subtle hover:text-zeli-ink transition-colors'>
+                className='p-1.5 text-perce-ink-subtle hover:text-perce-ink transition-colors'>
                 <Share2 className='w-4 h-4' />
               </button>
               <button
@@ -165,35 +166,35 @@ export function QuickViewDialog({ product, open, onClose }: QuickViewDialogProps
                 onClick={() => toggle(product.id)}
                 className={cn(
                   "p-1.5 transition-colors",
-                  wishlisted ? "text-zeli-sale" : "text-zeli-ink-subtle hover:text-zeli-ink",
+                  wishlisted ? "text-perce-sale" : "text-perce-ink-subtle hover:text-perce-ink",
                 )}>
                 <Heart className={cn("w-4 h-4", wishlisted && "fill-current")} />
               </button>
             </div>
 
             {/* Name */}
-            <h2 className='text-lg font-normal text-zeli-ink mb-1'>
+            <h2 className='text-lg font-medium text-perce-ink mb-1'>
               {product.name}
             </h2>
 
             {/* Tax note */}
-            {/* <p className='text-xs text-zeli-ink-subtle mb-2'>{t("price_includes_tax")}</p> */}
+            {/* <p className='text-xs text-perce-ink-subtle mb-2'>{t("price_includes_tax")}</p> */}
 
             {/* Price */}
             <div className='flex items-center gap-2 mb-4'>
               {hasDiscount && (
-                <span className='text-base text-zeli-ink-subtle line-through'>
-                  {product.price} {t("currency")}
+                <span className='text-base text-perce-ink-subtle line-through'>
+                  {formatMoney(product.price, { locale })}
                 </span>
               )}
-              <span className={cn("text-base font-semibold", hasDiscount ? "text-zeli-sale" : "text-zeli-ink")}>
-                {displayPrice} {t("currency")}
+              <span className={cn("text-base font-semibold", hasDiscount ? "text-perce-sale" : "text-perce-ink")}>
+                {formatMoney(displayPrice, { locale })}
               </span>
             </div>
 
             {/* Availability */}
             {product.available && (
-              <div className='flex items-center gap-1.5 text-zeli-success text-sm mb-4'>
+              <div className='flex items-center gap-1.5 text-perce-success text-sm mb-4'>
                 <Check className='w-4 h-4' />
                 {t("in_stock")}
               </div>
@@ -202,29 +203,29 @@ export function QuickViewDialog({ product, open, onClose }: QuickViewDialogProps
             {/* Description (truncated) */}
             {product.description && (
               <div className='mb-4'>
-                <p className='text-sm text-zeli-ink-secondary leading-relaxed line-clamp-4'>
+                <p className='text-sm text-perce-ink-secondary leading-relaxed line-clamp-4'>
                   {product.description}
                 </p>
               </div>
             )}
 
             {/* Divider */}
-            <div className='border-t border-zeli-line my-3' />
+            <div className='border-t border-perce-line my-3' />
 
             {/* Quantity + Add to cart */}
             <div className='flex items-center gap-3 mt-auto'>
-              <div className='flex items-center border border-zeli-line'>
+              <div className='flex items-center border border-perce-line'>
                 <button
                   type='button'
                   onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                  className='w-9 h-9 flex items-center justify-center text-zeli-ink-muted hover:text-zeli-ink transition-colors'>
+                  className='w-9 h-9 flex items-center justify-center text-perce-ink-muted hover:text-perce-ink transition-colors'>
                   −
                 </button>
-                <span className='w-10 text-center text-sm text-zeli-ink'>{quantity}</span>
+                <span className='w-10 text-center text-sm text-perce-ink'>{quantity}</span>
                 <button
                   type='button'
                   onClick={() => setQuantity((q) => q + 1)}
-                  className='w-9 h-9 flex items-center justify-center text-zeli-ink-muted hover:text-zeli-ink transition-colors'>
+                  className='w-9 h-9 flex items-center justify-center text-perce-ink-muted hover:text-perce-ink transition-colors'>
                   +
                 </button>
               </div>
@@ -233,7 +234,7 @@ export function QuickViewDialog({ product, open, onClose }: QuickViewDialogProps
                 onClick={handleAddToCart}
                 disabled={!product.available}
                 data-add-to-cart='true'
-                className='flex-1 py-2.5 bg-zeli-accent text-zeli-ink-inverse text-xs font-medium tracking-wide uppercase hover:bg-zeli-accent-hover transition-colors disabled:opacity-40'>
+                className='flex-1 py-2.5 bg-perce-cta text-perce-ink-inverse text-xs font-medium hover:bg-perce-cta-hover transition-colors disabled:opacity-40'>
                 {product.available ? t("add_to_cart") : t("out_of_stock")}
               </button>
             </div>

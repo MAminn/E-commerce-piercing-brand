@@ -1,8 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import type React from "react";
 import { Link } from "#root/components/utils/Link";
-import { ZeliHero } from "#root/components/template-system/minimal/ZeliHero";
-import { ZeliEditorialBlock } from "#root/components/template-system/minimal/ZeliEditorialBlock";
+import { PerceHero } from "#root/components/template-system/minimal/PerceHero";
+import { PerceEditorialBlock } from "#root/components/template-system/minimal/PerceEditorialBlock";
 import type { HeroSlide } from "#root/components/ui/hero-carousel";
 import { MinimalProductCarousel } from "#root/components/template-system/minimal/MinimalProductCarousel";
 import { MinimalBundleSection } from "#root/components/bundles/MinimalBundleSection";
@@ -99,7 +99,7 @@ function CategoryCarousel({ categories }: { categories: CategoryStripItem[] }) {
         disabled={!canScrollLeft}
         tabIndex={-1}
         aria-hidden='true'
-        className='absolute -start-2 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center border border-zeli-line bg-zeli-bg transition-colors hover:border-zeli-accent disabled:opacity-20 md:flex'>
+        className='absolute -start-2 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center border border-perce-line bg-perce-bg transition-colors hover:border-perce-cta disabled:opacity-20 md:flex'>
         <ChevronLeft className='w-4 h-4' />
       </button>
       <button
@@ -107,7 +107,7 @@ function CategoryCarousel({ categories }: { categories: CategoryStripItem[] }) {
         disabled={!canScrollRight}
         tabIndex={-1}
         aria-hidden='true'
-        className='absolute -end-2 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center border border-zeli-line bg-zeli-bg transition-colors hover:border-zeli-accent disabled:opacity-20 md:flex'>
+        className='absolute -end-2 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center border border-perce-line bg-perce-bg transition-colors hover:border-perce-cta disabled:opacity-20 md:flex'>
         <ChevronRight className='w-4 h-4' />
       </button>
 
@@ -132,31 +132,27 @@ function CategoryCarousel({ categories }: { categories: CategoryStripItem[] }) {
               {/* Tall portrait crop — a placement shot is a close-up of an
                   ear, which is a vertical subject. The whole tile is the
                   link, so there is no separate clickable div. */}
-              <div className='relative aspect-[4/5] overflow-hidden bg-zeli-surface'>
+              <div className='relative aspect-[4/5] overflow-hidden bg-perce-surface'>
                 {imgSrc ? (
                   <img
                     src={imgSrc}
                     alt=''
                     className='h-full w-full object-cover object-center transition-transform ease-out group-hover:scale-[1.04]'
-                    style={{ transitionDuration: "var(--zeli-duration-slow)" }}
+                    style={{ transitionDuration: "var(--perce-duration-slow)" }}
                     loading='lazy'
                     decoding='async'
                   />
                 ) : (
                   /* No category image uploaded yet: a plain warm ground, not
                      a placeholder icon pretending to be product imagery. */
-                  <div className='h-full w-full bg-zeli-surface' />
+                  <div className='h-full w-full bg-perce-surface' />
                 )}
-                {/* Bottom scrim so the caption stays legible over any
-                    photograph, without dimming the whole image. */}
-                <div
-                  aria-hidden='true'
-                  className='pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/45 to-transparent'
-                />
-                <h3 className='absolute inset-x-0 bottom-0 p-4 text-left text-[0.8125rem] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-white sm:text-sm'>
-                  {cat.name}
-                </h3>
               </div>
+              {/* Caption below the photo, not over it: no scrim, no gradient,
+                  and the image stays a clean product window. */}
+              <h3 className='mt-2 text-left text-[0.8125rem] font-medium text-perce-ink sm:text-sm'>
+                {cat.name}
+              </h3>
             </Link>
           );
         })}
@@ -278,17 +274,17 @@ export function LandingTemplateMinimal({
   }));
 
   return (
-    <div className={`landing-template-minimal overflow-x-hidden bg-white ${className}`}>
+    <div className={`landing-template-minimal overflow-x-hidden bg-perce-bg ${className}`}>
       <ScrollToProductsButton targetId='home-products' />
       {/* ═══════════════════════════════════════════════
           3. HERO — image + campaign copy
           ═══════════════════════════════════════════════
-          ZeliHero replaces the old HeroCarousel here. That component rendered
+          PerceHero replaces the old HeroCarousel here. That component rendered
           images only, so on a store with hero images the CMS title, subtitle
           and CTA never appeared at all and the page opened on a bare 16:9
-          strip. ZeliHero composes image and copy, uses a portrait crop on
+          strip. PerceHero composes image and copy, uses a portrait crop on
           phones, and still degrades to image-only or text-only. */}
-      <ZeliHero
+      <PerceHero
         hero={content.hero}
         slides={heroSlides}
         onCtaClick={onCtaClick}
@@ -302,20 +298,20 @@ export function LandingTemplateMinimal({
           an empty catalogue should show nothing, not fabricated navigation. */}
       {content.categories.enabled &&
         (categoriesLoading || categories.length > 0) && (
-        <section className='zeli-section zeli-container'>
+        <section className='perce-section perce-container'>
           <div>
             {/* Left-aligned editorial heading. The previous centred heading
                 with a hard 2px underline bar is the single most template-like
                 element on the page; a quiet left-aligned title lets the
                 photography carry the section. */}
             <div className='mb-8 sm:mb-10'>
-              <h2 className='zeli-section-title'>
+              <h2 className='perce-section-title'>
                 {locale === "ar" && content.categories.titleAr
                   ? content.categories.titleAr
                   : content.categories.title}
               </h2>
               {content.categories.subtitle?.trim() && (
-                <p className='mt-2 max-w-prose text-sm text-zeli-ink-muted'>
+                <p className='mt-2 max-w-prose text-sm text-perce-ink-muted'>
                   {content.categories.subtitle}
                 </p>
               )}
@@ -326,7 +322,7 @@ export function LandingTemplateMinimal({
                 {["s1", "s2", "s3", "s4"].map((key) => (
                   <div
                     key={key}
-                    className='aspect-[4/5] animate-pulse bg-zeli-surface'
+                    className='aspect-[4/5] animate-pulse bg-perce-surface'
                   />
                 ))}
               </div>
@@ -355,7 +351,7 @@ export function LandingTemplateMinimal({
                 ? content.newArrivals.viewAllTextAr
                 : content.newArrivals?.viewAllText || t("view_all")
             }
-            className='bg-zeli-surface'
+            className='bg-perce-surface'
             onQuickView={setQuickViewProduct}
           />
         )}
@@ -390,7 +386,7 @@ export function LandingTemplateMinimal({
               ? content.bundles.viewAllTextAr
               : content.bundles?.viewAllText || t("bundles.view_all")
           }
-          className='bg-zeli-bg'
+          className='bg-perce-bg'
         />
       )}
 
@@ -411,7 +407,7 @@ export function LandingTemplateMinimal({
               ? content.featuredProducts.viewAllTextAr
               : content.featuredProducts.viewAllText
           }
-          className='bg-zeli-bg'
+          className='bg-perce-bg'
           onQuickView={setQuickViewProduct}
         />
       )}
@@ -422,7 +418,7 @@ export function LandingTemplateMinimal({
           Driven entirely by the existing `brandStatement` CMS fields, which
           the template never rendered before. Shows nothing at all until an
           admin publishes a heading or an image — no placeholder manifesto. */}
-      <ZeliEditorialBlock
+      <PerceEditorialBlock
         heading={content.brandStatement?.title}
         body={content.brandStatement?.description}
         imageUrl={resolveImageUrl(content.brandStatement?.image)}
@@ -453,7 +449,7 @@ export function LandingTemplateMinimal({
                 ? content.discountedProducts.viewAllTextAr
                 : content.discountedProducts?.viewAllText || t("view_all")
             }
-            className='bg-zeli-bg'
+            className='bg-perce-bg'
             onQuickView={setQuickViewProduct}
           />
         )}
@@ -473,12 +469,12 @@ export function LandingTemplateMinimal({
         if (content.bottomCarousel?.enabled === false) return null;
         if (stackSlides.length === 0) return null;
         return (
-          <section className='zeli-section bg-zeli-bg'>
-            <div className='zeli-container'>
-              <h2 className='zeli-eyebrow mb-6'>{t("shop_the_look")}</h2>
+          <section className='perce-section bg-perce-bg'>
+            <div className='perce-container'>
+              <h2 className='perce-eyebrow mb-6'>{t("shop_the_look")}</h2>
             </div>
             <div className='overflow-x-auto scrollbar-hide snap-x snap-mandatory'>
-              <div className='flex w-max gap-3 px-[var(--zeli-gutter)] sm:gap-4'>
+              <div className='flex w-max gap-3 px-[var(--perce-gutter)] sm:gap-4'>
                 {stackSlides.map((slide, i) => {
                   const src = resolveImageUrl(slide.imageUrl);
                   const mobileSrc = resolveImageUrl(slide.mobileImageUrl);
@@ -487,7 +483,7 @@ export function LandingTemplateMinimal({
                     <Frame
                       key={slide.id ?? `${slide.imageUrl}-${i}`}
                       {...(slide.linkUrl ? { href: slide.linkUrl } : {})}
-                      className='group relative w-[240px] flex-none snap-start overflow-hidden bg-zeli-surface sm:w-[300px] lg:w-[360px]'>
+                      className='group relative w-[240px] flex-none snap-start overflow-hidden bg-perce-surface sm:w-[300px] lg:w-[360px]'>
                       <div className='aspect-[4/5]'>
                         <picture>
                           {mobileSrc && (
@@ -501,7 +497,7 @@ export function LandingTemplateMinimal({
                             alt={slide.alt ?? ""}
                             className='h-full w-full object-cover object-center transition-transform ease-out group-hover:scale-[1.04]'
                             style={{
-                              transitionDuration: "var(--zeli-duration-slow)",
+                              transitionDuration: "var(--perce-duration-slow)",
                             }}
                             loading='lazy'
                             decoding='async'
@@ -509,7 +505,7 @@ export function LandingTemplateMinimal({
                         </picture>
                       </div>
                       {slide.alt?.trim() && (
-                        <p className='px-1 py-3 text-xs text-zeli-ink-muted'>
+                        <p className='px-1 py-3 text-xs text-perce-ink-muted'>
                           {slide.alt}
                         </p>
                       )}

@@ -61,7 +61,7 @@ export default function Page() {
               <h1 className='text-2xl font-bold text-center'>
                 Verifying Your Email
               </h1>
-              <p className='text-zeli-ink-muted text-center mt-2'>
+              <p className='text-perce-ink-muted text-center mt-2'>
                 Please wait while we verify your email address...
               </p>
             </div>
@@ -73,7 +73,7 @@ export default function Page() {
               <h1 className='text-2xl font-bold text-center text-[#1B4571]'>
                 Email Verified Successfully!
               </h1>
-              <p className='text-zeli-ink-muted text-center mt-2 mb-6'>
+              <p className='text-perce-ink-muted text-center mt-2 mb-6'>
                 Your email has been verified. You can now log in to your account
                 and access all features of {STORE_NAME}.
               </p>
@@ -89,7 +89,7 @@ export default function Page() {
               <h1 className='text-2xl font-bold text-center text-red-600'>
                 Verification Failed
               </h1>
-              <p className='text-zeli-ink-muted text-center mt-2 mb-6'>
+              <p className='text-perce-ink-muted text-center mt-2 mb-6'>
                 {errorMessage ||
                   "We couldn't verify your email. The verification link may be invalid or expired."}
               </p>

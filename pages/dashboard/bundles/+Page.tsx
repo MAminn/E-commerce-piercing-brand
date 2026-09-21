@@ -27,6 +27,7 @@ import {
   AlertDialogTitle,
 } from "#root/components/ui/alert-dialog";
 import { CampaignFormDialog, type BundleCampaign } from "./components";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 const STATE_LABEL: Record<BundleCampaignState, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
   inactive: { label: "Draft", variant: "outline" },
@@ -35,7 +36,7 @@ const STATE_LABEL: Record<BundleCampaignState, { label: string; variant: "defaul
   expired: { label: "Expired", variant: "destructive" },
 };
 
-const money = (n: number) => `${n.toFixed(2)} ${STORE_CURRENCY}`;
+const money = (n: number) => formatMoney(n, { currency: STORE_CURRENCY, alwaysShowFraction: true });
 
 /**
  * "Choose 6 from 10 · 480.00 EGP" / "3·4·6 pieces from 10 · from 270.00 EGP"

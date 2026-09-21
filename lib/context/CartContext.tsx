@@ -20,6 +20,7 @@ import {
   type PricingBundle,
   type PricingRegularLine,
 } from "#root/shared/bundles/cart-pricing";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 const CART_STORAGE_KEY = "cart";
 /** Separate key from the legacy "cart" array so pre-Phase-2 carts parse unchanged. */
@@ -607,7 +608,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           result.result.discountLabel ??
           (result.result.discountType === "percentage"
             ? `${result.result.discountValue}% off`
-            : `${result.result.discountValue.toFixed(2)} EGP off`);
+            : `${formatMoney(result.result.discountValue)} off`);
         return {
           success: true,
           message: `"${code}" applied — ${label}.`,

@@ -18,6 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "#root/components/ui/table";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 interface TopSellingProduct {
   id: string;
@@ -171,10 +172,10 @@ export const TopSellingProductsCard = ({
                     {showVendor && (
                       <TableCell>{product.vendorName || "N/A"}</TableCell>
                     )}
-                    <TableCell>{product.price.toFixed(2)} EGP</TableCell>
+                    <TableCell>{formatMoney(product.price, { alwaysShowFraction: true })}</TableCell>
                     <TableCell>{product.sold}</TableCell>
                     <TableCell className='font-semibold'>
-                      {product.revenue.toFixed(2)} EGP
+                      {formatMoney(product.revenue, { alwaysShowFraction: true })}
                     </TableCell>
                   </TableRow>
                 ))

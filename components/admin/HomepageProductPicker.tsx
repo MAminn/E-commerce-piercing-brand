@@ -12,6 +12,7 @@ import {
 } from "#root/components/ui/dialog";
 import { Checkbox } from "#root/components/ui/checkbox";
 import { Plus, X, Search, GripVertical } from "lucide-react";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 interface ProductItem {
   id: string;
@@ -209,14 +210,14 @@ export function HomepageProductPicker({
                             {product.discountPrice ? (
                               <>
                                 <span className='line-through'>
-                                  ${product.price}
+                                  {formatMoney(product.price)}
                                 </span>{" "}
                                 <span className='text-green-600'>
-                                  ${product.discountPrice}
+                                  {formatMoney(product.discountPrice)}
                                 </span>
                               </>
                             ) : (
-                              `$${product.price}`
+                              formatMoney(product.price)
                             )}
                             {product.stock <= 0 && (
                               <span className='ml-2 text-red-500'>

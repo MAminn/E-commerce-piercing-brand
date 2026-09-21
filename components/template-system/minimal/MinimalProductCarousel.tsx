@@ -70,18 +70,18 @@ export function MinimalProductCarousel({
   if (!products.length) return null;
 
   return (
-    <section id={id} className={cn("zeli-section", className)}>
-      <div className='mx-auto max-w-[var(--zeli-content-max)]'>
+    <section id={id} className={cn("perce-section", className)}>
+      <div className='mx-auto max-w-[var(--perce-content-max)]'>
         {/* Heading row: title left, "view all" right on the same baseline.
             The previous centred title with a 2px underline bar read as a
             generic storefront; this reads as an editorial section head. */}
         {title && (
-          <div className='mb-7 flex items-baseline justify-between gap-4 px-[var(--zeli-gutter)] sm:mb-9'>
-            <h2 className='zeli-section-title'>{title}</h2>
+          <div className='mb-7 flex items-baseline justify-between gap-4 px-[var(--perce-gutter)] sm:mb-9'>
+            <h2 className='perce-section-title'>{title}</h2>
             {viewAllHref && (
               <a
                 href={viewAllHref}
-                className='zeli-underline-hover hidden shrink-0 text-[0.6875rem] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-zeli-ink-muted hover:text-zeli-ink sm:inline-flex'>
+                className='perce-underline-hover hidden shrink-0 text-xs font-medium text-perce-ink-muted hover:text-perce-ink sm:inline-flex'>
                 {viewAllText || t("view_all")}
               </a>
             )}
@@ -96,7 +96,7 @@ export function MinimalProductCarousel({
             disabled={!canScrollLeft}
             tabIndex={-1}
             aria-hidden='true'
-            className='absolute -start-2 top-[38%] z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center border border-zeli-line bg-zeli-bg transition-colors hover:border-zeli-accent disabled:opacity-20 md:flex'>
+            className='absolute -start-2 top-[38%] z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center border border-perce-line bg-perce-bg transition-colors hover:border-perce-cta disabled:opacity-20 md:flex'>
             <ChevronLeft className='w-4 h-4' />
           </button>
           <button
@@ -104,14 +104,14 @@ export function MinimalProductCarousel({
             disabled={!canScrollRight}
             tabIndex={-1}
             aria-hidden='true'
-            className='absolute -end-2 top-[38%] z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center border border-zeli-line bg-zeli-bg transition-colors hover:border-zeli-accent disabled:opacity-20 md:flex'>
+            className='absolute -end-2 top-[38%] z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center border border-perce-line bg-perce-bg transition-colors hover:border-perce-cta disabled:opacity-20 md:flex'>
             <ChevronRight className='w-4 h-4' />
           </button>
 
           {/* Scrollable track */}
           <div
             ref={scrollRef}
-            className='scrollbar-hide flex snap-x snap-mandatory gap-3 overflow-x-auto px-[var(--zeli-gutter)] pb-2 sm:gap-5'>
+            className='scrollbar-hide flex snap-x snap-mandatory gap-3 overflow-x-auto px-[var(--perce-gutter)] pb-2 sm:gap-5'>
             {products.map((product) => (
               <div
                 key={product.id}
@@ -170,7 +170,7 @@ function ViewAllButton({ href, text }: { href: string; text: string }) {
       )}>
       <a
         href={href}
-        className='group inline-flex items-center gap-2 px-8 py-3 border border-stone-900 text-sm font-light text-stone-900 tracking-widest uppercase hover:bg-stone-900 hover:text-white transition-all duration-300'>
+        className='group inline-flex items-center gap-2 px-8 py-3 border border-stone-900 text-sm font-medium text-stone-900 hover:bg-stone-900 hover:text-white transition-all duration-300'>
         {text}
         <ArrowRight className='w-4 h-4 transition-transform duration-300 group-hover:translate-x-1' />
       </a>

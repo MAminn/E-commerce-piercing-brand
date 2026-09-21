@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Business-promise sweep (Phase 2). Hardcoded shipping / returns / warranty
-// claims removed — ZELI has published no such policies, and switching to this
+// claims removed — Percé has published no such policies, and switching to this
 // template from the dashboard would have shown them to customers.
 // ─────────────────────────────────────────────────────────────────────────────
 /**

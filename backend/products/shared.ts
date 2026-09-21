@@ -4,7 +4,7 @@ import { Effect } from "effect";
 import { ServerError } from "#root/shared/error/server";
 
 /**
- * Legacy fragrance payload from the previous perfume storefront. The ZELI
+ * Legacy fragrance payload from the previous perfume storefront. The Percé
  * product form no longer sends it, and no active template renders it — the
  * create/edit contracts still accept it so older clients and existing records
  * keep working. Omitting it on edit leaves the stored value untouched.

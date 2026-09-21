@@ -193,28 +193,28 @@ export function bundleRejectionMessage(
   campaignTitle?: string,
   detail?: BundleRejectionDetail | null,
 ): string {
-  const name = campaignTitle ? `"${campaignTitle}"` : "This bundle";
-  const productName = detail?.productName ?? "one of the products in your stack";
+  const name = campaignTitle ? `"${campaignTitle}"` : "This set";
+  const productName = detail?.productName ?? "one of the products in your set";
   const optionName = detail?.optionName ?? "an option";
   switch (code) {
     case "campaign_not_found":
-      return "This bundle is no longer available.";
+      return "This set is no longer available.";
     case "tier_unavailable":
-      return "That stack size is no longer offered. Please rebuild your stack.";
+      return "That set size is no longer offered. Please pick your set again.";
     case "campaign_not_live":
       return `${name} is not available right now.`;
     case "product_unavailable":
-      return "One of the products in your stack is no longer available. Please rebuild your stack.";
+      return "One of the products in your set is no longer available. Please pick your set again.";
     case "product_not_eligible":
-      return "One of the products in your stack is not part of this bundle. Please rebuild your stack.";
+      return "One of the products in your set is not part of this offer. Please pick your set again.";
     case "out_of_stock":
-      return "One of the products in your stack has sold out. Please rebuild your stack.";
+      return "One of the products in your set has sold out. Please pick your set again.";
     case "invalid_pricing":
       return `${name} cannot be priced right now. Please try again later.`;
     case "price_changed":
       return `The price of ${name} has changed. Please review your cart before continuing.`;
     case "option_required":
-      return `Please choose ${optionName} for ${productName} before adding it to your stack.`;
+      return `Please choose ${optionName} for ${productName} before adding it to your set.`;
     case "option_not_found":
       return `The ${optionName} you chose for ${productName} is no longer available. Please choose another option.`;
     case "option_unavailable":
@@ -222,19 +222,19 @@ export function bundleRejectionMessage(
     case "composition_incomplete":
       return `${name} is not available right now.`;
     case "duplicates_not_allowed":
-      return "Each product can only be added once to this stack.";
+      return "Each product can only be added once to this set.";
     case "max_per_product_exceeded":
-      return "You have added too many of the same product to this stack.";
+      return "You have added too many of the same product to this set.";
     case "not_enough_units":
-      return "Your stack is not complete yet.";
+      return "Your set is not complete yet.";
     case "too_many_units":
-      return "Your stack has too many items.";
+      return "Your set has too many items.";
     case "no_matching_tier":
-      return "That number of pieces isn't one of this bundle's sizes. Adjust your stack to a listed size.";
+      return "That number of pieces isn't one of this set's sizes. Adjust your set to a listed size.";
     case "no_tiers_configured":
       return `${name} has no pricing set up right now.`;
     default:
-      return "Your stack could not be validated. Please rebuild it.";
+      return "Your set could not be checked. Please pick it again.";
   }
 }
 

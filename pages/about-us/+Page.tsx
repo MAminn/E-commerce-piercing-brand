@@ -63,7 +63,7 @@ function Page() {
 
           {/* Text Content */}
           <div className={`w-full ${imageUrl ? "lg:w-1/2" : "max-w-2xl mx-auto text-center"}`}>
-            <h1 className='text-3xl sm:text-4xl lg:text-5xl font-light tracking-wide text-gray-900 mb-6 sm:mb-8'>
+            <h1 className='text-3xl sm:text-4xl lg:text-5xl font-medium tracking-wide text-gray-900 mb-6 sm:mb-8'>
               {title}
             </h1>
             <div className='space-y-4'>

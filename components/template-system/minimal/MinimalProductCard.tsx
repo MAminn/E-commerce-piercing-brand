@@ -9,6 +9,7 @@ import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { getProductUrl } from "#root/lib/utils/route-helpers";
 import { cn } from "#root/lib/utils";
 import { showCartToast, flyToCart } from "#root/components/ui/cart-toast";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 interface ProductImage {
   url: string;
@@ -52,7 +53,7 @@ export function MinimalProductCard({
   const { addItem } = useCart();
   const { trackEvent } = useTracking();
   const { toggle, isWishlisted } = useWishlist();
-  const { t } = useMinimalI18n();
+  const { t, locale } = useMinimalI18n();
   const [isAdding, setIsAdding] = useState(false);
   // Starts false and flips on load, which fades the image in. A browser that
   // serves the image from cache can finish decoding before React attaches the
@@ -132,7 +133,7 @@ export function MinimalProductCard({
   return (
     <div className={cn("group flex flex-col", className)}>
       {/* Image container */}
-      <div className='relative aspect-[4/5] overflow-hidden bg-zeli-surface'>
+      <div className='relative aspect-[4/5] overflow-hidden bg-perce-surface'>
         <Link href={productUrl} className='block w-full h-full'>
           <img
             ref={(node) => {
@@ -154,7 +155,7 @@ export function MinimalProductCard({
 
         {/* Tag badge (top-right) */}
         {tagText && (
-          <span className='absolute start-3 top-3 bg-zeli-bg/95 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-zeli-ink'>
+          <span className='absolute start-3 top-3 bg-perce-bg/95 px-2.5 py-1 text-xs font-medium text-perce-ink'>
             {tagText}
           </span>
         )}
@@ -162,8 +163,8 @@ export function MinimalProductCard({
         {/* Sold out — stated on the image itself. Previously the only signal
             was a disabled button below the fold of the card. */}
         {!product.available && (
-          <div className='absolute inset-0 flex items-center justify-center bg-zeli-bg/55'>
-            <span className='bg-zeli-bg px-3 py-1.5 text-[10px] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-zeli-ink'>
+          <div className='absolute inset-0 flex items-center justify-center bg-perce-bg/55'>
+            <span className='bg-perce-bg px-3 py-1.5 text-xs font-medium text-perce-ink'>
               {t("out_of_stock")}
             </span>
           </div>
@@ -178,7 +179,7 @@ export function MinimalProductCard({
               e.stopPropagation();
               onQuickView?.(product);
             }}
-            className='w-11 h-11 md:w-9 md:h-9 flex items-center justify-center bg-white rounded-full shadow-md hover:bg-zeli-surface transition-colors'
+            className='w-11 h-11 md:w-9 md:h-9 flex items-center justify-center bg-white rounded-full shadow-md hover:bg-perce-surface transition-colors'
             aria-label={`${t("quick_view")}: ${product.name}`}>
             <Eye className='w-4 h-4 text-stone-700' />
           </button>
@@ -193,7 +194,7 @@ export function MinimalProductCard({
               "w-11 h-11 md:w-9 md:h-9 flex items-center justify-center rounded-full shadow-md transition-colors",
               wishlisted
                 ? "bg-red-50 text-red-500 hover:bg-red-100"
-                : "bg-white text-zeli-ink-secondary hover:bg-zeli-surface",
+                : "bg-white text-perce-ink-secondary hover:bg-perce-surface",
             )}
             aria-pressed={wishlisted}
             aria-label={`${t("nav.wishlist")}: ${product.name}`}>
@@ -209,7 +210,7 @@ export function MinimalProductCard({
         <Link href={productUrl}>
           <h3
             style={{ fontFamily: "var(--font-product-title)" }}
-            className='line-clamp-1 text-[0.8125rem] font-normal text-zeli-ink transition-colors hover:text-zeli-ink-muted'>
+            className='line-clamp-1 text-[0.8125rem] font-normal text-perce-ink transition-colors hover:text-perce-ink-muted'>
             {product.name}
           </h3>
         </Link>
@@ -217,17 +218,17 @@ export function MinimalProductCard({
           {originalPrice !== null && (
             <span
               style={{ fontFamily: "var(--font-price)" }}
-              className='text-sm text-zeli-ink-subtle line-through'>
-              {originalPrice} {t("currency")}
+              className='text-sm text-perce-ink-subtle line-through'>
+              {formatMoney(originalPrice, { locale })}
             </span>
           )}
           <span
             style={{ fontFamily: "var(--font-price)" }}
             className={cn(
               "text-sm font-medium",
-              hasDiscount ? "text-zeli-sale" : "text-zeli-ink",
+              hasDiscount ? "text-perce-sale" : "text-perce-ink",
             )}>
-            {displayPrice} {t("currency")}
+            {formatMoney(displayPrice, { locale })}
           </span>
         </div>
       </div>
@@ -240,7 +241,7 @@ export function MinimalProductCard({
           onClick={handleAddToCart}
           disabled={!product.available || isAdding}
           data-add-to-cart='true'
-          className='zeli-underline-hover mt-2 inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap text-[10px] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-zeli-ink-muted transition-colors hover:text-zeli-ink disabled:cursor-not-allowed disabled:opacity-40 sm:text-[11px]'>
+          className='perce-underline-hover mt-2 inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap text-xs font-medium text-perce-ink-muted transition-colors hover:text-perce-ink disabled:cursor-not-allowed disabled:opacity-40 sm:text-[11px]'>
           <span className='truncate'>
             {product.available ? t("add_to_cart") : t("out_of_stock")}
           </span>

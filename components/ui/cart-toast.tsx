@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Check, X } from "lucide-react";
 import { Link } from "#root/components/utils/Link";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
-import { STORE_CURRENCY } from "#root/shared/config/branding";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 interface CartToastItem {
   name: string;
@@ -137,7 +137,7 @@ export function CartToastContainer() {
               {item.name}
             </p>
             <p className="text-sm text-stone-500">
-              {item.price} {STORE_CURRENCY}
+              {formatMoney(item.price)}
             </p>
           </div>
         </div>

@@ -1,6 +1,6 @@
 import { Link } from "#root/components/utils/Link";
 import { useLayoutSettings } from "#root/frontend/contexts/LayoutSettingsContext";
-import { STORE_NAME } from "#root/shared/config/branding";
+import { BRAND_WORDMARK, STORE_NAME } from "#root/shared/config/branding";
 import { DEFAULT_LOGO_SIZE } from "#root/shared/types/layout-settings";
 
 /* ------------------------------------------------------------------ */
@@ -24,8 +24,10 @@ export interface ResolvedHeaderLogo {
   kind: "image" | "text";
   /** Image URL (only when kind === "image"). */
   imageUrl: string;
-  /** Resolved display text: logoText → STORE_NAME. */
+  /** Resolved display text: logoText → BRAND_WORDMARK ("percé"). */
   text: string;
+  /** Accessible name for an image logo: logoText → STORE_NAME ("Percé"). */
+  alt: string;
   /** Width in px for the current variant. */
   width: number;
   /** Max-height in px for the current variant. */
@@ -41,12 +43,16 @@ export function useResolvedHeaderLogo(
 ): ResolvedHeaderLogo {
   const { header } = useLayoutSettings();
   const size = header.logoSize ?? DEFAULT_LOGO_SIZE;
-  const text = header.logoText || STORE_NAME;
+  // The drawn wordmark is lowercase "percé"; the *name* (alt text, titles)
+  // keeps its capital. An admin-entered logoText overrides both.
+  const text = header.logoText || BRAND_WORDMARK;
+  const alt = header.logoText || STORE_NAME;
 
   return {
     kind: header.logoUrl ? "image" : "text",
     imageUrl: header.logoUrl,
     text,
+    alt,
     width: variant === "desktop" ? size.desktopWidth : size.mobileWidth,
     maxHeight:
       variant === "desktop" ? size.desktopMaxHeight : size.mobileMaxHeight,
@@ -65,7 +71,7 @@ export function useResolvedHeaderLogo(
  *
  * - If `header.logoUrl` exists → `<img>` with CMS sizing, no filters.
  * - Else if `header.logoText` exists → styled text.
- * - Else → STORE_NAME fallback.
+ * - Else → the lowercase Percé wordmark.
  */
 export function HeaderLogo({
   textClassName = "",
@@ -79,7 +85,7 @@ export function HeaderLogo({
       <Link href='/' onClick={onClick}>
         <img
           src={logo.imageUrl}
-          alt={logo.text}
+          alt={logo.alt}
           className='object-contain'
           style={{ width: logo.width, maxHeight: logo.maxHeight }}
         />

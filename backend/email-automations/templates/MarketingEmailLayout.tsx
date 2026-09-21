@@ -181,8 +181,8 @@ export const MarketingEmailLayout = ({
 // ─── Styles ─────────────────────────────────────────────────────────────────
 
 const main = {
-  backgroundColor: "#f9fafb",
-  fontFamily: "'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+  backgroundColor: "#F2F0ED",
+  fontFamily: "'Inter Tight', -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
   padding: "24px 0",
 };
 
@@ -190,7 +190,7 @@ const container = {
   backgroundColor: "#ffffff",
   margin: "0 auto",
   maxWidth: "600px",
-  border: "1px solid #e5e7eb",
+  border: "1px solid #DAD7D3",
 };
 
 const header = {
@@ -203,7 +203,7 @@ const logoText = {
   fontWeight: "700",
   letterSpacing: "0.12em",
   textTransform: "uppercase" as const,
-  color: "#1c1917",
+  color: "#0E0E0E",
   margin: "0",
   textAlign: "center" as const,
 };
@@ -215,19 +215,19 @@ const section = {
 const headlineStyle = {
   fontSize: "22px",
   fontWeight: "600",
-  color: "#1c1917",
+  color: "#0E0E0E",
   margin: "0 0 12px",
 };
 
 const paragraph = {
   fontSize: "14px",
   lineHeight: "22px",
-  color: "#44403c",
+  color: "#2A2A2A",
   margin: "0",
 };
 
 const itemCard = {
-  border: "1px solid #e5e7eb",
+  border: "1px solid #DAD7D3",
   borderRadius: "8px",
   padding: "20px 16px",
   textAlign: "center" as const,
@@ -243,36 +243,36 @@ const itemImage = {
 const itemName = {
   fontSize: "15px",
   fontWeight: "600",
-  color: "#1c1917",
+  color: "#0E0E0E",
   margin: "0 0 4px",
 };
 
 const itemSubtitle = {
   fontSize: "13px",
-  color: "#78716c",
+  color: "#5F5C5A",
   margin: "0 0 4px",
 };
 
 const itemPrice = {
   fontSize: "14px",
   fontWeight: "600",
-  color: "#1c1917",
+  color: "#0E0E0E",
   margin: "0",
 };
 
 const starsRow = {
   fontSize: "24px",
   letterSpacing: "6px",
-  color: "#d4a72c",
+  color: "#0E0E0E",
   margin: "0",
 };
 
 const discountBadge = {
   fontSize: "13px",
   fontWeight: "600",
-  color: "#1c1917",
-  backgroundColor: "#f5f5f4",
-  border: "1px dashed #d6d3d1",
+  color: "#0E0E0E",
+  backgroundColor: "#F2F0ED",
+  border: "1px dashed #C4C1BD",
   borderRadius: "6px",
   padding: "10px 16px",
   display: "inline-block",
@@ -280,7 +280,7 @@ const discountBadge = {
 };
 
 const ctaButton = {
-  backgroundColor: "#1c1917",
+  backgroundColor: "#0E0E0E",
   color: "#ffffff",
   fontSize: "14px",
   fontWeight: "600",
@@ -293,7 +293,7 @@ const ctaButton = {
 };
 
 const divider = {
-  borderTop: "1px solid #e5e7eb",
+  borderTop: "1px solid #DAD7D3",
   margin: "8px 0 0",
 };
 
@@ -304,27 +304,27 @@ const footer = {
 
 const socialRow = {
   fontSize: "12px",
-  color: "#78716c",
+  color: "#5F5C5A",
   margin: "0 0 8px",
 };
 
 const socialLink = {
-  color: "#78716c",
+  color: "#5F5C5A",
   textDecoration: "none",
 };
 
 const footerText = {
   fontSize: "12px",
-  color: "#a8a29e",
+  color: "#8A8785",
   margin: "4px 0",
 };
 
 const link = {
-  color: "#1c1917",
+  color: "#0E0E0E",
   textDecoration: "underline",
 };
 
 const unsubscribeLink = {
-  color: "#a8a29e",
+  color: "#8A8785",
   textDecoration: "underline",
 };

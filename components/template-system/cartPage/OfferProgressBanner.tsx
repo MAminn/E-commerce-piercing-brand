@@ -3,6 +3,7 @@ import { Tag, Zap, Truck, CheckCircle2 } from "lucide-react";
 import { trpc } from "#root/shared/trpc/client";
 import type { OfferCondition, OfferReward } from "#root/shared/database/drizzle/schema";
 import type { AppliedOfferSummary } from "./AppliedOffersSavings";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 interface Props {
   cartSubtotal: number;
@@ -74,7 +75,7 @@ function conditionProgress(
     return {
       met: false,
       progress,
-      message: `Spend ${needed.toFixed(2)} ${currency} more to unlock`,
+      message: `Spend ${formatMoney(needed, { currency })} more to unlock`,
     };
   }
 
@@ -142,26 +143,26 @@ export function OfferProgressBanner({
     latestApplied?.freeShipping && latestApplied.discountAmount === 0
       ? "Free shipping applied at checkout"
       : latestApplied
-        ? `${latestApplied.discountAmount.toFixed(2)} ${currency} off applied at checkout`
+        ? `${formatMoney(latestApplied.discountAmount, { currency })} off applied at checkout`
         : "";
 
   return (
     <div className="mb-6 space-y-2">
       {latestApplied && (
-        <div className="flex items-center gap-3 border border-zeli-line-strong bg-zeli-surface px-4 py-3">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zeli-surface">
-            <CheckCircle2 className="h-4 w-4 text-zeli-success" />
+        <div className="flex items-center gap-3 border border-perce-line-strong bg-perce-surface px-4 py-3">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-perce-surface">
+            <CheckCircle2 className="h-4 w-4 text-perce-success" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-semibold leading-snug text-zeli-ink">
+            <p className="text-[13px] font-semibold leading-snug text-perce-ink">
               🎉 <span className="font-bold">{latestApplied.name}</span> unlocked!
             </p>
-            <p className="mt-0.5 text-[12px] text-zeli-success">
+            <p className="mt-0.5 text-[12px] text-perce-success">
               <strong>{latestRewardLabel}</strong>
               {latestSavingsLabel ? ` — ${latestSavingsLabel}` : ""}
             </p>
           </div>
-          <span className="hidden shrink-0 rounded bg-zeli-success px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zeli-ink-inverse sm:inline">
+          <span className="hidden shrink-0 rounded bg-perce-success px-2 py-0.5 text-xs font-medium text-perce-ink-inverse sm:inline">
             Active
           </span>
         </div>
@@ -175,27 +176,27 @@ export function OfferProgressBanner({
               ? Zap
               : Tag;
         return (
-          <div className="border border-zeli-line-strong bg-zeli-blush-soft px-4 py-3.5">
+          <div className="border border-perce-line-strong bg-perce-surface px-4 py-3.5">
             <div className="flex items-start gap-3">
-              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zeli-blush">
-                <IconComponent className="h-3.5 w-3.5 text-zeli-ink-secondary" />
+              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-perce-line">
+                <IconComponent className="h-3.5 w-3.5 text-perce-ink-secondary" />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-medium leading-snug text-zeli-ink">
+                <p className="text-[13px] font-medium leading-snug text-perce-ink">
                   {closestPending.message}{" "}
-                  <span className="text-zeli-ink-secondary">
+                  <span className="text-perce-ink-secondary">
                     — get <strong>{closestPending.rewardLabel}</strong>!
                   </span>
                 </p>
-                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-zeli-blush">
+                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-perce-line">
                   <div
-                    className="h-full rounded-full bg-zeli-accent transition-all duration-500"
+                    className="h-full rounded-full bg-perce-cta transition-all duration-500"
                     style={{
                       width: `${Math.round(closestPending.progress * 100)}%`,
                     }}
                   />
                 </div>
-                <p className="mt-1 text-[11px] text-zeli-ink-secondary">
+                <p className="mt-1 text-[11px] text-perce-ink-secondary">
                   {Math.round(closestPending.progress * 100)}% of the way there
                 </p>
               </div>

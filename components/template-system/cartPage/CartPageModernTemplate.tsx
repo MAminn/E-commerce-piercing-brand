@@ -627,14 +627,14 @@ export function CartPageModernTemplate({
 
               {/* Trust signals removed. "Fast Delivery" and "Easy Returns"
                   were asserted as fact directly above the checkout button —
-                  ZELI has set no delivery time and published no returns
+                  Percé has set no delivery time and published no returns
                   policy, so both were promises the business had not made.
                   "Secure Checkout" went with them: this store is COD-only
                   until a gateway is configured, and there is nothing for a
                   padlock to be securing.
 
-                  This template is not the ZELI production cart (see
-                  ZELI_TEMPLATE_PRESET in shared/config/storefront.ts) but it
+                  This template is not the Percé production cart (see
+                  PERCE_TEMPLATE_PRESET in shared/config/storefront.ts) but it
                   remains selectable from Dashboard > Templates, so it must
                   not carry claims either. */}
 

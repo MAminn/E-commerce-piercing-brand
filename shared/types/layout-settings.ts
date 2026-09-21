@@ -163,11 +163,19 @@ export const DEFAULT_LAYOUT_SETTINGS: LayoutSettings = {
     tagline: "",
     announcementBarEnabled: false,
     announcementBarText: "",
-    // One real destination. Placement/category navigation is added by the
-    // admin once real categories exist (Dashboard > Layout Settings), where a
-    // link can be marked as a dropdown bound to specific category IDs.
-    navigationLinks: [{ id: "nav-shop", label: "Shop", url: "/shop" }],
-    // ZELI's shell. See shared/config/storefront.ts for why minimal is the
+    // Percé navigation (Brand Source of Truth): Shop All · New In · Sets ·
+    // then placements. Only destinations that resolve on an unconfigured
+    // store are seeded. "Ready Sets" and "Pick Your Set" both live on
+    // /bundles (the page lists both models); the placement links (Ear /
+    // Nose / Lip / Belly) are categories the admin binds from Dashboard >
+    // Layout Settings once those categories exist — a dropdown link bound to
+    // category IDs, not a guessed URL.
+    navigationLinks: [
+      { id: "nav-shop", label: "Shop all", labelAr: "كل المنتجات", url: "/shop" },
+      { id: "nav-new", label: "New in", labelAr: "جديد", url: "/shop?section=newarrivals" },
+      { id: "nav-sets", label: "Sets", labelAr: "الأطقم", url: "/bundles" },
+    ],
+    // Percé's shell. See shared/config/storefront.ts for why minimal is the
     // foundation and what the alternatives still offer. Kept as a literal
     // (not an import) so this pure types module stays dependency-free —
     // DEFAULT_NAVBAR_STYLE is asserted equal to it by a unit test.
@@ -185,8 +193,10 @@ export const DEFAULT_LAYOUT_SETTINGS: LayoutSettings = {
     logoUrl: "",
     logoText: "",
     logoSize: { ...DEFAULT_FOOTER_LOGO_SIZE },
-    description:
-      "Sculptural piercings & curated jewelry — crafted with intention.",
+    // Matches STORE_DESCRIPTION in shared/config/branding.ts — the safer
+    // brand subheading, with no photography, material or policy claims.
+    description: "Piercing jewellery, delivered across Egypt.",
+    descriptionAr: "مجوهرات بيرسينج، توصيل لكل مصر.",
     copyright: "",
     showNewsletter: true,
     footerStyle: "default",
@@ -195,21 +205,29 @@ export const DEFAULT_LAYOUT_SETTINGS: LayoutSettings = {
     // at "#" — footer links that looked real and did nothing. Policy and
     // company pages belong here once they exist; admins add them from
     // Dashboard > Layout Settings.
+    // Terms, Privacy and Delivery pages do not exist in this codebase and
+    // /return-policy only renders once an admin publishes real terms — so
+    // none of them are linked here. Linking a policy that is not written is
+    // worse than the link being absent. See docs/CURRENT_PROJECT.md.
     footerLinkGroups: [
       {
         id: "shop",
         title: "Shop",
+        titleAr: "تسوق",
         links: [
-          { id: "all-products", label: "All Products", url: "/shop" },
-          { id: "offers", label: "Offers", url: "/offers" },
+          { id: "all-products", label: "Shop all", labelAr: "كل المنتجات", url: "/shop" },
+          { id: "new-in", label: "New in", labelAr: "جديد", url: "/shop?section=newarrivals" },
+          { id: "sets", label: "Sets", labelAr: "الأطقم", url: "/bundles" },
+          { id: "offers", label: "Offers", labelAr: "العروض", url: "/offers" },
         ],
       },
       {
         id: "help",
         title: "Help",
+        titleAr: "مساعدة",
         links: [
-          { id: "contact", label: "Contact Us", url: "/contact" },
-          { id: "account", label: "My Account", url: "/account" },
+          { id: "contact", label: "Contact", labelAr: "تواصل معنا", url: "/contact" },
+          { id: "account", label: "My account", labelAr: "حسابي", url: "/account" },
         ],
       },
     ],

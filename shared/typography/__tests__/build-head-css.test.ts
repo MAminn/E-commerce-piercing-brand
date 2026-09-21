@@ -58,6 +58,6 @@ describe("buildTypographyHeadCss", () => {
 
   it("falls back to the default stack when a role is unassigned", () => {
     const css = buildTypographyHeadCss(settings, []);
-    expect(css).toContain('--font-body: "Poppins"');
+    expect(css).toContain('--font-body: "Inter Tight Variable"');
   });
 });

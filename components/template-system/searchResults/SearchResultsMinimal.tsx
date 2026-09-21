@@ -104,20 +104,20 @@ export function SearchResultsMinimal({
 
   return (
     <div
-      className={`search-results-minimal min-h-screen bg-zeli-bg ${className}`}>
-      <div className='zeli-container'>
+      className={`search-results-minimal min-h-screen bg-perce-bg ${className}`}>
+      <div className='perce-container'>
         {/* Header. The title used to be set at text-7xl — a display size that
             overflowed at 375px and shouted louder than any product on the
             page. It is a search result header, not the brand statement. */}
-        <div className='border-b border-zeli-line py-10 md:py-14'>
+        <div className='border-b border-perce-line py-10 md:py-14'>
           <div className='text-center'>
-            <h1 className='zeli-section-title'>Search results</h1>
+            <h1 className='perce-section-title'>Search results</h1>
             {searchQuery && (
               <p
                 aria-live='polite'
-                className='mt-2 text-[length:var(--zeli-text-body)] text-zeli-ink-muted'>
+                className='mt-2 text-[length:var(--perce-text-body)] text-perce-ink-muted'>
                 {resultCount} {resultCount === 1 ? "result" : "results"} for{" "}
-                <span className='text-zeli-ink'>"{searchQuery}"</span>
+                <span className='text-perce-ink'>"{searchQuery}"</span>
               </p>
             )}
           </div>
@@ -129,7 +129,7 @@ export function SearchResultsMinimal({
             </label>
             <Search
               aria-hidden
-              className='pointer-events-none absolute start-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zeli-ink-subtle'
+              className='pointer-events-none absolute start-4 top-1/2 h-4 w-4 -translate-y-1/2 text-perce-ink-subtle'
             />
             <Input
               id='search-results-refine'
@@ -138,20 +138,20 @@ export function SearchResultsMinimal({
               value={localSearchTerm}
               onChange={(e) => handleSearchChange(e.target.value)}
               onKeyDown={handleKeyPress}
-              className='h-12 rounded-none border-zeli-line-strong bg-zeli-surface-raised pe-4 ps-12 text-[length:var(--zeli-text-body)] focus:border-zeli-ink'
+              className='h-12 rounded-none border-perce-line-strong bg-perce-surface-raised pe-4 ps-12 text-[length:var(--perce-text-body)] focus:border-perce-ink'
             />
           </div>
         </div>
 
         {/* Toolbar */}
-        <div className='border-b border-zeli-line py-5'>
+        <div className='border-b border-perce-line py-5'>
           <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4'>
-            <div className='zeli-eyebrow'>
+            <div className='perce-eyebrow'>
               Viewing {Math.min(products.length, resultCount)} of {resultCount}
             </div>
 
             <div className='flex min-w-0 items-center gap-3'>
-              <ArrowUpDown aria-hidden className='h-4 w-4 shrink-0 text-zeli-ink-subtle' />
+              <ArrowUpDown aria-hidden className='h-4 w-4 shrink-0 text-perce-ink-subtle' />
               {/* Only the three orderings the products.search API accepts.
                   "Most Relevant", "Name: A to Z" and "Name: Z to A" were also
                   offered here; product.search validates sortBy against
@@ -162,7 +162,7 @@ export function SearchResultsMinimal({
               <Select value={sortBy} onValueChange={handleSortChange}>
                 <SelectTrigger
                   aria-label='Sort results'
-                  className='min-h-11 w-48 rounded-none border-zeli-line-strong bg-zeli-surface-raised'>
+                  className='min-h-11 w-48 rounded-none border-perce-line-strong bg-perce-surface-raised'>
                   <SelectValue placeholder='Sort by' />
                 </SelectTrigger>
                 <SelectContent>
@@ -182,18 +182,18 @@ export function SearchResultsMinimal({
               <div className='text-center'>
                 <Loader2
                   aria-hidden
-                  className='mx-auto mb-4 h-8 w-8 animate-spin text-zeli-ink-subtle'
+                  className='mx-auto mb-4 h-8 w-8 animate-spin text-perce-ink-subtle'
                 />
-                <p role='status' className='text-[length:var(--zeli-text-body)] text-zeli-ink-muted'>
+                <p role='status' className='text-[length:var(--perce-text-body)] text-perce-ink-muted'>
                   Searching…
                 </p>
               </div>
             </div>
           ) : products.length === 0 ? (
             <div className='py-24 text-center'>
-              <Search aria-hidden className='mx-auto mb-6 h-12 w-12 text-zeli-ink-subtle' />
-              <h2 className='zeli-section-title'>No results</h2>
-              <p className='mx-auto mt-2 max-w-md text-[length:var(--zeli-text-body)] text-zeli-ink-muted'>
+              <Search aria-hidden className='mx-auto mb-6 h-12 w-12 text-perce-ink-subtle' />
+              <h2 className='perce-section-title'>No results</h2>
+              <p className='mx-auto mt-2 max-w-md text-[length:var(--perce-text-body)] text-perce-ink-muted'>
                 {searchQuery
                   ? `Nothing matches "${searchQuery}".`
                   : "Enter a search term above to look through the store."}
@@ -205,7 +205,7 @@ export function SearchResultsMinimal({
                     setLocalSearchTerm("");
                     if (onSearchChange) onSearchChange("");
                   }}
-                  className='mt-6 min-h-11 rounded-none border-zeli-ink text-zeli-ink hover:bg-zeli-accent hover:text-zeli-ink-inverse'>
+                  className='mt-6 min-h-11 rounded-none border-perce-ink text-perce-ink hover:bg-perce-cta hover:text-perce-ink-inverse'>
                   Clear search
                 </Button>
               )}
@@ -240,13 +240,13 @@ export function SearchResultsMinimal({
 
               {/* Minimal Pagination */}
               {totalPages > 1 && (
-                <nav aria-label='Pagination' className='border-t border-zeli-line pt-12'>
+                <nav aria-label='Pagination' className='border-t border-perce-line pt-12'>
                   <div className='flex items-center justify-center gap-4 sm:gap-6'>
                     <Button
                       variant='ghost'
                       disabled={currentPage === 1}
                       onClick={() => onPageChange?.(currentPage - 1)}
-                      className='min-h-11 rounded-none text-zeli-ink-secondary hover:text-zeli-ink disabled:opacity-30'>
+                      className='min-h-11 rounded-none text-perce-ink-secondary hover:text-perce-ink disabled:opacity-30'>
                       <ChevronLeft className='h-4 w-4 mr-1' />
                       Previous
                     </Button>
@@ -264,7 +264,7 @@ export function SearchResultsMinimal({
                         .map((page, idx, arr) => (
                           <React.Fragment key={page}>
                             {idx > 0 && arr[idx - 1] !== page - 1 && (
-                              <span aria-hidden className='px-1 text-zeli-ink-subtle'>
+                              <span aria-hidden className='px-1 text-perce-ink-subtle'>
                                 •••
                               </span>
                             )}
@@ -275,8 +275,8 @@ export function SearchResultsMinimal({
                               onClick={() => onPageChange?.(page)}
                               className={`h-11 min-w-11 rounded-none ${
                                 currentPage === page
-                                  ? "bg-zeli-accent text-zeli-ink-inverse hover:bg-zeli-accent-hover hover:text-zeli-ink-inverse"
-                                  : "text-zeli-ink-secondary hover:text-zeli-ink"
+                                  ? "bg-perce-cta text-perce-ink-inverse hover:bg-perce-cta-hover hover:text-perce-ink-inverse"
+                                  : "text-perce-ink-secondary hover:text-perce-ink"
                               }`}>
                               {page}
                             </Button>
@@ -288,14 +288,14 @@ export function SearchResultsMinimal({
                       variant='ghost'
                       disabled={currentPage === totalPages}
                       onClick={() => onPageChange?.(currentPage + 1)}
-                      className='min-h-11 rounded-none text-zeli-ink-secondary hover:text-zeli-ink disabled:opacity-30'>
+                      className='min-h-11 rounded-none text-perce-ink-secondary hover:text-perce-ink disabled:opacity-30'>
                       Next
                       <ChevronRight className='h-4 w-4 ml-1' />
                     </Button>
                   </div>
 
                   <div className='mt-6 text-center'>
-                    <p className='zeli-eyebrow'>
+                    <p className='perce-eyebrow'>
                       Page {currentPage} of {totalPages}
                     </p>
                   </div>

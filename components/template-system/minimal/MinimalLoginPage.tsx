@@ -87,16 +87,16 @@ export function MinimalLoginPage() {
   };
 
   return (
-    <section className='min-h-screen flex items-center justify-center bg-zeli-surface-raised px-4 py-12'>
+    <section className='min-h-screen flex items-center justify-center bg-perce-surface-raised px-4 py-12'>
       <div className='w-full max-w-[420px]'>
         {/* Card */}
-        <div className='border border-zeli-line bg-zeli-surface-raised p-8 sm:p-10'>
+        <div className='border border-perce-line bg-perce-surface-raised p-8 sm:p-10'>
           {/* Header */}
           <div className='text-center mb-8'>
-            <h1 className='text-2xl sm:text-[28px] font-light text-zeli-ink tracking-tight mb-2'>
+            <h1 className='text-2xl sm:text-[28px] font-medium text-perce-ink tracking-tight mb-2'>
               {t("login.title")}
             </h1>
-            <p className='text-sm text-zeli-ink-muted'>{t("login.subtitle")}</p>
+            <p className='text-sm text-perce-ink-muted'>{t("login.subtitle")}</p>
           </div>
 
           <form onSubmit={form.handleSubmit(onSubmit)} autoComplete='on' className='flex flex-col gap-6'>
@@ -104,7 +104,7 @@ export function MinimalLoginPage() {
             <div>
               <label
                 htmlFor='login-email'
-                className='block text-xs uppercase tracking-widest text-zeli-ink-muted mb-2 font-medium'>
+                className='block text-xs text-perce-ink-muted mb-2 font-medium'>
                 {t("login.email")}
               </label>
               <Input
@@ -115,11 +115,11 @@ export function MinimalLoginPage() {
                 type='email'
                 autoComplete='email'
                 placeholder={t("login.email_placeholder")}
-                className='border-0 border-b border-zeli-line-strong bg-transparent rounded-none px-0 py-3 text-sm focus:outline-none focus:ring-0 focus:border-zeli-ink transition-colors placeholder:text-zeli-ink-subtle text-zeli-ink'
+                className='border-0 border-b border-perce-line-strong bg-transparent rounded-none px-0 py-3 text-sm focus:outline-none focus:ring-0 focus:border-perce-ink transition-colors placeholder:text-perce-ink-subtle text-perce-ink'
                 disabled={isSubmitting}
               />
               {form.formState.errors.email && (
-                <p id='login-email-error' role='alert' className='text-zeli-sale text-xs mt-2'>
+                <p id='login-email-error' role='alert' className='text-perce-sale text-xs mt-2'>
                   {form.formState.errors.email.message}
                 </p>
               )}
@@ -129,7 +129,7 @@ export function MinimalLoginPage() {
             <div>
               <label
                 htmlFor='login-password'
-                className='block text-xs uppercase tracking-widest text-zeli-ink-muted mb-2 font-medium'>
+                className='block text-xs text-perce-ink-muted mb-2 font-medium'>
                 {t("login.password")}
               </label>
               <div className='relative'>
@@ -141,13 +141,13 @@ export function MinimalLoginPage() {
                   type={showPassword ? "text" : "password"}
                   autoComplete='current-password'
                   placeholder={t("login.password_placeholder")}
-                  className='border-0 border-b border-zeli-line-strong bg-transparent rounded-none px-0 py-3 pe-10 text-sm focus:outline-none focus:ring-0 focus:border-zeli-ink transition-colors placeholder:text-zeli-ink-subtle text-zeli-ink'
+                  className='border-0 border-b border-perce-line-strong bg-transparent rounded-none px-0 py-3 pe-10 text-sm focus:outline-none focus:ring-0 focus:border-perce-ink transition-colors placeholder:text-perce-ink-subtle text-perce-ink'
                   disabled={isSubmitting}
                 />
                 <button
                   type='button'
                   onClick={() => setShowPassword(!showPassword)}
-                  className='absolute end-0 top-1/2 -translate-y-1/2 text-zeli-ink-subtle hover:text-zeli-ink transition-colors'
+                  className='absolute end-0 top-1/2 -translate-y-1/2 text-perce-ink-subtle hover:text-perce-ink transition-colors'
                   disabled={isSubmitting}>
                   {showPassword ? (
                     <EyeOff className='w-4 h-4' />
@@ -157,7 +157,7 @@ export function MinimalLoginPage() {
                 </button>
               </div>
               {form.formState.errors.password && (
-                <p id='login-password-error' role='alert' className='text-zeli-sale text-xs mt-2'>
+                <p id='login-password-error' role='alert' className='text-perce-sale text-xs mt-2'>
                   {form.formState.errors.password.message}
                 </p>
               )}
@@ -167,24 +167,24 @@ export function MinimalLoginPage() {
             <button
               type='submit'
               disabled={isSubmitting}
-              className='w-full py-3 mt-2 bg-zeli-accent text-zeli-ink-inverse text-sm font-medium tracking-wide uppercase hover:bg-zeli-accent-hover transition-colors disabled:opacity-40'>
+              className='w-full py-3 mt-2 bg-perce-cta text-perce-ink-inverse text-sm font-medium hover:bg-perce-cta-hover transition-colors disabled:opacity-40'>
               {isSubmitting ? t("login.submitting") : t("login.submit")}
             </button>
 
             {/* OAuth */}
             <div className='flex flex-col gap-3 -mt-1'>
               <div className='flex items-center gap-3'>
-                <div className='h-px flex-1 bg-zeli-line' />
-                <span className='text-[11px] uppercase tracking-widest text-zeli-ink-subtle'>or</span>
-                <div className='h-px flex-1 bg-zeli-line' />
+                <div className='h-px flex-1 bg-perce-line' />
+                <span className='text-xs text-perce-ink-subtle'>or</span>
+                <div className='h-px flex-1 bg-perce-line' />
               </div>
               <button
                 type='button'
                 onClick={() => handleOAuth("google")}
                 disabled={!!oauthLoading || isSubmitting}
-                className='w-full py-2.5 border border-zeli-line-strong flex items-center justify-center gap-3 text-sm text-zeli-ink-secondary hover:bg-zeli-surface transition-colors disabled:opacity-40'>
+                className='w-full py-2.5 border border-perce-line-strong flex items-center justify-center gap-3 text-sm text-perce-ink-secondary hover:bg-perce-surface transition-colors disabled:opacity-40'>
                 {oauthLoading === "google" ? (
-                  <div className='w-4 h-4 border-2 border-zeli-line-strong border-t-stone-700 rounded-full animate-spin' />
+                  <div className='w-4 h-4 border-2 border-perce-line-strong border-t-stone-700 rounded-full animate-spin' />
                 ) : (
                   <svg className='w-4 h-4' viewBox='0 0 24 24' aria-hidden='true'>
                     <path fill='#4285F4' d='M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z'/>
@@ -200,20 +200,20 @@ export function MinimalLoginPage() {
             {/* Forgot password */}
             <Link
               href='/forgot-password'
-              className='text-center text-xs text-zeli-ink-muted hover:text-zeli-ink transition-colors'>
+              className='text-center text-xs text-perce-ink-muted hover:text-perce-ink transition-colors'>
               {t("login.forgot_password")}
             </Link>
 
             {/* Divider */}
             <div className='flex items-center gap-3 mt-2'>
-              <div className='h-px flex-1 bg-zeli-line' />
-              <span className='text-xs text-zeli-ink-subtle'>{t("login.no_account")}</span>
-              <div className='h-px flex-1 bg-zeli-line' />
+              <div className='h-px flex-1 bg-perce-line' />
+              <span className='text-xs text-perce-ink-subtle'>{t("login.no_account")}</span>
+              <div className='h-px flex-1 bg-perce-line' />
             </div>
 
             <Link
               href='/register'
-              className='text-center text-sm text-zeli-ink hover:text-zeli-ink-secondary transition-colors font-light -mt-2'>
+              className='text-center text-sm text-perce-ink hover:text-perce-ink-secondary transition-colors font-light -mt-2'>
               {t("login.create_account")}
             </Link>
           </form>

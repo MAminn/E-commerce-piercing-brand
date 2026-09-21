@@ -54,6 +54,7 @@ import {
   ArchiveX,
 } from "lucide-react";
 import { trpc } from "#root/shared/trpc/client";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -293,13 +294,13 @@ export default function AnalyticsDashboardPage() {
           />
           <OverviewCard
             label='Total Revenue'
-            value={`$${overviewData.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-            sub={`$${overviewData.totalRevenue7d.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} in last 7 days`}
+            value={formatMoney(overviewData.totalRevenue, { alwaysShowFraction: true })}
+            sub={`${formatMoney(overviewData.totalRevenue7d, { alwaysShowFraction: true })} in last 7 days`}
             icon={<DollarSign className='h-4 w-4' />}
           />
           <OverviewCard
             label='Avg. Order Value'
-            value={`$${overviewData.avgOrderValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            value={formatMoney(overviewData.avgOrderValue, { alwaysShowFraction: true })}
             icon={<CreditCard className='h-4 w-4' />}
           />
           <OverviewCard
@@ -519,7 +520,7 @@ export default function AnalyticsDashboardPage() {
                           <Badge variant='secondary'>{c.orderCount}</Badge>
                         </TableCell>
                         <TableCell className='text-right font-medium'>
-                          ${c.totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {formatMoney(c.totalSpent, { alwaysShowFraction: true })}
                         </TableCell>
                         <TableCell className='text-right text-xs text-muted-foreground hidden sm:table-cell'>
                           {c.firstOrderAt ? new Date(c.firstOrderAt).toLocaleDateString() : '—'}

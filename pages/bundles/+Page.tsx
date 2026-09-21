@@ -35,26 +35,26 @@ export default function BundlesPage() {
   }, []);
 
   return (
-    <div className="zeli-header-offset min-h-screen bg-zeli-bg">
-      <div className="mx-auto max-w-[var(--zeli-content-max)] px-[var(--zeli-gutter)] py-8 sm:py-12">
+    <div className="perce-header-offset min-h-screen bg-perce-bg">
+      <div className="mx-auto max-w-[var(--perce-content-max)] px-[var(--perce-gutter)] py-8 sm:py-12">
         <header className="max-w-2xl">
-          <p className="zeli-eyebrow">{t("nav.bundles")}</p>
-          <h1 className="zeli-section-title mt-2">{t("bundles.page_title")}</h1>
-          <p className="mt-3 text-[length:var(--zeli-text-body)] leading-[var(--zeli-leading-body)] text-zeli-ink-muted">
+          <p className="perce-eyebrow">{t("nav.bundles")}</p>
+          <h1 className="perce-section-title mt-2">{t("bundles.page_title")}</h1>
+          <p className="mt-3 text-[length:var(--perce-text-body)] leading-[var(--perce-leading-body)] text-perce-ink-muted">
             {t("bundles.page_intro")}
           </p>
         </header>
 
         {state.status === "loading" ? (
           <div role="status" aria-label="Loading" className="flex min-h-[40vh] items-center justify-center">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-zeli-border-strong border-t-zeli-ink" />
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-perce-border-strong border-t-perce-ink" />
           </div>
         ) : state.campaigns.length === 0 ? (
           <div className="mt-12 max-w-md">
-            <p className="text-[length:var(--zeli-text-body)] text-zeli-ink-muted">{t("bundles.empty")}</p>
+            <p className="text-[length:var(--perce-text-body)] text-perce-ink-muted">{t("bundles.empty")}</p>
             <Link
               href="/shop"
-              className="zeli-underline mt-6 inline-flex min-h-11 items-center text-[length:var(--zeli-text-small)] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-zeli-ink">
+              className="perce-underline mt-6 inline-flex min-h-11 items-center text-[length:var(--perce-text-small)] font-medium text-perce-ink">
               {t("bundle.browse_shop")}
             </Link>
           </div>

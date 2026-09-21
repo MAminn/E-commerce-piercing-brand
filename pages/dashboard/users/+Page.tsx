@@ -16,6 +16,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Label } from "#root/components/ui/label";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 interface UserRow { id: string; name: string; email: string; phone: string | null; role: string; emailVerified: boolean; createdAt: Date | string | null; }
 interface OrderRow { id: string; customerName: string; customerEmail: string; total: string; status: string; createdAt: Date | string | null; items: { id: string; name: string; quantity: number; price: string; }[]; }
@@ -547,7 +548,7 @@ export default function UsersPage() {
                   ].map((s) => (
                     <div key={s.label} className={`rounded-lg border p-3 flex flex-col justify-between items-center text-center ${s.color}`}>
                       <div className="flex flex-col justify-center items-center text-center gap-1.5 mb-1">{s.icon}<p className="text-xs text-muted-foreground">{s.label}</p></div>
-                      <p className="text-2xl font-bold text-center ">{s.value.toLocaleString()}</p>
+                      <p className="text-2xl font-bold text-center">{s.value.toLocaleString()}</p>
                     </div>
                   ))}
                 </div>
@@ -577,11 +578,11 @@ export default function UsersPage() {
                 <div className="grid grid-cols-2 gap-2">
                   <div className="rounded-lg border p-3 bg-indigo-50">
                     <p className="text-xs text-indigo-600 mb-1 flex items-center gap-1"><DollarSign className="h-3 w-3" />Total Spent</p>
-                    <p className="text-2xl font-bold text-indigo-700">${activityData.totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    <p className="text-2xl font-bold text-indigo-700">{formatMoney(activityData.totalSpent, { alwaysShowFraction: true })}</p>
                   </div>
                   <div className="rounded-lg border p-3">
                     <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1"><TrendingUp className="h-3 w-3" />Avg Order Value</p>
-                    <p className="text-2xl font-bold">${activityData.avgOrderValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    <p className="text-2xl font-bold">{formatMoney(activityData.avgOrderValue, { alwaysShowFraction: true })}</p>
                   </div>
                 </div>
                 {(activityData.firstOrderAt || activityData.lastOrderAt) && (
@@ -617,7 +618,7 @@ export default function UsersPage() {
                         <span className="font-medium">{p.productName}</span>
                         <div className="flex items-center gap-3 text-xs text-muted-foreground">
                           <span>{p.timesBought}× ordered</span>
-                          <span className="font-medium text-foreground">${p.totalSpent.toFixed(2)}</span>
+                          <span className="font-medium text-foreground">{formatMoney(p.totalSpent, { alwaysShowFraction: true })}</span>
                         </div>
                       </div>
                     ))}

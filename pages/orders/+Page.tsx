@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Button } from "#root/components/ui/button";
 import { Badge } from "#root/components/ui/badge";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 interface OrderItem {
   id: string;
@@ -114,15 +115,15 @@ export default function OrderHistoryPage() {
 
   if (isLoading) {
     return (
-      <div className='min-h-screen bg-zeli-surface flex items-center justify-center'>
-        <Loader2 className='w-6 h-6 animate-spin text-zeli-ink-subtle' />
+      <div className='min-h-screen bg-perce-surface flex items-center justify-center'>
+        <Loader2 className='w-6 h-6 animate-spin text-perce-ink-subtle' />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className='min-h-screen bg-zeli-surface flex items-center justify-center px-4'>
+      <div className='min-h-screen bg-perce-surface flex items-center justify-center px-4'>
         <div className='text-center'>
           <p className='text-red-500 mb-4'>{error}</p>
           <Button onClick={() => window.location.reload()} variant='outline'>
@@ -134,29 +135,29 @@ export default function OrderHistoryPage() {
   }
 
   return (
-    <div className='min-h-screen bg-zeli-surface py-12 md:py-20 px-4'>
+    <div className='min-h-screen bg-perce-surface py-12 md:py-20 px-4'>
       <div className='max-w-3xl mx-auto'>
         {/* Header */}
         <div className='mb-8'>
-          <h1 className='text-2xl md:text-3xl font-semibold text-zeli-ink'>
+          <h1 className='text-2xl md:text-3xl font-semibold text-perce-ink'>
             My Orders
           </h1>
-          <p className='text-zeli-ink-muted mt-1'>
+          <p className='text-perce-ink-muted mt-1'>
             Track and manage your recent purchases
           </p>
         </div>
 
         {/* Empty state */}
         {orders.length === 0 ? (
-          <div className='bg-white rounded-2xl border border-zeli-line shadow-sm p-12 text-center'>
-            <ShoppingBag className='w-12 h-12 text-zeli-ink-subtle mx-auto mb-4' />
-            <h2 className='text-lg font-medium text-zeli-ink mb-2'>
+          <div className='bg-white rounded-2xl border border-perce-line shadow-sm p-12 text-center'>
+            <ShoppingBag className='w-12 h-12 text-perce-ink-subtle mx-auto mb-4' />
+            <h2 className='text-lg font-medium text-perce-ink mb-2'>
               No orders yet
             </h2>
-            <p className='text-zeli-ink-muted mb-6'>
+            <p className='text-perce-ink-muted mb-6'>
               When you place an order, it will appear here.
             </p>
-            <Button asChild className='bg-black text-white hover:bg-zeli-accent-hover'>
+            <Button asChild className='bg-black text-white hover:bg-perce-cta-hover'>
               <Link href='/shop'>Start Shopping</Link>
             </Button>
           </div>
@@ -172,7 +173,7 @@ export default function OrderHistoryPage() {
               return (
                 <div
                   key={order.id}
-                  className='bg-white rounded-xl border border-zeli-line shadow-sm overflow-hidden'>
+                  className='bg-white rounded-xl border border-perce-line shadow-sm overflow-hidden'>
                   {/* Order header — clickable */}
                   <button
                     type='button'
@@ -186,10 +187,10 @@ export default function OrderHistoryPage() {
                         <StatusIcon className={`w-5 h-5 ${status.color}`} />
                       </div>
                       <div className='min-w-0'>
-                        <p className='text-sm font-medium text-zeli-ink'>
+                        <p className='text-sm font-medium text-perce-ink'>
                           Order #{order.id.substring(0, 8).toUpperCase()}
                         </p>
-                        <p className='text-xs text-zeli-ink-subtle mt-0.5'>
+                        <p className='text-xs text-perce-ink-subtle mt-0.5'>
                           {new Date(order.createdAt).toLocaleDateString(
                             "en-US",
                             {
@@ -206,8 +207,8 @@ export default function OrderHistoryPage() {
                     </div>
                     <div className='flex items-center gap-4 shrink-0'>
                       <div className='text-right'>
-                        <p className='text-sm font-semibold text-zeli-ink'>
-                          {Number.parseFloat(order.total).toFixed(2)} EGP
+                        <p className='text-sm font-semibold text-perce-ink'>
+                          {formatMoney(Number.parseFloat(order.total))}
                         </p>
                         <Badge
                           variant='outline'
@@ -216,14 +217,14 @@ export default function OrderHistoryPage() {
                         </Badge>
                       </div>
                       <ChevronRight
-                        className={`w-4 h-4 text-zeli-ink-subtle transition-transform ${isExpanded ? "rotate-90" : ""}`}
+                        className={`w-4 h-4 text-perce-ink-subtle transition-transform ${isExpanded ? "rotate-90" : ""}`}
                       />
                     </div>
                   </button>
 
                   {/* Expanded details */}
                   {isExpanded && (
-                    <div className='border-t border-zeli-line px-5 pb-5'>
+                    <div className='border-t border-perce-line px-5 pb-5'>
                       {/* Items */}
                       <div className='mt-4 space-y-3'>
                         {order.items.map((item) => {
@@ -235,15 +236,15 @@ export default function OrderHistoryPage() {
                               key={item.id}
                               className='flex items-center justify-between text-sm'>
                               <div className='flex items-center gap-2 min-w-0'>
-                                <span className='text-zeli-ink truncate'>
+                                <span className='text-perce-ink truncate'>
                                   {item.name ?? "Product"}
                                 </span>
-                                <span className='text-zeli-ink-subtle'>
+                                <span className='text-perce-ink-subtle'>
                                   ×{item.quantity}
                                 </span>
                               </div>
-                              <span className='text-zeli-ink-secondary shrink-0'>
-                                {(price * item.quantity).toFixed(2)} EGP
+                              <span className='text-perce-ink-secondary shrink-0'>
+                                {formatMoney((price * item.quantity))}
                               </span>
                             </div>
                           );
@@ -251,39 +252,38 @@ export default function OrderHistoryPage() {
                       </div>
 
                       {/* Totals */}
-                      <div className='mt-4 pt-3 border-t border-zeli-line space-y-1.5 text-sm'>
-                        <div className='flex justify-between text-zeli-ink-muted'>
+                      <div className='mt-4 pt-3 border-t border-perce-line space-y-1.5 text-sm'>
+                        <div className='flex justify-between text-perce-ink-muted'>
                           <span>Subtotal</span>
                           <span>
-                            {Number.parseFloat(order.subtotal).toFixed(2)} EGP
+                            {formatMoney(Number.parseFloat(order.subtotal))}
                           </span>
                         </div>
                         {order.discount && (
                           <div className='flex justify-between text-green-600'>
                             <span>Discount</span>
                             <span>
-                              -{Number.parseFloat(order.discount).toFixed(2)}{" "}
-                              EGP
+                              -{formatMoney(order.discount)}
                             </span>
                           </div>
                         )}
-                        <div className='flex justify-between text-zeli-ink-muted'>
+                        <div className='flex justify-between text-perce-ink-muted'>
                           <span>Shipping</span>
                           <span>
-                            {Number.parseFloat(order.shipping).toFixed(2)} EGP
+                            {formatMoney(Number.parseFloat(order.shipping))}
                           </span>
                         </div>
-                        <div className='flex justify-between font-semibold text-zeli-ink pt-1'>
+                        <div className='flex justify-between font-semibold text-perce-ink pt-1'>
                           <span>Total</span>
                           <span>
-                            {Number.parseFloat(order.total).toFixed(2)} EGP
+                            {formatMoney(Number.parseFloat(order.total))}
                           </span>
                         </div>
                       </div>
 
                       {/* Shipping info */}
-                      <div className='mt-4 pt-3 border-t border-zeli-line text-sm text-zeli-ink-muted'>
-                        <p className='font-medium text-zeli-ink-secondary mb-1'>
+                      <div className='mt-4 pt-3 border-t border-perce-line text-sm text-perce-ink-muted'>
+                        <p className='font-medium text-perce-ink-secondary mb-1'>
                           Shipping to
                         </p>
                         <p>

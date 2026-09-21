@@ -12,6 +12,7 @@ import type {
 } from "#root/components/template-system";
 import type { CartPageBundleGroup } from "#root/components/template-system/cartPage/CartBundleGroup";
 import { navigate } from "vike/client/router";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 export default function CartPage() {
   const {
@@ -185,7 +186,7 @@ export default function CartPage() {
             promoCode.discountLabel ??
             (promoCode.discountType === "percentage"
               ? `${promoCode.discountValue}% off`
-              : `${promoCode.discountValue.toFixed(2)} EGP off`),
+              : `${formatMoney(promoCode.discountValue)} off`),
         }
       : null,
     onRemoveCoupon: removePromoCode,

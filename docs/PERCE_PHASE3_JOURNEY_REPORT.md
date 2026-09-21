@@ -1,8 +1,8 @@
-# ZELI PHASE 3 — Purchase journey, template alignment, selling readiness
+# Percé PHASE 3 — Purchase journey, template alignment, selling readiness
 
 > Not to be confused with the repository-root `PHASE3_REPORT.md`, which is an
 > archived document from an **earlier project** (page transitions). This is the
-> ZELI phase report. The authoritative project document remains
+> Percé phase report. The authoritative project document remains
 > [`docs/CURRENT_PROJECT.md`](CURRENT_PROJECT.md).
 
 Scope: discovery → category → search → product → cart → checkout → order
@@ -11,10 +11,10 @@ writes, no schema migration, no catalogue data.
 
 ---
 
-## A. ZELI production template preset
+## A. Percé production template preset
 
 Defined once in [`shared/config/storefront.ts`](../shared/config/storefront.ts)
-as `ZELI_TEMPLATE_PRESET`, with the per-id reasoning recorded beside it.
+as `PERCE_TEMPLATE_PRESET`, with the per-id reasoning recorded beside it.
 
 ```
 landing:       landing-minimal
@@ -85,7 +85,7 @@ touched.** No migration was written.
 | `/contact`, `/return-policy` | bespoke / `ReturnPolicyPage` | — | `homepage_content` (SSR) |
 | `/links` | bespoke, chromeless | — | `store_settings.link_tree_config` |
 | `/_error` | bespoke | — | — |
-| `/featured/{men,women,brands,products}`, `/featured/*/categories/[id]` | legacy gendered routes | `sorting` / `categoryPage` | no inbound links anywhere in the ZELI shell |
+| `/featured/{men,women,brands,products}`, `/featured/*/categories/[id]` | legacy gendered routes | `sorting` / `categoryPage` | no inbound links anywhere in the Percé shell |
 
 Notes worth carrying forward:
 
@@ -99,12 +99,12 @@ Notes worth carrying forward:
 
 ## C. Shop (`/shop`)
 
-`MinimalCategoryPage` moved onto the ZELI token system and had its
+`MinimalCategoryPage` moved onto the Percé token system and had its
 information design corrected.
 
-- Palette: `stone-*` / `bg-white` → `zeli-bg`, `zeli-surface`, `zeli-ink*`,
-  `zeli-line*`. Container/gutters → `.zeli-container`.
-- **Header clearance:** `mt-25` (an ad-hoc 6.25rem) → `.zeli-header-offset`,
+- Palette: `stone-*` / `bg-white` → `perce-bg`, `perce-surface`, `perce-ink*`,
+  `perce-line*`. Container/gutters → `.perce-container`.
+- **Header clearance:** `mt-25` (an ad-hoc 6.25rem) → `.perce-header-offset`,
   which tracks the chrome's *measured* height. The old value did not match the
   real navbar + banner stack.
 - **Result count** added, driven by the API's own `total`. No estimate.
@@ -131,9 +131,9 @@ badges beyond the real `sale` / `out of stock` states the card already derives.
 Shares `MinimalCategoryPage`, so everything in §C applies, plus:
 
 - The **not-found** state was a bare stone-palette block with a pill button;
-  it is now a ZELI page with a truthful message and a route to `/shop`.
+  it is now a Percé page with a truthful message and a route to `/shop`.
 - The non-minimal breadcrumb on both `/shop` and `/categories` became a real
-  `<nav aria-label="Breadcrumb">` on ZELI tokens.
+  `<nav aria-label="Breadcrumb">` on Percé tokens.
 - Category title and product grid come from `category.view` + `product.search`.
   No editorial copy is invented and no product count is fabricated.
 
@@ -169,7 +169,7 @@ stay selectable, so they had to be cleaned):
   `components/shop/ProductCard`. Same imagery ratio, same pricing behaviour,
   same discount treatment, same out-of-stock treatment.
 - Header dropped from `text-7xl` (which overflowed at 375px) to
-  `.zeli-section-title`; result count is `aria-live`; the refine input has a
+  `.perce-section-title`; result count is `aria-live`; the refine input has a
   real label; loading has `role="status"`; pagination is a labelled `<nav>`
   with `aria-current` and 44px targets.
 - Empty state states the fact and only offers *Clear search* when there is
@@ -186,7 +186,7 @@ Search backend logic was not rewritten.
 
 ## F. Product
 
-`product-minimal` confirmed as the ZELI product page, and given the pass it
+`product-minimal` confirmed as the Percé product page, and given the pass it
 had not had.
 
 - **Selector bug fixed:** the page hard-coded `"product-minimal"` whenever the
@@ -194,12 +194,12 @@ had not had.
   Dashboard → Templates → Product Page. It now resolves through
   `resolveTemplateId("productPage", …)`, so a DB selection wins and the preset
   is the fallback.
-- Full ZELI token pass — the file had **zero** ZELI tokens and ~46 distinct
+- Full Percé token pass — the file had **zero** Percé tokens and ~46 distinct
   `gray-*` / `stone-*` / `black` / `white` classes.
 - **Mobile sticky add-to-cart bar was underneath the bottom nav:**
   `bottom-15` is 3.75rem; the fixed mobile bottom nav is `h-16` (4rem) plus the
   safe-area inset. The Add-to-cart button was covered. Now positioned at
-  `calc(4rem + env(safe-area-inset-bottom))` on the shared `--zeli-z-sticky`
+  `calc(4rem + env(safe-area-inset-bottom))` on the shared `--perce-z-sticky`
   layer.
 - **"Best Layered With" accordion** rendered unconditionally and, with nothing
   to show, told the shopper "Stay tuned for our recommended layering
@@ -227,14 +227,14 @@ scarcity or review claim is asserted anywhere on the active path.
 working prop surface (offer progress banner, applied-offer savings, per-line
 free quantities, the full promo apply/remove/notice cycle, mobile sticky CTA).
 
-- Full ZELI token pass, including the inline `#111827` literals.
+- Full Percé token pass, including the inline `#111827` literals.
 - **The mobile sticky checkout bar was never anchored.** It carried
   `fixed inset-x-0 z-40` with **no `bottom`**, so it sat at its static
   position and scrolled away — while `pb-60` above reserved empty space for a
   bar that was not there. It is now pinned above the mobile bottom nav at
-  `calc(4rem + env(safe-area-inset-bottom))` on `--zeli-z-sticky`.
+  `calc(4rem + env(safe-area-inset-bottom))` on `--perce-z-sticky`.
 - The page did not clear the fixed header chrome; the "Cart" heading started
-  underneath the navbar. Fixed with `.zeli-header-offset`.
+  underneath the navbar. Fixed with `.perce-header-offset`.
 - **Shipping line:** read "Calculated at checkout" whenever the fee was zero or
   unknown. Checkout applies the same single flat
   `store_settings.shipping_fee` and calculates nothing, so the line promised a
@@ -331,12 +331,12 @@ exists. Local value: `0.00`.
   the fact ("Card details are entered on the payment provider's own page").
   In a COD-only store there is no payment information to secure.
 - **The Terms & Conditions line is gone.** It linked to `/links`, which is the
-  link-tree page, not a terms document — ZELI has published no terms, so it
+  link-tree page, not a terms document — Percé has published no terms, so it
   pointed a paying customer at an agreement that does not exist. It reappears
   automatically if an admin supplies real copy via the `checkout.terms`
   translation override.
-- Palette moved off `green-600` / `emerald-600` onto ZELI tokens; the page
-  clears the header chrome and uses `.zeli-container`.
+- Palette moved off `green-600` / `emerald-600` onto Percé tokens; the page
+  clears the header chrome and uses `.perce-container`.
 
 ### Blockers
 
@@ -389,7 +389,7 @@ Reviewed against the actual order schema — nothing migrated, nothing invented.
 
 ## J. Order confirmation
 
-Restyled onto ZELI and reduced to statements the page can actually support.
+Restyled onto Percé and reduced to statements the page can actually support.
 
 Removed:
 
@@ -442,7 +442,7 @@ Audited; **no functional change**, which is the correct outcome.
 Login, register, forgot-password, reset-password, verify-email, account and
 orders. **No auth backend or security behaviour was touched.**
 
-- ZELI token pass across `MinimalLoginPage`, `MinimalRegisterPage`,
+- Percé token pass across `MinimalLoginPage`, `MinimalRegisterPage`,
   `MinimalForgotPasswordPage`, `ReturnPolicyPage`, `QuickViewDialog`,
   `/account`, `/orders`, `/verify-email`.
 - Every auth field already had a real `<label htmlFor>` and correct
@@ -462,9 +462,9 @@ orders. **No auth backend or security behaviour was touched.**
 | Empty shop / category (no products at all) | "No products found — Try adjusting your filters or browse our full collection" | "Nothing here yet — This collection has no products at the moment." + route home |
 | Search matched nothing (on `/shop`) | same message as above | "No products match this search." + *Clear search* |
 | `/search` no results | generic, always offered *Clear Search* | states the query, offers *Clear search* only when there is a query |
-| Empty cart | grey stack, "Add items to your cart to continue shopping" | ZELI page, "Nothing added yet", *Continue shopping* |
-| Category not found | stone-palette block with a pill button | ZELI page, factual, routes to `/shop` |
-| **404 / 500** | **two bare `<h1>`/`<p>` tags — no layout, no styling, browser-default serif on white inside the ZELI shell** | full ZELI page with a `404`/`500` eyebrow, factual copy, and both real destinations |
+| Empty cart | grey stack, "Add items to your cart to continue shopping" | Percé page, "Nothing added yet", *Continue shopping* |
+| Category not found | stone-palette block with a pill button | Percé page, factual, routes to `/shop` |
+| **404 / 500** | **two bare `<h1>`/`<p>` tags — no layout, no styling, browser-default serif on white inside the Percé shell** | full Percé page with a `404`/`500` eyebrow, factual copy, and both real destinations |
 | No account orders | existing empty state, retokenised | unchanged in substance |
 | Failed checkout | server error surfaced through `parseOrderError` with field labels | unchanged in substance |
 | Failed product load | error block | unchanged in substance |
@@ -507,8 +507,8 @@ HTML inspection):
   (36px) were left.
 - Sticky/bottom-nav overlap: two real defects found and fixed (cart sticky bar
   unanchored; product sticky bar 4px+safe-area behind the bottom nav). Both now
-  use `calc(4rem + env(safe-area-inset-bottom))` and `--zeli-z-sticky`, below
-  the bottom nav's `--zeli-z-bottom-nav` and the header's `--zeli-z-header`.
+  use `calc(4rem + env(safe-area-inset-bottom))` and `--perce-z-sticky`, below
+  the bottom nav's `--perce-z-bottom-nav` and the header's `--perce-z-header`.
 - Safe area: the bottom nav already had `pb-[env(safe-area-inset-bottom)]`;
   both sticky bars now account for it.
 - Checkout form density: single column on mobile, `1fr 380px` from `lg`;
@@ -527,7 +527,7 @@ HTML inspection):
 | `npm test` | **pass** — 497 passed, 62 skipped (all skips are the `*.integration.test.ts` files that need `TEST_DATABASE_URL`) |
 | `npm run build` | **pass** |
 | Biome lint (changed files) | **77 → 76** pre-existing errors on the same 22 files; **0 introduced**. Newly authored files (`pages/_error/+Page.tsx`, `shared/config/storefront.ts`, its test, the i18n file) lint clean. The remaining 76 are long-standing repo-wide rules (`useSemanticElements`, `noSvgWithoutTitle`, `useExhaustiveDependencies`, `useButtonType`, `noLabelWithoutControl`). |
-| Legacy brand scan (source + `dist/`) | Only `product-perce` — the internal template id documented in `docs/CURRENT_PROJECT.md` as deliberately retained because it is persisted in `store_settings.template_selection`. Its customer-facing label is "Premium (Default)". No Percé, Percée, perce-eg, piercingsperce, Lebsy, Lebsey, SYNT or syntperfumes. |
+| Legacy brand scan (source + `dist/`) | Only `product-perce` — the internal template id documented in `docs/CURRENT_PROJECT.md` as deliberately retained because it is persisted in `store_settings.template_selection`. Its customer-facing label is "Premium (Default)". No earlier-brand names, perce-eg, piercingsperce, Lebsy, Lebsey, SYNT or syntperfumes. |
 | Claims scan (`dist/`) | 0 for free returns, complimentary shipping, 30-day, 14-day, money-back, guarantee, hypoallergenic, waterproof, tarnish, lifetime warranty, ships within, delivery in, We accept, VISA, meeza, Apple Pay, 100% Authentic, Happy Customers. `free shipping` × 35 and `30 day` × 14 all classified below. `Fast Delivery` × 1, `Easy Returns` × 2, `satisfied customers` × 4 are **this phase's own explanatory code comments** compiled into the SSR bundle — no customer-visible text. |
 
 **Classification of every remaining runtime hit**
@@ -548,14 +548,14 @@ HTML inspection):
 
 | File | Purpose |
 |---|---|
-| `docs/ZELI_LAUNCH_CONFIGURATION.md` | Every non-code prerequisite, derived from the runtime |
-| `docs/ZELI_PHASE3_JOURNEY_REPORT.md` | This document |
+| `docs/PERCE_LAUNCH_CONFIGURATION.md` | Every non-code prerequisite, derived from the runtime |
+| `docs/PERCE_PHASE3_JOURNEY_REPORT.md` | This document |
 
 **Configuration / architecture**
 
 | File | Change |
 |---|---|
-| `shared/config/storefront.ts` | `ZELI_TEMPLATE_PRESET` for all 8 categories + `resolveTemplateId()`, with the reasoning for each id |
+| `shared/config/storefront.ts` | `PERCE_TEMPLATE_PRESET` for all 8 categories + `resolveTemplateId()`, with the reasoning for each id |
 | `shared/config/__tests__/storefront.test.ts` | 16 tests: preset covers every registry category, every id exists, no `*-editorial` fallback, resolver precedence |
 | `frontend/contexts/TemplateContext.tsx` | `getDefaultSelection()` now uses the preset instead of `templateConfig[category][0]` — the invisible fallback an unconfigured store actually got |
 | `layouts/LayoutDefault.tsx` | Footer follows `navbarStyle` like the navbar, instead of keying off the landing template |
@@ -566,16 +566,16 @@ HTML inspection):
 
 | File | Change |
 |---|---|
-| `components/template-system/minimal/MinimalCategoryPage.tsx` | ZELI tokens, header offset, result count, two empty states, a11y on breadcrumb/pagination/toolbar |
+| `components/template-system/minimal/MinimalCategoryPage.tsx` | Percé tokens, header offset, result count, two empty states, a11y on breadcrumb/pagination/toolbar |
 | `components/template-system/minimal/MinimalNavbar.tsx` | Live-search discount pricing (desktop + mobile) |
-| `components/template-system/searchResults/SearchResultsMinimal.tsx` | ZELI tokens, invalid sort options removed, shared product card, a11y |
+| `components/template-system/searchResults/SearchResultsMinimal.tsx` | Percé tokens, invalid sort options removed, shared product card, a11y |
 | `components/template-system/productPage/ProductPageMinimal.tsx` | Full token pass, sticky-bar overlap fix, "Pairs With" gated on real data |
 | `components/template-system/cartPage/CartPageMinimalTemplate.tsx` | Full token pass, sticky-bar anchoring fix, header offset, truthful shipping row, 44px targets |
 | `components/template-system/cartPage/{AppliedOffersSavings,OfferProgressBanner}.tsx` | Token pass |
 | `components/template-system/checkoutPage/CheckoutPageModernTemplate.tsx` | Labels, error association, duplicate-id fix, postal code, claims removed, token pass |
-| `pages/order-confirmation/+Page.tsx` | ZELI pass, unsupported statements removed |
+| `pages/order-confirmation/+Page.tsx` | Percé pass, unsupported statements removed |
 | `pages/_error/+Page.tsx` | Rewritten from bare unstyled tags |
-| `pages/{categories/@slug,shop}/+Page.tsx` | Breadcrumb `<nav>`, ZELI not-found state |
+| `pages/{categories/@slug,shop}/+Page.tsx` | Breadcrumb `<nav>`, Percé not-found state |
 | `pages/offers/+Page.tsx` | Perfume copy from the previous brand replaced; token pass |
 | `pages/{account,orders,verify-email,contact}/+Page.tsx` | Token pass |
 | `components/template-system/minimal/{MinimalLoginPage,MinimalRegisterPage,MinimalForgotPasswordPage,ReturnPolicyPage,QuickViewDialog}.tsx` | Token pass + error association |
@@ -597,7 +597,7 @@ HTML inspection):
 
 | File | Change |
 |---|---|
-| `docs/CURRENT_PROJECT.md` | ZELI production template preset section + shell-owned routes rule |
+| `docs/CURRENT_PROJECT.md` | Percé production template preset section + shell-owned routes rule |
 
 ---
 
@@ -630,7 +630,7 @@ HTML inspection):
 | Support | **BLOCKED** | No `VITE_SUPPORT_EMAIL`; every contact line is hidden |
 | Tracking | **CAN WAIT** | `pixel_config` empty; internal event pipeline works |
 
-### What exactly prevents ZELI from accepting its first real customer order today
+### What exactly prevents Percé from accepting its first real customer order today
 
 1. There are **no products and no categories** in the database.
 2. There is **no support email**, so `SUPPORT_EMAIL` is undefined and every

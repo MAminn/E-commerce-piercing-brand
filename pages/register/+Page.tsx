@@ -112,7 +112,7 @@ export default function Page() {
               <CheckCircle className='w-8 h-8 text-[#4CAF50]' />
             </div>
             <div className='space-y-3'>
-              <h1 className='text-[24px] md:text-[28px] font-light tracking-[-0.02em] text-[#2B231D] leading-tight'>
+              <h1 className='text-[24px] md:text-[28px] font-medium tracking-[-0.02em] text-[#2B231D] leading-tight'>
                 You're all set
               </h1>
               <p className='text-[14px] text-[#8B7E74] leading-relaxed max-w-[320px]'>
@@ -122,7 +122,7 @@ export default function Page() {
             </div>
             <Link
               href='/login'
-              className='inline-flex items-center gap-2 text-[13px] text-[#2B231D] hover:text-[#C4A574] transition-all duration-500 tracking-[0.04em] font-light mt-4'>
+              className='inline-flex items-center gap-2 text-[13px] text-[#2B231D] hover:text-[#C4A574] transition-all duration-500 font-light mt-4'>
               <ArrowLeft className='w-4 h-4' />
               Go to login
             </Link>
@@ -131,7 +131,7 @@ export default function Page() {
           /* ── Registration form ── */
           <>
             <div className='relative space-y-3'>
-              <h1 className='text-[28px] md:text-[32px] text-center font-light tracking-[-0.02em] text-[#2B231D] leading-tight'>
+              <h1 className='text-[28px] md:text-[32px] text-center font-medium tracking-[-0.02em] text-[#2B231D] leading-tight'>
                 Create account
               </h1>
               <p className='text-center text-[13px] text-[#8B7E74] tracking-wide leading-relaxed'>
@@ -148,7 +148,7 @@ export default function Page() {
                 <div className='relative'>
                   <label
                     htmlFor='name'
-                    className='block text-[10px] uppercase tracking-[0.12em] text-[#8B7E74] mb-3 font-medium'>
+                    className='block text-[10px] text-[#8B7E74] mb-3 font-medium'>
                     Full name
                   </label>
                   <Input
@@ -170,7 +170,7 @@ export default function Page() {
                 <div className='relative'>
                   <label
                     htmlFor='email'
-                    className='block text-[10px] uppercase tracking-[0.12em] text-[#8B7E74] mb-3 font-medium'>
+                    className='block text-[10px] text-[#8B7E74] mb-3 font-medium'>
                     Email
                   </label>
                   <Input
@@ -193,7 +193,7 @@ export default function Page() {
               <div className='relative'>
                 <label
                   htmlFor='phone'
-                  className='block text-[10px] uppercase tracking-[0.12em] text-[#8B7E74] mb-3 font-medium'>
+                  className='block text-[10px] text-[#8B7E74] mb-3 font-medium'>
                   Phone
                 </label>
                 <Input
@@ -217,7 +217,7 @@ export default function Page() {
                 <div className='relative'>
                   <label
                     htmlFor='password'
-                    className='block text-[10px] uppercase tracking-[0.12em] text-[#8B7E74] mb-3 font-medium'>
+                    className='block text-[10px] text-[#8B7E74] mb-3 font-medium'>
                     Password
                   </label>
                   <div className='relative'>
@@ -252,7 +252,7 @@ export default function Page() {
                 <div className='relative'>
                   <label
                     htmlFor='confirmPassword'
-                    className='block text-[10px] uppercase tracking-[0.12em] text-[#8B7E74] mb-3 font-medium'>
+                    className='block text-[10px] text-[#8B7E74] mb-3 font-medium'>
                     Confirm password
                   </label>
                   <div className='relative'>
@@ -288,7 +288,7 @@ export default function Page() {
 
               {/* Submit button */}
               <Button
-                className='w-full bg-[#2B231D] hover:bg-[#3A3028] text-[#F8F6F3] font-normal text-[14px] tracking-[0.04em] mt-4 py-7 rounded-[14px] transition-all duration-500 shadow-[0_4px_16px_rgba(43,35,29,0.12)] hover:shadow-[0_6px_24px_rgba(43,35,29,0.18)] uppercase'
+                className='w-full bg-[#2B231D] hover:bg-[#3A3028] text-[#F8F6F3] font-normal text-[14px] mt-4 py-7 rounded-[14px] transition-all duration-500 shadow-[0_4px_16px_rgba(43,35,29,0.12)] hover:shadow-[0_6px_24px_rgba(43,35,29,0.18)] uppercase'
                 type='submit'
                 disabled={isSubmitting}>
                 {isSubmitting ? "Creating account..." : "Create account"}
@@ -297,7 +297,7 @@ export default function Page() {
               {/* Divider + login link */}
               <div className='flex items-center justify-center gap-2 mt-2'>
                 <div className='h-[1px] flex-1 bg-gradient-to-r from-transparent via-[#D9D3CC] to-transparent opacity-40' />
-                <p className='text-center text-[12px] text-[#9C918A] tracking-[0.04em] px-4'>
+                <p className='text-center text-[12px] text-[#9C918A] px-4'>
                   Already have an account?
                 </p>
                 <div className='h-[1px] flex-1 bg-gradient-to-r from-transparent via-[#D9D3CC] to-transparent opacity-40' />
@@ -305,7 +305,7 @@ export default function Page() {
 
               <Link
                 href='/login'
-                className='text-center text-[13px] text-[#2B231D] hover:text-[#C4A574] transition-all duration-500 tracking-[0.04em] font-light opacity-80 hover:opacity-100 -mt-2'>
+                className='text-center text-[13px] text-[#2B231D] hover:text-[#C4A574] transition-all duration-500 font-light opacity-80 hover:opacity-100 -mt-2'>
                 Sign in instead
               </Link>
             </form>

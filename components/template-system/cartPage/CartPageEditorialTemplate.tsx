@@ -131,7 +131,7 @@ export function CartPageEditorialTemplate({
         {/* Header */}
         <Reveal variant="fadeUp">
         <div className="mb-10">
-          <p className="text-xs tracking-[0.32em] uppercase text-stone-500">
+          <p className="text-xs uppercase text-stone-500">
             Shopping
           </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-900 sm:text-4xl">
@@ -173,7 +173,7 @@ export function CartPageEditorialTemplate({
                     />
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-[9px] tracking-[0.28em] uppercase text-stone-400">
+                      <span className="text-[9px] text-stone-400">
                         No img
                       </span>
                     </div>
@@ -260,7 +260,7 @@ export function CartPageEditorialTemplate({
           {/* -------------------------------------------------------- */}
           <Reveal variant="fadeUp" delay={0.15} className="lg:col-span-4">
             <div className="lg:sticky lg:top-24 rounded-2xl border border-stone-200 bg-white p-6">
-              <h2 className="text-sm font-medium tracking-[0.2em] uppercase text-stone-500 mb-5">
+              <h2 className="text-sm font-medium text-stone-500 mb-5">
                 Order Summary
               </h2>
 

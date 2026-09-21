@@ -15,6 +15,7 @@ import {
 } from "@react-email/components";
 // NEVER REMOVE THIS IMPORT
 import * as React from "react";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 export const NewOrderEmailTemplate = ({
   storeName,
@@ -60,10 +61,7 @@ export const NewOrderEmailTemplate = ({
   customerEmail: string;
   customerPhone: string;
 }) => {
-  // Format currency function
-  const formatPrice = (price: number) => {
-    return price.toFixed(2);
-  };
+  const formatPrice = (price: number) => formatMoney(price, { currency });
 
   return (
     <Html>
@@ -132,15 +130,15 @@ export const NewOrderEmailTemplate = ({
                             textDecoration: "line-through",
                             color: "#888",
                           }}>
-                          {formatPrice(item.price)} {currency}
+                          {formatPrice(item.price)}
                         </span>
                         <br />
                         <span style={{ color: "#e53e3e" }}>
-                          {formatPrice(item.discountPrice)} {currency}
+                          {formatPrice(item.discountPrice)}
                         </span>
                       </>
                     ) : (
-                      <>{formatPrice(item.price)} {currency}</>
+                      <>{formatPrice(item.price)}</>
                     )}
                   </Column>
                 </Row>
@@ -152,7 +150,7 @@ export const NewOrderEmailTemplate = ({
                 Subtotal
               </Column>
               <Column style={summaryValueCell}>
-                {formatPrice(subTotal)} {currency}
+                {formatPrice(subTotal)}
               </Column>
             </Row>
             <Row style={summaryRow}>
@@ -160,14 +158,14 @@ export const NewOrderEmailTemplate = ({
                 Shipping
               </Column>
               <Column style={summaryValueCell}>
-                {formatPrice(shippingFees)} {currency}
+                {formatPrice(shippingFees)}
               </Column>
             </Row>
             <Row style={totalRow}>
               <Column style={totalLabelCell} colSpan={2}>
                 Total
               </Column>
-              <Column style={totalValueCell}>{formatPrice(total)} {currency}</Column>
+              <Column style={totalValueCell}>{formatPrice(total)}</Column>
             </Row>
           </Section>
 
@@ -286,7 +284,7 @@ const logo = {
 };
 
 const divider = {
-  borderTop: "1px solid #e5e7eb",
+  borderTop: "1px solid #DAD7D3",
   margin: "20px 0",
 };
 
@@ -309,7 +307,7 @@ const paragraph = {
 };
 
 const tableHeaderRow = {
-  borderBottom: "2px solid #e5e7eb",
+  borderBottom: "2px solid #DAD7D3",
 };
 
 const tableHeaderCell = {

@@ -355,26 +355,33 @@ export interface HomepageContent {
  * Default homepage content - safe fallback values
  */
 export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
+  // Homepage copy from the Percé Brand Source of Truth. The subheading is
+  // the SAFER of the two approved versions: the preferred one ("Piercing
+  // jewellery, photographed properly, delivered across Egypt.") claims
+  // photography coverage that has not been verified against the live
+  // catalogue. Switch it in Dashboard > Homepage once it has.
   meta: {
     enabled: true,
-    pageTitle: "Welcome to Our Store",
-    pageDescription: "Discover amazing products curated just for you",
+    pageTitle: "Percé — Piercing jewellery, delivered across Egypt",
+    pageDescription: "Piercing jewellery, delivered across Egypt.",
   },
   hero: {
     enabled: true,
-    title: "Welcome to Our Store",
-    subtitle: "Discover amazing products curated just for you",
-    ctaText: "Start Shopping",
+    title: "Small pieces. Made to mix.",
+    subtitle: "Piercing jewellery, delivered across Egypt.",
+    ctaText: "Shop all",
     ctaLink: "/shop",
     backgroundImage: undefined,
     mobileBackgroundImage: undefined,
     heroSlides: [],
   },
   brandStatement: {
+    // Plain statement of what the shop is. No material, quality or
+    // "timeless" claims — those need supplier documentation first.
     enabled: true,
-    title: "Worn with intention. Designed for life.",
+    title: "A proper shop, not an inbox.",
     description:
-      "Every piercing is an expression of self. Our pieces are crafted to honor that commitment—refined in form, enduring in quality, and timeless in design.",
+      "Prices on the page, sizes listed, delivery across Egypt, cash on delivery. Pick one piece or pick a set.",
     // No default image. This pointed at "/uploads/homepage/brand-statement.jpg",
     // a file that does not exist in this repo — so an unconfigured store
     // rendered a broken-image icon with the heading spilling across it as alt
@@ -394,16 +401,16 @@ export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
   },
   categories: {
     enabled: true,
-    title: "Shop by Category",
-    subtitle: "Browse our curated selection of product categories",
-    ctaText: "View All Categories",
-    ctaLink: "/categories",
+    title: "Shop by placement",
+    subtitle: "",
+    ctaText: "Shop all",
+    ctaLink: "/shop",
   },
   featuredProducts: {
     enabled: true,
-    title: "Featured Products",
-    subtitle: "Check out our handpicked selection of trending products",
-    viewAllText: "View All Products",
+    title: "Featured",
+    subtitle: "",
+    viewAllText: "Shop all",
     viewAllLink: "/shop",
   },
   valueProps: {
@@ -426,31 +433,31 @@ export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
   },
   newsletter: {
     enabled: true,
-    title: "Stay Updated",
-    subtitle: "Subscribe to our newsletter for exclusive deals and updates",
-    placeholderText: "Enter your email address",
+    title: "Join the list",
+    subtitle: "New pieces and offers, in your inbox.",
+    placeholderText: "Your email address",
     ctaText: "Subscribe",
-    privacyText: "We respect your privacy. Unsubscribe at any time.",
+    privacyText: "Unsubscribe at any time.",
   },
   footerCta: {
     enabled: true,
-    title: "Ready to Start Shopping?",
+    title: "Shop all pieces",
     // "Join thousands of satisfied customers today" — the store has taken no
     // orders and has no reviews.
     subtitle: "",
-    ctaText: "Browse Products",
+    ctaText: "Shop all",
     ctaLink: "/shop",
   },
   discountedProducts: {
     enabled: true,
     title: "Offers",
-    viewAllText: "View All",
+    viewAllText: "View all",
     viewAllLink: "/shop",
   },
   newArrivals: {
     enabled: true,
-    title: "New Arrivals",
-    viewAllText: "View All",
+    title: "New in",
+    viewAllText: "View all",
     viewAllLink: "/shop",
   },
   bundles: {
@@ -458,12 +465,12 @@ export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
     // so an unconfigured store shows no empty section. Copy is generic —
     // no brand name, no savings claims.
     enabled: true,
-    title: "Bundles & Stacks",
-    titleAr: "الباقات والأطقم",
+    title: "Sets",
+    titleAr: "الأطقم",
     subtitle: "",
     subtitleAr: "",
-    viewAllText: "View all bundles",
-    viewAllTextAr: "عرض كل الباقات",
+    viewAllText: "View all sets",
+    viewAllTextAr: "عرض كل الأطقم",
     viewAllLink: "/bundles",
     limit: 6,
     source: "manual",
@@ -484,20 +491,20 @@ export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
   contactBanner: {
     enabled: true,
     slides: [],
-    heading: "We Would Love To Hear From You",
-    headingAr: "نود أن نسمع منك",
+    heading: "Questions? Ask.",
+    headingAr: "تواصلي معنا",
     description:
-      "Have a question, feedback, or just want to say hello? Drop us a message and we'll get back to you as soon as possible.",
+      "Sizes, delivery, an order — send a message and we'll get back to you.",
     descriptionAr:
-      "هل لديك سؤال أو ملاحظة أو تريد فقط أن تقول مرحبا؟ أرسل لنا رسالة وسنعود إليك في أقرب وقت ممكن.",
+      "للاستفسار عن المقاسات أو التوصيل أو طلبك، أرسلي رسالة وسنرد عليك.",
     directionsUrl: "",
   },
   aboutUs: {
     enabled: false,
-    title: "About Us",
-    titleAr: "من نحن",
+    title: "About Percé",
+    titleAr: "عن Percé",
     description:
-      "Welcome to our store. We are passionate about bringing you the finest products.",
+      "Percé sells piercing jewellery online in Egypt — a proper shop, with prices on the page and delivery to your door. Small pieces, made to mix.",
     descriptionAr: "",
     imageUrl: "",
   },
@@ -507,8 +514,8 @@ export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
     // business facts this store has not established, so /return-policy shows
     // "not available yet" until an admin publishes real terms.
     enabled: false,
-    title: "Return Policy",
-    titleAr: "سياسة الإرجاع",
+    title: "Returns & exchange",
+    titleAr: "الاستبدال والإرجاع",
     intro:
       "Our return policy has not been published yet. Set it from Dashboard > Homepage > Return Policy before enabling this page.",
     introAr:

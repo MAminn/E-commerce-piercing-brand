@@ -2,7 +2,12 @@ import defaultFaviconUrl from "../assets/favicon.svg";
 import { useEffect } from "react";
 import { usePageContext } from "vike-react/usePageContext";
 import type { LayoutSettings } from "#root/shared/types/layout-settings";
-import { STORE_NAME, STORE_DESCRIPTION } from "#root/shared/config/branding";
+import {
+  STORE_NAME,
+  STORE_DESCRIPTION,
+  STORE_COUNTRY_CODE,
+  STORE_SOCIAL_LINKS,
+} from "#root/shared/config/branding";
 import { getPublicOrigin, toAbsoluteUrl } from "#root/shared/config/site-url";
 import { buildTypographyHeadCss } from "#root/shared/typography/build-head-css";
 
@@ -65,6 +70,48 @@ export default function HeadDefault() {
     }
   }, [layoutSettings?.siteTitle]);
 
+  // Organization + WebSite structured data. Name is the customer-facing
+  // "Percé"; the URL is the canonical origin; sameAs lists only social
+  // profiles that are actually configured (CMS first, then VITE_SOCIAL_*).
+  const cmsSocialUrls = (layoutSettings?.footer?.socialLinks ?? [])
+    .map((s) => s.url?.trim())
+    .filter((u): u is string => Boolean(u) && /^https?:/i.test(u ?? ""));
+  const sameAs =
+    cmsSocialUrls.length > 0
+      ? cmsSocialUrls
+      : STORE_SOCIAL_LINKS.map((s) => s.url);
+  const organizationJsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": `${siteOrigin}/#organization`,
+        name: siteTitle,
+        url: siteOrigin,
+        ...(ogImageUrl ? { logo: ogImageUrl } : {}),
+        ...(sameAs.length > 0 ? { sameAs } : {}),
+        areaServed: STORE_COUNTRY_CODE,
+      },
+      {
+        "@type": "WebSite",
+        "@id": `${siteOrigin}/#website`,
+        name: siteTitle,
+        url: siteOrigin,
+        description: siteDescription,
+        inLanguage: ["en", "ar"],
+        publisher: { "@id": `${siteOrigin}/#organization` },
+        potentialAction: {
+          "@type": "SearchAction",
+          target: {
+            "@type": "EntryPoint",
+            urlTemplate: `${siteOrigin}/search?q={search_term_string}`,
+          },
+          "query-input": "required name=search_term_string",
+        },
+      },
+    ],
+  };
+
   return (
     <>
       {/* Basic favicon */}
@@ -101,9 +148,9 @@ export default function HeadDefault() {
       )}
 
       {/* ── Fonts ──────────────────────────────────────────────────────
-          The storefront's base families (Poppins, Rubik, Roboto Flex) are
-          self-hosted via @fontsource and imported at the top of
-          layouts/style.css — they are part of the CSS bundle and need no
+          The storefront's base families (Inter Tight for the brand, Rubik
+          for Arabic) are self-hosted via @fontsource and imported at the top
+          of layouts/style.css — they are part of the CSS bundle and need no
           network preconnect. Admin-assigned fonts arrive as real @font-face
           rules in the <style> block at the bottom of this head, emitted by
           shared/typography/build-head-css.ts. That is the ONLY runtime
@@ -166,7 +213,7 @@ export default function HeadDefault() {
               <meta property='og:image:height' content='630' />
             </>
           )}
-          <meta property='og:image:alt' content={`${siteTitle} logo`} />
+          <meta property='og:image:alt' content={siteTitle} />
         </>
       )}
 
@@ -176,9 +223,16 @@ export default function HeadDefault() {
       <meta name='twitter:description' content={siteDescription} />
       {ogImageUrl && <meta name='twitter:image' content={ogImageUrl} />}
 
-      {/* Core Web Vitals hints */}
-      <meta name='theme-color' content='#ffffff' />
+      {/* Browser chrome matches the dark brand frame (Percé Ground). */}
+      <meta name='theme-color' content='#0E0E0E' />
       <meta name='color-scheme' content='light' />
+
+      {/* Structured data: Organization + WebSite (schema.org). Product
+          pages add their own Product node with priceCurrency EGP. */}
+      <script
+        type='application/ld+json'
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+      />
 
       {/* Critical CSS — layout only. Deliberately declares NO font-family:
           that is owned by layouts/style.css (.storefront-shell rules reading

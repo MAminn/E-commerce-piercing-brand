@@ -870,7 +870,7 @@ function ModernOrderSummary({
             <span className='font-light'>EGP {shipping.toFixed(2)}</span>
           </div>
 
-          <div className='bg-gray-50 border  rounded-none p-4 border-t border-gray-200'>
+          <div className='bg-gray-50 border rounded-none p-4 border-t border-gray-200'>
             <div className='flex justify-between text-2xl font-medium'>
               <span className='text-gray-900'>Total:</span>
               <span className='text-gray-900'>EGP {total.toFixed(2)}</span>
@@ -880,7 +880,7 @@ function ModernOrderSummary({
 
         {/* Trust indicators removed: "Secure", "Trusted" and "Fast Delivery"
             asserted a payment guarantee, a reputation and a delivery time that
-            ZELI has not established. Legacy V1 template — reachable only from
+            Percé has not established. Legacy V1 template — reachable only from
             the admin Templates screen and the admin-guarded /template-preview,
             never from a customer route — but it must not carry the claims
             either. */}

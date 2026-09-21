@@ -159,15 +159,15 @@ export default function CategoryPage() {
 
   if (notFound) {
     return (
-      <div className='zeli-header-offset flex min-h-[60vh] items-center justify-center bg-zeli-bg px-4'>
+      <div className='perce-header-offset flex min-h-[60vh] items-center justify-center bg-perce-bg px-4'>
         <div className='max-w-md text-center'>
-          <h1 className='zeli-section-title'>Category not found</h1>
-          <p className='mt-2 text-[length:var(--zeli-text-body)] text-zeli-ink-muted'>
+          <h1 className='perce-section-title'>Category not found</h1>
+          <p className='mt-2 text-[length:var(--perce-text-body)] text-perce-ink-muted'>
             This collection does not exist, or it is no longer available.
           </p>
           <a
             href='/shop'
-            className='zeli-underline mt-6 inline-flex min-h-11 items-center text-[length:var(--zeli-text-small)] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-zeli-ink'>
+            className='perce-underline mt-6 inline-flex min-h-11 items-center text-[length:var(--perce-text-small)] font-medium text-perce-ink'>
             Browse all products
           </a>
         </div>
@@ -216,15 +216,15 @@ export default function CategoryPage() {
         <nav
           aria-label='Breadcrumb'
           data-shop-breadcrumb
-          className='zeli-container pt-6'>
-          <div className='mb-4 flex items-center gap-2 text-[length:var(--zeli-text-small)] text-zeli-ink-muted'>
+          className='perce-container pt-6'>
+          <div className='mb-4 flex items-center gap-2 text-[length:var(--perce-text-small)] text-perce-ink-muted'>
             <a
               href='/shop'
-              className='zeli-underline-hover transition-colors hover:text-zeli-ink'>
+              className='perce-underline-hover transition-colors hover:text-perce-ink'>
               All Products
             </a>
             <span aria-hidden>/</span>
-            <span aria-current='page' className='truncate text-zeli-ink'>
+            <span aria-current='page' className='truncate text-perce-ink'>
               {categoryName}
             </span>
           </div>

@@ -21,6 +21,7 @@ import {
   type MarketingEmailFeaturedItem,
 } from "./MarketingEmailLayout";
 import type { EmailAutomationType } from "../queue/service";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 function readString(
   payload: unknown,
@@ -65,6 +66,12 @@ function readFeaturedItem(payload: unknown): MarketingEmailFeaturedItem | undefi
   };
 }
 
+/** "1234.50" → "EGP 1,234.50"; anything non-numeric passes through untouched. */
+function formatCartTotal(raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed === "" || Number.isNaN(Number(trimmed))) return raw;
+  return formatMoney(trimmed);
+}
 async function renderGeneric(
   row: ScheduledEmailRow,
   unsubscribeUrl: string,
@@ -90,7 +97,7 @@ async function renderGeneric(
     discountCode: template.promoCode?.code ?? "",
     productName: readString(row.payload, "productName"),
     customerName: readString(row.payload, "customerName"),
-    cartTotal: readString(row.payload, "cartTotal"),
+    cartTotal: formatCartTotal(readString(row.payload, "cartTotal")),
   };
   // Both the English and Arabic bracketed label resolve to the same value,
   // since a single template's fields can mix which language's tokens they

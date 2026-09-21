@@ -5,5 +5,5 @@ import type { Data } from "./+data";
 export default function title(pageContext: PageContext) {
   const brand = pageContext.brandName || STORE_NAME;
   const campaign = (pageContext.data as Data | undefined)?.campaign;
-  return campaign ? `${campaign.title} | ${brand}` : `Bundles & Stacks | ${brand}`;
+  return campaign ? `${campaign.title} | ${brand}` : `Sets | ${brand}`;
 }

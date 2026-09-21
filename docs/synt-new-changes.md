@@ -1,5 +1,5 @@
 > ⚠️ **HISTORICAL DOCUMENT — NOT CURRENT PROJECT TRUTH.**
-> This file describes an earlier project and earlier brands (Percé/Percée,
+> This file describes an earlier project and earlier brands (an earlier Percé storefront,
 > Lebsy/Lebsey, SYNT). It is kept for engineering history only. Brand names,
 > domains, social accounts, support addresses, policies and roadmap here do
 > **not** apply to this repository. The authoritative document is [`CURRENT_PROJECT.md`](CURRENT_PROJECT.md).

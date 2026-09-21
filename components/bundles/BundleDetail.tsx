@@ -57,27 +57,27 @@ export function BundleDetail({ slug }: { slug: string }) {
 
   if (state.status === "loading") {
     return (
-      <div role="status" aria-label="Loading" className="zeli-header-offset flex min-h-[60vh] items-center justify-center bg-zeli-bg">
-        <div className="h-5 w-5 animate-spin rounded-full border-2 border-zeli-border-strong border-t-zeli-ink" />
+      <div role="status" aria-label="Loading" className="perce-header-offset flex min-h-[60vh] items-center justify-center bg-perce-bg">
+        <div className="h-5 w-5 animate-spin rounded-full border-2 border-perce-border-strong border-t-perce-ink" />
       </div>
     );
   }
 
   if (state.status === "not_found") {
     return (
-      <div className="zeli-header-offset flex min-h-[60vh] items-center justify-center bg-zeli-bg px-4">
+      <div className="perce-header-offset flex min-h-[60vh] items-center justify-center bg-perce-bg px-4">
         <div className="max-w-md text-center">
-          <h1 className="zeli-section-title">{t("bundle.not_found")}</h1>
-          <p className="mt-2 text-[length:var(--zeli-text-body)] text-zeli-ink-muted">{t("bundle.not_found_body")}</p>
+          <h1 className="perce-section-title">{t("bundle.not_found")}</h1>
+          <p className="mt-2 text-[length:var(--perce-text-body)] text-perce-ink-muted">{t("bundle.not_found_body")}</p>
           <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
             <Link
               href="/bundles"
-              className="inline-flex min-h-11 items-center justify-center bg-zeli-accent px-6 text-[length:var(--zeli-text-small)] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-zeli-ink-inverse hover:bg-zeli-accent-hover">
+              className="inline-flex min-h-11 items-center justify-center bg-perce-cta px-6 text-[length:var(--perce-text-small)] font-medium text-perce-ink-inverse hover:bg-perce-cta-hover">
               {t("bundles.view_all")}
             </Link>
             <Link
               href="/shop"
-              className="zeli-underline-hover inline-flex min-h-11 items-center px-2 text-[length:var(--zeli-text-small)] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-zeli-ink">
+              className="perce-underline-hover inline-flex min-h-11 items-center px-2 text-[length:var(--perce-text-small)] font-medium text-perce-ink">
               {t("bundle.browse_shop")}
             </Link>
           </div>

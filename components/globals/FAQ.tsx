@@ -14,7 +14,7 @@ import {
  * Apple Pay as accepted payment methods, 3–5 day domestic and 7–14 day
  * international delivery, a 30-day return window, and "yes, we ship to many
  * countries worldwide" — which directly contradicts an Egypt-only store.
- * Every one of those is a business fact ZELI has not established.
+ * Every one of those is a business fact Percé has not established.
  *
  * Callers pass real FAQs via the `faqs` prop (the product page reads them
  * from Dashboard > Settings). With none supplied the section renders nothing.

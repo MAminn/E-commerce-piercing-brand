@@ -1,6 +1,6 @@
 /**
  * ─────────────────────────────────────────────────────────────────────────────
- * ZELI STOREFRONT SHELL — which chrome and which homepage the store falls back
+ * Percé STOREFRONT SHELL — which chrome and which homepage the store falls back
  * to when the CMS has not chosen one.
  * ─────────────────────────────────────────────────────────────────────────────
  *
@@ -19,7 +19,7 @@
  * its email logo from a different template's settings row.
  *
  * Both fallbacks now come from here, so there is exactly one answer to
- * "what does ZELI look like before an admin touches anything".
+ * "what does Percé look like before an admin touches anything".
  *
  * WHY MINIMAL: it is the only shell in the repo with Arabic/RTL support
  * (non-negotiable for an Egyptian storefront), live search, a mobile bottom
@@ -75,7 +75,7 @@ export function isUsableHref(href: string | undefined | null): href is string {
 }
 
 /* ════════════════════════════════════════════════════════════════════════
-   ZELI PRODUCTION TEMPLATE PRESET
+   Percé PRODUCTION TEMPLATE PRESET
    ────────────────────────────────────────────────────────────────────────
    One coherent set of template ids for the whole customer journey, so that
    an unconfigured store renders ONE store rather than five different ones.
@@ -91,7 +91,7 @@ export function isUsableHref(href: string | undefined | null): href is string {
 
    THESE ARE FALLBACKS ONLY. A value stored in `store_settings.
    template_selection` always wins — the admin template picker keeps working
-   exactly as before. Changing what ZELI looks like out of the box is a change
+   exactly as before. Changing what Percé looks like out of the box is a change
    to this object and nothing else.
 
    WHY EACH ID (verified against the implementations, not assumed):
@@ -109,13 +109,13 @@ export function isUsableHref(href: string | undefined | null): href is string {
      `sorting-editorial` wraps itself in EditorialChrome, which renders a
      SECOND footer and only hides the global one from a client-side effect —
      so SSR emits both and one disappears on hydration. Also a different
-     visual family from the ZELI shell. sorting-minimal took the Phase 2 token
-     pass (its hero band is a ZELI surface, not the old clothing stock photo).
+     visual family from the Percé shell. sorting-minimal took the Phase 2 token
+     pass (its hero band is a Percé surface, not the old clothing stock photo).
 
    productPage → product-minimal
      Phase 2 selection. Image-first, guards every fabricated claim behind
      admin-authored content, and is the only product template with the
-     ZELI-token gallery and mobile sticky bar.
+     Percé-token gallery and mobile sticky bar.
 
    categoryPage → category-minimal
      The only category template with no fabricated defaults.
@@ -141,7 +141,7 @@ export function isUsableHref(href: string | undefined | null): href is string {
      list, building/apartment fields the order schema actually accepts, and
      offer + promo-code totals. `checkout-editorial` is the EditorialChrome
      family again. There is no "checkout-minimal"; this template took the
-     ZELI pass instead of a new one being written.
+     Percé pass instead of a new one being written.
 
    searchResults → search-results-minimal
      `search-results-grid` ships a sidebar whose three filter groups read
@@ -149,7 +149,7 @@ export function isUsableHref(href: string | undefined | null): href is string {
      "Stock filters will appear here" — placeholder scaffolding pointed at
      customers. `search-results-editorial` is the EditorialChrome family.
 
-   NOTE ON /shop AND /categories/[slug]: under the ZELI shell
+   NOTE ON /shop AND /categories/[slug]: under the Percé shell
    (navbarStyle === "minimal") those two routes do not go through the
    `sorting` / `categoryPage` selectors at all — they render
    MinimalCategoryPage, which is the only catalogue UI with the shell's
@@ -169,7 +169,7 @@ export type StorefrontTemplateCategory =
   | "checkoutPage"
   | "searchResults";
 
-export const ZELI_TEMPLATE_PRESET: Record<
+export const PERCE_TEMPLATE_PRESET: Record<
   StorefrontTemplateCategory,
   string
 > = {
@@ -197,5 +197,5 @@ export function resolveTemplateId(
 ): string {
   return selected && selected.trim() !== ""
     ? selected
-    : ZELI_TEMPLATE_PRESET[category];
+    : PERCE_TEMPLATE_PRESET[category];
 }

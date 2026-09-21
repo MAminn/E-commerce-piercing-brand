@@ -60,7 +60,7 @@ function EditorialHero({
     <section className="relative w-full h-56 sm:h-64 lg:h-80 overflow-hidden">
       {/* Was a generic clothing stock photo baked into the template — see
           the note in SortingMinimalTemplate. */}
-      <div className='absolute inset-0 bg-zeli-surface-inverse' />
+      <div className='absolute inset-0 bg-perce-surface-inverse' />
       <div className="absolute inset-0 bg-black/55" />
       <div className="relative z-10 h-full flex flex-col justify-end max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 pb-10 lg:pb-14">
         <nav className="flex items-center gap-2 text-sm text-white/60 mb-3">

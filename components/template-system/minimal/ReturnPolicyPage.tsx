@@ -28,12 +28,12 @@ export function ReturnPolicyPage({ content, locale, dir }: ReturnPolicyPageProps
     <div className='minimal-template' dir={dir}>
       <div className='max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24'>
         {/* Title + intro */}
-        <section className='pb-12 sm:pb-16 border-b border-zeli-line'>
-          <h1 className='text-3xl sm:text-4xl lg:text-[42px] font-bold uppercase leading-tight tracking-tight'>
+        <section className='pb-12 sm:pb-16 border-b border-perce-line'>
+          <h1 className='text-3xl sm:text-4xl lg:text-[42px] font-bold leading-tight tracking-tight'>
             {title}
           </h1>
           {intro && (
-            <p className='mt-6 text-sm sm:text-base text-zeli-ink-secondary leading-relaxed max-w-3xl'>
+            <p className='mt-6 text-sm sm:text-base text-perce-ink-secondary leading-relaxed max-w-3xl'>
               {intro}
             </p>
           )}
@@ -41,7 +41,7 @@ export function ReturnPolicyPage({ content, locale, dir }: ReturnPolicyPageProps
 
         {/* Steps grid */}
         {content.steps.length > 0 && (
-          <section className='py-12 sm:py-16 border-b border-zeli-line'>
+          <section className='py-12 sm:py-16 border-b border-perce-line'>
             <div className='grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-10 xl:gap-8'>
               {content.steps.map((step, index) => {
                 const stepTitle = isAr
@@ -55,12 +55,12 @@ export function ReturnPolicyPage({ content, locale, dir }: ReturnPolicyPageProps
                   <div key={`${stepTitle}-${index}`} className='flex flex-col'>
                     <ValuePropIcon
                       icon={step.icon}
-                      className='w-9 h-9 stroke-[1.25] text-zeli-ink mb-6'
+                      className='w-9 h-9 stroke-[1.25] text-perce-ink mb-6'
                     />
-                    <h2 className='text-xs sm:text-sm font-bold uppercase tracking-wide text-zeli-ink mb-3'>
+                    <h2 className='text-xs sm:text-sm font-bold text-perce-ink mb-3'>
                       {stepTitle}
                     </h2>
-                    <p className='text-sm text-zeli-ink-secondary leading-relaxed'>
+                    <p className='text-sm text-perce-ink-secondary leading-relaxed'>
                       {stepDescription}
                     </p>
                   </div>
@@ -72,7 +72,7 @@ export function ReturnPolicyPage({ content, locale, dir }: ReturnPolicyPageProps
 
         {/* Detail sections */}
         {content.detailSections.length > 0 && (
-          <section className='py-12 sm:py-16 border-b border-zeli-line'>
+          <section className='py-12 sm:py-16 border-b border-perce-line'>
             <div className='grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-16'>
               {content.detailSections.map((section, index) => {
                 const sectionTitle = isAr
@@ -84,10 +84,10 @@ export function ReturnPolicyPage({ content, locale, dir }: ReturnPolicyPageProps
 
                 return (
                   <div key={`${sectionTitle}-${index}`}>
-                    <h2 className='text-xs sm:text-sm font-bold uppercase tracking-wide text-zeli-ink mb-4'>
+                    <h2 className='text-xs sm:text-sm font-bold text-perce-ink mb-4'>
                       {sectionTitle}
                     </h2>
-                    <p className='text-sm text-zeli-ink-secondary leading-relaxed'>
+                    <p className='text-sm text-perce-ink-secondary leading-relaxed'>
                       {sectionBody}
                     </p>
                   </div>
@@ -99,7 +99,7 @@ export function ReturnPolicyPage({ content, locale, dir }: ReturnPolicyPageProps
 
         {/* Footer help line */}
         <section className='pt-12 sm:pt-16'>
-          <p className='text-sm text-zeli-ink-secondary leading-relaxed'>
+          <p className='text-sm text-perce-ink-secondary leading-relaxed'>
             {footerPrefix}{" "}
             <a
               href={`mailto:${content.supportEmail}`}

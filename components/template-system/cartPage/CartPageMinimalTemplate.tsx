@@ -7,6 +7,7 @@ import {
   AppliedOffersSavings,
   computeOfferSavingsTotal,
 } from "./AppliedOffersSavings";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 /**
  * CartPageMinimalTemplate
@@ -70,22 +71,22 @@ export function CartPageMinimalTemplate({
         role="status"
         aria-label="Loading cart"
         className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-5 w-5 animate-spin rounded-full border-2 border-zeli-line-strong border-t-zeli-ink" />
+        <div className="h-5 w-5 animate-spin rounded-full border-2 border-perce-line-strong border-t-perce-ink" />
       </div>
     );
   }
 
   if (items.length === 0 && bundles.length === 0) {
     return (
-      <div className="zeli-header-offset flex min-h-[60vh] flex-col items-center justify-center bg-zeli-bg px-4 text-center">
-        <ShoppingCart aria-hidden className="mb-4 h-10 w-10 text-zeli-ink-subtle" />
-        <h1 className="zeli-section-title">Your cart is empty</h1>
-        <p className="mt-2 text-[length:var(--zeli-text-body)] text-zeli-ink-muted">
+      <div className="perce-header-offset flex min-h-[60vh] flex-col items-center justify-center bg-perce-bg px-4 text-center">
+        <ShoppingCart aria-hidden className="mb-4 h-10 w-10 text-perce-ink-subtle" />
+        <h1 className="perce-section-title">Your cart is empty</h1>
+        <p className="mt-2 text-[length:var(--perce-text-body)] text-perce-ink-muted">
           Nothing added yet.
         </p>
         <a
           href="/shop"
-          className="mt-6 inline-flex min-h-11 items-center gap-2 bg-zeli-accent px-6 text-[length:var(--zeli-text-small)] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-zeli-ink-inverse transition-colors hover:bg-zeli-accent-hover">
+          className="mt-6 inline-flex min-h-11 items-center gap-2 bg-perce-cta px-6 text-[length:var(--perce-text-small)] font-medium text-perce-ink-inverse transition-colors hover:bg-perce-cta-hover">
           Continue shopping
         </a>
       </div>
@@ -104,12 +105,12 @@ export function CartPageMinimalTemplate({
       {/* pb-60 reserves room for the mobile sticky bar below; the page also
           has to clear the fixed header chrome, which it previously did not —
           the "Cart" heading started underneath the navbar. */}
-      <div className="zeli-header-offset min-h-screen bg-zeli-bg pb-60 sm:pb-0">
+      <div className="perce-header-offset min-h-screen bg-perce-bg pb-60 sm:pb-0">
         <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
 
           {/* Page title */}
-          <h1 className="text-[22px] sm:text-[28px] font-medium text-zeli-ink mb-4 sm:mb-6">
-            Cart <span className="text-zeli-ink-muted font-normal text-[16px] sm:text-[18px]">({lineCount} {lineCount === 1 ? "item" : "items"})</span>
+          <h1 className="text-[22px] sm:text-[28px] font-medium text-perce-ink mb-4 sm:mb-6">
+            Cart <span className="text-perce-ink-muted font-normal text-[16px] sm:text-[18px]">({lineCount} {lineCount === 1 ? "item" : "items"})</span>
           </h1>
 
           {/* Offer progress banner */}
@@ -125,7 +126,7 @@ export function CartPageMinimalTemplate({
             {/* ── Left: Items ───────────────────────────────── */}
             <div>
               {/* Column headers (desktop only) */}
-              <div className="hidden sm:grid grid-cols-[1fr_120px_100px_40px] gap-4 pb-3 border-b border-zeli-line text-[11px] uppercase tracking-wider text-zeli-ink-muted font-medium">
+              <div className="hidden sm:grid grid-cols-[1fr_120px_100px_40px] gap-4 pb-3 border-b border-perce-line text-xs text-perce-ink-muted font-medium">
                 <span>Product</span>
                 <span className="text-center">Quantity</span>
                 <span className="text-right">Price</span>
@@ -133,7 +134,7 @@ export function CartPageMinimalTemplate({
               </div>
 
               {/* Items list — stacks first, as grouped units */}
-              <div className="divide-y divide-zeli-line">
+              <div className="divide-y divide-perce-line">
                 {bundles.map((bundle) => (
                   <CartBundleGroup
                     key={bundle.instanceId}
@@ -154,7 +155,7 @@ export function CartPageMinimalTemplate({
                       {/* Mobile layout */}
                       <div className="flex gap-3 sm:hidden">
                         {/* Image */}
-                        <div className="w-[88px] h-[88px] shrink-0 bg-zeli-surface overflow-hidden">
+                        <div className="w-[88px] h-[88px] shrink-0 bg-perce-surface overflow-hidden">
                           {item.imageUrl ? (
                             <img
                               src={item.imageUrl}
@@ -163,7 +164,7 @@ export function CartPageMinimalTemplate({
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
-                              <ShoppingCart className="w-6 h-6 text-zeli-ink-subtle" />
+                              <ShoppingCart className="w-6 h-6 text-perce-ink-subtle" />
                             </div>
                           )}
                         </div>
@@ -174,34 +175,34 @@ export function CartPageMinimalTemplate({
                           <div className="flex items-start gap-1">
                             <p
                               className="flex-1 text-[14px] font-medium leading-snug break-words overflow-hidden"
-                              style={{ color: "var(--zeli-ink)", fontFamily: "var(--font-product-title)" }}>
+                              style={{ color: "var(--perce-ink)", fontFamily: "var(--font-product-title)" }}>
                               {item.name}
                             </p>
                             <button
                               type="button"
                               onClick={() => onRemoveItem?.(item.id)}
                               aria-label="Remove item"
-                              className="shrink-0 h-11 w-11 flex items-center justify-center text-zeli-ink-subtle hover:text-zeli-sale transition-colors -mr-1">
+                              className="shrink-0 h-11 w-11 flex items-center justify-center text-perce-ink-subtle hover:text-perce-sale transition-colors -mr-1">
                               <Trash2 className="w-[15px] h-[15px]" />
                             </button>
                           </div>
 
                           {item.variant && (
-                            <p className="text-[11px] text-zeli-ink-muted leading-none">{item.variant}</p>
+                            <p className="text-[11px] text-perce-ink-muted leading-none">{item.variant}</p>
                           )}
 
                           {/* Unit price */}
                           <div className="flex items-center gap-1.5">
                             {hasDiscount && (
-                              <span className="text-[11px] text-zeli-ink-muted line-through">
-                                {item.originalPrice!.toFixed(2)} {currency}
+                              <span className="text-[11px] text-perce-ink-muted line-through">
+                                {formatMoney(item.originalPrice!, { currency })}
                               </span>
                             )}
-                            <span className={`text-[12px] ${hasDiscount ? "text-zeli-sale font-medium" : "text-zeli-ink-muted"}`}>
-                              {item.price.toFixed(2)} {currency} each
+                            <span className={`text-[12px] ${hasDiscount ? "text-perce-sale font-medium" : "text-perce-ink-muted"}`}>
+                              {formatMoney(item.price, { currency })} each
                             </span>
                             {hasDiscount && (
-                              <span className="text-[10px] bg-zeli-blush-soft text-zeli-sale px-1.5 py-0.5 font-medium">
+                              <span className="text-[10px] bg-perce-surface text-perce-sale px-1.5 py-0.5 font-medium">
                                 -{Math.round((1 - item.price / item.originalPrice!) * 100)}%
                               </span>
                             )}
@@ -209,25 +210,25 @@ export function CartPageMinimalTemplate({
 
                           {/* Qty + line total */}
                           <div className="flex flex-col items-center mt-auto pt-1">
-                            <div className="flex  items-center border border-zeli-line w-fit">
+                            <div className="flex items-center border border-perce-line w-fit">
                               <button
                                 type="button"
                                 onClick={() => onQuantityChange?.(item.id, Math.max(1, item.quantity - 1))}
                                 aria-label="Decrease quantity"
-                                className="h-11 w-11 flex items-center justify-center text-zeli-ink-secondary hover:bg-zeli-surface active:bg-zeli-surface transition-colors"
+                                className="h-11 w-11 flex items-center justify-center text-perce-ink-secondary hover:bg-perce-surface active:bg-perce-surface transition-colors"
                                 disabled={item.quantity <= 1}>
                                 <Minus className="w-3 h-3" />
                               </button>
                               <span
                                 className="w-8 text-center text-[13px] font-medium"
-                                style={{ color: "var(--zeli-ink)", fontFamily: "var(--font-body)" }}>
+                                style={{ color: "var(--perce-ink)", fontFamily: "var(--font-body)" }}>
                                 {item.quantity}
                               </span>
                               <button
                                 type="button"
                                 onClick={() => onQuantityChange?.(item.id, item.quantity + 1)}
                                 aria-label="Increase quantity"
-                                className="h-11 w-11 flex items-center justify-center text-zeli-ink-secondary hover:bg-zeli-surface active:bg-zeli-surface transition-colors"
+                                className="h-11 w-11 flex items-center justify-center text-perce-ink-secondary hover:bg-perce-surface active:bg-perce-surface transition-colors"
                                 disabled={item.stock != null && item.quantity >= item.stock}>
                                 <Plus className="w-3 h-3" />
                               </button>
@@ -235,17 +236,17 @@ export function CartPageMinimalTemplate({
                             <div className="flex items-baseline gap-1.5 mt-1">
                               {freeQty > 0 ? (
                                 <>
-                                  <span className="text-[12px] text-zeli-ink-muted line-through">
-                                    {lineTotal.toFixed(2)} {currency}
+                                  <span className="text-[12px] text-perce-ink-muted line-through">
+                                    {formatMoney(lineTotal, { currency })}
                                   </span>
                                   {isFullyFree ? (
-                                    <p className="text-[15px] font-semibold text-zeli-success uppercase" style={{ fontFamily: "var(--font-price)" }}>
+                                    <p className="text-[15px] font-semibold text-perce-success" style={{ fontFamily: "var(--font-price)" }}>
                                       Free
                                     </p>
                                   ) : (
-                                    <p className="text-[15px] font-semibold" style={{ color: "var(--zeli-ink)", fontFamily: "var(--font-price)" }}>
-                                      {(item.price * (item.quantity - freeQty)).toFixed(2)} {currency}
-                                      <span className="ms-1 text-[10px] text-zeli-success font-semibold">
+                                    <p className="text-[15px] font-semibold" style={{ color: "var(--perce-ink)", fontFamily: "var(--font-price)" }}>
+                                      {formatMoney((item.price * (item.quantity - freeQty)), { currency })}
+                                      <span className="ms-1 text-[10px] text-perce-success font-semibold">
                                         ({freeQty} free)
                                       </span>
                                     </p>
@@ -254,14 +255,14 @@ export function CartPageMinimalTemplate({
                               ) : (
                                 <>
                                   {hasDiscount && (
-                                    <span className="text-[12px] text-zeli-ink-muted line-through">
-                                      {(item.originalPrice! * item.quantity).toFixed(2)} {currency}
+                                    <span className="text-[12px] text-perce-ink-muted line-through">
+                                      {formatMoney((item.originalPrice! * item.quantity), { currency })}
                                     </span>
                                   )}
                                   <p
-                                    className={`text-[15px] font-semibold ${hasDiscount ? "text-zeli-sale" : ""}`}
-                                    style={{ color: hasDiscount ? undefined : "var(--zeli-ink)", fontFamily: "var(--font-price)" }}>
-                                    {lineTotal.toFixed(2)} {currency}
+                                    className={`text-[15px] font-semibold ${hasDiscount ? "text-perce-sale" : ""}`}
+                                    style={{ color: hasDiscount ? undefined : "var(--perce-ink)", fontFamily: "var(--font-price)" }}>
+                                    {formatMoney(lineTotal, { currency })}
                                   </p>
                                 </>
                               )}
@@ -274,53 +275,53 @@ export function CartPageMinimalTemplate({
                       <div className="hidden sm:grid grid-cols-[1fr_120px_100px_40px] gap-4 items-center">
                         <div className="flex items-center gap-4">
                           {item.imageUrl ? (
-                            <img src={item.imageUrl} alt={item.name} className="w-16 h-16 object-cover bg-zeli-surface shrink-0" />
+                            <img src={item.imageUrl} alt={item.name} className="w-16 h-16 object-cover bg-perce-surface shrink-0" />
                           ) : (
-                            <div className="w-16 h-16 bg-zeli-surface shrink-0" />
+                            <div className="w-16 h-16 bg-perce-surface shrink-0" />
                           )}
                           <div className="min-w-0">
                             <p
                               className="text-[14px] font-medium break-words"
-                              style={{ color: "var(--zeli-ink)", fontFamily: "var(--font-product-title)" }}>
+                              style={{ color: "var(--perce-ink)", fontFamily: "var(--font-product-title)" }}>
                               {item.name}
                             </p>
-                            {item.variant && <p className="text-[12px] text-zeli-ink-muted mt-0.5">{item.variant}</p>}
+                            {item.variant && <p className="text-[12px] text-perce-ink-muted mt-0.5">{item.variant}</p>}
                             <div className="flex items-center gap-1.5 mt-0.5">
                               {hasDiscount && (
-                                <span className="text-[11px] text-zeli-ink-muted line-through">
-                                  {item.originalPrice!.toFixed(2)} {currency}
+                                <span className="text-[11px] text-perce-ink-muted line-through">
+                                  {formatMoney(item.originalPrice!, { currency })}
                                 </span>
                               )}
-                              <span className={`text-[12px] ${hasDiscount ? "text-zeli-sale font-medium" : "text-zeli-ink-muted"}`}>
-                                {item.price.toFixed(2)} {currency}
+                              <span className={`text-[12px] ${hasDiscount ? "text-perce-sale font-medium" : "text-perce-ink-muted"}`}>
+                                {formatMoney(item.price, { currency })}
                               </span>
                               {hasDiscount && (
-                                <span className="text-[10px] bg-zeli-blush-soft text-zeli-sale px-1.5 py-0.5 font-medium">
+                                <span className="text-[10px] bg-perce-surface text-perce-sale px-1.5 py-0.5 font-medium">
                                   -{Math.round((1 - item.price / item.originalPrice!) * 100)}%
                                 </span>
                               )}
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center justify-center border border-zeli-line w-fit mx-auto">
+                        <div className="flex items-center justify-center border border-perce-line w-fit mx-auto">
                           <button
                             type="button"
                             onClick={() => onQuantityChange?.(item.id, Math.max(1, item.quantity - 1))}
                             aria-label="Decrease quantity"
-                            className="w-9 h-9 flex items-center justify-center text-zeli-ink-secondary hover:bg-zeli-surface transition-colors"
+                            className="w-9 h-9 flex items-center justify-center text-perce-ink-secondary hover:bg-perce-surface transition-colors"
                             disabled={item.quantity <= 1}>
                             <Minus className="w-3 h-3" />
                           </button>
                           <span
                             className="w-8 text-center text-[13px] font-medium"
-                            style={{ color: "var(--zeli-ink)", fontFamily: "var(--font-body)" }}>
+                            style={{ color: "var(--perce-ink)", fontFamily: "var(--font-body)" }}>
                             {item.quantity}
                           </span>
                           <button
                             type="button"
                             onClick={() => onQuantityChange?.(item.id, item.quantity + 1)}
                             aria-label="Increase quantity"
-                            className="w-9 h-9 flex items-center justify-center text-zeli-ink-secondary hover:bg-zeli-surface transition-colors"
+                            className="w-9 h-9 flex items-center justify-center text-perce-ink-secondary hover:bg-perce-surface transition-colors"
                             disabled={item.stock != null && item.quantity >= item.stock}>
                             <Plus className="w-3 h-3" />
                           </button>
@@ -328,17 +329,17 @@ export function CartPageMinimalTemplate({
                         <div className="text-right">
                           {freeQty > 0 ? (
                             <>
-                              <p className="text-[11px] text-zeli-ink-muted line-through">
-                                {lineTotal.toFixed(2)} {currency}
+                              <p className="text-[11px] text-perce-ink-muted line-through">
+                                {formatMoney(lineTotal, { currency })}
                               </p>
                               {isFullyFree ? (
-                                <p className="text-[14px] font-semibold text-zeli-success uppercase" style={{ fontFamily: "var(--font-price)" }}>
+                                <p className="text-[14px] font-semibold text-perce-success" style={{ fontFamily: "var(--font-price)" }}>
                                   Free
                                 </p>
                               ) : (
-                                <p className="text-[14px] font-semibold" style={{ color: "var(--zeli-ink)", fontFamily: "var(--font-price)" }}>
-                                  {(item.price * (item.quantity - freeQty)).toFixed(2)} {currency}
-                                  <span className="ms-1 text-[10px] text-zeli-success font-semibold">
+                                <p className="text-[14px] font-semibold" style={{ color: "var(--perce-ink)", fontFamily: "var(--font-price)" }}>
+                                  {formatMoney((item.price * (item.quantity - freeQty)), { currency })}
+                                  <span className="ms-1 text-[10px] text-perce-success font-semibold">
                                     ({freeQty} free)
                                   </span>
                                 </p>
@@ -347,14 +348,14 @@ export function CartPageMinimalTemplate({
                           ) : (
                             <>
                               {hasDiscount && (
-                                <p className="text-[11px] text-zeli-ink-muted line-through">
-                                  {(item.originalPrice! * item.quantity).toFixed(2)} {currency}
+                                <p className="text-[11px] text-perce-ink-muted line-through">
+                                  {formatMoney((item.originalPrice! * item.quantity), { currency })}
                                 </p>
                               )}
                               <p
-                                className={`text-[14px] font-semibold ${hasDiscount ? "text-zeli-sale" : ""}`}
-                                style={{ color: hasDiscount ? undefined : "var(--zeli-ink)", fontFamily: "var(--font-price)" }}>
-                                {lineTotal.toFixed(2)} {currency}
+                                className={`text-[14px] font-semibold ${hasDiscount ? "text-perce-sale" : ""}`}
+                                style={{ color: hasDiscount ? undefined : "var(--perce-ink)", fontFamily: "var(--font-price)" }}>
+                                {formatMoney(lineTotal, { currency })}
                               </p>
                             </>
                           )}
@@ -363,7 +364,7 @@ export function CartPageMinimalTemplate({
                           type="button"
                           onClick={() => onRemoveItem?.(item.id)}
                           aria-label="Remove item"
-                          className="w-8 h-8 flex items-center justify-center text-zeli-ink-subtle hover:text-zeli-sale transition-colors justify-self-end">
+                          className="w-8 h-8 flex items-center justify-center text-perce-ink-subtle hover:text-perce-sale transition-colors justify-self-end">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -374,9 +375,9 @@ export function CartPageMinimalTemplate({
               </div>
 
               {/* Promo code */}
-              <div className="mt-6 lg:mt-8 pt-6 border-t border-zeli-line">
+              <div className="mt-6 lg:mt-8 pt-6 border-t border-perce-line">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-                  <p className="text-[13px] font-medium text-zeli-ink shrink-0">
+                  <p className="text-[13px] font-medium text-perce-ink shrink-0">
                     Apply promo code
                   </p>
                   <div className="flex flex-1 gap-2 min-w-0">
@@ -394,17 +395,17 @@ export function CartPageMinimalTemplate({
                       disabled={isApplyingCoupon}
                       aria-invalid={couponFeedback?.success === false}
                       aria-describedby="promo-code-feedback"
-                      className={`flex-1 px-4 py-2.5 rounded-md border text-[13px] text-zeli-ink placeholder-zeli-ink-subtle outline-none transition-colors bg-zeli-surface-raised min-w-0 disabled:opacity-60 ${
+                      className={`flex-1 px-4 py-2.5 rounded-md border text-[13px] text-perce-ink placeholder-perce-ink-subtle outline-none transition-colors bg-perce-surface-raised min-w-0 disabled:opacity-60 ${
                         couponFeedback && !couponFeedback.success
-                          ? "border-zeli-sale focus:border-zeli-sale"
-                          : "border-zeli-line focus:border-zeli-ink"
+                          ? "border-perce-sale focus:border-perce-sale"
+                          : "border-perce-line focus:border-perce-ink"
                       }`}
                     />
                     <button
                       type="button"
                       onClick={handleApplyCoupon}
                       disabled={!couponCode.trim() || isApplyingCoupon}
-                      className="px-5 py-2.5 rounded-md bg-zeli-accent text-zeli-ink-inverse text-[12px] font-medium uppercase tracking-wide hover:bg-zeli-accent-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0">
+                      className="px-5 py-2.5 rounded-md bg-perce-cta text-perce-ink-inverse text-[12px] font-medium hover:bg-perce-cta-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0">
                       {isApplyingCoupon ? "Checking…" : "Apply"}
                     </button>
                   </div>
@@ -423,8 +424,8 @@ export function CartPageMinimalTemplate({
                     <p
                       className={`text-[12px] mt-2 ${
                         couponFeedback.success
-                          ? "text-zeli-success"
-                          : "text-zeli-sale"
+                          ? "text-perce-success"
+                          : "text-perce-sale"
                       }`}>
                       {couponFeedback.message}
                     </p>
@@ -433,8 +434,8 @@ export function CartPageMinimalTemplate({
 
                 {/* Currently applied code, with a way to take it off */}
                 {appliedCoupon && (
-                  <div className="flex items-center justify-between gap-3 mt-3 px-3 py-2 rounded-md bg-zeli-surface border border-zeli-line">
-                    <p className="text-[12px] text-zeli-success min-w-0">
+                  <div className="flex items-center justify-between gap-3 mt-3 px-3 py-2 rounded-md bg-perce-surface border border-perce-line">
+                    <p className="text-[12px] text-perce-success min-w-0">
                       <span className="font-semibold">
                         {appliedCoupon.code}
                       </span>
@@ -442,14 +443,14 @@ export function CartPageMinimalTemplate({
                         ? ` — ${appliedCoupon.discountLabel}`
                         : ""}
                       {totals.discount != null && totals.discount > 0
-                        ? ` · saving ${totals.discount.toFixed(2)} ${currency}`
+                        ? ` · saving ${formatMoney(totals.discount, { currency })}`
                         : ""}
                     </p>
                     {onRemoveCoupon && (
                       <button
                         type="button"
                         onClick={handleRemoveCoupon}
-                        className="text-[11px] font-medium uppercase tracking-wide text-zeli-success hover:text-zeli-success underline shrink-0">
+                        className="text-[11px] font-medium text-perce-success hover:text-perce-success underline shrink-0">
                         Remove
                       </button>
                     )}
@@ -460,24 +461,24 @@ export function CartPageMinimalTemplate({
 
             {/* ── Right: Order Summary ────────────────────── */}
             <div className="mt-8 lg:mt-0">
-              <div className="bg-zeli-surface p-6">
-                <h2 className="text-[15px] font-semibold text-zeli-ink mb-5">Order Summary</h2>
+              <div className="bg-perce-surface p-6">
+                <h2 className="text-[15px] font-semibold text-perce-ink mb-5">Order Summary</h2>
 
                 <div className="space-y-3">
-                  <div className="flex justify-between text-[13px] text-zeli-ink-secondary">
+                  <div className="flex justify-between text-[13px] text-perce-ink-secondary">
                     <span>Subtotal</span>
-                    <span>{totals.subtotal.toFixed(2)} {currency}</span>
+                    <span>{formatMoney(totals.subtotal, { currency })}</span>
                   </div>
                   {bundleSavings > 0 && (
-                    <div className="flex justify-between text-[13px] text-zeli-success">
+                    <div className="flex justify-between text-[13px] text-perce-success">
                       <span>Stack savings</span>
-                      <span>−{bundleSavings.toFixed(2)} {currency}</span>
+                      <span>−{formatMoney(bundleSavings, { currency })}</span>
                     </div>
                   )}
                   {totals.discount != null && totals.discount > 0 && (
-                    <div className="flex justify-between text-[13px] text-zeli-success">
+                    <div className="flex justify-between text-[13px] text-perce-success">
                       <span>Discount</span>
-                      <span>−{totals.discount.toFixed(2)} {currency}</span>
+                      <span>−{formatMoney(totals.discount, { currency })}</span>
                     </div>
                   )}
                   <AppliedOffersSavings
@@ -491,16 +492,16 @@ export function CartPageMinimalTemplate({
                       calculates nothing, so the line promised a step that
                       does not exist. */}
                   {totals.shipping != null && totals.shipping > 0 && (
-                    <div className="flex justify-between text-[13px] text-zeli-ink-secondary">
+                    <div className="flex justify-between text-[13px] text-perce-ink-secondary">
                       <span>Shipping</span>
                       <span>
-                        {totals.shipping.toFixed(2)} {currency}
+                        {formatMoney(totals.shipping, { currency })}
                       </span>
                     </div>
                   )}
-                  <div className="pt-3 border-t border-zeli-line flex justify-between text-[15px] font-semibold text-zeli-ink">
+                  <div className="pt-3 border-t border-perce-line flex justify-between text-[15px] font-semibold text-perce-ink">
                     <span>Total</span>
-                    <span>{totals.grandTotal.toFixed(2)} {currency}</span>
+                    <span>{formatMoney(totals.grandTotal, { currency })}</span>
                   </div>
                 </div>
 
@@ -509,13 +510,13 @@ export function CartPageMinimalTemplate({
                   type="button"
                   onClick={onProceedToCheckout}
                   disabled={isUpdating || lineCount === 0}
-                  className="mt-6 w-full py-4 rounded-md bg-zeli-accent text-zeli-ink-inverse text-[13px] font-medium uppercase tracking-wider hover:bg-zeli-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed hidden sm:block">
+                  className="mt-6 w-full py-4 rounded-md bg-perce-cta text-perce-ink-inverse text-sm font-medium hover:bg-perce-cta-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed hidden sm:block">
                   {isUpdating ? "Updating…" : "Proceed to Checkout"}
                 </button>
 
                 <a
                   href="/shop"
-                  className="mt-3 w-full hidden sm:flex items-center justify-center py-3 text-[12px] text-zeli-ink-muted hover:text-zeli-ink transition-colors uppercase tracking-wide">
+                  className="mt-3 w-full hidden sm:flex items-center justify-center py-3 text-[12px] text-perce-ink-muted hover:text-perce-ink transition-colors">
                   ← Continue Shopping
                 </a>
               </div>
@@ -530,13 +531,13 @@ export function CartPageMinimalTemplate({
           position — a "sticky" checkout CTA that scrolled away with the page,
           while pb-60 above reserved empty space for a bar that was not there.
           It also has to sit ABOVE the fixed mobile bottom nav (h-16 + safe
-          area, z-index --zeli-z-bottom-nav) rather than behind it. */}
+          area, z-index --perce-z-bottom-nav) rather than behind it. */}
       <div
         style={{
           bottom: "calc(4rem + env(safe-area-inset-bottom))",
-          zIndex: "var(--zeli-z-sticky)",
+          zIndex: "var(--perce-z-sticky)",
         }}
-        className="fixed inset-x-0 border-t border-zeli-line bg-zeli-bg shadow-[0_-4px_16px_rgba(36,29,25,0.08)] sm:hidden">
+        className="fixed inset-x-0 border-t border-perce-line bg-perce-bg shadow-[0_-4px_16px_rgba(36,29,25,0.08)] sm:hidden">
         <AppliedOffersSavings
           appliedOffers={appliedOffers}
           promoDiscount={totals.discount ?? 0}
@@ -545,15 +546,15 @@ export function CartPageMinimalTemplate({
         />
         <div className="px-4 py-3">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[12px] text-zeli-ink-muted uppercase tracking-wide">Total</span>
+            <span className="text-[12px] text-perce-ink-muted">Total</span>
             <div className="text-right">
               {totalSavings > 0 && (
-                <p className="text-[10px] font-medium text-zeli-success">
-                  Saving {totalSavings.toFixed(2)} {currency}
+                <p className="text-[10px] font-medium text-perce-success">
+                  Saving {formatMoney(totalSavings, { currency })}
                 </p>
               )}
-              <span className="text-[15px] font-semibold text-zeli-ink">
-                {totals.grandTotal.toFixed(2)} {currency}
+              <span className="text-[15px] font-semibold text-perce-ink">
+                {formatMoney(totals.grandTotal, { currency })}
               </span>
             </div>
           </div>
@@ -561,13 +562,13 @@ export function CartPageMinimalTemplate({
             type="button"
             onClick={onProceedToCheckout}
             disabled={isUpdating || lineCount === 0}
-            className="flex w-full items-center justify-center gap-2 py-3.5 rounded-md bg-zeli-accent text-zeli-ink-inverse text-[13px] font-medium uppercase tracking-wider hover:bg-zeli-accent-hover active:bg-zeli-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            className="flex w-full items-center justify-center gap-2 py-3.5 rounded-md bg-perce-cta text-perce-ink-inverse text-sm font-medium hover:bg-perce-cta-hover active:bg-perce-cta-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             {isUpdating ? "Updating…" : "Proceed to Checkout"}
             <ArrowRight className="h-4 w-4" />
           </button>
         <a
           href="/shop"
-          className="mt-2 w-full flex items-center justify-center py-2 text-[11px] text-zeli-ink-muted hover:text-zeli-ink transition-colors uppercase tracking-wide">
+          className="mt-2 w-full flex items-center justify-center py-2 text-[11px] text-perce-ink-muted hover:text-perce-ink transition-colors">
           ← Continue Shopping
         </a>
         </div>

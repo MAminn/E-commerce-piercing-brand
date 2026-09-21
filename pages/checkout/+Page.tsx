@@ -23,6 +23,7 @@ import { navigate } from "vike/client/router";
 import { useTracking } from "#root/frontend/contexts/TrackingContext";
 import { TrackingEventName } from "#root/shared/types/pixel-tracking";
 import { getCartSessionToken } from "#root/lib/cart-session";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 /** Parse a Zod validation error (JSON array) into a friendly message */
 function parseOrderError(error: unknown): string {
@@ -447,7 +448,7 @@ export default function CheckoutPage() {
             promoCode.discountLabel ??
             (promoCode.discountType === "percentage"
               ? `${promoCode.discountValue}% off`
-              : `${promoCode.discountValue.toFixed(2)} EGP off`),
+              : `${formatMoney(promoCode.discountValue)} off`),
         }
       : null,
     onRemoveCoupon: removePromoCode,

@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Business-promise sweep (Phase 2). This template previously hardcoded
-// shipping / returns / guarantee claims that ZELI has not established. An
+// shipping / returns / guarantee claims that Percé has not established. An
 // admin switching to it from the dashboard would have published them to
 // customers instantly. Only claims the store can stand behind remain.
 // ─────────────────────────────────────────────────────────────────────────────

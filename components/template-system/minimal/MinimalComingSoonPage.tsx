@@ -6,13 +6,16 @@ import { Button } from "#root/components/ui/button";
 import { trpc } from "#root/shared/trpc/client";
 import { toast } from "sonner";
 import { useLayoutSettings } from "#root/frontend/contexts/LayoutSettingsContext";
-import { STORE_NAME } from "#root/shared/config/branding";
+import { BRAND_LINE, BRAND_WORDMARK, STORE_NAME } from "#root/shared/config/branding";
 
 const emailSchema = z.string().email();
 
 export function MinimalComingSoonPage() {
   const layoutSettings = useLayoutSettings();
   const storeName = layoutSettings.siteTitle || STORE_NAME;
+  // The big heading is the drawn wordmark (lowercase); the copyright line
+  // uses the name. An admin site title overrides both.
+  const wordmark = layoutSettings.siteTitle || BRAND_WORDMARK;
 
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -42,12 +45,12 @@ export function MinimalComingSoonPage() {
 
   if (done) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white px-4">
+      <div className="min-h-screen flex items-center justify-center bg-perce-bg px-4">
         <div className="max-w-md w-full text-center space-y-6 py-16">
           <div className="w-16 h-16 rounded-full bg-stone-100 flex items-center justify-center mx-auto">
             <CheckCircle className="w-8 h-8 text-stone-700" />
           </div>
-          <h1 className="text-2xl font-light tracking-tight text-stone-900">You're on the list!</h1>
+          <h1 className="text-2xl font-medium tracking-tight text-stone-900">You're on the list!</h1>
           <p className="text-sm text-stone-500 leading-relaxed max-w-xs mx-auto">
             Check your inbox — we've sent you something. See you soon.
           </p>
@@ -57,7 +60,7 @@ export function MinimalComingSoonPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
+    <div className="min-h-screen bg-perce-bg flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-16 text-center">
         {/* The previous hero was a baked-in JPEG carrying another brand's
             wordmark and a "15% discount" promise. Rendered as type from
@@ -65,12 +68,13 @@ export function MinimalComingSoonPage() {
             promises nothing that isn't decided yet. Swap in real launch
             artwork during the storefront design phase. */}
         <div className="w-full max-w-[460px]">
-          <p className="text-xs tracking-[0.25em] uppercase text-stone-400 mb-4">
+          <p className="text-xs text-stone-400 mb-4">
             Coming Soon
           </p>
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-light tracking-tight text-stone-900 mb-6">
-            {storeName}
+          <h1 className="perce-wordmark text-5xl sm:text-6xl md:text-7xl text-perce-ink mb-3">
+            {wordmark}
           </h1>
+          <p className="text-base text-perce-ink mb-2">{BRAND_LINE}</p>
           <p className="text-xs text-stone-600 mb-7">Drop your email — be the first to know when we launch.</p>
         </div>
 
@@ -79,7 +83,7 @@ export function MinimalComingSoonPage() {
 
           <form onSubmit={onSubmit} className="flex flex-col gap-4">
             <div>
-              <label className="block text-[11px] uppercase tracking-widest text-stone-600 mb-2">
+              <label className="block text-xs text-stone-600 mb-2">
                 Email
               </label>
               <Input
@@ -96,7 +100,7 @@ export function MinimalComingSoonPage() {
             </div>
 
             <div>
-              <label className="block text-[11px] uppercase tracking-widest text-stone-600 mb-2">
+              <label className="block text-xs text-stone-600 mb-2">
                 WhatsApp Number <span className="normal-case text-stone-400">(optional)</span>
               </label>
               <Input
@@ -112,8 +116,8 @@ export function MinimalComingSoonPage() {
             <Button
               type="submit"
               disabled={submitting}
-              className="w-full bg-stone-900 hover:bg-stone-800 text-white text-xs tracking-widest uppercase py-3 rounded-none h-auto mt-1">
-              {submitting ? "Submitting…" : "Notify Me at Launch"}
+              className="w-full bg-stone-900 hover:bg-stone-800 text-white text-xs py-3 rounded-none h-auto mt-1">
+              {submitting ? "Submitting…" : "Notify me at launch"}
             </Button>
           </form>
         </div>

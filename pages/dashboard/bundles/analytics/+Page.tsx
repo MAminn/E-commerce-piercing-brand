@@ -39,6 +39,7 @@ import { Badge } from "#root/components/ui/badge";
 import { Button } from "#root/components/ui/button";
 import { Input } from "#root/components/ui/input";
 import { Label } from "#root/components/ui/label";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 /**
  * Bundles & Stacks analytics.
@@ -63,8 +64,7 @@ const TYPE_LABEL: Record<string, string> = {
   curated_stack: "Curated Stack",
 };
 
-const money = (n: number) =>
-  `${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${STORE_CURRENCY}`;
+const money = (n: number) => formatMoney(n, { currency: STORE_CURRENCY, alwaysShowFraction: true });
 
 const count = (n: number) => n.toLocaleString();
 

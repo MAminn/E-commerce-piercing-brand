@@ -77,7 +77,7 @@ export function BundleCampaignCard({ campaign, className, eager = false }: Bundl
 
   return (
     <article className={cn("group flex flex-col", className)} data-bundle-card={campaign.slug}>
-      <Link href={href} className="relative block aspect-[4/5] w-full overflow-hidden bg-zeli-surface">
+      <Link href={href} className="relative block aspect-[4/5] w-full overflow-hidden bg-perce-surface">
         <img
           src={resolveBundleImage(campaign.heroImageUrl)}
           alt={campaign.title}
@@ -88,18 +88,18 @@ export function BundleCampaignCard({ campaign, className, eager = false }: Bundl
             soldOut && "opacity-70",
           )}
         />
-        <span className="absolute start-3 top-3 flex items-center gap-1 bg-zeli-bg/95 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-zeli-ink">
+        <span className="absolute start-3 top-3 flex items-center gap-1 bg-perce-bg/95 px-2.5 py-1 text-xs font-medium text-perce-ink">
           {isCurated ? <Sparkles className="h-3 w-3" aria-hidden /> : <Layers className="h-3 w-3" aria-hidden />}
           {t(isCurated ? "bundles.type_curated" : "bundles.type_build")}
         </span>
         {campaign.badgeText && !soldOut && (
-          <span className="absolute end-3 top-3 bg-zeli-ink px-2.5 py-1 text-[10px] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-zeli-ink-inverse">
+          <span className="absolute end-3 top-3 bg-perce-ink px-2.5 py-1 text-xs font-medium text-perce-ink-inverse">
             {campaign.badgeText}
           </span>
         )}
         {soldOut && (
-          <div className="absolute inset-0 flex items-center justify-center bg-zeli-bg/55">
-            <span className="bg-zeli-bg px-3 py-1.5 text-[10px] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-zeli-ink">
+          <div className="absolute inset-0 flex items-center justify-center bg-perce-bg/55">
+            <span className="bg-perce-bg px-3 py-1.5 text-xs font-medium text-perce-ink">
               {t("bundles.sold_out")}
             </span>
           </div>
@@ -108,22 +108,22 @@ export function BundleCampaignCard({ campaign, className, eager = false }: Bundl
 
       <div className="mt-3 flex flex-1 flex-col">
         <h3
-          className="text-[14px] font-medium leading-snug text-zeli-ink"
+          className="text-[14px] font-medium leading-snug text-perce-ink"
           style={{ fontFamily: "var(--font-product-title)" }}>
-          <Link href={href} className="hover:text-zeli-ink-secondary">
+          <Link href={href} className="hover:text-perce-ink-secondary">
             {campaign.title}
           </Link>
         </h3>
-        {campaign.subtitle && <p className="mt-0.5 text-[12px] text-zeli-ink-muted">{campaign.subtitle}</p>}
+        {campaign.subtitle && <p className="mt-0.5 text-[12px] text-perce-ink-muted">{campaign.subtitle}</p>}
 
-        <p className="mt-2 text-[15px] font-semibold text-zeli-ink" style={{ fontFamily: "var(--font-price)" }}>
+        <p className="mt-2 text-[15px] font-semibold text-perce-ink" style={{ fontFamily: "var(--font-price)" }}>
           {isCurated
             ? formatMoney(price, currency)
             : tierSummary
               ? tierSummary.price
               : fillTemplate(t("bundle.choose_any"), { count: campaign.requiredQuantity, price: formatMoney(price, currency) })}
         </p>
-        <p className="mt-0.5 text-[12px] text-zeli-ink-muted">
+        <p className="mt-0.5 text-[12px] text-perce-ink-muted">
           {isCurated
             ? piecesLabel(campaign.unitCount)
             : tierSummary
@@ -131,7 +131,7 @@ export function BundleCampaignCard({ campaign, className, eager = false }: Bundl
               : fillTemplate(t("bundles.pieces_to_choose"), { count: campaign.eligibleProductCount })}
           {separatelyLine && <> · {separatelyLine}</>}
         </p>
-        {savingLine && <p className="mt-0.5 text-[12px] font-medium text-zeli-success">{savingLine}</p>}
+        {savingLine && <p className="mt-0.5 text-[12px] font-medium text-perce-success">{savingLine}</p>}
 
         {/* A sold-out stack still links through: seeing what is in it (and
             that it is sold out) is more useful than a dead control. No
@@ -139,10 +139,10 @@ export function BundleCampaignCard({ campaign, className, eager = false }: Bundl
         <Link
           href={href}
           className={cn(
-            "mt-3 inline-flex min-h-11 w-full items-center justify-center border text-[11px] font-medium uppercase tracking-[var(--zeli-tracking-label)] transition-colors",
+            "mt-3 inline-flex min-h-11 w-full items-center justify-center border text-xs font-medium transition-colors",
             soldOut
-              ? "border-zeli-border text-zeli-ink-muted"
-              : "border-zeli-ink text-zeli-ink hover:bg-zeli-ink hover:text-zeli-ink-inverse",
+              ? "border-perce-border text-perce-ink-muted"
+              : "border-perce-ink text-perce-ink hover:bg-perce-ink hover:text-perce-ink-inverse",
           )}>
           {soldOut ? t("bundles.sold_out") : t(isCurated ? "bundles.cta_shop" : "bundles.cta_build")}
         </Link>

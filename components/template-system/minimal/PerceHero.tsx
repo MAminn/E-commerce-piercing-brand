@@ -2,23 +2,28 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "#root/lib/utils";
 import type { HomepageHeroContent } from "#root/shared/types/homepage-content";
 
-export interface ZeliHeroSlide {
+export interface PerceHeroSlide {
   imageUrl: string;
   mobileImageUrl?: string;
   linkUrl?: string;
   alt?: string;
 }
 
-export interface ZeliHeroProps {
+export interface PerceHeroProps {
   hero: HomepageHeroContent;
-  slides: ZeliHeroSlide[];
+  slides: PerceHeroSlide[];
   /** Overrides navigation for admin preview contexts. */
   onCtaClick?: (link: string) => void;
   className?: string;
 }
 
 /**
- * ZELI hero.
+ * Percé hero — the top of the dark brand frame.
+ *
+ * Ground background, Paper type, the campaign image in a light window beside
+ * (desktop) or above (mobile) the copy. Headline is the H1 from the Brand
+ * Source of Truth by default ("Small pieces. Made to mix."), editable in
+ * Dashboard > Homepage.
  *
  * Replaces the generic `HeroCarousel` on the homepage. That component rendered
  * images and nothing else — in a store with hero images uploaded, the CMS
@@ -46,12 +51,12 @@ export interface ZeliHeroProps {
  * full-bleed image; copy with no images renders as a typographic hero. No
  * placeholder imagery and no invented copy.
  */
-export function ZeliHero({
+export function PerceHero({
   hero,
   slides,
   onCtaClick,
   className,
-}: ZeliHeroProps) {
+}: PerceHeroProps) {
   const [current, setCurrent] = useState(0);
   const [paused, setPaused] = useState(false);
   const touchStartX = useRef(0);
@@ -99,15 +104,15 @@ export function ZeliHero({
     return (
       <section
         className={cn(
-          "zeli-header-offset bg-zeli-surface",
+          "perce-header-offset bg-perce-ground text-perce-frame-ink",
           "flex min-h-[58vh] items-center",
           className,
         )}
         aria-label='Highlight'>
-        <div className='zeli-container py-16 text-center'>
-          {title && <h1 className='zeli-display text-zeli-ink'>{title}</h1>}
+        <div className='perce-container py-16 text-center'>
+          {title && <h1 className='perce-display text-perce-frame-ink text-balance'>{title}</h1>}
           {subtitle && (
-            <p className='mx-auto mt-5 max-w-prose text-base leading-relaxed text-zeli-ink-muted'>
+            <p className='mx-auto mt-5 max-w-prose text-base leading-relaxed text-perce-frame-ink-muted'>
               {subtitle}
             </p>
           )}
@@ -120,7 +125,7 @@ export function ZeliHero({
   const imageFrame = (
     <div
       className={cn(
-        "relative w-full overflow-hidden bg-zeli-surface",
+        "relative w-full overflow-hidden bg-perce-surface",
         // Portrait on phones, cinematic from md up. Two crops, one element.
         "aspect-[4/5] sm:aspect-[3/4] md:aspect-[16/9]",
         "md:max-h-[72vh]",
@@ -191,10 +196,10 @@ export function ZeliHero({
               type='button'
               onClick={() => goTo(i)}
               className={cn(
-                "h-2 rounded-full bg-zeli-ink-inverse transition-all",
+                "h-2 rounded-full bg-perce-ink-inverse transition-all",
                 i === current ? "w-6 opacity-90" : "w-2 opacity-50",
               )}
-              style={{ transitionDuration: "var(--zeli-duration)" }}
+              style={{ transitionDuration: "var(--perce-duration)" }}
               aria-label={`Show highlight ${i + 1} of ${total}`}
               aria-current={i === current ? "true" : undefined}
             />
@@ -207,7 +212,7 @@ export function ZeliHero({
   // ── Image with no copy: let it run full-bleed ──
   if (!hasCopy) {
     return (
-      <section className={cn("zeli-header-offset", className)} aria-label='Highlight'>
+      <section className={cn("perce-header-offset", className)} aria-label='Highlight'>
         {imageFrame}
       </section>
     );
@@ -215,19 +220,19 @@ export function ZeliHero({
 
   // ── Editorial split: image + copy, stacked on mobile ──
   return (
-    <section className={cn("zeli-header-offset bg-zeli-bg", className)}>
+    <section className={cn("perce-header-offset bg-perce-ground text-perce-frame-ink", className)}>
       <div className='md:grid md:grid-cols-12 md:items-center'>
         <div className='md:col-span-7'>{imageFrame}</div>
         <div
           className={cn(
             "md:col-span-5",
-            "px-[var(--zeli-gutter)] py-10 md:py-12 lg:px-12",
+            "px-[var(--perce-gutter)] py-10 md:py-12 lg:px-12",
           )}>
           {title && (
-            <h1 className='zeli-display text-zeli-ink text-balance'>{title}</h1>
+            <h1 className='perce-display text-perce-frame-ink text-balance'>{title}</h1>
           )}
           {subtitle && (
-            <p className='mt-4 max-w-prose text-[0.9375rem] leading-relaxed text-zeli-ink-muted'>
+            <p className='mt-4 max-w-prose text-base leading-relaxed text-perce-frame-ink-muted'>
               {subtitle}
             </p>
           )}
@@ -256,14 +261,13 @@ function HeroCta({
       onClick={onClick}
       className={cn(
         "mt-8 inline-flex min-h-11 items-center justify-center",
-        "bg-zeli-accent px-8 text-[0.6875rem] font-medium uppercase",
-        "tracking-[var(--zeli-tracking-label)] text-zeli-ink-inverse",
-        "transition-colors hover:bg-zeli-accent-hover",
+        "bg-perce-paper px-8 text-sm font-medium text-perce-ground",
+        "transition-colors hover:bg-white",
       )}
-      style={{ transitionDuration: "var(--zeli-duration)" }}>
+      style={{ transitionDuration: "var(--perce-duration)" }}>
       {text}
     </a>
   );
 }
 
-ZeliHero.displayName = "ZeliHero";
+PerceHero.displayName = "PerceHero";

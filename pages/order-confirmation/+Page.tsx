@@ -17,6 +17,7 @@ import { TrackingEventName } from "#root/shared/types/pixel-tracking";
 import { STORE_CURRENCY } from "#root/shared/config/branding";
 import { useCart } from "#root/lib/context/CartContext";
 import { trpc } from "#root/shared/trpc/client";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 type PaymentState = "none" | "success" | "pending" | "cancelled" | "failed";
 
@@ -188,22 +189,22 @@ export default function OrderConfirmationPage() {
   }, [orderId, orderTotal, isPaymentSuccess, trackEvent]);
 
   return (
-    <div className='zeli-header-offset flex min-h-screen items-center justify-center bg-zeli-bg px-4 py-12 sm:py-16'>
-      <div className='flex w-full max-w-2xl flex-col border border-zeli-line bg-zeli-surface-raised px-6 pb-12 pt-8 text-center sm:px-8'>
+    <div className='perce-header-offset flex min-h-screen items-center justify-center bg-perce-bg px-4 py-12 sm:py-16'>
+      <div className='flex w-full max-w-2xl flex-col border border-perce-line bg-perce-surface-raised px-6 pb-12 pt-8 text-center sm:px-8'>
         {/* Icon */}
         {isPaymentSuccess && (
-          <div className='mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-zeli-surface'>
-            <CheckCircle aria-hidden className='h-7 w-7 text-zeli-success' />
+          <div className='mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-perce-surface'>
+            <CheckCircle aria-hidden className='h-7 w-7 text-perce-success' />
           </div>
         )}
         {isPaymentPending && (
-          <div className='mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-zeli-blush-soft'>
-            <Clock aria-hidden className='h-7 w-7 text-zeli-ink-secondary' />
+          <div className='mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-perce-surface'>
+            <Clock aria-hidden className='h-7 w-7 text-perce-ink-secondary' />
           </div>
         )}
         {isPaymentFailed && (
-          <div className='mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-zeli-blush-soft'>
-            <XCircle aria-hidden className='h-7 w-7 text-zeli-sale' />
+          <div className='mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-perce-surface'>
+            <XCircle aria-hidden className='h-7 w-7 text-perce-sale' />
           </div>
         )}
 
@@ -212,11 +213,11 @@ export default function OrderConfirmationPage() {
             knows: whether the order row was created, and what the payment
             gateway (or the absence of one) reported. Nothing here states a
             delivery date, a courier, a confirmation call or a shipping
-            window — ZELI has set none of those. */}
+            window — Percé has set none of those. */}
         {isPaymentSuccess && (
           <>
-            <h1 className='zeli-section-title'>Order placed</h1>
-            <p className='mt-2 text-[length:var(--zeli-text-body)] text-zeli-ink-muted'>
+            <h1 className='perce-section-title'>Order placed</h1>
+            <p className='mt-2 text-[length:var(--perce-text-body)] text-perce-ink-muted'>
               Your order has been received.
               {paymentState === "success" &&
                 verifiedPaymentStatus === "paid" &&
@@ -226,8 +227,8 @@ export default function OrderConfirmationPage() {
         )}
         {isPaymentPending && (
           <>
-            <h1 className='zeli-section-title'>Payment pending</h1>
-            <p className='mt-2 text-[length:var(--zeli-text-body)] text-zeli-ink-muted'>
+            <h1 className='perce-section-title'>Payment pending</h1>
+            <p className='mt-2 text-[length:var(--perce-text-body)] text-perce-ink-muted'>
               Your order has been created. The payment provider has not
               confirmed the payment yet.
             </p>
@@ -235,10 +236,10 @@ export default function OrderConfirmationPage() {
         )}
         {isPaymentFailed && (
           <>
-            <h1 className='zeli-section-title'>
+            <h1 className='perce-section-title'>
               Payment {paymentState === "cancelled" ? "cancelled" : "failed"}
             </h1>
-            <p className='mt-2 text-[length:var(--zeli-text-body)] text-zeli-ink-muted'>
+            <p className='mt-2 text-[length:var(--perce-text-body)] text-perce-ink-muted'>
               {paymentState === "cancelled"
                 ? "The payment was cancelled. Your order has been saved and is unpaid."
                 : "The payment did not go through. Your order has been saved and is unpaid."}
@@ -247,47 +248,47 @@ export default function OrderConfirmationPage() {
         )}
 
         {/* Order Details Card */}
-        <div className='mt-8 mb-8 space-y-3 overflow-x-auto bg-zeli-surface p-6 text-start'>
+        <div className='mt-8 mb-8 space-y-3 overflow-x-auto bg-perce-surface p-6 text-start'>
           {shortId && (
             <div className='flex justify-between items-center flex-wrap gap-2'>
-              <span className='text-sm text-zeli-ink-muted'>Order number</span>
-              <span className='font-mono text-sm font-medium text-zeli-ink'>
+              <span className='text-sm text-perce-ink-muted'>Order number</span>
+              <span className='font-mono text-sm font-medium text-perce-ink'>
                 #{shortId}
               </span>
             </div>
           )}
           {orderTotal && (
             <div className='flex justify-between items-center flex-wrap gap-2'>
-              <span className='text-sm text-zeli-ink-muted'>Total</span>
-              <span className='text-sm font-semibold text-zeli-ink'>
-                {Number.parseFloat(orderTotal).toFixed(2)} EGP
+              <span className='text-sm text-perce-ink-muted'>Total</span>
+              <span className='text-sm font-semibold text-perce-ink'>
+                {formatMoney(Number.parseFloat(orderTotal))}
               </span>
             </div>
           )}
           {customerEmail && (
-            <div className='flex justify-between items-center flex-wrap gap-2 '>
-              <span className='text-sm text-zeli-ink-muted'>
+            <div className='flex justify-between items-center flex-wrap gap-2'>
+              <span className='text-sm text-perce-ink-muted'>
                 Order email
               </span>
-              <span className='whitespace-nowrap text-sm text-zeli-ink'>{customerEmail}</span>
+              <span className='whitespace-nowrap text-sm text-perce-ink'>{customerEmail}</span>
             </div>
           )}
           <div className='flex justify-between items-center flex-wrap gap-2'>
-            <span className='text-sm text-zeli-ink-muted'>Status</span>
+            <span className='text-sm text-perce-ink-muted'>Status</span>
             {isPaymentSuccess && (
-              <span className='inline-flex items-center gap-1.5 rounded-full bg-zeli-blush-soft px-2.5 py-0.5 text-sm font-medium text-zeli-ink-secondary'>
+              <span className='inline-flex items-center gap-1.5 rounded-full bg-perce-surface px-2.5 py-0.5 text-sm font-medium text-perce-ink-secondary'>
                 <Package aria-hidden className='h-3.5 w-3.5' />
                 Processing
               </span>
             )}
             {isPaymentPending && (
-              <span className='inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-zeli-blush-soft px-2.5 py-0.5 text-sm font-medium text-zeli-ink-secondary'>
+              <span className='inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-perce-surface px-2.5 py-0.5 text-sm font-medium text-perce-ink-secondary'>
                 <Clock aria-hidden className='h-3.5 w-3.5' />
                 Awaiting payment
               </span>
             )}
             {isPaymentFailed && (
-              <span className='inline-flex items-center gap-1.5 rounded-full bg-zeli-blush-soft px-2.5 py-0.5 text-sm font-medium text-zeli-sale'>
+              <span className='inline-flex items-center gap-1.5 rounded-full bg-perce-surface px-2.5 py-0.5 text-sm font-medium text-perce-sale'>
                 <AlertTriangle aria-hidden className='h-3.5 w-3.5' />
                 Payment {paymentState === "cancelled" ? "cancelled" : "failed"}
               </span>
@@ -304,12 +305,12 @@ export default function OrderConfirmationPage() {
             made" was likewise asserted for a *failed* payment, which this
             page cannot know. */}
         {isPaymentPending && (
-          <p className='mb-8 text-sm text-zeli-ink-muted'>
+          <p className='mb-8 text-sm text-perce-ink-muted'>
             A completed payment can take a few minutes to show here.
           </p>
         )}
         {isPaymentFailed && (
-          <p className='mb-8 text-sm text-zeli-ink-muted'>
+          <p className='mb-8 text-sm text-perce-ink-muted'>
             Any amount the provider authorised is released by the provider, not
             by this store.
           </p>

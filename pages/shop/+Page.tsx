@@ -295,15 +295,15 @@ export default function ShopPage() {
         <nav
           aria-label='Breadcrumb'
           data-shop-breadcrumb
-          className='zeli-container pt-6'>
-          <div className='mb-4 flex items-center gap-2 text-[length:var(--zeli-text-small)] text-zeli-ink-muted'>
+          className='perce-container pt-6'>
+          <div className='mb-4 flex items-center gap-2 text-[length:var(--perce-text-small)] text-perce-ink-muted'>
             <a
               href='/shop'
-              className='zeli-underline-hover transition-colors hover:text-zeli-ink'>
+              className='perce-underline-hover transition-colors hover:text-perce-ink'>
               All Products
             </a>
             <span aria-hidden>/</span>
-            <span aria-current='page' className='truncate text-zeli-ink'>
+            <span aria-current='page' className='truncate text-perce-ink'>
               {categoryName}
             </span>
           </div>

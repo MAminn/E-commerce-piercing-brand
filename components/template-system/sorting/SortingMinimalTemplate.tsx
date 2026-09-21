@@ -3,6 +3,7 @@ import { Link } from "#root/components/utils/Link";
 import { Search, SlidersHorizontal, X, ChevronRight } from "lucide-react";
 import type { FeaturedProduct } from "../home/HomeFeaturedProducts";
 import { getProductUrl } from "#root/lib/utils/route-helpers";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 /**
  * Extended product type for sorting pages
@@ -56,7 +57,7 @@ function ShopHero({
           (assets/landing.webp) baked into the template — wrong category for a
           piercing store, and one dashboard toggle away from being the live
           /shop header. Real collection imagery belongs in the CMS. */}
-      <div className='absolute inset-0 bg-zeli-surface-inverse' />
+      <div className='absolute inset-0 bg-perce-surface-inverse' />
 
       {/* Bottom fade into bg-neutral-50 */}
       {/* <div className='absolute bottom-0 left-0 right-0 h-24 bg-linear-to-t from-neutral-50 to-transparent' /> */}
@@ -73,7 +74,7 @@ function ShopHero({
         </nav>
 
         {/* Title */}
-        <h1 className='text-3xl sm:text-4xl lg:text-5xl font-light tracking-tight text-white mb-1.5'>
+        <h1 className='text-3xl sm:text-4xl lg:text-5xl font-medium tracking-tight text-white mb-1.5'>
           Collection
         </h1>
 
@@ -205,7 +206,7 @@ export function SortingMinimalTemplate({
     if (price === null || price === undefined) return "N/A";
     const numPrice = typeof price === "string" ? parseFloat(price) : price;
     if (isNaN(numPrice)) return "N/A";
-    return `EGP ${numPrice.toFixed(2)}`;
+    return formatMoney(numPrice);
   };
 
   const resolveImagePath = (url: string | undefined | null): string => {

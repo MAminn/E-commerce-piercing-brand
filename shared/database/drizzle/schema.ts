@@ -328,11 +328,11 @@ export const product = pgTable("product", {
   deleted: boolean("deleted").notNull().default(false),
   /** When true, product is hidden from the public shop */
   hidden: boolean("hidden").notNull().default(false),
-  /** Legacy (fragrance era): optional "inspired by" text supporting [color:#hex]text[/color] syntax. No longer authored or rendered by ZELI; kept so existing records read back unchanged. */
+  /** Legacy (fragrance era): optional "inspired by" text supporting [color:#hex]text[/color] syntax. No longer authored or rendered by Percé; kept so existing records read back unchanged. */
   inspiredBy: text("inspired_by"),
   /** Display order within a category (lower = shown first, null = default) */
   sortOrder: integer("sort_order"),
-  /** Legacy (fragrance era): character, longevity, when to wear, and top/middle/base notes. No longer authored or rendered by ZELI; kept so existing records read back unchanged. */
+  /** Legacy (fragrance era): character, longevity, when to wear, and top/middle/base notes. No longer authored or rendered by Percé; kept so existing records read back unchanged. */
   fragranceInfo: jsonb("fragrance_info").$type<{
     tagline?: string;
     taglineAr?: string;

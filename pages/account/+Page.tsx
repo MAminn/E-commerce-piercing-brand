@@ -34,6 +34,7 @@ import { useResolvedHeaderLogo } from "#root/components/globals/HeaderLogo";
 import { useWishlist } from "#root/lib/hooks/useWishlist";
 import { STORE_CURRENCY } from "#root/shared/config/branding";
 import { getProductUrl } from "#root/lib/utils/route-helpers";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 const profileSchema = z.object({
   name: z.string().min(1, "Name is required").max(255),
@@ -156,11 +157,11 @@ function AccountTab({ session, onProfileUpdated }: { session: { name?: string | 
   return (
     <div className="space-y-6">
       {/* Profile Info */}
-      <div className="bg-white rounded-2xl border border-zeli-line overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zeli-line">
-          <h3 className="text-[15px] font-medium text-zeli-ink">Personal Information</h3>
+      <div className="bg-white rounded-2xl border border-perce-line overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-perce-line">
+          <h3 className="text-[15px] font-medium text-perce-ink">Personal Information</h3>
           {!isEditing ? (
-            <button onClick={() => setIsEditing(true)} className="flex items-center gap-1.5 text-[12px] text-zeli-ink-subtle hover:text-stone-700 transition-colors">
+            <button onClick={() => setIsEditing(true)} className="flex items-center gap-1.5 text-[12px] text-perce-ink-subtle hover:text-stone-700 transition-colors">
               <Pencil className="w-3 h-3" /> Edit
             </button>
           ) : (
@@ -173,24 +174,24 @@ function AccountTab({ session, onProfileUpdated }: { session: { name?: string | 
         {isEditing ? (
           <form onSubmit={form.handleSubmit(onSaveProfile)} className="px-6 py-5 space-y-4">
             <div>
-              <label className="block text-[11px] uppercase tracking-[0.1em] text-zeli-ink-subtle mb-1.5 font-medium">Full Name</label>
+              <label className="block text-[11px] text-perce-ink-subtle mb-1.5 font-medium">Full Name</label>
               <Input {...form.register("name")} disabled={isSubmitting} className="h-10 text-[14px]" />
               {form.formState.errors.name && <p className="text-red-500 text-[11px] mt-1">{form.formState.errors.name.message}</p>}
             </div>
             <div>
-              <label className="block text-[11px] uppercase tracking-[0.1em] text-zeli-ink-subtle mb-1.5 font-medium">Email</label>
-              <div className="flex items-center gap-2 px-3 py-2.5 bg-zeli-surface rounded-md border border-zeli-line text-[14px] text-zeli-ink-subtle">
+              <label className="block text-[11px] text-perce-ink-subtle mb-1.5 font-medium">Email</label>
+              <div className="flex items-center gap-2 px-3 py-2.5 bg-perce-surface rounded-md border border-perce-line text-[14px] text-perce-ink-subtle">
                 <Mail className="w-4 h-4 shrink-0" />
                 {session.email}
-                <span className="ml-auto text-[10px] text-zeli-ink-subtle">read-only</span>
+                <span className="ml-auto text-[10px] text-perce-ink-subtle">read-only</span>
               </div>
             </div>
             <div>
-              <label className="block text-[11px] uppercase tracking-[0.1em] text-zeli-ink-subtle mb-1.5 font-medium">Phone</label>
+              <label className="block text-[11px] text-perce-ink-subtle mb-1.5 font-medium">Phone</label>
               <Input {...form.register("phone")} disabled={isSubmitting} className="h-10 text-[14px]" />
               {form.formState.errors.phone && <p className="text-red-500 text-[11px] mt-1">{form.formState.errors.phone.message}</p>}
             </div>
-            <Button type="submit" disabled={isSubmitting} size="sm" className="bg-zeli-accent hover:bg-zeli-accent-hover text-white gap-1.5">
+            <Button type="submit" disabled={isSubmitting} size="sm" className="bg-perce-cta hover:bg-perce-cta-hover text-white gap-1.5">
               <Check className="w-3.5 h-3.5" />
               {isSubmitting ? "Saving…" : "Save Changes"}
             </Button>
@@ -204,12 +205,12 @@ function AccountTab({ session, onProfileUpdated }: { session: { name?: string | 
               // { icon: Shield, label: "Role", value: session.role === "admin" ? "Administrator" : "Customer" },
             ].map(({ icon: Icon, label, value }) => (
               <div key={label} className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-zeli-surface flex items-center justify-center shrink-0">
-                  <Icon className="w-3.5 h-3.5 text-zeli-ink-subtle" />
+                <div className="w-8 h-8 rounded-full bg-perce-surface flex items-center justify-center shrink-0">
+                  <Icon className="w-3.5 h-3.5 text-perce-ink-subtle" />
                 </div>
                 <div>
-                  <p className="text-[11px] uppercase tracking-[0.08em] text-zeli-ink-subtle font-medium">{label}</p>
-                  <p className="text-[14px] text-zeli-ink mt-0.5">{value}</p>
+                  <p className="text-[11px] text-perce-ink-subtle font-medium">{label}</p>
+                  <p className="text-[14px] text-perce-ink mt-0.5">{value}</p>
                 </div>
               </div>
             ))}
@@ -218,10 +219,10 @@ function AccountTab({ session, onProfileUpdated }: { session: { name?: string | 
       </div>
 
       {/* Change Password */}
-      <div className="bg-white rounded-2xl border border-zeli-line overflow-hidden">
-        <div className="px-6 py-4 border-b border-zeli-line">
-          <h3 className="text-[15px] font-medium text-zeli-ink">Change Password</h3>
-          <p className="text-[12px] text-zeli-ink-subtle mt-0.5">Leave blank to keep your current password</p>
+      <div className="bg-white rounded-2xl border border-perce-line overflow-hidden">
+        <div className="px-6 py-4 border-b border-perce-line">
+          <h3 className="text-[15px] font-medium text-perce-ink">Change Password</h3>
+          <p className="text-[12px] text-perce-ink-subtle mt-0.5">Leave blank to keep your current password</p>
         </div>
         <form onSubmit={pwForm.handleSubmit(onChangePassword)} className="px-6 py-5 space-y-4">
           {(
@@ -232,7 +233,7 @@ function AccountTab({ session, onProfileUpdated }: { session: { name?: string | 
             ] as const
           ).map(({ name, label, show, setShow }) => (
             <div key={name}>
-              <label className="block text-[11px] uppercase tracking-[0.1em] text-zeli-ink-subtle mb-1.5 font-medium">{label}</label>
+              <label className="block text-[11px] text-perce-ink-subtle mb-1.5 font-medium">{label}</label>
               <div className="relative">
                 <Input
                   {...pwForm.register(name)}
@@ -243,7 +244,7 @@ function AccountTab({ session, onProfileUpdated }: { session: { name?: string | 
                 <button
                   type="button"
                   onClick={() => setShow(!show)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zeli-ink-subtle hover:text-stone-600">
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-perce-ink-subtle hover:text-stone-600">
                   {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
@@ -252,7 +253,7 @@ function AccountTab({ session, onProfileUpdated }: { session: { name?: string | 
               )}
             </div>
           ))}
-          <Button type="submit" disabled={isChangingPw} size="sm" className="bg-zeli-accent hover:bg-zeli-accent-hover text-white gap-1.5">
+          <Button type="submit" disabled={isChangingPw} size="sm" className="bg-perce-cta hover:bg-perce-cta-hover text-white gap-1.5">
             <Shield className="w-3.5 h-3.5" />
             {isChangingPw ? "Updating…" : "Update Password"}
           </Button>
@@ -286,20 +287,20 @@ function OrdersTab() {
 
   if (isLoading) return (
     <div className="flex items-center justify-center py-20">
-      <Loader2 className="w-5 h-5 animate-spin text-zeli-ink-subtle" />
+      <Loader2 className="w-5 h-5 animate-spin text-perce-ink-subtle" />
     </div>
   );
 
   if (error) return (
-    <div className="text-center py-16 text-zeli-ink-subtle text-[14px]">{error}</div>
+    <div className="text-center py-16 text-perce-ink-subtle text-[14px]">{error}</div>
   );
 
   if (orders.length === 0) return (
     <div className="text-center py-20">
-      <ShoppingBag className="w-10 h-10 text-zeli-ink-inverse mx-auto mb-4" />
-      <p className="text-[15px] font-medium text-zeli-ink mb-1">No orders yet</p>
-      <p className="text-[13px] text-zeli-ink-subtle mb-6">Your order history will appear here</p>
-      <Link href="/shop" className="inline-flex items-center gap-2 px-5 py-2.5 bg-zeli-accent text-white text-[13px] rounded-lg hover:bg-zeli-accent-hover transition-colors">
+      <ShoppingBag className="w-10 h-10 text-perce-ink-inverse mx-auto mb-4" />
+      <p className="text-[15px] font-medium text-perce-ink mb-1">No orders yet</p>
+      <p className="text-[13px] text-perce-ink-subtle mb-6">Your order history will appear here</p>
+      <Link href="/shop" className="inline-flex items-center gap-2 px-5 py-2.5 bg-perce-cta text-white text-[13px] rounded-lg hover:bg-perce-cta-hover transition-colors">
         Start Shopping
       </Link>
     </div>
@@ -314,7 +315,7 @@ function OrdersTab() {
         const date = new Date(order.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 
         return (
-          <div key={order.id} className="bg-white rounded-2xl border border-zeli-line overflow-hidden">
+          <div key={order.id} className="bg-white rounded-2xl border border-perce-line overflow-hidden">
             <button
               type="button"
               className="w-full px-5 py-4 flex items-center gap-4 text-left hover:bg-stone-50 transition-colors"
@@ -324,50 +325,50 @@ function OrdersTab() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[13px] font-medium text-zeli-ink">#{order.id.substring(0, 8).toUpperCase()}</span>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium uppercase tracking-wide ${cfg.bg} ${cfg.color}`}>{cfg.label}</span>
+                  <span className="text-[13px] font-medium text-perce-ink">#{order.id.substring(0, 8).toUpperCase()}</span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${cfg.bg} ${cfg.color}`}>{cfg.label}</span>
                 </div>
-                <div className="flex items-center gap-2 mt-0.5 text-[12px] text-zeli-ink-subtle">
+                <div className="flex items-center gap-2 mt-0.5 text-[12px] text-perce-ink-subtle">
                   <span>{date}</span>
                   <span>·</span>
                   <span>{(order.items ?? []).length} item{(order.items ?? []).length !== 1 ? "s" : ""}</span>
                 </div>
               </div>
               <div className="text-right shrink-0">
-                <p className="text-[14px] font-semibold text-zeli-ink">{Number(order.total).toFixed(2)} {STORE_CURRENCY}</p>
+                <p className="text-[14px] font-semibold text-perce-ink">{formatMoney(Number(order.total))}</p>
               </div>
             </button>
 
             {isExpanded && (
-              <div className="border-t border-zeli-line px-5 py-4 space-y-3">
+              <div className="border-t border-perce-line px-5 py-4 space-y-3">
                 {(order.items ?? []).map((item) => (
                   <div key={item.id} className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-[13px] text-zeli-ink-secondary truncate">{item.name || "Product"}</p>
-                      <p className="text-[11px] text-zeli-ink-subtle">Qty: {item.quantity}</p>
+                      <p className="text-[13px] text-perce-ink-secondary truncate">{item.name || "Product"}</p>
+                      <p className="text-[11px] text-perce-ink-subtle">Qty: {item.quantity}</p>
                     </div>
-                    <p className="text-[13px] font-medium text-zeli-ink shrink-0">
-                      {(Number(item.discountPrice ?? item.price) * item.quantity).toFixed(2)} {STORE_CURRENCY}
+                    <p className="text-[13px] font-medium text-perce-ink shrink-0">
+                      {formatMoney((Number(item.discountPrice ?? item.price) * item.quantity))}
                     </p>
                   </div>
                 ))}
-                <div className="border-t border-zeli-line pt-3 space-y-1">
-                  <div className="flex justify-between text-[12px] text-zeli-ink-subtle">
-                    <span>Subtotal</span><span>{Number(order.subtotal).toFixed(2)} {STORE_CURRENCY}</span>
+                <div className="border-t border-perce-line pt-3 space-y-1">
+                  <div className="flex justify-between text-[12px] text-perce-ink-subtle">
+                    <span>Subtotal</span><span>{formatMoney(Number(order.subtotal))}</span>
                   </div>
-                  <div className="flex justify-between text-[12px] text-zeli-ink-subtle">
-                    <span>Shipping</span><span>{Number(order.shipping) > 0 ? `${Number(order.shipping).toFixed(2)} ${STORE_CURRENCY}` : "Free"}</span>
+                  <div className="flex justify-between text-[12px] text-perce-ink-subtle">
+                    <span>Shipping</span><span>{Number(order.shipping) > 0 ? `${formatMoney(Number(order.shipping))}` : "Free"}</span>
                   </div>
                   {order.discount && Number(order.discount) > 0 && (
                     <div className="flex justify-between text-[12px] text-green-600">
-                      <span>Discount</span><span>-{Number(order.discount).toFixed(2)} {STORE_CURRENCY}</span>
+                      <span>Discount</span><span>-{formatMoney(Number(order.discount))}</span>
                     </div>
                   )}
-                  <div className="flex justify-between text-[14px] font-semibold text-zeli-ink pt-1 border-t border-zeli-line">
-                    <span>Total</span><span>{Number(order.total).toFixed(2)} {STORE_CURRENCY}</span>
+                  <div className="flex justify-between text-[14px] font-semibold text-perce-ink pt-1 border-t border-perce-line">
+                    <span>Total</span><span>{formatMoney(Number(order.total))}</span>
                   </div>
                 </div>
-                <div className="pt-1 text-[12px] text-zeli-ink-subtle">
+                <div className="pt-1 text-[12px] text-perce-ink-subtle">
                   <p>Ship to: {order.shippingAddress}, {order.shippingCity}{order.shippingState ? `, ${order.shippingState}` : ""}</p>
                 </div>
               </div>
@@ -407,16 +408,16 @@ function WishlistTab() {
 
   if (isLoading) return (
     <div className="flex items-center justify-center py-20">
-      <Loader2 className="w-5 h-5 animate-spin text-zeli-ink-subtle" />
+      <Loader2 className="w-5 h-5 animate-spin text-perce-ink-subtle" />
     </div>
   );
 
   if (wishlistIds.length === 0) return (
     <div className="text-center py-20">
-      <Heart className="w-10 h-10 text-zeli-ink-inverse mx-auto mb-4" />
-      <p className="text-[15px] font-medium text-zeli-ink mb-1">Your wishlist is empty</p>
-      <p className="text-[13px] text-zeli-ink-subtle mb-6">Save products you love by tapping the heart icon</p>
-      <Link href="/shop" className="inline-flex items-center gap-2 px-5 py-2.5 bg-zeli-accent text-white text-[13px] rounded-lg hover:bg-zeli-accent-hover transition-colors">
+      <Heart className="w-10 h-10 text-perce-ink-inverse mx-auto mb-4" />
+      <p className="text-[15px] font-medium text-perce-ink mb-1">Your wishlist is empty</p>
+      <p className="text-[13px] text-perce-ink-subtle mb-6">Save products you love by tapping the heart icon</p>
+      <Link href="/shop" className="inline-flex items-center gap-2 px-5 py-2.5 bg-perce-cta text-white text-[13px] rounded-lg hover:bg-perce-cta-hover transition-colors">
         Browse Products
       </Link>
     </div>
@@ -428,23 +429,23 @@ function WishlistTab() {
         const displayPrice = product.discountPrice ?? product.price;
         const hasDiscount = product.discountPrice != null && product.discountPrice < product.price;
         return (
-          <div key={product.id} className="bg-white rounded-xl border border-zeli-line overflow-hidden group">
-            <Link href={getProductUrl(product)} className="block relative aspect-square bg-zeli-surface overflow-hidden">
+          <div key={product.id} className="bg-white rounded-xl border border-perce-line overflow-hidden group">
+            <Link href={getProductUrl(product)} className="block relative aspect-square bg-perce-surface overflow-hidden">
               {product.imageUrl ? (
                 <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <ShoppingBag className="w-8 h-8 text-zeli-ink-inverse" />
+                  <ShoppingBag className="w-8 h-8 text-perce-ink-inverse" />
                 </div>
               )}
             </Link>
             <div className="p-3">
               <Link href={getProductUrl(product)} className="block">
-                <p className="text-[13px] font-medium text-zeli-ink truncate hover:text-stone-600 transition-colors">{product.name}</p>
+                <p className="text-[13px] font-medium text-perce-ink truncate hover:text-stone-600 transition-colors">{product.name}</p>
               </Link>
               <div className="flex items-center gap-1.5 mt-1">
-                <span className="text-[13px] font-semibold text-zeli-ink">{displayPrice.toFixed(2)} {STORE_CURRENCY}</span>
-                {hasDiscount && <span className="text-[11px] text-zeli-ink-subtle line-through">{product.price.toFixed(2)}</span>}
+                <span className="text-[13px] font-semibold text-perce-ink">{formatMoney(displayPrice)}</span>
+                {hasDiscount && <span className="text-[11px] text-perce-ink-subtle line-through">{formatMoney(product.price)}</span>}
               </div>
               <button
                 type="button"
@@ -494,7 +495,7 @@ export default function Page() {
   ];
 
   return (
-    <div className="min-h-screen bg-zeli-surface">
+    <div className="min-h-screen bg-perce-surface">
 
       <div className="max-w-4xl mx-auto px-4 py-8 sm:py-12">
         {/* Profile header */}
@@ -503,13 +504,13 @@ export default function Page() {
             {initials}
           </div>
           <div className="text-center sm:text-left">
-            <h1 className="text-[22px] font-semibold text-zeli-ink">{session.name || "My Account"}</h1>
-            <p className="text-[13px] text-zeli-ink-subtle">{session.email}</p>
+            <h1 className="text-[22px] font-semibold text-perce-ink">{session.name || "My Account"}</h1>
+            <p className="text-[13px] text-perce-ink-subtle">{session.email}</p>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 rounded-xl shadow-lg border-b border-zeli-line mb-6">
+        <div className="flex gap-1 rounded-xl shadow-lg border-b border-perce-line mb-6">
           {tabs.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -517,8 +518,8 @@ export default function Page() {
               onClick={() => setActiveTab(id)}
               className={`flex-1 flex items-center justify-center gap-1 sm:gap-2 px-1.5 sm:px-4 py-2.5 text-[11px] sm:text-[13px] font-medium whitespace-nowrap border-b-2 -mb-px transition-colors ${
                 activeTab === id
-                  ? "border-zeli-ink text-black"
-                  : "border-transparent text-zeli-ink-subtle hover:text-stone-700"
+                  ? "border-perce-ink text-black"
+                  : "border-transparent text-perce-ink-subtle hover:text-stone-700"
               }`}>
               <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
               {label}

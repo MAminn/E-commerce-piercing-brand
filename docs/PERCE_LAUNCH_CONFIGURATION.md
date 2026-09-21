@@ -1,7 +1,7 @@
-# ZELI — LAUNCH CONFIGURATION
+# Percé — LAUNCH CONFIGURATION
 
 Everything that is **not code** and must be decided, supplied or configured
-before ZELI can safely accept a real customer order.
+before Percé can safely accept a real customer order.
 
 Every item below was derived by reading the runtime — the environment
 variables the server actually reads, the database rows the storefront actually
@@ -27,7 +27,7 @@ That is deliberate — see `docs/CURRENT_PROJECT.md`.
 
 | Item | Where it is read | Default if unset | Status |
 |---|---|---|---|
-| Final brand name | `VITE_STORE_NAME` → `shared/config/branding.ts` `STORE_NAME`; CMS `layoutSettings.siteTitle` overrides the *displayed* name | `"ZELI"` | **REQUIRED FOR FIRST SALE** — it appears in the order-confirmation email subject and body, and in every page title. Shipping under a working name that later changes means already-sent emails carry the old name. |
+| Final brand name | `VITE_STORE_NAME` → `shared/config/branding.ts` `STORE_NAME`; CMS `layoutSettings.siteTitle` overrides the *displayed* name | `"Percé"` | **REQUIRED FOR FIRST SALE** — it appears in the order-confirmation email subject and body, and in every page title. Shipping under a working name that later changes means already-sent emails carry the old name. |
 | Store description / meta | `VITE_STORE_DESCRIPTION` | `"Piercing jewelry, curated in Egypt."` | OPTIONAL FOR FIRST SALE |
 | Currency label | `VITE_CURRENCY` | `"EGP"` | CAN WAIT (already correct) |
 | Logo | Dashboard → Layout Settings → Header logo (uploaded file) | none — the header falls back to the store name as text | OPTIONAL FOR FIRST SALE |

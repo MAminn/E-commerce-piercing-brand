@@ -1,6 +1,6 @@
 import { useCart } from "#root/lib/context/CartContext";
 import { usePageContext } from "vike-react/usePageContext";
-import { ShoppingBag, ArrowRight, Plus, ChevronDown } from "lucide-react";
+import { ShoppingBag, ArrowRight, ChevronDown } from "lucide-react";
 import { trpc } from "#root/shared/trpc/client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { OfferCondition, OfferReward } from "#root/shared/database/drizzle/schema";
@@ -8,6 +8,7 @@ import type { AppliedOffer } from "#root/backend/offers/service";
 import { cn } from "#root/lib/utils";
 import { computeOfferSavingsTotal } from "#root/components/template-system/cartPage/AppliedOffersSavings";
 import { STORE_CURRENCY } from "#root/shared/config/branding";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 const HIDDEN_PATHS = ["/cart", "/checkout", "/login", "/register", "/dashboard"];
 
@@ -60,13 +61,13 @@ function rewardHeadline(reward: OfferReward): string {
 function unlockedHeadline(reward: OfferReward, name: string): string {
   switch (reward.type) {
     case "percentage_off":
-      return `${reward.percentOff}% OFF UNLOCKED`;
+      return `${reward.percentOff}% off unlocked`;
     case "fixed_off":
-      return `${reward.amountOff} OFF UNLOCKED`;
+      return `${formatMoney(reward.amountOff)} off unlocked`;
     case "free_shipping":
-      return "FREE SHIPPING UNLOCKED";
+      return "Free shipping unlocked";
     default:
-      return `${name.toUpperCase()} UNLOCKED`;
+      return `${name} unlocked`;
   }
 }
 
@@ -74,7 +75,7 @@ function formatOfferSaving(offer: AppliedOffer, currency: string): string {
   if (offer.freeShipping && offer.discountAmount === 0) {
     return "Free shipping";
   }
-  return `−${offer.discountAmount.toFixed(2)} ${currency}`;
+  return `−${formatMoney(offer.discountAmount, { currency })}`;
 }
 
 function buildStripState(
@@ -92,16 +93,16 @@ function buildStripState(
     const matched = offers.find((o) => o.name === latestApplied.name);
     const rewardText =
       totalSavings > 0
-        ? `SAVING ${totalSavings.toFixed(2)} ${currency}`
+        ? `Saving ${formatMoney(totalSavings, { currency })}`
         : latestApplied.freeShipping && latestApplied.discountAmount === 0
-          ? "APPLIED AT CHECKOUT"
-          : `SAVING ${latestApplied.discountAmount.toFixed(2)} ${currency}`;
+          ? "Applied at checkout"
+          : `Saving ${formatMoney(latestApplied.discountAmount, { currency })}`;
 
     return {
       kind: "unlocked",
       actionText: matched
         ? unlockedHeadline(matched.reward, matched.name)
-        : `${latestApplied.name.toUpperCase()} UNLOCKED`,
+        : `${latestApplied.name} unlocked`,
       rewardText,
       href: "/cart",
       ctaLabel: "VIEW CART",
@@ -122,7 +123,7 @@ function buildStripState(
       if (cartQuantity >= cond.minQuantity) continue;
       const needed = cond.minQuantity - cartQuantity;
       const progress = cartQuantity / cond.minQuantity;
-      const actionText = `ADD ${needed} MORE ITEM${needed === 1 ? "" : "S"}`;
+      const actionText = `Add ${needed} more item${needed === 1 ? "" : "s"}`;
       if (!best || progress > best.progress) {
         best = { offer, progress, actionText };
       }
@@ -132,7 +133,7 @@ function buildStripState(
       if (cartSubtotal >= cond.minTotal) continue;
       const needed = cond.minTotal - cartSubtotal;
       const progress = cartSubtotal / cond.minTotal;
-      const actionText = `SPEND ${needed.toFixed(0)} ${currency} MORE`;
+      const actionText = `Spend ${formatMoney(needed, { currency })} more`;
       if (!best || progress > best.progress) {
         best = { offer, progress, actionText };
       }
@@ -145,7 +146,7 @@ function buildStripState(
       actionText: best.actionText,
       rewardText: rewardHeadline(best.offer.reward),
       href: "/shop",
-      ctaLabel: "SHOP MORE",
+      ctaLabel: "Shop more",
       progress: best.progress,
     };
   }
@@ -153,7 +154,7 @@ function buildStripState(
   return {
     kind: "cart",
     actionText: `${cartQuantity} ITEM${cartQuantity === 1 ? "" : "S"} IN CART`,
-    rewardText: `${total.toFixed(2)} ${currency}`,
+    rewardText: `${formatMoney(total, { currency })}`,
     href: "/cart",
     ctaLabel: "VIEW CART",
   };
@@ -247,27 +248,27 @@ export function StickyCartBar({
     >
       <div className="mx-auto w-full max-w-3xl pointer-events-auto relative">
         {isUnlocked && savingsExpanded && hasSavingsBreakdown && (
-          <div className="mb-2 rounded-2xl border border-emerald-400/40 bg-[#0a0a0a]/95 px-4 py-3 shadow-[0_8px_32px_rgba(0,0,0,0.35)] backdrop-blur-sm">
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-emerald-300/90">
+          <div className="mb-2 border border-perce-frame-line bg-perce-ground/95 px-4 py-3 shadow-[0_8px_32px_rgba(0,0,0,0.35)] backdrop-blur-sm">
+            <p className="mb-2 text-xs font-medium text-perce-frame-ink-muted">
               Savings breakdown
             </p>
             <ul className="space-y-1.5">
               {appliedOffers.map((offer) => (
                 <li
                   key={offer.name}
-                  className="flex items-start justify-between gap-3 text-[11px] leading-snug text-white/90"
+                  className="flex items-start justify-between gap-3 text-[11px] leading-snug text-perce-frame-ink"
                 >
                   <span className="min-w-0 break-words">{offer.name}</span>
-                  <span className="shrink-0 font-semibold text-emerald-300">
+                  <span className="shrink-0 font-semibold text-perce-accent">
                     {formatOfferSaving(offer, currency)}
                   </span>
                 </li>
               ))}
               {discount > 0 && (
-                <li className="flex items-center justify-between gap-3 text-[11px] text-white/90">
+                <li className="flex items-center justify-between gap-3 text-[11px] text-perce-frame-ink">
                   <span>Promo code</span>
-                  <span className="font-semibold text-emerald-300">
-                    −{discount.toFixed(2)} {currency}
+                  <span className="font-semibold text-perce-accent">
+                    −{formatMoney(discount, { currency })}
                   </span>
                 </li>
               )}
@@ -275,36 +276,18 @@ export function StickyCartBar({
           </div>
         )}
 
-        {/* Sparkle accents */}
-        {isProgress && (
-          <>
-            <Plus
-              className="absolute -left-0.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-amber-400 animate-offer-sparkle pointer-events-none"
-              strokeWidth={3}
-              aria-hidden
-            />
-            <Plus
-              className="absolute -right-0.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-amber-400 animate-offer-sparkle-delayed pointer-events-none"
-              strokeWidth={3}
-              aria-hidden
-            />
-          </>
-        )}
-
         <div
           className={cn(
-            "relative flex items-center gap-2 sm:gap-3 rounded-full border border-amber-400/50 bg-[#0a0a0a] px-3 py-2.5 sm:px-4 sm:py-3",
-            isUnlocked
-              ? "border-emerald-400/50 animate-offer-border-pulse-success"
-              : isProgress
-                ? "animate-offer-border-pulse"
-                : "shadow-[0_8px_32px_rgba(0,0,0,0.35)]",
+            // Percé: a Ground pill with Paper type. No gold, no gradient, no
+            // glow — the single accent is the reward figure and the count.
+            "relative flex items-center gap-2 sm:gap-3 border border-perce-frame-line bg-perce-ground px-3 py-2.5 sm:px-4 sm:py-3 shadow-[0_8px_32px_rgba(0,0,0,0.35)]",
+            isUnlocked && "border-perce-accent/60",
           )}
         >
           {/* Progress fill (subtle) */}
           {isProgress && (
             <div
-              className="absolute inset-y-0 left-0 rounded-full bg-amber-500/10 transition-all duration-700 ease-out"
+              className="absolute inset-y-0 left-0 bg-perce-paper/10 transition-all duration-700 ease-out"
               style={{ width: `${Math.round(strip.progress * 100)}%` }}
               aria-hidden
             />
@@ -315,16 +298,14 @@ export function StickyCartBar({
             <ShoppingBag
               className={cn(
                 "h-5 w-5 sm:h-[22px] sm:w-[22px]",
-                isUnlocked ? "text-emerald-300" : "text-amber-300",
+                isUnlocked ? "text-perce-accent" : "text-perce-frame-ink",
               )}
               strokeWidth={1.75}
             />
             <span
               className={cn(
                 "absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-0.5 text-[9px] font-bold leading-none",
-                isUnlocked
-                  ? "bg-emerald-400 text-emerald-950"
-                  : "bg-amber-400 text-amber-950",
+                "bg-perce-accent text-perce-accent-ink",
               )}
             >
               {totalItems > 99 ? "99+" : totalItems}
@@ -340,28 +321,28 @@ export function StickyCartBar({
                 className="flex w-full min-w-0 items-center gap-1 text-left"
                 aria-expanded={savingsExpanded}
               >
-                <p className="min-w-0 flex-1 truncate text-[10px] font-bold uppercase leading-tight tracking-wide text-white sm:text-[13px] animate-offer-text-glow">
+                <p className="min-w-0 flex-1 truncate text-xs font-medium leading-tight text-perce-frame-ink sm:text-[13px]">
                   <span>{strip.actionText}</span>
-                  <span className="mx-1.5 font-normal text-white/30">|</span>
-                  <span className="font-semibold text-emerald-300">
+                  <span className="mx-1.5 font-normal text-perce-frame-ink-muted">·</span>
+                  <span className="font-semibold text-perce-accent">
                     {strip.rewardText}
                   </span>
                 </p>
                 <ChevronDown
                   className={cn(
-                    "h-3.5 w-3.5 shrink-0 text-emerald-300/80 transition-transform sm:h-4 sm:w-4",
+                    "h-3.5 w-3.5 shrink-0 text-perce-frame-ink-muted transition-transform sm:h-4 sm:w-4",
                     savingsExpanded && "rotate-180",
                   )}
                 />
               </button>
             ) : (
-              <p className="truncate text-[10px] font-bold uppercase leading-tight tracking-wide text-white sm:text-[13px] animate-offer-text-glow">
+              <p className="truncate text-xs font-medium leading-tight text-perce-frame-ink sm:text-[13px]">
                 <span>{strip.actionText}</span>
-                <span className="mx-1.5 font-normal text-white/30">|</span>
+                <span className="mx-1.5 font-normal text-perce-frame-ink-muted">·</span>
                 <span
                   className={cn(
                     "font-semibold",
-                    isUnlocked ? "text-emerald-300" : "text-amber-200/90",
+                    isUnlocked ? "text-perce-accent" : "text-perce-frame-ink",
                   )}
                 >
                   {strip.rewardText}
@@ -374,17 +355,15 @@ export function StickyCartBar({
           <a
             href={ctaLink}
             className={cn(
-              "relative z-10 flex shrink-0 items-center gap-1.5 overflow-hidden rounded-full px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-[#1a1000] transition-transform active:scale-95 sm:px-4 sm:py-2.5 sm:text-[12px]",
-              isUnlocked
-                ? "bg-gradient-to-r from-emerald-300 via-emerald-400 to-teal-400"
-                : "bg-gradient-to-r from-amber-300 via-orange-400 to-amber-500 animate-offer-cta-shimmer",
+              "relative z-10 flex shrink-0 items-center gap-1.5 overflow-hidden px-3 py-2 text-xs font-medium text-perce-ground transition-colors active:translate-y-px sm:px-4 sm:py-2.5 sm:text-[12px]",
+              "bg-perce-paper hover:bg-white",
             )}
           >
             <span className="hidden sm:inline">{ctaText}</span>
             <span
               className={cn(
                 "flex h-6 w-6 items-center justify-center rounded-full sm:h-7 sm:w-7",
-                isUnlocked ? "bg-emerald-950/15" : "bg-black/15",
+                "bg-perce-ground/10",
               )}
             >
               <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" strokeWidth={2.5} />

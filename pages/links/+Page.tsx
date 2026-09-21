@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { trpc } from "#root/shared/trpc/client";
 import type { LinkTreeConfig } from "#root/shared/types/link-tree";
 import {
+  BRAND_WORDMARK,
   STORE_NAME,
   STORE_SOCIAL_LINKS,
   STORE_URL,
@@ -191,7 +192,7 @@ const SOCIAL_LABELS: Record<string, string> = {
 
 const FALLBACK_CONFIG: LinkTreeConfig = {
   brandName: STORE_NAME,
-  subtitle: "Shop, follow, and connect",
+  subtitle: "Piercing jewellery, delivered across Egypt.",
   links: [
     ...(isUsableUrl(STORE_URL)
       ? [{ label: "Shop", href: STORE_URL, icon: "shop", enabled: true }]
@@ -252,14 +253,14 @@ export default function Page() {
 
   if (loading) {
     return (
-      <div className='min-h-screen bg-black flex items-center justify-center'>
+      <div className='min-h-screen bg-perce-ground flex items-center justify-center'>
         <div className='w-5 h-5 border border-white/20 border-t-white/60 rounded-full animate-spin' />
       </div>
     );
   }
 
   return (
-    <div className='min-h-screen bg-black flex flex-col items-center justify-center px-6 py-16 font-poppins selection:bg-white/20'>
+    <div className='min-h-screen bg-perce-ground flex flex-col items-center justify-center px-6 py-16 selection:bg-white/20'>
       {/* Content wrapper */}
       <div
         className={`w-full max-w-md flex flex-col items-center gap-10 transition-all duration-700 ease-out ${
@@ -267,11 +268,11 @@ export default function Page() {
         }`}>
         {/* Brand header */}
         <header className='flex flex-col items-center gap-3 text-center'>
-          <h1 className='text-white text-3xl sm:text-4xl font-light tracking-[0.25em] uppercase'>
-            {brandName}
+          <h1 className='perce-wordmark text-perce-frame-ink text-4xl sm:text-5xl'>
+            {brandName === STORE_NAME ? BRAND_WORDMARK : brandName}
           </h1>
           <div className='w-8 h-px bg-white/30' aria-hidden='true' />
-          <p className='text-white/50 text-sm tracking-[0.12em] font-light'>
+          <p className='text-white/50 text-sm font-light'>
             {subtitle}
           </p>
         </header>
@@ -286,7 +287,7 @@ export default function Page() {
                 href={link.href}
                 target='_blank'
                 rel='noopener noreferrer'
-                className='group relative flex items-center gap-4 w-full px-6 py-4 rounded-sm border border-white/8 bg-white/3 text-white/80 transition-all duration-300 ease-out hover:bg-white/7 hover:border-white/20 hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+                className='group relative flex items-center gap-4 w-full px-6 py-4 rounded-sm border border-white/8 bg-white/3 text-white/80 transition-all duration-300 ease-out hover:bg-white/7 hover:border-white/20 hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-perce-ground'
                 style={{
                   transitionDelay: mounted ? `${i * 60}ms` : "0ms",
                   opacity: mounted ? 1 : 0,
@@ -296,7 +297,7 @@ export default function Page() {
                 <span className='shrink-0 w-5 h-5 text-white/40 transition-colors duration-300 group-hover:text-white/70'>
                   {IconFn({ width: 20, height: 20 })}
                 </span>
-                <span className='text-sm tracking-[0.08em] font-light'>
+                <span className='text-sm font-light'>
                   {link.label}
                 </span>
                 <svg

@@ -291,7 +291,7 @@ export function CheckoutPageEditorialTemplate({
           <Reveal variant='fadeUp'>
             <div className='mb-10 flex items-center justify-between'>
               <div>
-                <p className='text-xs tracking-[0.32em] uppercase text-stone-500'>
+                <p className='text-xs uppercase text-stone-500'>
                   Checkout
                 </p>
                 <h1 className='mt-2 text-3xl font-semibold tracking-tight text-stone-900 sm:text-4xl'>
@@ -327,7 +327,7 @@ export function CheckoutPageEditorialTemplate({
                 {/* Customer Info */}
                 <StaggerItem>
                   <section className='rounded-2xl border border-stone-200 bg-white p-6'>
-                    <h2 className='text-sm font-medium tracking-[0.2em] uppercase text-stone-500 mb-5'>
+                    <h2 className='text-sm font-medium text-stone-500 mb-5'>
                       Contact Information
                     </h2>
                     <div className='space-y-4'>
@@ -381,7 +381,7 @@ export function CheckoutPageEditorialTemplate({
                 {/* Shipping Address */}
                 <StaggerItem>
                   <section className='rounded-2xl border border-stone-200 bg-white p-6'>
-                    <h2 className='text-sm font-medium tracking-[0.2em] uppercase text-stone-500 mb-5'>
+                    <h2 className='text-sm font-medium text-stone-500 mb-5'>
                       Shipping Address
                     </h2>
                     <div className='space-y-4'>
@@ -459,7 +459,7 @@ export function CheckoutPageEditorialTemplate({
                 {/* Payment Method */}
                 <StaggerItem>
                   <section className='rounded-2xl border border-stone-200 bg-white p-6'>
-                    <h2 className='text-sm font-medium tracking-[0.2em] uppercase text-stone-500 mb-5'>
+                    <h2 className='text-sm font-medium text-stone-500 mb-5'>
                       Payment Method
                     </h2>
                     {paymentMethodsLoading ? (
@@ -526,7 +526,7 @@ export function CheckoutPageEditorialTemplate({
                 {/* Order Notes */}
                 <StaggerItem>
                   <section className='rounded-2xl border border-stone-200 bg-white p-6'>
-                    <h2 className='text-sm font-medium tracking-[0.2em] uppercase text-stone-500 mb-5'>
+                    <h2 className='text-sm font-medium text-stone-500 mb-5'>
                       Order Notes (Optional)
                     </h2>
                     <textarea
@@ -549,7 +549,7 @@ export function CheckoutPageEditorialTemplate({
                 className='lg:col-span-5 space-y-3'>
                 {/* Desktop: full itemized card */}
                 <div className='hidden lg:block lg:sticky lg:top-24 rounded-2xl border border-stone-200 bg-white p-6'>
-                  <h2 className='text-sm font-medium tracking-[0.2em] uppercase text-stone-500 mb-5'>
+                  <h2 className='text-sm font-medium text-stone-500 mb-5'>
                     Order Summary
                   </h2>
 

@@ -1,6 +1,6 @@
 import { Link } from "#root/components/utils/Link";
 import { useLayoutSettings } from "#root/frontend/contexts/LayoutSettingsContext";
-import { STORE_NAME } from "#root/shared/config/branding";
+import { BRAND_WORDMARK, STORE_NAME } from "#root/shared/config/branding";
 import { DEFAULT_FOOTER_LOGO_SIZE } from "#root/shared/types/layout-settings";
 
 /* ------------------------------------------------------------------ */
@@ -24,18 +24,19 @@ export interface FooterLogoProps {
  * Renders exactly ONE logo element based on CMS footer settings:
  * 1. If `footer.logoUrl` exists → `<img>` (no filters, rendered as-is)
  * 2. Else if `footer.logoText` exists → styled text
- * 3. Else → STORE_NAME fallback
+ * 3. Else → the lowercase Percé wordmark
  *
  * All footer variants should use this instead of inline logo logic.
  */
 export function FooterLogo({
-  textClassName = "inline-block text-xl md:text-2xl font-extralight tracking-[0.18em] text-white/90 uppercase hover:text-white transition-colors duration-500",
+  textClassName = "perce-wordmark inline-block text-xl md:text-2xl text-perce-frame-ink hover:text-perce-frame-ink-muted transition-colors",
   imgClassName = "",
 }: FooterLogoProps) {
   const { footer } = useLayoutSettings();
   const size = footer.logoSize ?? DEFAULT_FOOTER_LOGO_SIZE;
 
-  const logoText = footer.logoText || STORE_NAME;
+  const logoText = footer.logoText || BRAND_WORDMARK;
+  const logoAlt = footer.logoText || STORE_NAME;
 
   if (footer.logoUrl) {
     return (
@@ -44,7 +45,7 @@ export function FooterLogo({
         className='inline-block hover:opacity-70 transition-opacity duration-500'>
         <img
           src={footer.logoUrl}
-          alt={logoText}
+          alt={logoAlt}
           className={`object-cover ${imgClassName}`}
           style={{ width: size.desktopWidth, maxHeight: size.desktopMaxHeight }}
         />

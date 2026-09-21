@@ -75,7 +75,7 @@ export default function LayoutSettingsPage() {
   // `landing-minimal` — their changes went to a row nobody was reading.
   //
   // Same resolver and the same precedence as every customer-facing route: a
-  // stored selection still wins, the ZELI preset is only the fallback.
+  // stored selection still wins, the Percé preset is only the fallback.
   const activeLandingTemplate = resolveTemplateId(
     "landing",
     getTemplateId("landing"),
@@ -958,7 +958,7 @@ export default function LayoutSettingsPage() {
                     onChange={(e) =>
                       updateHeader("announcementBarText", e.target.value)
                     }
-                    placeholder='e.g. Free shipping on all orders over $50!'
+                    placeholder='e.g. Delivery across Egypt · Cash on delivery'
                     className='mt-1'
                   />
                 </div>

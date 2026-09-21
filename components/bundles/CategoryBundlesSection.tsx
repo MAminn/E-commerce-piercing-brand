@@ -30,5 +30,5 @@ export function CategoryBundlesSection({ categoryId }: { categoryId: string }) {
   }, [categoryId]);
 
   if (campaigns.length === 0) return null;
-  return <MinimalBundleSection campaigns={campaigns} title={t("bundles.in_category")} className="bg-zeli-surface" />;
+  return <MinimalBundleSection campaigns={campaigns} title={t("bundles.in_category")} className="bg-perce-surface" />;
 }

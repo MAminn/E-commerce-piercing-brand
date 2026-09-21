@@ -3,6 +3,10 @@
 > "template for sale" framing are inherited from the earlier project this
 > repo was copied from and do **not** describe the current product. For what
 > this repository actually is, read [`docs/CURRENT_PROJECT.md`](docs/CURRENT_PROJECT.md).
+>
+> **Brand:** this repository runs the **Percé** storefront (Egypt, EGP). Brand
+> rules, palette, type and naming live in that document; runtime values in
+> [`shared/config/branding.ts`](shared/config/branding.ts).
 
 ---
 

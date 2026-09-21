@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { ChevronDown, Gift } from "lucide-react";
 import { cn } from "#root/lib/utils";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 export interface AppliedOfferSummary {
   name: string;
@@ -24,7 +25,7 @@ function formatOfferAmount(
   if (offer.freeShipping && offer.discountAmount === 0) {
     return "Free shipping";
   }
-  return `−${offer.discountAmount.toFixed(2)} ${currency}`;
+  return `−${formatMoney(offer.discountAmount, { currency })}`;
 }
 
 export function AppliedOffersSavings({
@@ -59,7 +60,7 @@ export function AppliedOffersSavings({
         <li className="flex items-center justify-between gap-3 text-[11px]">
           <span>Promo code</span>
           <span className="font-semibold">
-            −{promoDiscount.toFixed(2)} {currency}
+            −{formatMoney(promoDiscount, { currency })}
           </span>
         </li>
       )}
@@ -70,7 +71,7 @@ export function AppliedOffersSavings({
     if (totalSavings <= 0) return null;
 
     return (
-      <div className="bg-zeli-success text-zeli-ink-inverse">
+      <div className="bg-perce-success text-perce-ink-inverse">
         <button
           type="button"
           onClick={toggle}
@@ -78,8 +79,7 @@ export function AppliedOffersSavings({
           aria-expanded={expanded}
         >
           <span className="text-[11px] font-semibold tracking-wide">
-            🎉 Saving {currency}
-            {totalSavings.toFixed(2)}
+            Saving {formatMoney(totalSavings, { currency })}
             {!expanded && (
               <span className="font-normal opacity-90"> — tap for details</span>
             )}
@@ -92,7 +92,7 @@ export function AppliedOffersSavings({
           />
         </button>
         {expanded && (
-          <div className="border-t border-zeli-ink-inverse/25 px-4 pb-2.5 opacity-95">
+          <div className="border-t border-perce-ink-inverse/25 px-4 pb-2.5 opacity-95">
             {details}
           </div>
         )}
@@ -103,7 +103,7 @@ export function AppliedOffersSavings({
   if (offersTotal <= 0) return null;
 
   return (
-    <div className="text-[13px] text-zeli-sale">
+    <div className="text-[13px] text-perce-sale">
       <button
         type="button"
         onClick={toggle}
@@ -123,11 +123,11 @@ export function AppliedOffersSavings({
           </span>
         </span>
         <span className="shrink-0 font-semibold">
-          −{offersTotal.toFixed(2)} {currency}
+          −{formatMoney(offersTotal, { currency })}
         </span>
       </button>
       {expanded && (
-        <div className="ml-4 mt-1.5 space-y-1 border-l border-zeli-sale/30 pl-3 text-[12px] text-zeli-sale/90">
+        <div className="ml-4 mt-1.5 space-y-1 border-l border-perce-sale/30 pl-3 text-[12px] text-perce-sale/90">
           {appliedOffers.map((offer) => (
             <div
               key={offer.name}

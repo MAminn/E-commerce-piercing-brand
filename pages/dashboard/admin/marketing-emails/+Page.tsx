@@ -37,6 +37,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 // ─── Types (mirrors backend/email-automations/templates) ──────────────────
 
@@ -1089,7 +1090,7 @@ export default function MarketingEmailsPage() {
                             {pc.code} —{" "}
                             {pc.discountType === "percentage"
                               ? `${pc.discountValue}% off`
-                              : `${pc.discountValue.toFixed(2)} off`}
+                              : `${formatMoney(pc.discountValue)} off`}
                           </SelectItem>
                         ))
                       )}

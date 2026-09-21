@@ -15,6 +15,7 @@ import {
 } from "@react-email/components";
 // NEVER REMOVE THIS IMPORT
 import * as React from "react";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 interface OrderItem {
   name: string;
@@ -62,7 +63,7 @@ export const MinimalOrderEmailTemplate = ({
   customerEmail,
   customerPhone,
 }: MinimalOrderEmailProps) => {
-  const fmt = (price: number) => price.toFixed(2);
+  const fmt = (price: number) => formatMoney(price, { currency });
 
   return (
     <Html>
@@ -122,16 +123,16 @@ export const MinimalOrderEmailTemplate = ({
                     {item.discountPrice ? (
                       <>
                         <span style={{ textDecoration: "line-through", color: "#999" }}>
-                          {fmt(item.price)} {currency}
+                          {fmt(item.price)}
                         </span>
                         <br />
-                        <span style={{ color: "#b91c1c" }}>
-                          {fmt(item.discountPrice)} {currency}
+                        <span style={{ color: "#C42E15" }}>
+                          {fmt(item.discountPrice)}
                         </span>
                       </>
                     ) : (
                       <>
-                        {fmt(item.price)} {currency}
+                        {fmt(item.price)}
                       </>
                     )}
                   </Column>
@@ -144,7 +145,7 @@ export const MinimalOrderEmailTemplate = ({
                 Subtotal
               </Column>
               <Column style={summaryValue}>
-                {fmt(subTotal)} {currency}
+                {fmt(subTotal)}
               </Column>
             </Row>
             <Row style={summaryRow}>
@@ -152,7 +153,7 @@ export const MinimalOrderEmailTemplate = ({
                 Shipping
               </Column>
               <Column style={summaryValue}>
-                {fmt(shippingFees)} {currency}
+                {fmt(shippingFees)}
               </Column>
             </Row>
             <Row style={totalRow}>
@@ -160,7 +161,7 @@ export const MinimalOrderEmailTemplate = ({
                 Total
               </Column>
               <Column style={totalValue}>
-                {fmt(total)} {currency}
+                {fmt(total)}
               </Column>
             </Row>
           </Section>
@@ -218,8 +219,8 @@ export const MinimalOrderEmailTemplate = ({
 // ─── Styles ─────────────────────────────────────────────────────────────────
 
 const main = {
-  backgroundColor: "#f9fafb",
-  fontFamily: "'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+  backgroundColor: "#F2F0ED",
+  fontFamily: "'Inter Tight', -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
   padding: "24px 0",
 };
 
@@ -227,7 +228,7 @@ const container = {
   backgroundColor: "#ffffff",
   margin: "0 auto",
   maxWidth: "600px",
-  border: "1px solid #e5e7eb",
+  border: "1px solid #DAD7D3",
 };
 
 const header = {
@@ -240,13 +241,13 @@ const logoText = {
   fontWeight: "700",
   letterSpacing: "0.12em",
   textTransform: "uppercase" as const,
-  color: "#1c1917",
+  color: "#0E0E0E",
   margin: "0",
   textAlign: "center" as const,
 };
 
 const divider = {
-  borderTop: "1px solid #e5e7eb",
+  borderTop: "1px solid #DAD7D3",
   margin: "0",
 };
 
@@ -257,7 +258,7 @@ const section = {
 const sectionTitle = {
   fontSize: "15px",
   fontWeight: "600",
-  color: "#1c1917",
+  color: "#0E0E0E",
   textTransform: "uppercase" as const,
   letterSpacing: "0.08em",
   margin: "0 0 12px",
@@ -266,18 +267,18 @@ const sectionTitle = {
 const paragraph = {
   fontSize: "14px",
   lineHeight: "22px",
-  color: "#44403c",
+  color: "#2A2A2A",
   margin: "8px 0",
 };
 
 const tableHeaderRow = {
-  borderBottom: "2px solid #e5e7eb",
+  borderBottom: "2px solid #DAD7D3",
 };
 
 const tableHeaderCell = {
   fontSize: "11px",
   fontWeight: "600",
-  color: "#78716c",
+  color: "#5F5C5A",
   textTransform: "uppercase" as const,
   letterSpacing: "0.06em",
   padding: "8px 4px",
@@ -290,12 +291,12 @@ const tableHeaderCellRight = {
 };
 
 const tableRow = {
-  borderBottom: "1px solid #f5f5f4",
+  borderBottom: "1px solid #F2F0ED",
 };
 
 const tableCell = {
   fontSize: "14px",
-  color: "#1c1917",
+  color: "#0E0E0E",
   padding: "10px 4px",
   textAlign: "left" as const,
 };
@@ -311,18 +312,18 @@ const summaryLabel = {
   fontSize: "13px",
   padding: "6px 4px",
   textAlign: "right" as const,
-  color: "#78716c",
+  color: "#5F5C5A",
 };
 
 const summaryValue = {
   fontSize: "13px",
   padding: "6px 4px",
   textAlign: "right" as const,
-  color: "#1c1917",
+  color: "#0E0E0E",
 };
 
 const totalRow = {
-  borderTop: "2px solid #1c1917",
+  borderTop: "2px solid #0E0E0E",
 };
 
 const totalLabel = {
@@ -330,7 +331,7 @@ const totalLabel = {
   fontWeight: "700",
   padding: "12px 4px",
   textAlign: "right" as const,
-  color: "#1c1917",
+  color: "#0E0E0E",
 };
 
 const totalValue = {
@@ -338,13 +339,13 @@ const totalValue = {
   fontWeight: "700",
   padding: "12px 4px",
   textAlign: "right" as const,
-  color: "#1c1917",
+  color: "#0E0E0E",
 };
 
 const infoText = {
   fontSize: "14px",
   lineHeight: "22px",
-  color: "#44403c",
+  color: "#2A2A2A",
   margin: "0",
 };
 
@@ -355,11 +356,11 @@ const footer = {
 
 const footerText = {
   fontSize: "12px",
-  color: "#a8a29e",
+  color: "#8A8785",
   margin: "4px 0",
 };
 
 const link = {
-  color: "#1c1917",
+  color: "#0E0E0E",
   textDecoration: "underline",
 };

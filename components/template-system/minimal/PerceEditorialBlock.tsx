@@ -1,7 +1,7 @@
 import { cn } from "#root/lib/utils";
 
-export interface ZeliEditorialBlockProps {
-  /** Small uppercase label above the heading. Optional. */
+export interface PerceEditorialBlockProps {
+  /** Small label above the heading. Optional. */
   eyebrow?: string;
   heading?: string;
   body?: string;
@@ -30,7 +30,7 @@ export interface ZeliEditorialBlockProps {
  * copy, no stock image and no default heading, so an unconfigured store simply
  * does not show this section rather than showing invented brand storytelling.
  */
-export function ZeliEditorialBlock({
+export function PerceEditorialBlock({
   eyebrow,
   heading,
   body,
@@ -42,7 +42,7 @@ export function ZeliEditorialBlock({
   tone = "bg",
   onCtaClick,
   className,
-}: ZeliEditorialBlockProps) {
+}: PerceEditorialBlockProps) {
   const hasImage = Boolean(imageUrl?.trim());
   const hasText = Boolean(heading?.trim() || body?.trim());
   if (!hasImage && !hasText) return null;
@@ -51,23 +51,23 @@ export function ZeliEditorialBlock({
 
   const toneClass =
     tone === "surface"
-      ? "bg-zeli-surface"
+      ? "bg-perce-surface"
       : tone === "blush"
-        ? "bg-zeli-blush-soft"
-        : "bg-zeli-bg";
+        ? "bg-perce-surface"
+        : "bg-perce-bg";
 
   const textBlock = (
     <div
       className={cn(
         "flex flex-col justify-center",
-        "px-[var(--zeli-gutter)] py-10 md:py-14 lg:px-14",
+        "px-[var(--perce-gutter)] py-10 md:py-14 lg:px-14",
       )}>
-      {eyebrow?.trim() && <p className='zeli-eyebrow mb-4'>{eyebrow}</p>}
+      {eyebrow?.trim() && <p className='perce-eyebrow mb-4'>{eyebrow}</p>}
       {heading?.trim() && (
-        <h2 className='zeli-section-title text-balance'>{heading}</h2>
+        <h2 className='perce-section-title text-balance'>{heading}</h2>
       )}
       {body?.trim() && (
-        <p className='mt-4 max-w-prose text-[0.9375rem] leading-relaxed text-zeli-ink-muted'>
+        <p className='mt-4 max-w-prose text-[0.9375rem] leading-relaxed text-perce-ink-muted'>
           {body}
         </p>
       )}
@@ -80,9 +80,9 @@ export function ZeliEditorialBlock({
             onCtaClick(ctaLink as string);
           }}
           className={cn(
-            "zeli-underline-hover mt-7 inline-flex min-h-11 w-fit items-center",
-            "text-[0.6875rem] font-medium uppercase",
-            "tracking-[var(--zeli-tracking-label)] text-zeli-ink",
+            "perce-underline-hover mt-7 inline-flex min-h-11 w-fit items-center",
+            "text-xs font-medium",
+            "tracking-[var(--perce-tracking-label)] text-perce-ink",
           )}>
           {ctaText}
         </a>
@@ -91,7 +91,7 @@ export function ZeliEditorialBlock({
   );
 
   const imageBlock = hasImage ? (
-    <div className='relative w-full overflow-hidden bg-zeli-surface aspect-[4/5] md:aspect-[3/4] md:h-full'>
+    <div className='relative w-full overflow-hidden bg-perce-surface aspect-[4/5] md:aspect-[3/4] md:h-full'>
       <img
         src={imageUrl}
         // Empty alt when the CMS gives none: the heading beside it carries the
@@ -107,14 +107,14 @@ export function ZeliEditorialBlock({
   // Text-only: centre it in a narrow measure rather than leaving a dead column.
   if (!hasImage) {
     return (
-      <section className={cn(toneClass, "zeli-section", className)}>
-        <div className='zeli-container-narrow text-center'>
-          {eyebrow?.trim() && <p className='zeli-eyebrow mb-4'>{eyebrow}</p>}
+      <section className={cn(toneClass, "perce-section", className)}>
+        <div className='perce-container-narrow text-center'>
+          {eyebrow?.trim() && <p className='perce-eyebrow mb-4'>{eyebrow}</p>}
           {heading?.trim() && (
-            <h2 className='zeli-section-title text-balance'>{heading}</h2>
+            <h2 className='perce-section-title text-balance'>{heading}</h2>
           )}
           {body?.trim() && (
-            <p className='mx-auto mt-4 max-w-prose text-[0.9375rem] leading-relaxed text-zeli-ink-muted'>
+            <p className='mx-auto mt-4 max-w-prose text-[0.9375rem] leading-relaxed text-perce-ink-muted'>
               {body}
             </p>
           )}
@@ -128,9 +128,9 @@ export function ZeliEditorialBlock({
                   onCtaClick(ctaLink as string);
                 }}
                 className={cn(
-                  "zeli-underline-hover mt-7 inline-flex min-h-11 items-center",
-                  "text-[0.6875rem] font-medium uppercase",
-                  "tracking-[var(--zeli-tracking-label)] text-zeli-ink",
+                  "perce-underline-hover mt-7 inline-flex min-h-11 items-center",
+                  "text-xs font-medium",
+                  "tracking-[var(--perce-tracking-label)] text-perce-ink",
                 )}>
                 {ctaText}
               </a>
@@ -168,4 +168,4 @@ export function ZeliEditorialBlock({
   );
 }
 
-ZeliEditorialBlock.displayName = "ZeliEditorialBlock";
+PerceEditorialBlock.displayName = "PerceEditorialBlock";

@@ -228,7 +228,7 @@ describeIfDb("create-order with bundle instances (integration)", () => {
     expect(await runFail(createOrderModule.createOrder(baseOrder({ bundles: [stackOf(productIds.slice(0, 5))] })))).toMatch(/not complete/);
     expect(
       await runFail(createOrderModule.createOrder(baseOrder({ bundles: [stackOf([...productIds.slice(0, 5), productIds[6]!])] }))),
-    ).toMatch(/not part of this bundle/);
+    ).toMatch(/not part of this (bundle|offer)/);
     expect(
       await runFail(
         createOrderModule.createOrder(baseOrder({ bundles: [stackOf(productIds.slice(0, 6)), stackOf(productIds.slice(0, 6))] })),
@@ -543,7 +543,7 @@ describeIfDb("create-order with bundle instances (integration)", () => {
 
     it("refuses a between-tiers selection instead of charging the tier below", async () => {
       const message = await runFail(createOrderModule.createOrder(baseOrder({ bundles: [tieredStack(5)] })));
-      expect(message).toMatch(/sizes|stack/i);
+      expect(message).toMatch(/sizes|stack|set/i);
       // Nothing was written.
       const orders = await db
         .select()

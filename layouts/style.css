@@ -1,3 +1,7 @@
+/* Percé typeface: one tight modern grotesque (Inter Tight, variable weight),
+   self-hosted like every other font here. Poppins is kept ONLY for the admin
+   dashboard (`font-poppins`); Rubik is the Arabic face. */
+@import "@fontsource-variable/inter-tight";
 @import "@fontsource/poppins/400.css";
 @import "@fontsource-variable/roboto-flex";
 @import "@fontsource/rubik/400.css";
@@ -10,17 +14,16 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* ── LaRojaTV font — minimal template only ── */
-@font-face {
-  font-family: "LaRojaTV";
-  src: url("/assets/fonts/LaRojaTV-Bold.ttf") format("truetype");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
+/* The storefront's base family. Every --font-* role below falls back to it,
+   so a store that never opens Dashboard > Typography renders in Inter Tight
+   throughout. */
+:root {
+  --perce-font-sans: "Inter Tight Variable", "Inter Tight", -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 .minimal-template {
-  font-family: var(--font-heading, "LaRojaTV", "Poppins", sans-serif);
+  font-family: var(--font-body, var(--perce-font-sans));
 }
 
 /* ── Admin-configurable typography (Dashboard > Typography) ──────────────
@@ -39,67 +42,48 @@
    element not named in the tag lists below (spans, divs, …) — so an admin's
    configured body font only half-applied. */
 .storefront-shell {
-  font-family: var(
-    --font-body,
-    "Poppins",
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    Roboto,
-    sans-serif
-  );
+  font-family: var(--font-body, var(--perce-font-sans));
 }
 
 .storefront-shell h1, .storefront-shell h2, .storefront-shell h3,
 .storefront-shell h4, .storefront-shell h5, .storefront-shell h6 {
-  font-family: var(--font-heading, "LaRojaTV", "Poppins", sans-serif);
+  font-family: var(--font-heading, var(--perce-font-sans));
+  /* Brand type rules: headings 500–600, tracking −0.02em. */
+  font-weight: var(--perce-weight-medium, 500);
+  letter-spacing: var(--perce-tracking-heading, -0.02em);
+}
+
+.storefront-shell {
+  line-height: var(--perce-leading-body, 1.65);
 }
 
 .storefront-shell p, .storefront-shell dd, .storefront-shell li,
 .storefront-shell td, .storefront-shell blockquote, .storefront-shell figcaption {
-  font-family: var(
-    --font-body,
-    "Poppins",
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    Roboto,
-    sans-serif
-  );
+  font-family: var(--font-body, var(--perce-font-sans));
 }
 
 .storefront-shell label, .storefront-shell input,
 .storefront-shell textarea, .storefront-shell select {
-  font-family: var(
-    --font-form-input,
-    "Poppins",
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    Roboto,
-    sans-serif
-  );
+  font-family: var(--font-form-input, var(--perce-font-sans));
 }
 
 .storefront-shell button, .storefront-shell [type="button"],
 .storefront-shell [type="submit"], .storefront-shell [type="reset"],
 .storefront-shell [data-slot="button"] {
-  font-family: var(--font-buttons, "LaRojaTV", "Poppins", sans-serif);
+  font-family: var(--font-buttons, var(--perce-font-sans));
 }
 
 .storefront-shell nav, .storefront-shell nav a, .storefront-shell footer a {
-  font-family: var(--font-nav, "LaRojaTV", "Poppins", sans-serif);
+  font-family: var(--font-nav, var(--perce-font-sans));
 }
 
-/* Body/description text in the minimal template uses Poppins instead of LaRojaTV.
-   Headings, buttons, nav links keep the branded font. */
 /* Arabic text uses Rubik for better Arabic readability — enforced on ALL elements */
 /* NOTE: dir="rtl" is set on <html> by MinimalI18nProvider, so selectors must be html[dir="rtl"] */
 /* Deliberately still hardcoded (not admin-configurable) — Arabic typography
    is out of scope for the Typography feature for now. */
 html[dir="rtl"] .minimal-template,
 html[dir="rtl"] .minimal-template * {
-  font-family: "Rubik", "Poppins", sans-serif !important;
+  font-family: "Rubik", var(--perce-font-sans) !important;
 }
 
 /* Arabic headings always use Rubik medium (500) for optimal readability */
@@ -158,7 +142,7 @@ label[for] {
   inset: 0;
   z-index: 9999;
   opacity: 0;
-  background: rgba(250, 250, 249, 0.96);
+  background: rgba(242, 240, 237, 0.96);
   pointer-events: none;
   transition: opacity 240ms cubic-bezier(0.16, 1, 0.3, 1);
   will-change: opacity;
@@ -188,14 +172,31 @@ html[data-page-transition="out"] body {
 }
 
 /* ════════════════════════════════════════════════════════════════════════
-   ZELI DESIGN TOKENS — the single visual source of truth for the
+   PERCÉ DESIGN TOKENS — the single visual source of truth for the
    customer-facing storefront.
    ────────────────────────────────────────────────────────────────────────
    This is NOT a second theming system. The repo already ships Tailwind 4's
    `@theme` + shadcn CSS custom properties (see `:root` further down); this
    block extends that same mechanism with the storefront-level tokens the
-   templates were previously hardcoding as magic values (stone-900, py-16,
-   max-w-[1400px], z-[10000], 240ms …).
+   templates read instead of magic values (stone-900, py-16, max-w-[1400px],
+   z-[10000], 240ms …).
+
+   THE PALETTE (Percé Brand Source of Truth) is exactly five colours:
+
+     Ground  #0E0E0E   the dark brand frame — header, footer, bottom nav
+     Paper   #F2F0ED   the light product window — page and card grounds
+     Line    #2A2A2A   hairlines on the dark frame
+     Muted   #8A8785   secondary type, decorative rules
+     Accent  #FF4326   sparingly — never more than ~5% of a screen
+
+   Gold and silver come from the product photography, never from the UI.
+   No champagne, no cream, no gradients, no foil. Everything below is either
+   one of those five values or a neutral step between Paper and Ground that
+   exists only so text meets WCAG AA on the surface it sits on.
+
+   PRINCIPLE: dark brand frame, light product windows. The page body is
+   Paper so jewellery photography stays legible; the chrome around it is
+   Ground.
 
    HOW TO REBRAND: change the values here. Nothing else should hardcode a
    storefront colour, gutter, section rhythm, radius, duration or z-index.
@@ -204,196 +205,239 @@ html[data-page-transition="out"] body {
    ════════════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* ── Colour: surfaces — warm ivory, not clinical white ──
-     The base is a warm off-white (#FBF9F6) rather than #fff so product
-     photography of silver/steel jewelry reads as warm and editorial instead
-     of clinical. `bg` and `surface` are close enough to stack without
-     banding but distinct enough to separate a section from the page. */
-  --zeli-bg: #fbf9f6;
-  --zeli-surface: #f4f0ea;
-  --zeli-surface-raised: #ffffff;
-  --zeli-surface-inverse: #241d19;
+  /* ── The five brand colours, verbatim ── */
+  --perce-brand-ground: #0e0e0e;
+  --perce-brand-paper: #f2f0ed;
+  --perce-brand-line: #2a2a2a;
+  --perce-brand-muted: #8a8785;
+  --perce-brand-accent: #ff4326;
 
-  /* ── Colour: text — deep espresso, never pure black ──
-     #241d19 against #fbf9f6 measures ~15.1:1, comfortably AAA. Pure black on
-     warm ivory reads cold and cheap; espresso keeps the warmth of the base. */
-  --zeli-ink: #241d19;
-  --zeli-ink-secondary: #4a3f38;   /* ~9.5:1 on bg */
-  --zeli-ink-muted: #7a6c62;       /* ~4.8:1 on bg — AA for body text */
-  --zeli-ink-subtle: #a1938a;      /* decorative / struck-through only */
-  --zeli-ink-inverse: #fbf9f6;
+  /* ── Colour: surfaces (light product windows) ──
+     `bg` is Paper. `surface` is one neutral step down so a section can
+     separate from the page without a border; `surface-raised` is white for
+     cards that need to lift off Paper (product tiles, dialogs). */
+  --perce-bg: var(--perce-brand-paper);
+  --perce-surface: #e9e7e4;
+  --perce-surface-raised: #ffffff;
+  --perce-surface-inverse: var(--perce-brand-ground);
 
-  /* ── Colour: lines ── */
-  --zeli-border: #e6dfd6;
-  --zeli-border-strong: #d3c8bc;
+  /* ── Colour: text on Paper ──
+     Ground on Paper measures ~17:1. `ink-muted` is a neutral step darker
+     than the brand Muted because #8A8785 on #F2F0ED is ~3.1:1 — fine for
+     large or decorative type, not for body copy. Brand Muted is exposed as
+     `ink-subtle` for labels, struck-through prices and rules. */
+  --perce-ink: var(--perce-brand-ground);
+  --perce-ink-secondary: var(--perce-brand-line);   /* ~13:1 on paper */
+  --perce-ink-muted: #5f5c5a;                        /* ~6.2:1 on paper — AA */
+  --perce-ink-subtle: var(--perce-brand-muted);      /* decorative only */
+  --perce-ink-inverse: var(--perce-brand-paper);
 
-  /* ── Colour: accent — espresso, used sparingly ──
-     The brand is image-led; the accent is deliberately the type colour so
-     buttons and rules never compete with the jewelry photography. */
-  --zeli-accent: #241d19;
-  --zeli-accent-hover: #3a302a;
-  --zeli-accent-ink: #fbf9f6;
-  --zeli-focus: #241d19;
+  /* ── Colour: text on Ground (the dark frame) ── */
+  --perce-frame-ink: var(--perce-brand-paper);
+  --perce-frame-ink-muted: #b3b0ad;                  /* ~9.5:1 on ground */
+  --perce-frame-line: var(--perce-brand-line);
 
-  /* ── Colour: secondary — muted blush / nude ──
-     Restrained by design. Used for editorial section grounds and a single
-     accent line, never as a fill for large UI. This is the guard against the
-     "pink everything" failure mode. */
-  --zeli-blush: #e9d9d2;
-  --zeli-blush-soft: #f5ebe6;
-  --zeli-nude: #ddcabc;
+  /* ── Colour: lines on Paper ── */
+  --perce-border: #dad7d3;
+  --perce-border-strong: #c4c1bd;
 
-  /* ── Colour: cool grey + silver/chrome ──
-     A cool counterweight to the warm base, for silver/steel product framing
-     and the chrome hairline used on hover states. */
-  --zeli-cool: #8e9196;
-  --zeli-cool-soft: #eceef0;
-  --zeli-silver: linear-gradient(
-    135deg,
-    #d8dade 0%,
-    #f2f3f5 42%,
-    #b9bdc2 100%
-  );
+  /* ── Colour: call to action ──
+     Buttons are Ground on Paper (and Paper on Ground). The brand accent is
+     NOT the button colour — that would put it on every screen at well over
+     5%. */
+  --perce-cta: var(--perce-brand-ground);
+  --perce-cta-hover: var(--perce-brand-line);
+  --perce-cta-ink: var(--perce-brand-paper);
 
-  /* ── Colour: state ── */
-  --zeli-disabled: #d3c8bc;
-  /* Sale is a warm brick rather than a pure red siren — it has to sit next to
-     jewelry photography without screaming. ~5.3:1 on bg. */
-  --zeli-sale: #9e3b2e;
-  --zeli-success: #3f6b4f;
-  --zeli-danger: #9e3b2e;
+  /* ── Colour: accent — #FF4326, sparingly ──
+     One live indicator per screen: the cart count, an active state, a
+     single rule. `accent-ink` is what sits on top of it. The keyboard focus
+     ring uses it too, because it is the one colour that reads on both
+     Paper and Ground. */
+  --perce-accent: var(--perce-brand-accent);
+  --perce-accent-ink: var(--perce-brand-ground);
+  --perce-focus: var(--perce-brand-accent);
 
-  /* ── Typography scale (families come from --font-*) ── */
-  /* Sized with `cqi`/`vw` so a long single word cannot outgrow its column.
-     The heading face is wide, and a 4rem "WELCOME" measured ~430px inside a
-     384px hero column — enough to push the whole page sideways. */
-  --zeli-text-display: clamp(2rem, 5vw, 3.25rem);
-  --zeli-text-h1: clamp(1.625rem, 3.5vw, 2.5rem);
-  --zeli-text-h2: clamp(1.25rem, 2.5vw, 1.875rem);
-  --zeli-text-h3: clamp(1.125rem, 2vw, 1.5rem);
-  --zeli-text-body: 0.9375rem;
-  --zeli-text-small: 0.8125rem;
-  --zeli-text-label: 0.6875rem;
+  /* ── Colour: state ──
+     Sale is the brand accent darkened until it passes AA for small text on
+     Paper (#FF4326 itself is ~3:1 there). Same hue, so a struck-through
+     price and the accent dot read as one family. */
+  --perce-sale: #c42e15;
+  --perce-danger: #c42e15;
+  --perce-success: #3f6b4f;
+  --perce-disabled: #c4c1bd;
 
-  --zeli-weight-regular: 400;
-  --zeli-weight-medium: 500;
-  --zeli-weight-semibold: 600;
+  /* ── Typography scale (families come from --font-*) ──
+     One tight modern grotesque throughout. Headings 500–600, tracking
+     −0.02em, generous body leading, lowercase-forward. No display serif,
+     no luxury letter-spacing. */
+  --perce-text-display: clamp(2.25rem, 6vw, 4rem);
+  --perce-text-h1: clamp(1.75rem, 3.5vw, 2.5rem);
+  --perce-text-h2: clamp(1.25rem, 2.5vw, 1.75rem);
+  --perce-text-h3: clamp(1.125rem, 2vw, 1.375rem);
+  --perce-text-body: 0.9375rem;
+  --perce-text-small: 0.8125rem;
+  --perce-text-label: 0.75rem;
 
-  --zeli-tracking-display: -0.02em;
-  --zeli-tracking-body: 0;
-  --zeli-tracking-label: 0.12em;
-  --zeli-tracking-wide: 0.25em;
+  --perce-weight-regular: 400;
+  --perce-weight-medium: 500;
+  --perce-weight-semibold: 600;
 
-  --zeli-leading-display: 1.05;
-  --zeli-leading-heading: 1.2;
-  --zeli-leading-body: 1.65;
+  --perce-tracking-display: -0.02em;
+  --perce-tracking-heading: -0.02em;
+  --perce-tracking-body: 0;
+  /* Labels used to be wide uppercase (0.12em). The brand avoids luxury-style
+     letter spacing, so labels are now plain-case with a hair of tracking. */
+  --perce-tracking-label: 0.01em;
+  --perce-tracking-wide: 0.04em;
+
+  --perce-leading-display: 1;
+  --perce-leading-heading: 1.15;
+  --perce-leading-body: 1.65;
 
   /* ── Spacing: page gutters ── */
-  --zeli-gutter: 1rem;
-  --zeli-gutter-sm: 1.5rem;
-  --zeli-gutter-lg: 2rem;
+  --perce-gutter: 1rem;
+  --perce-gutter-sm: 1.5rem;
+  --perce-gutter-lg: 2rem;
 
   /* ── Spacing: vertical section rhythm ── */
-  --zeli-section-y: 3rem;
-  --zeli-section-y-sm: 4rem;
-  --zeli-section-y-lg: 5rem;
+  --perce-section-y: 3rem;
+  --perce-section-y-sm: 4rem;
+  --perce-section-y-lg: 5rem;
 
   /* ── Spacing: component gaps ── */
-  --zeli-gap-xs: 0.5rem;
-  --zeli-gap-sm: 0.75rem;
-  --zeli-gap: 1rem;
-  --zeli-gap-lg: 1.5rem;
-  --zeli-gap-xl: 2.5rem;
+  --perce-gap-xs: 0.5rem;
+  --perce-gap-sm: 0.75rem;
+  --perce-gap: 1rem;
+  --perce-gap-lg: 1.5rem;
+  --perce-gap-xl: 2.5rem;
 
   /* ── Layout widths ── */
-  --zeli-content-max: 1400px;
-  --zeli-content-narrow: 768px;
-  --zeli-content-prose: 65ch;
+  --perce-content-max: 1400px;
+  --perce-content-narrow: 768px;
+  --perce-content-prose: 65ch;
 
   /* ── Layout: header heights (mobile-first) ── */
   /* Matches the minimal navbar's own h-16 / sm:h-[72px] row. The banner and
      marquee above it are variable-height, which is why the runtime
      measurement below exists rather than a fixed sum. */
-  --zeli-header-h: 64px;
-  --zeli-header-h-desktop: 72px;
+  --perce-header-h: 64px;
+  --perce-header-h-desktop: 72px;
   /* Offset for content that must clear the fixed header chrome. The shell
      also measures the real height at runtime (GlobalNavbarChrome); this is
      the SSR-safe starting value so nothing jumps on first paint. */
-  /* Falls back to 6rem — the value the homepage hero previously hardcoded as
-     `mt-24` — until GlobalNavbarChrome measures the real chrome on mount.
-     Nothing shifts on first paint; the measurement only corrects it. */
-  --zeli-header-offset: var(--zeli-header-measured, 6rem);
+  --perce-header-offset: var(--perce-header-measured, 6rem);
 
-  /* ── Shape ── */
-  --zeli-radius-none: 0;
-  --zeli-radius-sm: 2px;
-  --zeli-radius: 4px;
-  --zeli-radius-lg: 8px;
-  --zeli-radius-full: 9999px;
+  /* ── Shape — square. No pills, no soft radii. ── */
+  --perce-radius-none: 0;
+  --perce-radius-sm: 0;
+  --perce-radius: 0;
+  --perce-radius-lg: 0;
+  --perce-radius-full: 9999px;
 
   /* ── Motion ── */
-  --zeli-duration-fast: 150ms;
-  --zeli-duration: 240ms;
-  --zeli-duration-slow: 500ms;
-  --zeli-ease: cubic-bezier(0.4, 0, 0.2, 1);
-  --zeli-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --perce-duration-fast: 150ms;
+  --perce-duration: 240ms;
+  --perce-duration-slow: 500ms;
+  --perce-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --perce-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 
   /* ── Layers ──
      These deliberately reproduce the stacking values already in use across
      the shell rather than introducing a competing 1/10/100 scale — mixing
      two scales is how a dropdown ends up behind a fixed header. Names, not
      new numbers. */
-  --zeli-z-sticky: 9990;        /* StickyCartBar */
-  --zeli-z-bottom-nav: 9995;    /* MinimalMobileBottomNav */
-  --zeli-z-header: 10000;       /* #global-navbar */
-  --zeli-z-overlay: 10001;      /* drawers, dropdowns, toasts above header */
+  --perce-z-sticky: 9990;        /* StickyCartBar */
+  --perce-z-bottom-nav: 9995;    /* MinimalMobileBottomNav */
+  --perce-z-header: 10000;       /* #global-navbar */
+  --perce-z-overlay: 10001;      /* drawers, dropdowns, toasts above header */
 }
 
 @media (min-width: 640px) {
   :root {
-    --zeli-gutter: var(--zeli-gutter-sm);
-    --zeli-section-y: var(--zeli-section-y-sm);
+    --perce-gutter: var(--perce-gutter-sm);
+    --perce-section-y: var(--perce-section-y-sm);
   }
 }
 
 @media (min-width: 1024px) {
   :root {
-    --zeli-gutter: var(--zeli-gutter-lg);
-    --zeli-section-y: var(--zeli-section-y-lg);
-    --zeli-header-offset: var(--zeli-header-measured, 6rem);
+    --perce-gutter: var(--perce-gutter-lg);
+    --perce-section-y: var(--perce-section-y-lg);
+    --perce-header-offset: var(--perce-header-measured, 6rem);
   }
 }
 
-/* Expose the tokens as Tailwind utilities (bg-surface, text-ink,
-   border-line, rounded-zeli, z-header, max-w-content …). */
+/* Expose the tokens as Tailwind utilities (bg-perce-bg, text-perce-ink,
+   border-perce-line, bg-perce-ground, text-perce-frame-ink …). */
 @theme inline {
-  --color-zeli-bg: var(--zeli-bg);
-  --color-zeli-surface: var(--zeli-surface);
-  --color-zeli-surface-raised: var(--zeli-surface-raised);
-  --color-zeli-surface-inverse: var(--zeli-surface-inverse);
-  --color-zeli-ink: var(--zeli-ink);
-  --color-zeli-ink-secondary: var(--zeli-ink-secondary);
-  --color-zeli-ink-muted: var(--zeli-ink-muted);
-  --color-zeli-ink-subtle: var(--zeli-ink-subtle);
-  --color-zeli-ink-inverse: var(--zeli-ink-inverse);
-  --color-zeli-line: var(--zeli-border);
-  --color-zeli-line-strong: var(--zeli-border-strong);
-  --color-zeli-accent: var(--zeli-accent);
-  --color-zeli-accent-hover: var(--zeli-accent-hover);
-  --color-zeli-sale: var(--zeli-sale);
-  --color-zeli-disabled: var(--zeli-disabled);
-  --color-zeli-blush: var(--zeli-blush);
-  --color-zeli-blush-soft: var(--zeli-blush-soft);
-  --color-zeli-nude: var(--zeli-nude);
-  --color-zeli-cool: var(--zeli-cool);
-  --color-zeli-cool-soft: var(--zeli-cool-soft);
+  --color-perce-ground: var(--perce-brand-ground);
+  --color-perce-paper: var(--perce-brand-paper);
+  --color-perce-bg: var(--perce-bg);
+  --color-perce-surface: var(--perce-surface);
+  --color-perce-surface-raised: var(--perce-surface-raised);
+  --color-perce-surface-inverse: var(--perce-surface-inverse);
+  --color-perce-ink: var(--perce-ink);
+  --color-perce-ink-secondary: var(--perce-ink-secondary);
+  --color-perce-ink-muted: var(--perce-ink-muted);
+  --color-perce-ink-subtle: var(--perce-ink-subtle);
+  --color-perce-ink-inverse: var(--perce-ink-inverse);
+  --color-perce-frame-ink: var(--perce-frame-ink);
+  --color-perce-frame-ink-muted: var(--perce-frame-ink-muted);
+  --color-perce-frame-line: var(--perce-frame-line);
+  --color-perce-line: var(--perce-border);
+  --color-perce-line-strong: var(--perce-border-strong);
+  --color-perce-border: var(--perce-border);
+  --color-perce-cta: var(--perce-cta);
+  --color-perce-cta-hover: var(--perce-cta-hover);
+  --color-perce-cta-ink: var(--perce-cta-ink);
+  --color-perce-accent: var(--perce-accent);
+  --color-perce-accent-ink: var(--perce-accent-ink);
+  --color-perce-sale: var(--perce-sale);
+  --color-perce-danger: var(--perce-danger);
+  --color-perce-success: var(--perce-success);
+  --color-perce-disabled: var(--perce-disabled);
 
-  --radius-zeli-sm: var(--zeli-radius-sm);
-  --radius-zeli: var(--zeli-radius);
-  --radius-zeli-lg: var(--zeli-radius-lg);
+  --radius-perce-sm: var(--perce-radius-sm);
+  --radius-perce: var(--perce-radius);
+  --radius-perce-lg: var(--perce-radius-lg);
 
-  --container-zeli-content: var(--zeli-content-max);
-  --container-zeli-narrow: var(--zeli-content-narrow);
+  --container-perce-content: var(--perce-content-max);
+  --container-perce-narrow: var(--perce-content-narrow);
+}
+
+/* ── Neutral scale ───────────────────────────────────────────────────────
+   Hundreds of storefront call sites still use Tailwind's `stone-*` and
+   `gray-*` utilities as "some neutral". Tailwind's stone is warm (the old
+   cream direction) and gray is cool; neither is the brand. Both scales are
+   remapped here to ONE neutral ramp between Paper and Ground so every
+   remaining `text-stone-500` / `border-gray-200` lands on the Percé palette
+   without touching each file. Same lightness order as Tailwind's, so nothing
+   that was legible becomes illegible. */
+@theme {
+  --color-stone-50: #f2f0ed;
+  --color-stone-100: #e9e7e4;
+  --color-stone-200: #dad7d3;
+  --color-stone-300: #c4c1bd;
+  --color-stone-400: #a6a3a0;
+  --color-stone-500: #8a8785;
+  --color-stone-600: #6b6866;
+  --color-stone-700: #4a4846;
+  --color-stone-800: #2a2a2a;
+  --color-stone-900: #171717;
+  --color-stone-950: #0e0e0e;
+
+  --color-gray-50: #f2f0ed;
+  --color-gray-100: #e9e7e4;
+  --color-gray-200: #dad7d3;
+  --color-gray-300: #c4c1bd;
+  --color-gray-400: #a6a3a0;
+  --color-gray-500: #8a8785;
+  --color-gray-600: #6b6866;
+  --color-gray-700: #4a4846;
+  --color-gray-800: #2a2a2a;
+  --color-gray-900: #171717;
+  --color-gray-950: #0e0e0e;
 }
 
 /* ── Storefront layout primitives ────────────────────────────────────────
@@ -401,98 +445,105 @@ html[data-page-transition="out"] body {
    py-12 sm:py-16 lg:py-20` in every template section. */
 @layer components {
   /* Horizontal page gutter + max width. */
-  .zeli-container {
+  .perce-container {
     width: 100%;
-    max-width: var(--zeli-content-max);
+    max-width: var(--perce-content-max);
     margin-inline: auto;
-    padding-inline: var(--zeli-gutter);
+    padding-inline: var(--perce-gutter);
   }
 
-  .zeli-container-narrow {
+  .perce-container-narrow {
     width: 100%;
-    max-width: var(--zeli-content-narrow);
+    max-width: var(--perce-content-narrow);
     margin-inline: auto;
-    padding-inline: var(--zeli-gutter);
+    padding-inline: var(--perce-gutter);
   }
 
   /* Vertical rhythm for a storefront section. */
-  .zeli-section {
-    padding-block: var(--zeli-section-y);
+  .perce-section {
+    padding-block: var(--perce-section-y);
   }
 
-  .zeli-section-tight {
-    padding-block: calc(var(--zeli-section-y) * 0.6);
+  .perce-section-tight {
+    padding-block: calc(var(--perce-section-y) * 0.6);
   }
 
   /* Clears the fixed header chrome (hero / first-in-flow elements). */
-  .zeli-header-offset {
-    margin-block-start: var(--zeli-header-offset);
+  .perce-header-offset {
+    margin-block-start: var(--perce-header-offset);
   }
 }
 
-/* ── Editorial typography utilities ──────────────────────────────────────
-   The fashion-magazine register the brand asks for, expressed once. Section
-   headings are set in small, wide, uppercase type (the "eyebrow") with the
-   real weight carried by product photography — not by large headings
-   competing with it. */
+/* ── Typography utilities ────────────────────────────────────────────────
+   One grotesque, medium weight, tight tracking, lowercase-forward. Section
+   headings are set small and plain — the weight is carried by product
+   photography, not by large headings competing with it. */
 @layer components {
-  .zeli-eyebrow {
+  .perce-eyebrow {
     font-family: var(--font-nav, inherit);
-    font-size: var(--zeli-text-label);
-    font-weight: var(--zeli-weight-medium);
-    letter-spacing: var(--zeli-tracking-label);
-    text-transform: uppercase;
-    color: var(--zeli-ink-muted);
+    font-size: var(--perce-text-label);
+    font-weight: var(--perce-weight-medium);
+    letter-spacing: var(--perce-tracking-label);
+    color: var(--perce-ink-muted);
   }
 
-  .zeli-section-title {
+  .perce-section-title {
     font-family: var(--font-heading, inherit);
-    font-size: var(--zeli-text-h2);
-    font-weight: var(--zeli-weight-regular);
-    letter-spacing: var(--zeli-tracking-display);
-    line-height: var(--zeli-leading-heading);
-    color: var(--zeli-ink);
+    font-size: var(--perce-text-h2);
+    font-weight: var(--perce-weight-medium);
+    letter-spacing: var(--perce-tracking-heading);
+    line-height: var(--perce-leading-heading);
+    color: var(--perce-ink);
   }
 
-  .zeli-display {
+  .perce-display {
     font-family: var(--font-heading, inherit);
-    font-size: var(--zeli-text-display);
-    font-weight: var(--zeli-weight-regular);
-    letter-spacing: var(--zeli-tracking-display);
-    line-height: var(--zeli-leading-display);
+    font-size: var(--perce-text-display);
+    font-weight: var(--perce-weight-semibold);
+    letter-spacing: var(--perce-tracking-display);
+    line-height: var(--perce-leading-display);
+  }
+
+  /* The wordmark: lowercase "percé", tight, medium. No icon, no badge. */
+  .perce-wordmark {
+    font-family: var(--font-heading, inherit);
+    font-weight: var(--perce-weight-semibold);
+    letter-spacing: -0.03em;
+    text-transform: lowercase;
+    line-height: 1;
   }
 
   /* Admins can assign any font in Dashboard > Typography, including a much
      wider face than the one these sizes were tuned against. This guarantees a
      long word breaks instead of pushing the page sideways. */
-  .zeli-display,
-  .zeli-section-title {
+  .perce-display,
+  .perce-section-title {
     overflow-wrap: break-word;
     hyphens: auto;
   }
 
   /* Underline that draws in from the left on hover — the single link
      signature used across nav, CTAs and "view all" controls. */
-  .zeli-underline {
+  .perce-underline {
     background-image: linear-gradient(currentColor, currentColor);
     background-repeat: no-repeat;
     background-position: 0 100%;
     background-size: 100% 1px;
     padding-bottom: 2px;
-    transition: background-size var(--zeli-duration) var(--zeli-ease);
+    transition: background-size var(--perce-duration) var(--perce-ease);
   }
 
-  .zeli-underline-hover {
+  .perce-underline-hover {
     background-image: linear-gradient(currentColor, currentColor);
     background-repeat: no-repeat;
     background-position: 0 100%;
     background-size: 0 1px;
     padding-bottom: 2px;
-    transition: background-size var(--zeli-duration) var(--zeli-ease);
+    transition: background-size var(--perce-duration) var(--perce-ease);
   }
 
-  .zeli-underline-hover:hover,
-  .zeli-underline-hover:focus-visible {
+  .perce-underline-hover:hover,
+  .perce-underline-hover:focus-visible {
     background-size: 100% 1px;
   }
 }
@@ -501,12 +552,12 @@ html[data-page-transition="out"] body {
    The storefront's motion is decorative (image scale on hover, carousel
    crossfades, drawer slides). Anyone who has asked for less of it gets
    none — including the token durations, so components reading
-   var(--zeli-duration) go instant without needing their own media query. */
+   var(--perce-duration) go instant without needing their own media query. */
 @media (prefers-reduced-motion: reduce) {
   :root {
-    --zeli-duration-fast: 0ms;
-    --zeli-duration: 0ms;
-    --zeli-duration-slow: 0ms;
+    --perce-duration-fast: 0ms;
+    --perce-duration: 0ms;
+    --perce-duration-slow: 0ms;
   }
 
   .storefront-shell *,
@@ -524,25 +575,27 @@ html[data-page-transition="out"] body {
    ring. Scoped to .storefront-shell so the dashboard keeps shadcn's ring. */
 @layer base {
   .storefront-shell :is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
-    outline: 2px solid var(--zeli-focus);
+    outline: 2px solid var(--perce-focus);
     outline-offset: 2px;
-    border-radius: var(--zeli-radius-sm);
+    border-radius: var(--perce-radius-sm);
   }
 }
 
 :root {
   /* Legacy alias, kept so the ~25 existing `accent-lb` call sites keep
-     resolving — now points at the ZELI accent instead of the previous
-     brand's blue. Migrate those call sites to `zeli-accent` over time. */
-  --accent-lb: var(--zeli-accent);
-  --background: oklch(100% 0.00011 271.152);
-  --foreground: oklch(0.145 0 0);
+     resolving — now points at the Percé CTA colour instead of the previous
+     brand's blue. Migrate those call sites to `perce-cta` over time. */
+  --accent-lb: var(--perce-cta);
+  /* Storefront page ground is Paper; the dashboard overrides this to white
+     further down. */
+  --background: var(--perce-bg);
+  --foreground: var(--perce-ink);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: var(--zeli-accent);
-  --primary-foreground: var(--zeli-accent-ink);
+  --primary: var(--perce-cta);
+  --primary-foreground: var(--perce-cta-ink);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
@@ -553,13 +606,13 @@ html[data-page-transition="out"] body {
   --destructive-foreground: oklch(1 0.0296 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --ring: var(--perce-brand-muted);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --radius: 0.625rem;
+  --radius: 0.625rem; /* dashboard only — the storefront uses --perce-radius-* */
   --sidebar: oklch(0.24 0.078 256.36);
   --sidebar-foreground: white;
   --sidebar-primary: oklch(0.205 0 0);
@@ -568,6 +621,13 @@ html[data-page-transition="out"] body {
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+}
+
+/* The admin dashboard is an internal tool, not the brand: keep it on plain
+   white with neutral type so shadcn components look as designed there. */
+main:not(.storefront-shell) {
+  --background: #ffffff;
+  --foreground: oklch(0.145 0 0);
 }
 
 .dark {
@@ -674,16 +734,6 @@ html[data-page-transition="out"] body {
       opacity: 0;
     }
   }
-}
-
-.men-section-image {
-  background-image: url("../assets/men-section.webp");
-}
-.women-section-image {
-  background-image: url("../assets/women-section.webp");
-}
-.img1 {
-  background-image: url("../assets/img1.webp");
 }
 
 .header {

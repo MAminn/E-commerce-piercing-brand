@@ -3,7 +3,7 @@ import {
   DEFAULT_NAVBAR_STYLE,
   DEFAULT_LANDING_TEMPLATE_ID,
   DEFAULT_PRODUCT_TEMPLATE_ID,
-  ZELI_TEMPLATE_PRESET,
+  PERCE_TEMPLATE_PRESET,
   resolveLandingTemplateId,
   resolveTemplateId,
   type StorefrontTemplateCategory,
@@ -39,9 +39,9 @@ describe("storefront shell defaults", () => {
   });
 });
 
-describe("ZELI production template preset", () => {
+describe("Percé production template preset", () => {
   const categories = Object.keys(
-    ZELI_TEMPLATE_PRESET,
+    PERCE_TEMPLATE_PRESET,
   ) as StorefrontTemplateCategory[];
 
   it("covers every category the template registry exposes", () => {
@@ -55,13 +55,13 @@ describe("ZELI production template preset", () => {
     "resolves %s to a template id that exists in the registry",
     (category) => {
       const ids = templateConfig[category].map((t) => t.id);
-      expect(ids).toContain(ZELI_TEMPLATE_PRESET[category]);
+      expect(ids).toContain(PERCE_TEMPLATE_PRESET[category]);
     },
   );
 
   it("agrees with the individual landing and product constants", () => {
-    expect(ZELI_TEMPLATE_PRESET.landing).toBe(DEFAULT_LANDING_TEMPLATE_ID);
-    expect(ZELI_TEMPLATE_PRESET.productPage).toBe(DEFAULT_PRODUCT_TEMPLATE_ID);
+    expect(PERCE_TEMPLATE_PRESET.landing).toBe(DEFAULT_LANDING_TEMPLATE_ID);
+    expect(PERCE_TEMPLATE_PRESET.productPage).toBe(DEFAULT_PRODUCT_TEMPLATE_ID);
   });
 
   it("never falls back to a template that renders its own chrome", () => {
@@ -69,7 +69,7 @@ describe("ZELI production template preset", () => {
     // renders a second footer and hides the global one from a client-only
     // effect — so SSR emits both and one vanishes on hydration.
     for (const category of categories) {
-      expect(ZELI_TEMPLATE_PRESET[category]).not.toMatch(/-editorial$/);
+      expect(PERCE_TEMPLATE_PRESET[category]).not.toMatch(/-editorial$/);
     }
   });
 });
@@ -87,7 +87,7 @@ describe("resolveTemplateId", () => {
   it("falls back to the preset for every empty-ish selection", () => {
     for (const empty of [null, undefined, "", "   "]) {
       expect(resolveTemplateId("checkoutPage", empty)).toBe(
-        ZELI_TEMPLATE_PRESET.checkoutPage,
+        PERCE_TEMPLATE_PRESET.checkoutPage,
       );
     }
   });

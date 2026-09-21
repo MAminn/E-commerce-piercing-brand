@@ -57,6 +57,7 @@ import {
 } from "#root/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "#root/components/ui/popover";
 import { cn } from "#root/lib/utils";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 type CartOfferRow = {
   id: string;
@@ -570,7 +571,7 @@ export function Page() {
 
   function describeReward(reward: OfferReward): string {
     if (reward.type === "percentage_off") return `${reward.percentOff}% off`;
-    if (reward.type === "fixed_off") return `$${reward.amountOff} off`;
+    if (reward.type === "fixed_off") return `${formatMoney(reward.amountOff)} off`;
     if (reward.type === "free_shipping") return "Free shipping";
     if (reward.type === "free_items")
       return `${reward.quantity} free item(s) (${reward.which})`;

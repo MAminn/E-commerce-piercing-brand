@@ -126,48 +126,48 @@ export function CuratedStackDetail({ campaign, reload }: CuratedStackDetailProps
 
   const savingLine =
     savings > 0 ? (
-      <p className="font-medium text-zeli-success">
+      <p className="font-medium text-perce-success">
         {t("curated.you_save")} {formatMoney(savings, currency)}
       </p>
     ) : savings === 0 ? (
-      <p className="text-zeli-ink-muted">{t("curated.no_saving")}</p>
+      <p className="text-perce-ink-muted">{t("curated.no_saving")}</p>
     ) : (
-      <p className="text-zeli-sale">{t("curated.costs_more")}</p>
+      <p className="text-perce-sale">{t("curated.costs_more")}</p>
     );
 
   return (
-    <div className="zeli-header-offset min-h-screen bg-zeli-bg pb-40 sm:pb-16">
+    <div className="perce-header-offset min-h-screen bg-perce-bg pb-40 sm:pb-16">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <section className="grid gap-6 py-6 sm:py-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start">
-          <div className="aspect-[4/5] w-full overflow-hidden bg-zeli-surface lg:sticky lg:top-[var(--zeli-header-offset)]">
+          <div className="aspect-[4/5] w-full overflow-hidden bg-perce-surface lg:sticky lg:top-[var(--perce-header-offset)]">
             <img src={resolveBundleImage(campaign.heroImageUrl)} alt={campaign.title} className="h-full w-full object-cover" />
           </div>
           <div>
-            <p className="zeli-eyebrow flex items-center gap-1.5">
+            <p className="perce-eyebrow flex items-center gap-1.5">
               <Sparkles className="h-3.5 w-3.5" aria-hidden /> {t("curated.eyebrow")}
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <h1 className="zeli-section-title">{campaign.title}</h1>
+              <h1 className="perce-section-title">{campaign.title}</h1>
               {campaign.badgeText && (
-                <span className="bg-zeli-ink px-2.5 py-1 text-[10px] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-zeli-ink-inverse">
+                <span className="bg-perce-ink px-2.5 py-1 text-xs font-medium text-perce-ink-inverse">
                   {campaign.badgeText}
                 </span>
               )}
             </div>
-            {campaign.subtitle && <p className="mt-1 text-[14px] text-zeli-ink-secondary">{campaign.subtitle}</p>}
-            <p className="mt-3 text-[13px] text-zeli-ink-muted">
+            {campaign.subtitle && <p className="mt-1 text-[14px] text-perce-ink-secondary">{campaign.subtitle}</p>}
+            <p className="mt-3 text-[13px] text-perce-ink-muted">
               {fillTemplate(t(unitCount === 1 ? "bundles.piece" : "bundles.pieces"), { count: unitCount })}
             </p>
             {campaign.description && (
-              <p className="mt-3 max-w-prose text-[length:var(--zeli-text-body)] leading-[var(--zeli-leading-body)] text-zeli-ink-muted">
+              <p className="mt-3 max-w-prose text-[length:var(--perce-text-body)] leading-[var(--perce-leading-body)] text-perce-ink-muted">
                 {campaign.description}
               </p>
             )}
 
             {/* Composition */}
-            <h2 className="zeli-eyebrow mt-8">{t("curated.includes")}</h2>
-            <ul className="mt-3 divide-y divide-zeli-line border-y border-zeli-line">
+            <h2 className="perce-eyebrow mt-8">{t("curated.includes")}</h2>
+            <ul className="mt-3 divide-y divide-perce-line border-y border-perce-line">
               {pieces.map((p) => {
                 // The line's regular unit price as the server priced it: the
                 // effective price plus the fixed variant's modifiers.
@@ -180,25 +180,25 @@ export function CuratedStackDetail({ campaign, reload }: CuratedStackDetailProps
                 const variantLabel = p.selectedOptions ? formatSelectedOptions(p.selectedOptions) : "";
                 return (
                   <li key={p.productId} className={cn("flex items-center gap-3 py-3", pieceSoldOut && "opacity-60")}>
-                    <Link href={getProductUrl({ id: p.productId, slug: p.slug })} className="h-16 w-16 shrink-0 overflow-hidden bg-zeli-surface">
+                    <Link href={getProductUrl({ id: p.productId, slug: p.slug })} className="h-16 w-16 shrink-0 overflow-hidden bg-perce-surface">
                       <img src={resolveBundleImage(p.imageUrl)} alt={p.name} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                     </Link>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[14px] font-medium" style={{ fontFamily: "var(--font-product-title)" }}>
                         <Link
                           href={getProductUrl({ id: p.productId, slug: p.slug })}
-                          className="text-zeli-ink hover:text-zeli-ink-secondary">
+                          className="text-perce-ink hover:text-perce-ink-secondary">
                           {p.name}
                         </Link>
                       </p>
                       {/* The exact variant the merchant fixed — the shopper does not choose here. */}
-                      {variantLabel && <p className="text-[12px] text-zeli-ink-secondary">{variantLabel}</p>}
-                      <p className="text-[12px] text-zeli-ink-muted">
+                      {variantLabel && <p className="text-[12px] text-perce-ink-secondary">{variantLabel}</p>}
+                      <p className="text-[12px] text-perce-ink-muted">
                         {fillTemplate(t("curated.unit_x"), { count: p.quantity })} · {formatMoney(unit, currency)}
-                        {pieceSoldOut && <span className="ms-2 uppercase tracking-wide text-zeli-sale">{t("bundles.sold_out")}</span>}
+                        {pieceSoldOut && <span className="ms-2 text-perce-sale">{t("bundles.sold_out")}</span>}
                       </p>
                     </div>
-                    <p className="shrink-0 text-[13px] text-zeli-ink-secondary" style={{ fontFamily: "var(--font-price)" }}>
+                    <p className="shrink-0 text-[13px] text-perce-ink-secondary" style={{ fontFamily: "var(--font-price)" }}>
                       {formatMoney(unit * p.quantity, currency)}
                     </p>
                   </li>
@@ -207,7 +207,7 @@ export function CuratedStackDetail({ campaign, reload }: CuratedStackDetailProps
             </ul>
 
             {soldOut && (
-              <p className="mt-4 border border-zeli-border bg-zeli-surface px-4 py-3 text-[13px] text-zeli-ink-secondary">
+              <p className="mt-4 border border-perce-border bg-perce-surface px-4 py-3 text-[13px] text-perce-ink-secondary">
                 {t("curated.sold_out_body")}
               </p>
             )}
@@ -216,7 +216,7 @@ export function CuratedStackDetail({ campaign, reload }: CuratedStackDetailProps
                 role={notice.tone === "error" ? "alert" : "status"}
                 className={cn(
                   "mt-4 flex flex-wrap items-center justify-between gap-3 border px-4 py-3 text-[13px]",
-                  notice.tone === "error" ? "border-zeli-sale/40 bg-zeli-blush-soft text-zeli-sale" : "border-zeli-success/40 bg-zeli-surface text-zeli-success",
+                  notice.tone === "error" ? "border-perce-sale/40 bg-perce-surface text-perce-sale" : "border-perce-success/40 bg-perce-surface text-perce-success",
                 )}>
                 <span className="flex items-center gap-1.5">
                   {notice.tone === "success" && <Check className="h-3.5 w-3.5" />}
@@ -225,7 +225,7 @@ export function CuratedStackDetail({ campaign, reload }: CuratedStackDetailProps
                 {addedInstanceId && (
                   <Link
                     href="/cart"
-                    className="inline-flex min-h-9 items-center gap-1.5 bg-zeli-accent px-4 text-[11px] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-zeli-ink-inverse hover:bg-zeli-accent-hover">
+                    className="inline-flex min-h-9 items-center gap-1.5 bg-perce-cta px-4 text-xs font-medium text-perce-ink-inverse hover:bg-perce-cta-hover">
                     <ShoppingBag className="h-3.5 w-3.5" /> {t("bundle.view_bag")}
                   </Link>
                 )}
@@ -237,11 +237,11 @@ export function CuratedStackDetail({ campaign, reload }: CuratedStackDetailProps
 
       {/* ── Price + CTA (sticky bottom on mobile, inline card on desktop) ───── */}
       <div
-        className="fixed inset-x-0 border-t border-zeli-border bg-zeli-bg shadow-[0_-4px_16px_rgba(36,29,25,0.08)] sm:static sm:border-0 sm:bg-transparent sm:shadow-none"
-        style={{ bottom: "calc(4rem + env(safe-area-inset-bottom))", zIndex: "var(--zeli-z-sticky)" }}>
+        className="fixed inset-x-0 border-t border-perce-border bg-perce-bg shadow-[0_-4px_16px_rgba(36,29,25,0.08)] sm:static sm:border-0 sm:bg-transparent sm:shadow-none"
+        style={{ bottom: "calc(4rem + env(safe-area-inset-bottom))", zIndex: "var(--perce-z-sticky)" }}>
         <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6 sm:py-0 lg:px-8">
-          <div className="sm:ms-auto sm:max-w-md sm:border sm:border-zeli-border sm:bg-zeli-surface sm:p-6">
-            <div className="flex items-end justify-between gap-3 text-[12px] text-zeli-ink-secondary">
+          <div className="sm:ms-auto sm:max-w-md sm:border sm:border-perce-border sm:bg-perce-surface sm:p-6">
+            <div className="flex items-end justify-between gap-3 text-[12px] text-perce-ink-secondary">
               <div className="min-w-0 space-y-0.5">
                 <p>
                   {t("curated.current_value")}: <span className={cn(savings > 0 && "line-through")}>{formatMoney(regularValue, currency)}</span>
@@ -249,8 +249,8 @@ export function CuratedStackDetail({ campaign, reload }: CuratedStackDetailProps
                 {savingLine}
               </div>
               <div className="text-end">
-                <p className="text-[11px] uppercase tracking-wide text-zeli-ink-muted">{t("curated.stack_price")}</p>
-                <p className="text-[18px] font-semibold text-zeli-ink" style={{ fontFamily: "var(--font-price)" }}>
+                <p className="text-xs text-perce-ink-muted">{t("curated.stack_price")}</p>
+                <p className="text-[18px] font-semibold text-perce-ink" style={{ fontFamily: "var(--font-price)" }}>
                   {formatMoney(price, currency)}
                 </p>
               </div>
@@ -260,7 +260,7 @@ export function CuratedStackDetail({ campaign, reload }: CuratedStackDetailProps
               type="button"
               onClick={handleAddToBag}
               disabled={soldOut || submitting}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-md bg-zeli-accent py-3.5 text-[13px] font-medium uppercase tracking-wider text-zeli-ink-inverse transition-colors hover:bg-zeli-accent-hover disabled:cursor-not-allowed disabled:opacity-50">
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-md bg-perce-cta py-3.5 text-sm font-medium text-perce-ink-inverse transition-colors hover:bg-perce-cta-hover disabled:cursor-not-allowed disabled:opacity-50">
               <ShoppingBag className="h-4 w-4" />
               {soldOut ? t("bundles.sold_out") : submitting ? t("bundle.adding") : t("curated.add_to_bag")}
             </button>

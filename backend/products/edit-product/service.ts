@@ -105,7 +105,7 @@ export const editProduct = (
               sortOrder: data.sortOrder ?? 0,
               hidden: data.hidden ?? false,
               // `inspiredBy` and `fragranceInfo` are legacy columns from the
-              // previous fragrance storefront. The ZELI product form no
+              // previous fragrance storefront. The Percé product form no
               // longer edits them, so an omitted field means "leave alone"
               // rather than "clear" — otherwise every save of an old record
               // would wipe data the admin can no longer see or restore. The

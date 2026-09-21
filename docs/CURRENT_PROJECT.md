@@ -20,13 +20,52 @@
 
 ## Brand
 
-- **Working brand name: ZELI.**
-  This is a working name and may change. It is therefore **not** written into
-  runtime code. The single source of truth is
-  [`shared/config/branding.ts`](../shared/config/branding.ts), overridable per
-  environment via `VITE_STORE_NAME` and the other `VITE_*` variables documented
-  in [`.env.example`](../.env.example). Renaming the brand means changing that
-  one file's defaults, or the environment — never a repo-wide search/replace.
+- **Brand: Percé.** The "Percé — Brand Source of Truth" document is the
+  highest-priority reference for name, copy, visual system, language and
+  claims. Where this repository conflicts with it, the Source of Truth wins.
+- **Three spellings, by context (the misspelling with a trailing "e" is never used):**
+  - `Percé` — customer-facing name (headings, metadata, emails, About copy).
+  - `percé` — the lowercase typographic wordmark (header, footer, favicon "p").
+  - `perce` — operational / ASCII-safe (identifiers, config keys, filenames,
+    env vars, URLs, domains, email addresses, handles, code symbols).
+- The runtime reads all of this from
+  [`shared/config/branding.ts`](../shared/config/branding.ts)
+  (`STORE_NAME`, `BRAND_WORDMARK`, `BRAND_SLUG`, `BRAND_LINE`,
+  `STORE_DESCRIPTION`, `STORE_CURRENCY`, `STORE_LOCALE`,
+  `STORE_COUNTRY_CODE`), overridable per environment via `VITE_STORE_NAME` and
+  the other `VITE_*` variables documented in
+  [`.env.example`](../.env.example). Rebranding is a change to that one file's
+  defaults, or the environment — never a repo-wide search/replace.
+- **Position:** buying piercing jewellery online in Egypt should feel normal.
+  Percé is a proper shop, not an Instagram inbox. This is a principle for
+  implementation decisions, not a slogan to print everywhere.
+- **Brand line:** "Made to mix." **Homepage H1:** "Small pieces. Made to mix."
+  **Subheading (safer version, in use):** "Piercing jewellery, delivered across
+  Egypt." The preferred version ("…photographed properly…") may only be
+  switched on once on-ear photography coverage of the live catalogue is
+  verified.
+- **Currency: EGP.** Catalogue prices are Egyptian-pound amounts and are never
+  FX-converted. All money goes through
+  [`shared/pricing/format-money.ts`](../shared/pricing/format-money.ts)
+  (`Intl.NumberFormat("en-EG", { currency: "EGP" })`, whole pounds without
+  decimals, fractional amounts with two).
+- **Visual system:** Ground `#0E0E0E`, Paper `#F2F0ED`, Line `#2A2A2A`,
+  Muted `#8A8785`, Accent `#FF4326` (≤5% of a screen). Dark brand frame
+  (header / footer / bottom nav / hero), light product windows. No champagne,
+  cream, gold-as-brand, gradients or foil. Tokens live in
+  [`layouts/style.css`](../layouts/style.css) as `--perce-*` /
+  `bg-perce-*`; Tailwind's `stone` and `gray` scales are remapped there to
+  one neutral ramp so legacy utilities land on-palette.
+- **Type:** Inter Tight (self-hosted, `@fontsource-variable/inter-tight`) for
+  every role; Rubik for Arabic. Headings 500–600, tracking −0.02em, body 400,
+  lowercase-forward, no display serif, no all-caps/wide-tracked labels.
+- **Naming:** customer-facing "Build Your Stack" is **"Pick Your Set"**;
+  curated stacks are **"Ready Sets"**; the `/bundles` page is **"Sets"**. This
+  is terminology only — routes, tables, API names and the bundle engine are
+  unchanged, and nothing implies previewing or visualising pieces together.
+- **Claims:** no luxury / fine-jewellery / timeless / material (titanium,
+  surgical steel, hypoallergenic, nickel-free, 18k, solid gold) / expertise /
+  try-on / visualisation claims anywhere until supplier documentation exists.
 - **Primary market:** Egypt only.
 - **Primary audience:** Egyptian Gen Z women, roughly 18–27.
 - **Secondary audience:** younger millennials.
@@ -34,19 +73,24 @@
 ## Relationship to previous brands
 
 The codebase was copied from earlier e-commerce projects. Names that appear in
-the git history and in the archived documents — **Percé / Percée**, **Lebsy /
-Lebsey**, **SYNT** — are **previous, unrelated brands**.
+the git history and in the archived documents — **ZELI** (the working name
+this repository used before the Percé rebrand), an **earlier Percé
+storefront**, **Lebsy / Lebsey**, **SYNT** — are previous projects.
 
-- The old **Percé** social accounts (Instagram, Facebook, TikTok) are **not**
-  being renamed, reused, or inherited. They are historical assets belonging to
-  a different brand.
-- The new brand will have **entirely new** Instagram / Facebook / TikTok
-  accounts. Until those exist, social links are simply **hidden** everywhere
-  (footer, `/links`, emails) rather than filled with placeholders or the old
-  brand's URLs. See `STORE_SOCIAL_LINKS` in `shared/config/branding.ts`.
+- The earlier Percé-era social accounts and the ZELI placeholders are **not**
+  reused. Percé launches with **new** accounts (intended convention:
+  `perce`, e.g. `@perce.eg`). Until each account exists and its URL is set
+  (`VITE_SOCIAL_*` in `.env`, or Dashboard > Layout Settings), the link is
+  simply **hidden** everywhere (footer, `/links`, emails, JSON-LD) rather than
+  filled with a placeholder or a guessed handle. See `STORE_SOCIAL_LINKS` in
+  `shared/config/branding.ts`.
 - Old domains (`perce-eg.com`, `syntperfumes.com`) and old support inboxes
   (`support@lebsy.com`, `syntperfumes@gmail.com`, `cs@Lebsey.com`) must never
-  be reintroduced into runtime code, defaults, or configuration.
+  be reintroduced into runtime code, defaults, or configuration. The Percé
+  domain, support inbox and WhatsApp number are configuration
+  (`VITE_STORE_URL`, `VITE_SUPPORT_EMAIL`, `VITE_SOCIAL_WHATSAPP`), not
+  assumptions.
+- The misspelling of the brand with a trailing "e" is never correct. A repo-wide search for it must return nothing.
 
 ## What is reused vs. what is new
 
@@ -80,7 +124,7 @@ notes below for what is deliberately left outstanding.
 4. Treat the archived documents listed at the top of this file as history, not
    as a specification.
 
-## ZELI production template preset
+## Percé production template preset
 
 The template system has eight independent selectors. Left to their own
 defaults they used to disagree — five page files each carried their own
@@ -88,7 +132,7 @@ defaults they used to disagree — five page files each carried their own
 `templateConfig[category][0]`, a mix of three different visual families that
 no page file mentioned. There is now exactly one answer, in
 [`shared/config/storefront.ts`](../shared/config/storefront.ts) as
-`ZELI_TEMPLATE_PRESET`, with the reasoning for each id recorded beside it.
+`PERCE_TEMPLATE_PRESET`, with the reasoning for each id recorded beside it.
 
 | Selector | Template id | Notes |
 |---|---|---|
@@ -116,7 +160,7 @@ Rules:
 
 ### Shell-owned routes
 
-Under the ZELI shell (`layoutSettings.header.navbarStyle === "minimal"`)
+Under the Percé shell (`layoutSettings.header.navbarStyle === "minimal"`)
 `/shop` and `/categories/[slug]` do **not** go through the `sorting` /
 `categoryPage` selectors. Both render `MinimalCategoryPage`, the only
 catalogue UI with the shell's Arabic/RTL, pagination and shared product card.
@@ -124,7 +168,7 @@ The preset values for those two selectors are what those routes fall back to
 if an admin switches the shell away from minimal.
 
 Launch prerequisites that are configuration rather than code are tracked in
-[`docs/ZELI_LAUNCH_CONFIGURATION.md`](ZELI_LAUNCH_CONFIGURATION.md).
+[`docs/PERCE_LAUNCH_CONFIGURATION.md`](PERCE_LAUNCH_CONFIGURATION.md).
 
 ## Bundles & Stacks
 

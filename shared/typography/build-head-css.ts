@@ -5,18 +5,22 @@ import type {
 } from "#root/shared/database/drizzle/schema";
 
 /**
- * The site's built-in fonts, unchanged from before this feature existed —
- * every role falls back to these when unassigned, so a store that never
- * touches Typography settings renders identically to today.
+ * The site's built-in typeface. Percé uses ONE tight modern grotesque for
+ * every role (Inter Tight, self-hosted via @fontsource in layouts/style.css);
+ * a role falls back to it when unassigned, so a store that never touches
+ * Typography settings renders in the brand face throughout. Keep this in
+ * step with `--perce-font-sans` in layouts/style.css.
  */
+const PERCE_FONT_STACK = `"Inter Tight Variable", "Inter Tight", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+
 const ROLE_FALLBACK_STACK: Record<TypographyRoleKey, string> = {
-  heading: `"LaRojaTV", "Poppins", sans-serif`,
-  body: `"Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`,
-  buttons: `"LaRojaTV", "Poppins", sans-serif`,
-  nav: `"LaRojaTV", "Poppins", sans-serif`,
-  productTitle: `"LaRojaTV", "Poppins", sans-serif`,
-  price: `"Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`,
-  formInput: `"Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`,
+  heading: PERCE_FONT_STACK,
+  body: PERCE_FONT_STACK,
+  buttons: PERCE_FONT_STACK,
+  nav: PERCE_FONT_STACK,
+  productTitle: PERCE_FONT_STACK,
+  price: PERCE_FONT_STACK,
+  formInput: PERCE_FONT_STACK,
 };
 
 const ROLE_CSS_VAR: Record<TypographyRoleKey, string> = {

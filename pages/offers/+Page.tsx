@@ -6,7 +6,6 @@ import { useLayoutSettings } from "#root/frontend/contexts/LayoutSettingsContext
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { trpc } from "#root/shared/trpc/client";
 import { Link } from "#root/components/utils/Link";
-import { STORE_CURRENCY } from "#root/shared/config/branding";
 import { Check, Copy, Loader2, Lock, Percent, Send, Tag } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "#root/lib/utils";
@@ -15,6 +14,7 @@ import type {
   OfferReward,
 } from "#root/shared/database/drizzle/schema";
 import { AuthContext } from "#root/context/AuthContext.js";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 
 interface ActiveOffer {
@@ -148,21 +148,21 @@ export default function OffersPage() {
   if (!isMinimal) {
     return (
       <div className='min-h-[60vh] flex items-center justify-center'>
-        <p className='text-zeli-ink-muted'>Page not found</p>
+        <p className='text-perce-ink-muted'>Page not found</p>
       </div>
     );
   }
 
   return (
-    <div className='bg-zeli-bg pb-24 lg:pb-12 overflow-x-hidden'>
+    <div className='bg-perce-bg pb-24 lg:pb-12 overflow-x-hidden'>
       <div className='max-w-3xl lg:max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12 lg:py-16'>
         {/* Heading */}
         <div className='mb-8 lg:mb-12'>
-          <h1 className='text-2xl sm:text-3xl lg:text-4xl font-bold text-zeli-ink inline-block relative pb-2'>
+          <h1 className='text-2xl sm:text-3xl lg:text-4xl font-bold text-perce-ink inline-block relative pb-2'>
             {isAr ? "العروض" : "Offers"}
-            <span className='absolute bottom-0 start-0 w-12 h-[3px] bg-zeli-accent' />
+            <span className='absolute bottom-0 start-0 w-12 h-[3px] bg-perce-cta' />
           </h1>
-          <p className='text-sm lg:text-base text-zeli-ink-muted mt-3'>
+          <p className='text-sm lg:text-base text-perce-ink-muted mt-3'>
             {/* "Exclusive deals on your favorite scents." / "عطورك المفضلة"
                 is perfume copy carried over from the previous brand. */}
             {isAr
@@ -173,10 +173,10 @@ export default function OffersPage() {
 
         {isLoading ? (
           <div className='flex items-center justify-center py-16'>
-            <Loader2 className='w-6 h-6 animate-spin text-zeli-ink-subtle' />
+            <Loader2 className='w-6 h-6 animate-spin text-perce-ink-subtle' />
           </div>
         ) : offers.length === 0 ? (
-          <p className='text-sm text-zeli-ink-subtle py-8'>
+          <p className='text-sm text-perce-ink-subtle py-8'>
             {isAr ? "لا توجد عروض نشطة حالياً." : "No active offers right now."}
           </p>
         ) : (
@@ -192,12 +192,12 @@ export default function OffersPage() {
                     "relative border rounded-lg p-3 sm:p-4 lg:p-6 flex flex-row items-start gap-3 sm:gap-4 lg:gap-6 transition-colors duration-500",
                     isUnlocked
                       ? "border-emerald-400 bg-emerald-50/60 animate-offer-card-glow"
-                      : "border-zeli-line bg-zeli-bg",
+                      : "border-perce-line bg-perce-bg",
                     isFlashing && "animate-offer-card-flash",
                   )}>
                   <div
                     aria-hidden='true'
-                    className='w-16 h-16 sm:w-24 sm:h-24 lg:w-40 lg:h-40 rounded-md bg-zeli-surface border border-zeli-line shrink-0 self-start flex flex-col items-center justify-center text-zeli-ink-subtle'>
+                    className='w-16 h-16 sm:w-24 sm:h-24 lg:w-40 lg:h-40 rounded-md bg-perce-surface border border-perce-line shrink-0 self-start flex flex-col items-center justify-center text-perce-ink-subtle'>
                     <Tag className='w-5 h-5 lg:w-8 lg:h-8' />
                     {offerQuantityFor(offer.condition) !== null && (
                       <span className='mt-1 text-[10px] lg:text-sm font-semibold tracking-wide'>
@@ -208,7 +208,7 @@ export default function OffersPage() {
                   <div className='flex-1 min-w-0'>
                     <div className='flex flex-wrap items-center gap-1.5 lg:gap-3 mb-1.5 lg:mb-3'>
                       {badge && (
-                        <span className='inline-block bg-black text-zeli-ink-inverse text-[9px] sm:text-[10px] lg:text-xs font-bold uppercase tracking-wide px-2 py-0.5 lg:px-3 lg:py-1.5 rounded'>
+                        <span className='inline-block bg-black text-perce-ink-inverse text-[9px] sm:text-[10px] lg:text-xs font-bold px-2 py-0.5 lg:px-3 lg:py-1.5 rounded'>
                           {badge}
                         </span>
                       )}
@@ -223,17 +223,17 @@ export default function OffersPage() {
                         </span>
                       )}
                     </div>
-                    <h3 className='text-sm sm:text-base lg:text-2xl font-bold text-zeli-ink uppercase'>
+                    <h3 className='text-sm sm:text-base lg:text-2xl font-bold text-perce-ink'>
                       {offer.name}
                     </h3>
                     {offer.description && (
-                      <p className='text-xs sm:text-sm lg:text-base text-zeli-ink-secondary mt-0.5 lg:mt-2 mb-2.5 lg:mb-5'>
+                      <p className='text-xs sm:text-sm lg:text-base text-perce-ink-secondary mt-0.5 lg:mt-2 mb-2.5 lg:mb-5'>
                         {offer.description}
                       </p>
                     )}
                     <Link
                       href='/shop'
-                      className='inline-flex items-center gap-1.5 bg-black hover:bg-gray-900 text-zeli-ink-inverse text-[11px] sm:text-xs lg:text-sm font-semibold uppercase tracking-wide px-3 py-2 lg:px-6 lg:py-3 rounded-md transition-colors'>
+                      className='inline-flex items-center gap-1.5 bg-black hover:bg-gray-900 text-perce-ink-inverse text-[11px] sm:text-xs lg:text-sm font-semibold px-3 py-2 lg:px-6 lg:py-3 rounded-md transition-colors'>
                       {isAr ? "تسوق الآن" : "Shop Now"} →
                     </Link>
                   </div>
@@ -245,14 +245,14 @@ export default function OffersPage() {
 
         {/* Active promo codes */}
         {promoCodes.length > 0 && (
-          <div className='mt-10 lg:mt-14 border border-zeli-line rounded-lg bg-zeli-surface p-4 sm:p-5 lg:p-8'>
+          <div className='mt-10 lg:mt-14 border border-perce-line rounded-lg bg-perce-surface p-4 sm:p-5 lg:p-8'>
             <div className='flex items-center gap-2 mb-1'>
-              <Tag className='w-4 h-4 lg:w-5 lg:h-5 text-zeli-ink-secondary' />
-              <h4 className='text-sm lg:text-lg font-bold text-zeli-ink'>
+              <Tag className='w-4 h-4 lg:w-5 lg:h-5 text-perce-ink-secondary' />
+              <h4 className='text-sm lg:text-lg font-bold text-perce-ink'>
                 {isAr ? "أكواد الخصم النشطة" : "Active Promo Codes"}
               </h4>
             </div>
-            <p className='text-xs lg:text-sm text-zeli-ink-muted mb-4 lg:mb-6'>
+            <p className='text-xs lg:text-sm text-perce-ink-muted mb-4 lg:mb-6'>
               {isAr ? "استخدم هذه الأكواد عند الدفع." : "Use these codes at checkout."}
             </p>
             {isSignedIn ? (
@@ -260,24 +260,24 @@ export default function OffersPage() {
                 {promoCodes.map((pc) => (
                   <div
                     key={pc.id}
-                    className='bg-zeli-bg border border-dashed border-zeli-line-strong rounded-lg p-3 text-center'>
-                    <p className='text-sm font-bold tracking-wider text-zeli-ink'>
+                    className='bg-perce-bg border border-dashed border-perce-line-strong rounded-lg p-3 text-center'>
+                    <p className='text-sm font-bold tracking-wider text-perce-ink'>
                       {pc.code}
                     </p>
-                    <p className='text-xs text-zeli-ink-muted mt-1 mb-3'>
+                    <p className='text-xs text-perce-ink-muted mt-1 mb-3'>
                       {pc.discountType === "percentage"
-                        ? `${pc.discountValue}% OFF`
-                        : `${pc.discountValue.toFixed(0)} ${STORE_CURRENCY} OFF`}
+                        ? `${pc.discountValue}% off`
+                        : `${formatMoney(pc.discountValue, { locale: isAr ? "ar" : "en" })} off`}
                       {pc.minPurchaseAmount
                         ? isAr
-                          ? ` — بحد أدنى ${pc.minPurchaseAmount.toFixed(0)} ${STORE_CURRENCY}`
-                          : ` on orders above ${pc.minPurchaseAmount.toFixed(0)} ${STORE_CURRENCY}`
+                          ? ` — بحد أدنى ${formatMoney(pc.minPurchaseAmount, { locale: "ar" })}`
+                          : ` on orders above ${formatMoney(pc.minPurchaseAmount)}`
                         : ""}
                     </p>
                     <button
                       type='button'
                       onClick={() => handleCopyCode(pc.code)}
-                      className='inline-flex items-center gap-1.5 text-xs font-semibold text-zeli-ink-secondary hover:text-black border border-zeli-line-strong rounded-md px-3 py-1.5 transition-colors'>
+                      className='inline-flex items-center gap-1.5 text-xs font-semibold text-perce-ink-secondary hover:text-black border border-perce-line-strong rounded-md px-3 py-1.5 transition-colors'>
                       <Copy className='w-3 h-3' />
                       {isAr ? "نسخ" : "Copy"}
                     </button>
@@ -285,18 +285,18 @@ export default function OffersPage() {
                 ))}
               </div>
             ) : (
-              <div className='animate-reveal-overlay-in flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 bg-zeli-bg border border-zeli-line rounded-lg p-3 sm:p-4'>
+              <div className='animate-reveal-overlay-in flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 bg-perce-bg border border-perce-line rounded-lg p-3 sm:p-4'>
                 <div className='flex items-center gap-3 min-w-0'>
                   <span className='animate-reveal-lock-pulse flex items-center justify-center w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-emerald-50 text-emerald-600 shrink-0'>
                     <Percent className='w-4 h-4 sm:w-5 sm:h-5' />
                   </span>
                   <div className='min-w-0'>
-                    <p className='text-sm sm:text-base font-bold text-zeli-ink'>
+                    <p className='text-sm sm:text-base font-bold text-perce-ink'>
                       {isAr
                         ? "سجّل الدخول لكشف أكواد الخصم النشطة"
                         : "Sign in to reveal active promo codes"}
                     </p>
-                    <p className='text-xs sm:text-sm text-zeli-ink-muted mt-0.5'>
+                    <p className='text-xs sm:text-sm text-perce-ink-muted mt-0.5'>
                       {isAr
                         ? "أنشئ حسابًا مجانيًا لعرض ونسخ أكواد الخصم الحصرية."
                         : "Create a free account to view and copy exclusive discount codes."}
@@ -305,7 +305,7 @@ export default function OffersPage() {
                 </div>
                 <Link
                   href='/login'
-                  className='shrink-0 inline-flex items-center gap-1.5 bg-black hover:bg-gray-900 text-zeli-ink-inverse text-xs sm:text-sm font-semibold uppercase tracking-wide px-3 py-2 sm:px-4 sm:py-2.5 rounded-md transition-colors'>
+                  className='shrink-0 inline-flex items-center gap-1.5 bg-black hover:bg-gray-900 text-perce-ink-inverse text-xs sm:text-sm font-semibold px-3 py-2 sm:px-4 sm:py-2.5 rounded-md transition-colors'>
                   <Lock className='w-3.5 h-3.5' />
                   {isAr ? "دخول" : "Sign In"}
                 </Link>
@@ -315,14 +315,14 @@ export default function OffersPage() {
         )}
 
         {/* Newsletter */}
-        <div className='mt-8 lg:mt-8 border border-zeli-line rounded-lg p-4 sm:p-5 lg:p-8 flex flex-col sm:flex-row items-start sm:items-center gap-4 lg:gap-6'>
+        <div className='mt-8 lg:mt-8 border border-perce-line rounded-lg p-4 sm:p-5 lg:p-8 flex flex-col sm:flex-row items-start sm:items-center gap-4 lg:gap-6'>
           <div className='flex items-start gap-2 lg:gap-3 flex-1'>
-            <Send className='w-4 h-4 lg:w-5 lg:h-5 text-zeli-ink-secondary mt-0.5 shrink-0' />
+            <Send className='w-4 h-4 lg:w-5 lg:h-5 text-perce-ink-secondary mt-0.5 shrink-0' />
             <div>
-              <h4 className='text-sm lg:text-lg font-bold text-zeli-ink'>
+              <h4 className='text-sm lg:text-lg font-bold text-perce-ink'>
                 {isAr ? "اشترك لتصلك أحدث العروض" : "Subscribe to receive the latest offers"}
               </h4>
-              <p className='text-xs lg:text-sm text-zeli-ink-muted mt-0.5'>
+              <p className='text-xs lg:text-sm text-perce-ink-muted mt-0.5'>
                 {isAr
                   ? "كن أول من يعرف عن المنتجات الجديدة والعروض."
                   : "Be the first to hear about new pieces and offers."}
@@ -338,12 +338,12 @@ export default function OffersPage() {
               value={newsletterEmail}
               onChange={(e) => setNewsletterEmail(e.target.value)}
               placeholder={isAr ? "بريدك الإلكتروني" : "Enter your email"}
-              className='w-full sm:w-56 lg:w-72 px-3 py-2.5 lg:py-3 text-sm lg:text-base rounded-md border border-zeli-line-strong outline-none focus:border-zeli-ink transition-colors bg-zeli-bg'
+              className='w-full sm:w-56 lg:w-72 px-3 py-2.5 lg:py-3 text-sm lg:text-base rounded-md border border-perce-line-strong outline-none focus:border-perce-ink transition-colors bg-perce-bg'
             />
             <button
               type='submit'
               disabled={isSubscribing}
-              className='w-full sm:w-auto px-4 py-2.5 rounded-md bg-black hover:bg-gray-900 text-zeli-ink-inverse text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0'>
+              className='w-full sm:w-auto px-4 py-2.5 rounded-md bg-black hover:bg-gray-900 text-perce-ink-inverse text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0'>
               {isSubscribing ? (
                 <Loader2 className='w-4 h-4 animate-spin mx-auto' />
               ) : isAr ? (

@@ -432,7 +432,7 @@ export function LandingTemplateModern({
         <section className='py-16 md:py-24 bg-neutral-50'>
           <div className='container mx-auto px-6 sm:px-8 lg:px-12'>
             <p className='text-xs tracking-[0.2em] text-neutral-400 uppercase'>
-              {"Editor's Picks"}
+              {"Featured"}
             </p>
             <div className='flex justify-between items-end mt-2'>
               <h2 className='text-2xl font-light'>

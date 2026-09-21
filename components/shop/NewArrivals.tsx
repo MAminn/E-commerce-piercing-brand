@@ -3,6 +3,7 @@ import { Link } from "#root/components/utils/Link";
 import { cn } from "#root/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { getProductUrl } from "#root/lib/utils/route-helpers";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -51,7 +52,7 @@ function resolveImageUrl(product: NewArrivalProduct): string | null {
 }
 
 function formatPrice(value: number): string {
-  return `EGP ${value.toFixed(2).replace(".", ",")}`;
+  return formatMoney(value);
 }
 
 // ─── Badge logic ─────────────────────────────────────────────────────────────

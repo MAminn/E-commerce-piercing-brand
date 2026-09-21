@@ -12,6 +12,7 @@ import { ServerError } from "#root/shared/error/server";
 import { Effect } from "effect";
 import { z } from "zod";
 import { and, eq, inArray, count } from "drizzle-orm";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 const CartItemSchema = z.object({
   id: z.string().uuid(),
@@ -46,7 +47,7 @@ const describeDiscount = (
 ) =>
   discountType === "percentage"
     ? `${discountValue}% off`
-    : `${discountValue.toFixed(2)} EGP off`;
+    : `${formatMoney(discountValue)} off`;
 
 /**
  * Validates a promo code against the current cart.
@@ -245,7 +246,7 @@ export const validatePromoCode = (
           new ServerError({
             tag: "BadRequest",
             statusCode: 400,
-            clientMessage: `This promo code needs a minimum order of ${minPurchase.toFixed(2)} EGP — add ${shortfall.toFixed(2)} EGP more to use it.`,
+            clientMessage: `This promo code needs a minimum order of ${formatMoney(minPurchase)} — add ${formatMoney(shortfall)} more to use it.`,
           }),
         ),
       );

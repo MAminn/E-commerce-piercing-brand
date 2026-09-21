@@ -48,6 +48,7 @@ import { createBostaDelivery, isBostaEnabled } from "#root/backend/orders/bosta/
 import { persistBostaSyncStatus } from "#root/backend/orders/bosta/sync-status";
 import { isFincartEnabled } from "#root/backend/orders/fincart/config";
 import { logOrderEvent } from "#root/backend/orders/order-log";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 /**
  * The chosen option configuration. New clients send the map itself
@@ -616,7 +617,7 @@ export const createOrder = (
                 tag: "BundleValidationFailed",
                 message: `Campaign ${check.bundle.campaignId} is not repeatable`,
                 statusCode: 400,
-                clientMessage: `"${check.bundle.campaignTitle}" can only be added once per order. Please remove the extra stack.`,
+                clientMessage: `"${check.bundle.campaignTitle}" can only be added once per order. Please remove the extra set.`,
               });
             }
             // Every child line — its options, its label, its regular price —
@@ -779,7 +780,7 @@ export const createOrder = (
                 ? Number(promoCodeData.minPurchaseAmount)
                 : 0;
               if (minPurchase > 0 && subtotal < minPurchase) {
-                return `This promo code needs a minimum order of ${minPurchase.toFixed(2)} EGP.`;
+                return `This promo code needs a minimum order of ${formatMoney(minPurchase)}.`;
               }
               return null;
             })();
@@ -1111,7 +1112,7 @@ export const createOrder = (
           newStatus: result.status,
           note: `Order placed — ${result.paymentMethod}${
             result.paymentMethod === "cod" ? "" : ` (payment ${result.paymentStatus})`
-          }, total ${result.total} EGP`,
+          }, total ${formatMoney(result.total)}`,
         }),
       ),
     );

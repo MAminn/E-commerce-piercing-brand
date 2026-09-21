@@ -87,7 +87,7 @@ export default function Page() {
               <AlertCircle className='w-8 h-8 text-[#E65100]' />
             </div>
             <div className='space-y-3'>
-              <h1 className='text-[24px] font-light tracking-[-0.02em] text-[#2B231D]'>
+              <h1 className='text-[24px] font-medium tracking-[-0.02em] text-[#2B231D]'>
                 Invalid link
               </h1>
               <p className='text-[14px] text-[#8B7E74] leading-relaxed'>
@@ -109,7 +109,7 @@ export default function Page() {
               <CheckCircle className='w-8 h-8 text-[#4CAF50]' />
             </div>
             <div className='space-y-3'>
-              <h1 className='text-[24px] md:text-[28px] font-light tracking-[-0.02em] text-[#2B231D] leading-tight'>
+              <h1 className='text-[24px] md:text-[28px] font-medium tracking-[-0.02em] text-[#2B231D] leading-tight'>
                 You're unsubscribed
               </h1>
               <p className='text-[14px] text-[#8B7E74] leading-relaxed max-w-[320px]'>
@@ -134,7 +134,7 @@ export default function Page() {
               <MailX className='w-8 h-8 text-[#8B7E74]' />
             </div>
             <div className='space-y-3'>
-              <h1 className='text-[24px] md:text-[28px] font-light tracking-[-0.02em] text-[#2B231D] leading-tight'>
+              <h1 className='text-[24px] md:text-[28px] font-medium tracking-[-0.02em] text-[#2B231D] leading-tight'>
                 Email preferences
               </h1>
               <p className='text-[14px] text-[#8B7E74] leading-relaxed max-w-[320px]'>

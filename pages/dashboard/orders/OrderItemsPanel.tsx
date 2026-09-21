@@ -40,6 +40,7 @@ import {
   orderLineDisplay,
   standaloneLineTotal,
 } from "#root/shared/bundles/order-grouping";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 export interface AdminOrderItem extends GroupableOrderItem {
   productId: string;
@@ -59,7 +60,7 @@ function LineName({ item, campaignTitle }: { item: AdminOrderItem; campaignTitle
   );
 }
 
-const money = (value: number) => `${value.toFixed(2)} ${STORE_CURRENCY}`;
+const money = (value: number) => formatMoney(value, { currency: STORE_CURRENCY, alwaysShowFraction: true });
 
 function Thumb({ item, size }: { item: AdminOrderItem; size: "sm" | "lg" }) {
   const box = size === "lg" ? "h-14 w-14" : "h-12 w-12";

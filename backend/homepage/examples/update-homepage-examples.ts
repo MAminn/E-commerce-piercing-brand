@@ -56,7 +56,7 @@ async function updateFullHomepage(merchantId: string) {
         // Shipping / returns / guarantee value props removed: this script
         // writes example homepage content, and those were concrete policy
         // promises ("Free Shipping on orders over EGP 50", "30-day
-        // money-back guarantee") for policies ZELI has not set.
+        // money-back guarantee") for policies Percé has not set.
         {
           icon: ValuePropIconType.SECURITY,
           title: "Secure Checkout",

@@ -2129,7 +2129,7 @@ export default function HomepageAdminPage() {
                       },
                     }))
                   }
-                  placeholder='Free shipping on orders over $50 ✦ New arrivals every week'
+                  placeholder='Delivery across Egypt · Cash on delivery'
                   disabled={!content.marquee?.enabled}
                 />
               </div>
@@ -2266,7 +2266,7 @@ export default function HomepageAdminPage() {
                       },
                     }))
                   }
-                  placeholder='Free delivery on orders over 100 SAR'
+                  placeholder='Delivery across Egypt · Cash on delivery'
                 />
               </div>
               <div>

@@ -377,10 +377,10 @@ function GlobalNavbarChrome({
       const h = el.getBoundingClientRect().height;
       setHeight(h);
       // Publish the real height so overlay-mode pages (the homepage hero)
-      // can clear the fixed chrome with `.zeli-header-offset` instead of a
+      // can clear the fixed chrome with `.perce-header-offset` instead of a
       // hardcoded `mt-24` that only happened to match one navbar variant.
       document.documentElement.style.setProperty(
-        "--zeli-header-measured",
+        "--perce-header-measured",
         `${h}px`,
       );
     };
@@ -395,7 +395,7 @@ function GlobalNavbarChrome({
     return () => {
       ro?.disconnect();
       window.removeEventListener("resize", update);
-      document.documentElement.style.removeProperty("--zeli-header-measured");
+      document.documentElement.style.removeProperty("--perce-header-measured");
     };
   }, []);
 
@@ -404,7 +404,7 @@ function GlobalNavbarChrome({
       <div
         ref={ref}
         id='global-navbar'
-        style={{ zIndex: "var(--zeli-z-header)" }}
+        style={{ zIndex: "var(--perce-z-header)" }}
         className='fixed inset-x-0 top-0'>
         {/* Slot for page-level promo/announcement banners (portal target).
             Pages render their banner here so it stacks above the navbar

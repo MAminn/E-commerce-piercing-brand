@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Business-promise sweep (Phase 2). This template previously hardcoded
-// shipping, returns and guarantee claims. Those are business facts ZELI has
+// shipping, returns and guarantee claims. Those are business facts Percé has
 // not established, and an admin switching to this template in the dashboard
 // would have published them to customers instantly. Only claims the store can
 // actually stand behind (secure checkout — payments run through Paymob/Stripe)

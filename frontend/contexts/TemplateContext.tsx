@@ -13,7 +13,7 @@ import {
 } from "#root/components/template-system/templateConfig";
 import { trpc } from "#root/shared/trpc/client";
 import { usePageContext } from "vike-react/usePageContext";
-import { ZELI_TEMPLATE_PRESET } from "#root/shared/config/storefront";
+import { PERCE_TEMPLATE_PRESET } from "#root/shared/config/storefront";
 
 // Re-export TemplateCategory for convenience
 export type { TemplateCategory } from "#root/components/template-system/templateConfig";
@@ -54,7 +54,7 @@ const TEMPLATE_STORAGE_KEY = "selected-templates";
  * template_selection` produced landing-modern + product-perce +
  * category-grid-classic + cart-modern + checkout-modern, a mix of three
  * visual families that no page file mentioned and nobody could grep for. It
- * now comes from the one documented ZELI preset, like every other fallback.
+ * now comes from the one documented Percé preset, like every other fallback.
  *
  * Registry order still decides nothing; a preset id that does not exist in
  * the registry is caught by shared/config/__tests__/storefront.test.ts.
@@ -63,7 +63,7 @@ function getDefaultSelection(): TemplateSelection {
   const defaultSelection: TemplateSelection = {};
 
   (Object.keys(templateConfig) as TemplateCategory[]).forEach((category) => {
-    const preset = ZELI_TEMPLATE_PRESET[category];
+    const preset = PERCE_TEMPLATE_PRESET[category];
     const templates = templateConfig[category];
     if (preset && templates?.some((t) => t.id === preset)) {
       defaultSelection[category] = preset;

@@ -97,7 +97,7 @@ export default function Page() {
         <div className='absolute inset-0 rounded-[20px] shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]' />
 
         <div className='relative space-y-3'>
-          <h1 className='text-[28px] md:text-[32px] text-center font-light tracking-[-0.02em] text-[#2B231D] leading-tight'>
+          <h1 className='text-[28px] md:text-[32px] text-center font-medium tracking-[-0.02em] text-[#2B231D] leading-tight'>
             Enter {STORE_NAME}
           </h1>
           <p className='text-center text-[13px] text-[#8B7E74] tracking-wide leading-relaxed'>
@@ -113,7 +113,7 @@ export default function Page() {
           <div className='relative'>
             <label
               htmlFor='email'
-              className='block text-[10px] uppercase tracking-[0.12em] text-[#8B7E74] mb-3 font-medium'>
+              className='block text-[10px] text-[#8B7E74] mb-3 font-medium'>
               Email
             </label>
             <div className='relative'>
@@ -138,7 +138,7 @@ export default function Page() {
           <div className='relative'>
             <label
               htmlFor='password'
-              className='block text-[10px] uppercase tracking-[0.12em] text-[#8B7E74] mb-3 font-medium'>
+              className='block text-[10px] text-[#8B7E74] mb-3 font-medium'>
               Password
             </label>
             <div className='relative'>
@@ -172,7 +172,7 @@ export default function Page() {
 
           {/* Primary CTA - Calm, confident, not attention-seeking */}
           <Button
-            className='w-full bg-[#2B231D] hover:bg-[#3A3028] text-[#F8F6F3] font-normal text-[14px] tracking-[0.04em] mt-4 py-7 rounded-[14px] transition-all duration-500 shadow-[0_4px_16px_rgba(43,35,29,0.12)] hover:shadow-[0_6px_24px_rgba(43,35,29,0.18)] uppercase'
+            className='w-full bg-[#2B231D] hover:bg-[#3A3028] text-[#F8F6F3] font-normal text-[14px] mt-4 py-7 rounded-[14px] transition-all duration-500 shadow-[0_4px_16px_rgba(43,35,29,0.12)] hover:shadow-[0_6px_24px_rgba(43,35,29,0.18)] uppercase'
             type='submit'
             disabled={isSubmitting}>
             {isSubmitting ? "Entering..." : "Login"}
@@ -181,14 +181,14 @@ export default function Page() {
           {/* Forgot password link */}
           <Link
             href='/forgot-password'
-            className='text-center text-[12px] text-[#9C918A] hover:text-[#C4A574] transition-all duration-500 tracking-[0.04em] font-light'>
+            className='text-center text-[12px] text-[#9C918A] hover:text-[#C4A574] transition-all duration-500 font-light'>
             Forgot password?
           </Link>
 
           {/* Secondary action - understated and elegant */}
           <div className='flex items-center justify-center gap-2 mt-4'>
             <div className='h-[1px] flex-1 bg-gradient-to-r from-transparent via-[#D9D3CC] to-transparent opacity-40' />
-            <p className='text-center text-[12px] text-[#9C918A] tracking-[0.04em] px-4'>
+            <p className='text-center text-[12px] text-[#9C918A] px-4'>
               New to {STORE_NAME}?
             </p>
             <div className='h-[1px] flex-1 bg-gradient-to-r from-transparent via-[#D9D3CC] to-transparent opacity-40' />
@@ -196,7 +196,7 @@ export default function Page() {
 
           <Link
             href='/register'
-            className='text-center text-[13px] text-[#2B231D] hover:text-[#C4A574] transition-all duration-500 tracking-[0.04em] font-light opacity-80 hover:opacity-100 -mt-4'>
+            className='text-center text-[13px] text-[#2B231D] hover:text-[#C4A574] transition-all duration-500 font-light opacity-80 hover:opacity-100 -mt-4'>
             Create an account
           </Link>
         </form>

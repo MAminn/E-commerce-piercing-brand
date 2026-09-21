@@ -469,26 +469,26 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
       : null;
 
   return (
-    <div className="zeli-header-offset min-h-screen bg-zeli-bg pb-40 sm:pb-16">
+    <div className="perce-header-offset min-h-screen bg-perce-bg pb-40 sm:pb-16">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         {/* ── Campaign header ────────────────────────────────────────────── */}
         <section className="grid gap-6 py-6 sm:py-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-center">
           {campaign.imageUrl && (
-            <div className="aspect-[16/10] w-full overflow-hidden bg-zeli-surface lg:aspect-[4/3]">
+            <div className="aspect-[16/10] w-full overflow-hidden bg-perce-surface lg:aspect-[4/3]">
               <img src={`/uploads/${campaign.imageUrl}`} alt="" className="h-full w-full object-cover" />
             </div>
           )}
           <div className={cn(!campaign.imageUrl && "lg:col-span-2")}>
-            <p className="zeli-eyebrow">{t("bundle.eyebrow")}</p>
+            <p className="perce-eyebrow">{t("bundle.eyebrow")}</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <h1 className="zeli-section-title">{campaign.title}</h1>
+              <h1 className="perce-section-title">{campaign.title}</h1>
               {campaign.badgeText && (
-                <span className="bg-zeli-ink px-2.5 py-1 text-[10px] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-zeli-ink-inverse">
+                <span className="bg-perce-ink px-2.5 py-1 text-xs font-medium text-perce-ink-inverse">
                   {campaign.badgeText}
                 </span>
               )}
             </div>
-            <p className="mt-3 text-[17px] font-medium text-zeli-ink" style={{ fontFamily: "var(--font-price)" }}>
+            <p className="mt-3 text-[17px] font-medium text-perce-ink" style={{ fontFamily: "var(--font-price)" }}>
               {headline}
             </p>
             {/* ── Tier ladder ──────────────────────────────────────────────
@@ -509,10 +509,10 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
                       className={cn(
                         "border px-3 py-1.5 text-[12px]",
                         isCurrent
-                          ? "border-zeli-ink bg-zeli-ink text-zeli-ink-inverse"
+                          ? "border-perce-ink bg-perce-ink text-perce-ink-inverse"
                           : reachable
-                            ? "border-zeli-border text-zeli-ink"
-                            : "border-zeli-border text-zeli-ink-muted opacity-60",
+                            ? "border-perce-border text-perce-ink"
+                            : "border-perce-border text-perce-ink-muted opacity-60",
                       )}>
                       <span className="font-medium" style={{ fontFamily: "var(--font-price)" }}>
                         {fill(t("bundle.tier_price_hint"), {
@@ -521,7 +521,7 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
                         })}
                       </span>
                       {!reachable && (
-                        <span className="ms-1.5 uppercase tracking-wide text-[10px]">{t("bundle.sold_out")}</span>
+                        <span className="ms-1.5 text-xs">{t("bundle.sold_out")}</span>
                       )}
                     </li>
                   );
@@ -529,11 +529,11 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
               </ul>
             )}
             {campaign.description && (
-              <p className="mt-3 max-w-prose text-[length:var(--zeli-text-body)] leading-[var(--zeli-leading-body)] text-zeli-ink-muted">
+              <p className="mt-3 max-w-prose text-[length:var(--perce-text-body)] leading-[var(--perce-leading-body)] text-perce-ink-muted">
                 {campaign.description}
               </p>
             )}
-            <p className="mt-3 text-[12px] text-zeli-ink-muted">
+            <p className="mt-3 text-[12px] text-perce-ink-muted">
               {campaign.allowDuplicates
                 ? campaign.maxPerProduct
                   ? fill(t("bundle.max_per_product"), { count: campaign.maxPerProduct })
@@ -541,7 +541,7 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
                 : t("bundle.once_only")}
               {campaign.isRepeatable && (
                 <>
-                  {" "}
+                  {campaign.allowDuplicates && !campaign.maxPerProduct ? "" : " · "}
                   {t("bundle.repeatable_hint")}
                 </>
               )}
@@ -551,14 +551,14 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
 
         {/* ── Sticky progress ────────────────────────────────────────────── */}
         <div
-          className="sticky z-[5] -mx-4 border-y border-zeli-border bg-zeli-bg/95 px-4 py-3 backdrop-blur sm:mx-0 sm:px-0"
-          style={{ top: "var(--zeli-header-offset)" }}>
+          className="sticky z-[5] -mx-4 border-y border-perce-border bg-perce-bg/95 px-4 py-3 backdrop-blur sm:mx-0 sm:px-0"
+          style={{ top: "var(--perce-header-offset)" }}>
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[13px] font-medium text-zeli-ink">
+              <p className="text-[13px] font-medium text-perce-ink">
                 {fill(t("bundle.selected"), { selected: selectedCount, required })}
               </p>
-              <p className={cn("text-[12px]", evaluation.qualifies ? "text-zeli-success" : "text-zeli-ink-muted")}>
+              <p className={cn("text-[12px]", evaluation.qualifies ? "text-perce-success" : "text-perce-ink-muted")}>
                 {progressLabel}
               </p>
             </div>
@@ -568,16 +568,16 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
                   key={i}
                   className={cn(
                     "h-2 w-2 rounded-full transition-colors",
-                    i < Math.min(selectedCount, 12) ? "bg-zeli-ink" : "bg-zeli-border-strong",
+                    i < Math.min(selectedCount, 12) ? "bg-perce-ink" : "bg-perce-border-strong",
                   )}
                 />
               ))}
-              {required > 12 && <span className="text-[11px] text-zeli-ink-muted">+{required - 12}</span>}
+              {required > 12 && <span className="text-[11px] text-perce-ink-muted">+{required - 12}</span>}
             </div>
           </div>
-          <div className="mt-2 h-1 w-full bg-zeli-surface">
+          <div className="mt-2 h-1 w-full bg-perce-surface">
             <div
-              className="h-1 bg-zeli-ink transition-[width]"
+              className="h-1 bg-perce-ink transition-[width]"
               style={{ width: `${Math.min(100, (selectedCount / Math.max(1, required)) * 100)}%` }}
             />
           </div>
@@ -585,7 +585,7 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
 
         {/* ── Notices ───────────────────────────────────────────────────── */}
         {!poolCanComplete && (
-          <p className="mt-4 border border-zeli-border bg-zeli-surface px-4 py-3 text-[13px] text-zeli-ink-secondary">
+          <p className="mt-4 border border-perce-border bg-perce-surface px-4 py-3 text-[13px] text-perce-ink-secondary">
             {pool.length === 0 ? t("bundle.no_products") : t("bundle.pool_too_small")}
           </p>
         )}
@@ -594,15 +594,15 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
             role={notice.tone === "error" ? "alert" : "status"}
             className={cn(
               "mt-4 flex flex-wrap items-center justify-between gap-3 border px-4 py-3 text-[13px]",
-              notice.tone === "error" && "border-zeli-sale/40 bg-zeli-blush-soft text-zeli-sale",
-              notice.tone === "success" && "border-zeli-success/40 bg-zeli-surface text-zeli-success",
-              notice.tone === "info" && "border-zeli-border bg-zeli-surface text-zeli-ink-secondary",
+              notice.tone === "error" && "border-perce-sale/40 bg-perce-surface text-perce-sale",
+              notice.tone === "success" && "border-perce-success/40 bg-perce-surface text-perce-success",
+              notice.tone === "info" && "border-perce-border bg-perce-surface text-perce-ink-secondary",
             )}>
             <span>{notice.text}</span>
             {addedInstanceId && (
               <Link
                 href="/cart"
-                className="inline-flex min-h-9 items-center gap-1.5 bg-zeli-accent px-4 text-[11px] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-zeli-ink-inverse hover:bg-zeli-accent-hover">
+                className="inline-flex min-h-9 items-center gap-1.5 bg-perce-cta px-4 text-xs font-medium text-perce-ink-inverse hover:bg-perce-cta-hover">
                 <ShoppingBag className="h-3.5 w-3.5" /> {t("bundle.view_bag")}
               </Link>
             )}
@@ -611,7 +611,7 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
 
         {/* ── Product grid ───────────────────────────────────────────────── */}
         <section className="mt-6">
-          <h2 className="zeli-eyebrow">{t("bundle.eligible_products")}</h2>
+          <h2 className="perce-eyebrow">{t("bundle.eligible_products")}</h2>
           {pool.length === 0 ? null : (
             <ul className="mt-4 grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-4">
               {pool.map((p) => {
@@ -655,8 +655,8 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
                       aria-pressed={isSelected}
                       aria-label={`${isSelected ? t("bundle.remove") : t("bundle.add")}: ${p.name}`}
                       className={cn(
-                        "relative block aspect-[4/5] w-full overflow-hidden bg-zeli-surface text-start outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-zeli-ink",
-                        isSelected && "ring-2 ring-zeli-ink",
+                        "relative block aspect-[4/5] w-full overflow-hidden bg-perce-surface text-start outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-perce-ink",
+                        isSelected && "ring-2 ring-perce-ink",
                         !soldOut && !isSelected && !canIncrement && "cursor-not-allowed",
                       )}>
                       <img
@@ -667,13 +667,13 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
                         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                       />
                       {isSelected && (
-                        <span className="absolute end-2 top-2 flex h-7 min-w-7 items-center justify-center rounded-full bg-zeli-ink px-1.5 text-[11px] font-semibold text-zeli-ink-inverse">
+                        <span className="absolute end-2 top-2 flex h-7 min-w-7 items-center justify-center rounded-full bg-perce-ink px-1.5 text-[11px] font-semibold text-perce-ink-inverse">
                           {campaign.allowDuplicates ? qty : <Check className="h-4 w-4" />}
                         </span>
                       )}
                       {soldOut && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-zeli-bg/55">
-                          <span className="bg-zeli-bg px-3 py-1.5 text-[10px] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-zeli-ink">
+                        <div className="absolute inset-0 flex items-center justify-center bg-perce-bg/55">
+                          <span className="bg-perce-bg px-3 py-1.5 text-xs font-medium text-perce-ink">
                             {p.purchasable ? t("bundle.sold_out") : t("bundle.no_purchasable_options")}
                           </span>
                         </div>
@@ -682,16 +682,16 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
 
                     <div className="mt-2 min-w-0">
                       <p
-                        className="truncate text-[13px] font-medium text-zeli-ink"
+                        className="truncate text-[13px] font-medium text-perce-ink"
                         style={{ fontFamily: "var(--font-product-title)" }}>
                         {p.name}
                       </p>
                       <p className="mt-0.5 flex items-baseline gap-1.5 text-[12px]" style={{ fontFamily: "var(--font-price)" }}>
-                        <span className={hasDiscount ? "text-zeli-sale font-medium" : "text-zeli-ink-secondary"}>
+                        <span className={hasDiscount ? "text-perce-sale font-medium" : "text-perce-ink-secondary"}>
                           {money(unit, currency)}
                         </span>
                         {hasDiscount && (
-                          <span className="text-zeli-ink-muted line-through">
+                          <span className="text-perce-ink-muted line-through">
                             {money(hasOptions && pendingResolution?.ok ? resolvePurchasableLinePrice(p.price, pendingResolution.priceModifier) : p.price, currency)}
                           </span>
                         )}
@@ -720,7 +720,7 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
                         {productLines.length > 0 && (
                           <ul className="mt-2 space-y-1">
                             {productLines.map((line) => (
-                              <li key={line.key} className="flex items-center justify-between gap-2 border border-zeli-border px-2 py-1 text-[11px] text-zeli-ink">
+                              <li key={line.key} className="flex items-center justify-between gap-2 border border-perce-border px-2 py-1 text-[11px] text-perce-ink">
                                 <span className="min-w-0 truncate">
                                   <Check className="me-1 inline h-3 w-3" aria-hidden />
                                   {formatSelectedOptionValues(line.selectedOptions)}
@@ -732,7 +732,7 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
                                       type="button"
                                       onClick={() => decrement(p, line.selectedOptions)}
                                       aria-label={`${t("bundle.decrease")}: ${p.name} ${formatSelectedOptionValues(line.selectedOptions)}`}
-                                      className="flex h-8 w-8 items-center justify-center text-zeli-ink-secondary hover:bg-zeli-surface">
+                                      className="flex h-8 w-8 items-center justify-center text-perce-ink-secondary hover:bg-perce-surface">
                                       <Minus className="h-3 w-3" />
                                     </button>
                                     <button
@@ -740,7 +740,7 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
                                       onClick={() => increment(p, line.selectedOptions)}
                                       disabled={!canIncrement}
                                       aria-label={`${t("bundle.increase")}: ${p.name} ${formatSelectedOptionValues(line.selectedOptions)}`}
-                                      className="flex h-8 w-8 items-center justify-center text-zeli-ink-secondary hover:bg-zeli-surface disabled:opacity-40">
+                                      className="flex h-8 w-8 items-center justify-center text-perce-ink-secondary hover:bg-perce-surface disabled:opacity-40">
                                       <Plus className="h-3 w-3" />
                                     </button>
                                   </span>
@@ -749,7 +749,7 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
                                     type="button"
                                     onClick={() => removeProduct(p)}
                                     aria-label={`${t("bundle.remove")}: ${p.name}`}
-                                    className="flex h-8 w-8 shrink-0 items-center justify-center text-zeli-ink-secondary hover:bg-zeli-surface">
+                                    className="flex h-8 w-8 shrink-0 items-center justify-center text-perce-ink-secondary hover:bg-perce-surface">
                                     <X className="h-3 w-3" />
                                   </button>
                                 )}
@@ -770,8 +770,8 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
                               onClick={() => increment(p, pendingOptions)}
                               disabled={soldOut || !canIncrement || !pendingResolution?.ok}
                               className={cn(
-                                "flex min-h-11 w-full items-center justify-center gap-1.5 border text-[11px] font-medium uppercase tracking-[var(--zeli-tracking-label)] transition-colors",
-                                "border-zeli-border text-zeli-ink hover:border-zeli-ink disabled:cursor-not-allowed disabled:opacity-40",
+                                "flex min-h-11 w-full items-center justify-center gap-1.5 border text-xs font-medium transition-colors",
+                                "border-perce-border text-perce-ink hover:border-perce-ink disabled:cursor-not-allowed disabled:opacity-40",
                               )}>
                               {soldOut
                                 ? p.purchasable
@@ -789,28 +789,28 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
                             </button>
                           )}
                           {!campaign.allowDuplicates && isSelected && (
-                            <p className="flex min-h-11 w-full items-center justify-center gap-1.5 border border-zeli-ink bg-zeli-ink text-[11px] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-zeli-ink-inverse">
+                            <p className="flex min-h-11 w-full items-center justify-center gap-1.5 border border-perce-ink bg-perce-ink text-xs font-medium text-perce-ink-inverse">
                               <Check className="h-3.5 w-3.5" /> {t("bundle.selected_label")}
                             </p>
                           )}
                         </>
                       ) : campaign.allowDuplicates ? (
-                        <div className="flex items-center justify-between border border-zeli-border">
+                        <div className="flex items-center justify-between border border-perce-border">
                           <button
                             type="button"
                             onClick={() => decrement(p)}
                             disabled={qty === 0}
                             aria-label={`${t("bundle.decrease")}: ${p.name}`}
-                            className="flex h-11 w-11 items-center justify-center text-zeli-ink-secondary transition-colors hover:bg-zeli-surface disabled:opacity-40">
+                            className="flex h-11 w-11 items-center justify-center text-perce-ink-secondary transition-colors hover:bg-perce-surface disabled:opacity-40">
                             <Minus className="h-3.5 w-3.5" />
                           </button>
-                          <span className="text-[13px] font-medium text-zeli-ink">{qty}</span>
+                          <span className="text-[13px] font-medium text-perce-ink">{qty}</span>
                           <button
                             type="button"
                             onClick={() => increment(p)}
                             disabled={!canIncrement}
                             aria-label={`${t("bundle.increase")}: ${p.name}`}
-                            className="flex h-11 w-11 items-center justify-center text-zeli-ink-secondary transition-colors hover:bg-zeli-surface disabled:opacity-40">
+                            className="flex h-11 w-11 items-center justify-center text-perce-ink-secondary transition-colors hover:bg-perce-surface disabled:opacity-40">
                             <Plus className="h-3.5 w-3.5" />
                           </button>
                         </div>
@@ -820,10 +820,10 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
                           onClick={() => toggle(p)}
                           disabled={soldOut || (!isSelected && !canIncrement)}
                           className={cn(
-                            "flex min-h-11 w-full items-center justify-center gap-1.5 border text-[11px] font-medium uppercase tracking-[var(--zeli-tracking-label)] transition-colors",
+                            "flex min-h-11 w-full items-center justify-center gap-1.5 border text-xs font-medium transition-colors",
                             isSelected
-                              ? "border-zeli-ink bg-zeli-ink text-zeli-ink-inverse"
-                              : "border-zeli-border text-zeli-ink hover:border-zeli-ink disabled:cursor-not-allowed disabled:opacity-40",
+                              ? "border-perce-ink bg-perce-ink text-perce-ink-inverse"
+                              : "border-perce-border text-perce-ink hover:border-perce-ink disabled:cursor-not-allowed disabled:opacity-40",
                           )}>
                           {isSelected ? (
                             <>
@@ -839,7 +839,7 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
                         </button>
                       )}
                       {campaign.allowDuplicates && atCap && !soldOut && qty > 0 && !hasOptions && (
-                        <p className="mt-1 text-[10px] uppercase tracking-wide text-zeli-ink-muted">{t("bundle.max_reached")}</p>
+                        <p className="mt-1 text-xs text-perce-ink-muted">{t("bundle.max_reached")}</p>
                       )}
                     </div>
                   </li>
@@ -852,12 +852,12 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
 
       {/* ── Summary + CTA (sticky bottom on mobile, inline on desktop) ─────── */}
       <div
-        className="fixed inset-x-0 border-t border-zeli-border bg-zeli-bg shadow-[0_-4px_16px_rgba(36,29,25,0.08)] sm:static sm:mt-10 sm:border-0 sm:bg-transparent sm:shadow-none"
-        style={{ bottom: "calc(4rem + env(safe-area-inset-bottom))", zIndex: "var(--zeli-z-sticky)" }}>
+        className="fixed inset-x-0 border-t border-perce-border bg-perce-bg shadow-[0_-4px_16px_rgba(36,29,25,0.08)] sm:static sm:mt-10 sm:border-0 sm:bg-transparent sm:shadow-none"
+        style={{ bottom: "calc(4rem + env(safe-area-inset-bottom))", zIndex: "var(--perce-z-sticky)" }}>
         <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6 sm:py-0 lg:px-8">
-          <div className="sm:ms-auto sm:max-w-md sm:border sm:border-zeli-border sm:bg-zeli-surface sm:p-6">
+          <div className="sm:ms-auto sm:max-w-md sm:border sm:border-perce-border sm:bg-perce-surface sm:p-6">
             <div className="flex items-end justify-between gap-3">
-              <div className="min-w-0 space-y-0.5 text-[12px] text-zeli-ink-secondary">
+              <div className="min-w-0 space-y-0.5 text-[12px] text-perce-ink-secondary">
                 <div className="flex items-center gap-2">
                   <Layers className="h-3.5 w-3.5 shrink-0" aria-hidden />
                   <span className="truncate">{fill(t("bundle.selected"), { selected: selectedCount, required })}</span>
@@ -873,21 +873,21 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
                     difference is simply not announced — it is never relabelled
                     as a saving. */}
                 {evaluation.qualifies && savings !== null && savings > 0 && (
-                  <p className="font-medium text-zeli-success">
+                  <p className="font-medium text-perce-success">
                     {t("bundle.you_save")} {money(savings, currency)}
                   </p>
                 )}
               </div>
               <div className="text-end">
-                <p className="text-[11px] uppercase tracking-wide text-zeli-ink-muted">{t("bundle.stack_price")}</p>
+                <p className="text-xs text-perce-ink-muted">{t("bundle.stack_price")}</p>
                 {/* Between tiers there is no price, so none is shown. Falling
                     back to the tier below would quote a total the shopper
                     cannot actually be charged. */}
-                <p className="text-[18px] font-semibold text-zeli-ink" style={{ fontFamily: "var(--font-price)" }}>
+                <p className="text-[18px] font-semibold text-perce-ink" style={{ fontFamily: "var(--font-price)" }}>
                   {price === null ? "—" : money(price, currency)}
                 </p>
                 {price === null && nextTier && tierReachable(nextTier.quantity) && (
-                  <p className="text-[11px] text-zeli-ink-muted">
+                  <p className="text-[11px] text-perce-ink-muted">
                     {fill(t("bundle.tier_price_hint"), {
                       size: nextTier.quantity,
                       price: money(nextTier.price, currency),
@@ -901,14 +901,14 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
               type="button"
               onClick={handleAddToBag}
               disabled={!canAdd}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-md bg-zeli-accent py-3.5 text-[13px] font-medium uppercase tracking-wider text-zeli-ink-inverse transition-colors hover:bg-zeli-accent-hover disabled:cursor-not-allowed disabled:opacity-50">
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-md bg-perce-cta py-3.5 text-sm font-medium text-perce-ink-inverse transition-colors hover:bg-perce-cta-hover disabled:cursor-not-allowed disabled:opacity-50">
               <ShoppingBag className="h-4 w-4" />
               {submitting ? t("bundle.adding") : evaluation.qualifies ? t("bundle.add_to_bag") : progressLabel}
             </button>
             {/* A matched stack that can still be upgraded. Suppressed when the
                 pool cannot currently fill the next tier, so the builder never
                 dangles a size the shopper could not complete. */}
-            {upsellLabel && <p className="mt-2 text-center text-[11px] text-zeli-ink-secondary">{upsellLabel}</p>}
+            {upsellLabel && <p className="mt-2 text-center text-[11px] text-perce-ink-secondary">{upsellLabel}</p>}
             {addedInstanceId && (
               <button
                 type="button"
@@ -916,7 +916,7 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
                   setAddedInstanceId(null);
                   setNotice(null);
                 }}
-                className="mt-2 w-full py-2 text-[11px] uppercase tracking-wide text-zeli-ink-muted hover:text-zeli-ink">
+                className="mt-2 w-full py-2 text-xs text-perce-ink-muted hover:text-perce-ink">
                 {t("bundle.build_another")}
               </button>
             )}

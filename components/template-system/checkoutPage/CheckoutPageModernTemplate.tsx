@@ -23,6 +23,7 @@ import { OfferProgressBanner } from "#root/components/template-system/cartPage/O
 import {
   AppliedOffersSavings,
 } from "#root/components/template-system/cartPage/AppliedOffersSavings";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 /**
  * Customer information interface
@@ -136,10 +137,10 @@ function FieldLabel({
   return (
     <label
       htmlFor={htmlFor}
-      className='block text-[11px] font-medium uppercase tracking-[var(--zeli-tracking-label)] text-zeli-ink-muted'>
+      className='block text-xs font-medium text-perce-ink-muted'>
       {children}
       {optional && (
-        <span className='ms-1 normal-case tracking-normal text-zeli-ink-subtle'>
+        <span className='ms-1 normal-case tracking-normal text-perce-ink-subtle'>
           (optional)
         </span>
       )}
@@ -152,7 +153,7 @@ function FieldError({ id, message }: { id: string; message?: string }) {
   // — a region created at the same moment as its content is not reliably
   // announced.
   return (
-    <p id={id} role='alert' className='min-h-0 text-xs text-zeli-sale empty:hidden'>
+    <p id={id} role='alert' className='min-h-0 text-xs text-perce-sale empty:hidden'>
       {message ?? ""}
     </p>
   );
@@ -338,7 +339,7 @@ export function CheckoutPageModernTemplate({
   const SectionNum = ({ n }: { n: number }) => (
     <span
       aria-hidden
-      className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zeli-accent text-xs font-medium text-zeli-ink-inverse'>
+      className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-perce-cta text-xs font-medium text-perce-ink-inverse'>
       {n}
     </span>
   );
@@ -378,13 +379,11 @@ export function CheckoutPageModernTemplate({
             {item.originalPrice != null &&
               item.originalPrice > item.price && (
                 <p className='text-xs text-muted-foreground line-through'>
-                  {currency}
-                  {(item.originalPrice * item.quantity).toFixed(2)}
+                  {formatMoney(item.originalPrice * item.quantity, { currency })}
                 </p>
               )}
             <p className='font-semibold text-sm'>
-              {currency}
-              {(item.price * item.quantity).toFixed(2)}
+              {formatMoney(item.price * item.quantity, { currency })}
             </p>
           </div>
         </div>
@@ -408,18 +407,16 @@ export function CheckoutPageModernTemplate({
           {t("cart.subtotal") || "Subtotal"}
         </span>
         <span className='font-semibold'>
-          {currency}
-          {totals.subtotal.toFixed(2)}
+          {formatMoney(totals.subtotal, { currency })}
         </span>
       </div>
       {totals.discount !== undefined && totals.discount > 0 && (
-        <div className='flex justify-between text-zeli-sale'>
+        <div className='flex justify-between text-perce-sale'>
           <span className='font-medium'>
             {t("cart.discount") || "Discount"}
           </span>
           <span className='font-semibold'>
-            - {currency}
-            {totals.discount.toFixed(2)}
+            −{formatMoney(totals.discount, { currency })}
           </span>
         </div>
       )}
@@ -435,7 +432,7 @@ export function CheckoutPageModernTemplate({
           <span className='font-semibold'>
             {totals.shipping === 0
               ? t("cart.free") || "Free"
-              : `${currency}${totals.shipping.toFixed(2)}`}
+              : formatMoney(totals.shipping, { currency })}
           </span>
         </div>
       )}
@@ -469,7 +466,7 @@ export function CheckoutPageModernTemplate({
             className={cn(
               "flex-1 text-sm",
               couponFeedback?.success === false &&
-                "border-zeli-sale focus-visible:ring-zeli-sale",
+                "border-perce-sale focus-visible:ring-perce-sale",
             )}
           />
           <Button
@@ -486,7 +483,7 @@ export function CheckoutPageModernTemplate({
 
         <div id={feedbackId} aria-live='polite'>
           {couponNotice && (
-            <p className='rounded-md border border-zeli-line bg-zeli-blush-soft px-3 py-2 text-xs text-zeli-ink-secondary'>
+            <p className='rounded-md border border-perce-line bg-perce-surface px-3 py-2 text-xs text-perce-ink-secondary'>
               {couponNotice}
             </p>
           )}
@@ -494,7 +491,7 @@ export function CheckoutPageModernTemplate({
             <p
               className={cn(
                 "text-xs",
-                couponFeedback.success ? "text-zeli-success" : "text-zeli-sale",
+                couponFeedback.success ? "text-perce-success" : "text-perce-sale",
               )}>
               {couponFeedback.message}
             </p>
@@ -502,8 +499,8 @@ export function CheckoutPageModernTemplate({
         </div>
 
         {appliedCoupon && (
-          <div className='flex items-center justify-between gap-3 rounded-md border border-zeli-line bg-zeli-surface px-3 py-2'>
-            <p className='min-w-0 text-xs text-zeli-success'>
+          <div className='flex items-center justify-between gap-3 rounded-md border border-perce-line bg-perce-surface px-3 py-2'>
+            <p className='min-w-0 text-xs text-perce-success'>
               <span className='font-semibold'>{appliedCoupon.code}</span>
               {appliedCoupon.discountLabel ? ` — ${appliedCoupon.discountLabel}` : ""}
             </p>
@@ -511,7 +508,7 @@ export function CheckoutPageModernTemplate({
               <button
                 type='button'
                 onClick={handleRemoveCoupon}
-                className='shrink-0 text-[11px] font-medium uppercase tracking-wide text-zeli-success underline hover:text-zeli-ink'>
+                className='shrink-0 text-[11px] font-medium text-perce-success underline hover:text-perce-ink'>
                 {t("cart.remove") || "Remove"}
               </button>
             )}
@@ -522,8 +519,8 @@ export function CheckoutPageModernTemplate({
   };
 
   return (
-    <div className='zeli-header-offset zeli-container bg-zeli-bg py-10 sm:py-12'>
-      <h1 className='zeli-section-title mb-8'>
+    <div className='perce-header-offset perce-container bg-perce-bg py-10 sm:py-12'>
+      <h1 className='perce-section-title mb-8'>
         {t("checkout.title") || "Checkout"}
       </h1>
 
@@ -748,7 +745,7 @@ export function CheckoutPageModernTemplate({
                 <button
                   type='button'
                   onClick={() => setNotesOpen(true)}
-                  className='min-h-11 text-sm text-zeli-ink-muted underline underline-offset-4 hover:text-zeli-ink'>
+                  className='min-h-11 text-sm text-perce-ink-muted underline underline-offset-4 hover:text-perce-ink'>
                   + Add special instructions (optional)
                 </button>
               ) : (
@@ -795,8 +792,8 @@ export function CheckoutPageModernTemplate({
                       key={method.id}
                       className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all duration-300 ${
                         form.paymentMethod === method.id
-                          ? "border-zeli-ink bg-zeli-surface"
-                          : "border-zeli-line hover:border-zeli-line-strong"
+                          ? "border-perce-ink bg-perce-surface"
+                          : "border-perce-line hover:border-perce-line-strong"
                       }`}>
                       <input
                         type='radio'
@@ -821,7 +818,7 @@ export function CheckoutPageModernTemplate({
                         </div>
                       </div>
                       {method.id !== "cod" && (
-                        <div className='mt-1 flex shrink-0 items-center gap-1 text-xs text-zeli-success'>
+                        <div className='mt-1 flex shrink-0 items-center gap-1 text-xs text-perce-success'>
                           <Shield className='w-3 h-3' />
                           {t("checkout.secure") || "SECURE"}
                         </div>
@@ -837,7 +834,7 @@ export function CheckoutPageModernTemplate({
           <div className='lg:sticky lg:top-6 lg:self-start w-full space-y-3'>
             {/* Desktop: full itemized card */}
             <div className='hidden lg:block border rounded-2xl p-6 space-y-5 w-full'>
-              <h2 className='font-extrabold text-base uppercase tracking-widest'>
+              <h2 className='font-extrabold text-base'>
                 {t("checkout.order_summary") || "Order Summary"}
               </h2>
 
@@ -851,17 +848,17 @@ export function CheckoutPageModernTemplate({
 
               {/* Grand total */}
               <div className='border-t pt-4 flex justify-between items-center'>
-                <span className='font-bold text-base uppercase tracking-wide'>
+                <span className='font-semibold text-base'>
                   {t("cart.total") || "Total"}
                 </span>
-                <span className='text-xl font-semibold text-zeli-ink'>
-                  {currency} {totals.grandTotal.toFixed(2)}
+                <span className='text-xl font-semibold text-perce-ink'>
+                  {formatMoney(totals.grandTotal, { currency })}
                 </span>
               </div>
 
               {/* Trust badges.
                   "Fast Delivery — Quick delivery to your doorstep." is gone:
-                  ZELI has not set a delivery time, no courier integration is
+                  Percé has not set a delivery time, no courier integration is
                   configured, and the claim was made at the exact moment the
                   shopper decides to pay. "Easy Returns — 14-day return
                   policy." was removed for the same reason in Phase 2.
@@ -870,11 +867,11 @@ export function CheckoutPageModernTemplate({
                   own hosted page, which does not exist in a COD-only store,
                   so the line is hidden when COD is the only method. */}
               {hasOnlinePaymentMethod && (
-                <div className='space-y-2.5 text-sm text-zeli-ink-muted'>
+                <div className='space-y-2.5 text-sm text-perce-ink-muted'>
                   <div className='flex items-center gap-2'>
                     <Lock aria-hidden className='h-4 w-4 shrink-0' />
                     <div>
-                      <p className='text-xs font-medium text-zeli-ink'>
+                      <p className='text-xs font-medium text-perce-ink'>
                         Secure payment
                       </p>
                       <p className='text-xs'>
@@ -889,7 +886,7 @@ export function CheckoutPageModernTemplate({
               {/* Submit */}
               <Button
                 type='submit'
-                className='w-full font-bold tracking-wide uppercase'
+                className='w-full font-bold'
                 size='lg'
                 disabled={isSubmitting || items.length === 0}>
                 {isSubmitting ? (
@@ -909,13 +906,13 @@ export function CheckoutPageModernTemplate({
 
               {/* The default read "By placing your order, you agree to our
                   Terms & Conditions", linking to /links — which is the
-                  link-tree page, not a terms document. ZELI has no published
+                  link-tree page, not a terms document. Percé has no published
                   terms, so the sentence pointed a paying customer at an
                   agreement that does not exist. It renders only when an admin
                   has supplied real copy through the `checkout.terms`
                   translation override. */}
               {t("checkout.terms") ? (
-                <p className='text-center text-xs text-zeli-ink-muted'>
+                <p className='text-center text-xs text-perce-ink-muted'>
                   {t("checkout.terms")}
                 </p>
               ) : null}
@@ -952,12 +949,11 @@ export function CheckoutPageModernTemplate({
                 <div className='text-right shrink-0'>
                   {hasDiscount && (
                     <p className='text-xs text-muted-foreground line-through'>
-                      {currency}
-                      {originalTotal.toFixed(2)}
+                      {formatMoney(originalTotal, { currency })}
                     </p>
                   )}
                   <p className='font-extrabold text-base'>
-                    {currency} {totals.grandTotal.toFixed(2)}
+                    {formatMoney(totals.grandTotal, { currency })}
                   </p>
                 </div>
                 <ChevronDown
@@ -985,7 +981,7 @@ export function CheckoutPageModernTemplate({
             <div className='lg:hidden space-y-3'>
               <Button
                 type='submit'
-                className='w-full font-bold tracking-wide uppercase'
+                className='w-full font-bold'
                 size='lg'
                 disabled={isSubmitting || items.length === 0}>
                 {isSubmitting ? (
@@ -1005,13 +1001,13 @@ export function CheckoutPageModernTemplate({
 
               {/* The default read "By placing your order, you agree to our
                   Terms & Conditions", linking to /links — which is the
-                  link-tree page, not a terms document. ZELI has no published
+                  link-tree page, not a terms document. Percé has no published
                   terms, so the sentence pointed a paying customer at an
                   agreement that does not exist. It renders only when an admin
                   has supplied real copy through the `checkout.terms`
                   translation override. */}
               {t("checkout.terms") ? (
-                <p className='text-center text-xs text-zeli-ink-muted'>
+                <p className='text-center text-xs text-perce-ink-muted'>
                   {t("checkout.terms")}
                 </p>
               ) : null}
