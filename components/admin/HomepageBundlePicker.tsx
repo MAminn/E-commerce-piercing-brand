@@ -89,7 +89,7 @@ export function HomepageBundlePicker({ selectedIds, onChange, disabled }: Homepa
               <label htmlFor={`bundle-pick-${c.id}`} className="flex-1 min-w-0 cursor-pointer">
                 <span className="block truncate font-medium">{c.internalName}</span>
                 <span className="block truncate text-xs text-muted-foreground">
-                  {c.title} · {c.type === "curated_stack" ? "Curated stack" : "Build your stack"}
+                  {c.title} · {c.type === "curated_stack" ? "Ready Set" : "Pick Your Set"}
                 </span>
               </label>
               <Badge variant={c.state === "active" ? "default" : "outline"}>{STATE_LABEL[c.state]}</Badge>

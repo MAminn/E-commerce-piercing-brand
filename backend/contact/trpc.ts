@@ -20,7 +20,10 @@ export const contactRouter = router({
       // Get the contact email from layout settings
       const merchantId = getStoreOwnerId();
       const layoutSettings = await getLayoutSettings(merchantId, "landing-minimal");
-      const contactEmail = layoutSettings.header.contactEmail;
+      // The destination is admin-supplied and defaults to blank; a
+      // whitespace-only value is just as unconfigured as an empty one, and
+      // nodemailer would accept it and silently drop the message.
+      const contactEmail = layoutSettings.header.contactEmail?.trim();
 
       if (!contactEmail) {
         return {
@@ -49,11 +52,32 @@ export const contactRouter = router({
 
       const storeName = process.env.VITE_STORE_NAME || "Store";
 
+      /**
+       * FAIL CLOSED.
+       *
+       * `sendEmail` reports failure on its SUCCESS channel — it resolves with
+       * `{ success: false, error }` rather than rejecting, deliberately, so a
+       * transactional send can never roll back the order that triggered it
+       * (see the note on `SendEmailResult`). The dummy service installed when
+       * SMTP is unconfigured does exactly that on every call: it logs
+       * `[DUMMY EMAIL] Not sending…` and resolves `{ success: false }`.
+       *
+       * This handler used to ignore the returned value entirely and return
+       * `{ success: true }` whenever the Effect did not fail. On an
+       * unconfigured store — which is every store before SMTP is set up —
+       * the contact form therefore told every customer "Your message has been
+       * sent successfully!" while nothing left the building and no one was
+       * notified. Nothing retried, and there is no other record of the
+       * submission.
+       *
+       * The result is now inspected, so the storefront claims delivery only
+       * when the real transport accepted the message.
+       */
       try {
-        await Effect.runPromise(
+        const sendResult = await Effect.runPromise(
           Effect.gen(function* ($) {
             const emailService = yield* $(EmailService);
-            yield* $(
+            return yield* $(
               emailService.sendEmail(
                 contactEmail,
                 `[${storeName}] New message from ${name}`,
@@ -64,6 +88,19 @@ export const contactRouter = router({
             Effect.provideService(EmailService, ctx.emailService),
           ),
         );
+
+        if (!sendResult?.success) {
+          // The reason is for the operator's log, not for the customer: it can
+          // carry SMTP hostnames and credentials-related detail.
+          console.error(
+            "[Contact] Message not delivered:",
+            sendResult?.error ?? "email service returned no result",
+          );
+          return {
+            success: false as const,
+            error: "Failed to send message. Please try again later.",
+          };
+        }
 
         return { success: true as const };
       } catch (error) {

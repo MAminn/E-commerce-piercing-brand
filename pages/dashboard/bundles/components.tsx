@@ -631,7 +631,7 @@ export function buildCampaignPayload(form: CampaignFormState): { payload: Campai
     if (Math.round(curatedPrice * 100) !== curatedPrice * 100) {
       return { error: "Bundle price can have at most two decimals." };
     }
-    if (!(curatedPrice > 0)) return { error: "A curated stack needs a price greater than 0." };
+    if (!(curatedPrice > 0)) return { error: "A ready set needs a price greater than 0." };
   }
   // The legacy mirror the server also derives — sent so an older payload shape
   // stays valid, never authored independently.
@@ -772,7 +772,7 @@ function PricingTierEditor({
       </div>
       <p className="text-xs text-muted-foreground">
         Each tier is an exact number of pieces at a total price. A shopper who picks a quantity you have not listed
-        cannot complete a stack — nothing is rounded down to the tier below.
+        cannot complete a set — nothing is rounded down to the tier below.
       </p>
 
       <div className="space-y-2">
@@ -1092,7 +1092,7 @@ function EligibilityPreviewPanel({
         </ul>
       )}
       <p className="text-xs">
-        Can complete this {requiredQuantity}-piece stack:{" "}
+        Can complete this {requiredQuantity}-piece set:{" "}
         <span className={preview.canCompleteStack ? "font-medium text-green-700" : "font-medium text-amber-700"}>
           {preview.canCompleteStack ? "Yes" : "No"}
         </span>
@@ -1157,7 +1157,7 @@ function CuratedSummary({ composition, priceInput }: { composition: EligibleProd
         </span>
       </div>
       <div className="flex justify-between">
-        <span>Stack price</span>
+        <span>Set price</span>
         <span className="tabular-nums">{validPrice ? `${price.toFixed(2)} ${STORE_CURRENCY}` : "—"}</span>
       </div>
       {saving !== null && (
@@ -1171,7 +1171,7 @@ function CuratedSummary({ composition, priceInput }: { composition: EligibleProd
       )}
       {issues.length > 0 && (
         <p className="text-xs text-destructive">
-          {issues.length} product{issues.length > 1 ? "s are" : " is"} deleted, hidden or short on stock — the stack will show as sold out.
+          {issues.length} product{issues.length > 1 ? "s are" : " is"} deleted, hidden or short on stock — the set will show as sold out.
         </p>
       )}
     </div>
@@ -1340,8 +1340,8 @@ export function CampaignFormDialog({
           <DialogTitle>{editing ? "Edit bundle campaign" : "New bundle campaign"}</DialogTitle>
           <DialogDescription>
             {isCurated
-              ? "Curated stack — you fix the exact products and units; the shopper buys the whole set for one price."
-              : "Build Your Stack — the shopper picks a set number of units from the eligible pool for a fixed total."}
+              ? "Ready Set — you fix the exact products and units; the shopper buys the whole set for one price."
+              : "Pick Your Set — the shopper picks a set number of units from the eligible pool for a fixed total."}
           </DialogDescription>
         </DialogHeader>
 
@@ -1350,8 +1350,8 @@ export function CampaignFormDialog({
           <section className="space-y-3">
             <h3 className="text-sm font-semibold">Campaign type</h3>
             <div className="flex flex-col gap-2 sm:flex-row">
-              <TypeOption value="build_your_stack" icon={Layers} title="Build Your Stack" body="Customer chooses N products from an eligible pool." />
-              <TypeOption value="curated_stack" icon={Sparkles} title="Curated Stack" body="You define the exact products and quantities." />
+              <TypeOption value="build_your_stack" icon={Layers} title="Pick Your Set" body="Customer chooses N products from an eligible pool." />
+              <TypeOption value="curated_stack" icon={Sparkles} title="Ready Set" body="You define the exact products and quantities." />
             </div>
             {editing && editing.type !== form.type && (
               <p className="text-xs text-amber-600">Changing the type re-shapes the product list below — review it before saving.</p>
@@ -1364,7 +1364,7 @@ export function CampaignFormDialog({
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label>Internal name *</Label>
-                <Input value={form.internalName} onChange={(e) => update("internalName", e.target.value)} placeholder="e.g. Autumn stack promo" />
+                <Input value={form.internalName} onChange={(e) => update("internalName", e.target.value)} placeholder="e.g. Autumn set promo" />
                 <p className="text-xs text-muted-foreground">Only shown in the dashboard.</p>
               </div>
               <div className="space-y-1">
@@ -1375,7 +1375,7 @@ export function CampaignFormDialog({
                     const title = e.target.value;
                     setForm((f) => ({ ...f, title, slug: f.slugTouched ? f.slug : slugify(title) }));
                   }}
-                  placeholder={isCurated ? "e.g. Golden Ear Stack" : "e.g. Build Your Stack"}
+                  placeholder={isCurated ? "e.g. Golden Ear Set" : "e.g. Pick Your Set"}
                 />
               </div>
             </div>
@@ -1383,7 +1383,7 @@ export function CampaignFormDialog({
               <Label>Slug *</Label>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">/bundles/</span>
-                <Input value={form.slug} onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value, slugTouched: true }))} placeholder="build-your-stack" className="font-mono" />
+                <Input value={form.slug} onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value, slugTouched: true }))} placeholder="pick-your-set" className="font-mono" />
                 {slugStatus === "checking" && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
                 {slugStatus === "free" && <Check className="h-4 w-4 text-emerald-600" />}
                 {slugStatus === "taken" && <Badge variant="destructive">Taken</Badge>}
@@ -1429,17 +1429,17 @@ export function CampaignFormDialog({
           {/* Products / rules */}
           {isCurated ? (
             <section className="space-y-3">
-              <h3 className="text-sm font-semibold">Stack composition</h3>
+              <h3 className="text-sm font-semibold">Set composition</h3>
               <EligibleProductPicker selected={form.composition} onChange={(next) => update("composition", next)} withQuantities />
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <Label>Fixed stack price ({STORE_CURRENCY}) *</Label>
+                  <Label>Fixed set price ({STORE_CURRENCY}) *</Label>
                   <Input type="number" min={0.01} step={0.01} value={form.fixedBundlePrice} onChange={(e) => update("fixedBundlePrice", e.target.value)} placeholder="450.00" />
                 </div>
                 <div className="flex items-start justify-between gap-3 rounded-md border p-3">
                   <div>
                     <Label>Repeatable</Label>
-                    <p className="text-xs text-muted-foreground">Let one cart hold this stack more than once.</p>
+                    <p className="text-xs text-muted-foreground">Let one cart hold this set more than once.</p>
                   </div>
                   <Switch checked={form.isRepeatable} onCheckedChange={(v) => update("isRepeatable", v)} />
                 </div>
@@ -1452,7 +1452,7 @@ export function CampaignFormDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="exclusive">Exclusive — stack price only</SelectItem>
+                    <SelectItem value="exclusive">Exclusive — set price only</SelectItem>
                     <SelectItem value="stackable">Stackable — offers/codes may apply on top</SelectItem>
                   </SelectContent>
                 </Select>
@@ -1509,7 +1509,7 @@ export function CampaignFormDialog({
                 <EligibilitySection form={form} update={update} setForm={setForm} />
                 {regularRange && modeUsesManual(form.eligibilityMode) && (
                   <p className="text-xs text-muted-foreground">
-                    Bought separately, a stack of {form.requiredQuantity} from the manual pool costs between{" "}
+                    Bought separately, a set of {form.requiredQuantity} from the manual pool costs between{" "}
                     <span className="tabular-nums">{regularRange.min.toFixed(2)}</span> and <span className="tabular-nums">{regularRange.max.toFixed(2)}</span> {STORE_CURRENCY}.
                     {modeUsesDynamic(form.eligibilityMode) && " Rule-matched products widen this range — the storefront shows the range for the full effective pool."}
                   </p>

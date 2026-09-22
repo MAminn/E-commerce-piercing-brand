@@ -1,145 +1,155 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Link } from "#root/components/utils/Link";
-import {
-  CheckCircle,
-  Package,
-  Home,
-  ShoppingBag,
-  XCircle,
-  Clock,
-  AlertTriangle,
-} from "lucide-react";
-import { Button } from "#root/components/ui/button";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTracking } from "#root/frontend/contexts/TrackingContext";
 import { TrackingEventName } from "#root/shared/types/pixel-tracking";
 import { STORE_CURRENCY } from "#root/shared/config/branding";
 import { useCart } from "#root/lib/context/CartContext";
 import { trpc } from "#root/shared/trpc/client";
-import { formatMoney } from "#root/shared/pricing/format-money";
+import { OrderConfirmationCard } from "./OrderConfirmationCard";
+import {
+  deriveConfirmationView,
+  isOrderReference,
+  parsePaymentParam,
+  type OrderLookup,
+  type OrderPaymentStatus,
+} from "./confirmation-state";
 
-type PaymentState = "none" | "success" | "pending" | "cancelled" | "failed";
-
-function getPaymentState(param: string | null): PaymentState {
-  if (!param) return "none";
-  switch (param.toLowerCase()) {
-    case "success":
-      return "success";
-    case "pending":
-      return "pending";
-    case "cancelled":
-    case "canceled":
-      return "cancelled";
-    case "failed":
-      return "failed";
-    default:
-      return "none";
-  }
-}
+const POLL_INTERVAL_MS = 4000;
+const POLL_TIMEOUT_MS = 60000;
 
 export default function OrderConfirmationPage() {
-  const searchParams =
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search)
-      : null;
-  const orderId = searchParams?.get("id") ?? "";
+  // There is no query string to read during SSR, so the server cannot know
+  // which order this is. It renders the neutral loading card and the browser
+  // resolves the real state on hydration — never a confirmation, and never a
+  // not-found flash in front of a customer whose order is fine.
+  const isBrowser = typeof window !== "undefined";
+  const searchParams = isBrowser
+    ? new URLSearchParams(window.location.search)
+    : null;
+  const orderIdParam = searchParams?.get("id") ?? "";
   const orderTotal = searchParams?.get("total") ?? "";
   const customerEmail = searchParams?.get("email") ?? "";
-  const paymentState = getPaymentState(searchParams?.get("payment") ?? null);
-  const shortId = orderId ? orderId.substring(0, 8).toUpperCase() : "";
-  const [verifiedPaymentStatus, setVerifiedPaymentStatus] = useState<
-    | "pending"
-    | "paid"
-    | "failed"
-    | "processing"
-    | "not_required"
-    | "refunded"
-    | null
-  >(null);
+  const paymentParam = parsePaymentParam(searchParams?.get("payment") ?? null);
 
-  // Poll backend when customer returns from Paymob/Stripe before webhook lands
+  // Only a well-formed reference is worth a round trip; anything else is a
+  // direct visit and resolves to the not-found state without a request.
+  const orderId = isOrderReference(orderIdParam) ? orderIdParam : null;
+
+  // `loading` until the server has answered.
+  const [lookup, setLookup] = useState<OrderLookup>(
+    orderId || !isBrowser ? { status: "loading" } : { status: "missing" },
+  );
+
+  // ─── Verify the order against the backend ───────────────────────────────
+  // This runs for EVERY flow, not just the online-payment return. It is what
+  // makes "Order placed" conditional on an order actually existing: a COD
+  // order verifies as `not_required`, and a fabricated id 404s.
   useEffect(() => {
-    if (!orderId) return;
-    if (paymentState !== "success" && paymentState !== "pending") return;
+    if (!orderId) {
+      setLookup({ status: "missing" });
+      return;
+    }
+
+    setLookup({ status: "loading" });
 
     let cancelled = false;
     let interval: number | undefined;
 
-    const verifyPayment = async () => {
-      try {
-        const result = await trpc.payment.verify.query({ orderId });
-        const paymentStatus =
-          result && "result" in result && result.success
-            ? result.result.paymentStatus
-            : null;
-        if (!cancelled && paymentStatus) {
-          setVerifiedPaymentStatus(paymentStatus);
-          if (
-            interval &&
-            (paymentStatus === "paid" || paymentStatus === "failed")
-          ) {
-            window.clearInterval(interval);
-            interval = undefined;
-          }
-        }
-      } catch {
-        /* best-effort */
+    const stopPolling = () => {
+      if (interval) {
+        window.clearInterval(interval);
+        interval = undefined;
       }
     };
 
-    void verifyPayment();
-    interval = window.setInterval(verifyPayment, 4000);
-    const timeout = window.setTimeout(() => {
-      if (interval) window.clearInterval(interval);
-    }, 60000);
+    const verify = async () => {
+      try {
+        const result = await trpc.payment.verify.query({ orderId });
+        if (cancelled) return;
+
+        if (!result || !("success" in result) || !result.success) {
+          // Order not found (or the server refused) — say so rather than
+          // assuming the happy path.
+          setLookup({ status: "missing" });
+          stopPolling();
+          return;
+        }
+
+        const paymentStatus = result.result
+          ?.paymentStatus as OrderPaymentStatus | undefined;
+        if (!paymentStatus) {
+          setLookup({ status: "missing" });
+          stopPolling();
+          return;
+        }
+
+        setLookup({ status: "found", order: { paymentStatus } });
+        if (paymentStatus !== "pending" && paymentStatus !== "processing") {
+          stopPolling();
+        }
+      } catch {
+        // A transport failure is not evidence that the order exists — but it
+        // is not evidence that it doesn't, either. Leave a lookup that has
+        // already succeeded alone and only fail an as-yet-unanswered one, so
+        // one dropped poll cannot turn a confirmed order into "not found".
+        if (!cancelled) {
+          setLookup((prev) =>
+            prev.status === "found" ? prev : { status: "missing" },
+          );
+        }
+      }
+    };
+
+    void verify();
+    interval = window.setInterval(verify, POLL_INTERVAL_MS);
+    const timeout = window.setTimeout(stopPolling, POLL_TIMEOUT_MS);
 
     return () => {
       cancelled = true;
-      if (interval) window.clearInterval(interval);
+      stopPolling();
       window.clearTimeout(timeout);
     };
-  }, [orderId, paymentState]);
+  }, [orderId]);
 
-  const isPaymentFailed =
-    paymentState === "cancelled" || paymentState === "failed";
+  const view = useMemo(
+    () =>
+      isBrowser
+        ? deriveConfirmationView({ orderRef: orderId, paymentParam, lookup })
+        : ({ kind: "loading" } as const),
+    [isBrowser, orderId, paymentParam, lookup],
+  );
 
-  const isPaymentPending =
-    !isPaymentFailed &&
-    (paymentState === "pending" ||
-      (paymentState === "success" &&
-        verifiedPaymentStatus !== "paid" &&
-        verifiedPaymentStatus !== "failed"));
-
-  const isPaymentSuccess = !isPaymentFailed && !isPaymentPending;
-
-  // ─── Fire checkout_completed once per order ────────────────────────────
-  // Uses sessionStorage keyed by orderId to survive page refresh.
-  // Ref guards against React strict-mode double-effects within the same mount.
   const { trackEvent } = useTracking();
   const { clearCart } = useCart();
   const hasTrackedCompletion = useRef<string | null>(null);
 
-  // ─── Clear cart on successful payment (deferred from checkout page) ────
+  // ─── Clear cart once the order is known to exist ───────────────────────
   // For online payments, clearCart is NOT called before redirect (so pressing
   // back in the browser keeps the cart intact). This effect clears it once
-  // the user lands here with a successful/pending payment.
+  // the server has confirmed the order.
   useEffect(() => {
     if (!orderId) return;
+    if (view.kind !== "placed" && view.kind !== "pending") return;
     try {
       const key = `pending_cart_clear:${orderId}`;
-      if (sessionStorage.getItem(key) && (isPaymentSuccess || isPaymentPending)) {
+      if (sessionStorage.getItem(key)) {
         clearCart();
         sessionStorage.removeItem(key);
       }
-    } catch { /* best-effort */ }
-  }, [orderId, isPaymentSuccess, isPaymentPending, clearCart]);
+    } catch {
+      /* best-effort */
+    }
+  }, [orderId, view.kind, clearCart]);
 
+  // ─── Fire checkout_completed once per order ────────────────────────────
+  // Only for a verified, placed order — a direct visit must not emit a
+  // Purchase event. Uses sessionStorage keyed by orderId to survive refresh;
+  // the ref guards React strict-mode double-effects within one mount.
   useEffect(() => {
-    if (!orderId || !isPaymentSuccess) return;
+    if (!orderId || view.kind !== "placed") return;
     if (hasTrackedCompletion.current === orderId) return;
 
-    // Persist guard: prevent re-firing on page refresh
     const storageKey = `tracked_checkout_completed:${orderId}`;
     try {
       if (sessionStorage.getItem(storageKey)) return;
@@ -186,152 +196,21 @@ export default function OrderConfirmationPage() {
         items: purchaseItems,
       },
     });
-  }, [orderId, orderTotal, isPaymentSuccess, trackEvent]);
+  }, [orderId, orderTotal, view.kind, trackEvent]);
+
+  // Order number, total and email are shown only alongside a verified order,
+  // so a crafted `?total=` on a direct visit renders nothing.
+  const shortId =
+    lookup.status === "found" && orderId
+      ? orderId.substring(0, 8).toUpperCase()
+      : "";
 
   return (
-    <div className='perce-header-offset flex min-h-screen items-center justify-center bg-perce-bg px-4 py-12 sm:py-16'>
-      <div className='flex w-full max-w-2xl flex-col border border-perce-line bg-perce-surface-raised px-6 pb-12 pt-8 text-center sm:px-8'>
-        {/* Icon */}
-        {isPaymentSuccess && (
-          <div className='mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-perce-surface'>
-            <CheckCircle aria-hidden className='h-7 w-7 text-perce-success' />
-          </div>
-        )}
-        {isPaymentPending && (
-          <div className='mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-perce-surface'>
-            <Clock aria-hidden className='h-7 w-7 text-perce-ink-secondary' />
-          </div>
-        )}
-        {isPaymentFailed && (
-          <div className='mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-perce-surface'>
-            <XCircle aria-hidden className='h-7 w-7 text-perce-sale' />
-          </div>
-        )}
-
-        {/* Heading */}
-        {/* Every sentence below is limited to something this page actually
-            knows: whether the order row was created, and what the payment
-            gateway (or the absence of one) reported. Nothing here states a
-            delivery date, a courier, a confirmation call or a shipping
-            window — Percé has set none of those. */}
-        {isPaymentSuccess && (
-          <>
-            <h1 className='perce-section-title'>Order placed</h1>
-            <p className='mt-2 text-[length:var(--perce-text-body)] text-perce-ink-muted'>
-              Your order has been received.
-              {paymentState === "success" &&
-                verifiedPaymentStatus === "paid" &&
-                " Payment received."}
-            </p>
-          </>
-        )}
-        {isPaymentPending && (
-          <>
-            <h1 className='perce-section-title'>Payment pending</h1>
-            <p className='mt-2 text-[length:var(--perce-text-body)] text-perce-ink-muted'>
-              Your order has been created. The payment provider has not
-              confirmed the payment yet.
-            </p>
-          </>
-        )}
-        {isPaymentFailed && (
-          <>
-            <h1 className='perce-section-title'>
-              Payment {paymentState === "cancelled" ? "cancelled" : "failed"}
-            </h1>
-            <p className='mt-2 text-[length:var(--perce-text-body)] text-perce-ink-muted'>
-              {paymentState === "cancelled"
-                ? "The payment was cancelled. Your order has been saved and is unpaid."
-                : "The payment did not go through. Your order has been saved and is unpaid."}
-            </p>
-          </>
-        )}
-
-        {/* Order Details Card */}
-        <div className='mt-8 mb-8 space-y-3 overflow-x-auto bg-perce-surface p-6 text-start'>
-          {shortId && (
-            <div className='flex justify-between items-center flex-wrap gap-2'>
-              <span className='text-sm text-perce-ink-muted'>Order number</span>
-              <span className='font-mono text-sm font-medium text-perce-ink'>
-                #{shortId}
-              </span>
-            </div>
-          )}
-          {orderTotal && (
-            <div className='flex justify-between items-center flex-wrap gap-2'>
-              <span className='text-sm text-perce-ink-muted'>Total</span>
-              <span className='text-sm font-semibold text-perce-ink'>
-                {formatMoney(Number.parseFloat(orderTotal))}
-              </span>
-            </div>
-          )}
-          {customerEmail && (
-            <div className='flex justify-between items-center flex-wrap gap-2'>
-              <span className='text-sm text-perce-ink-muted'>
-                Order email
-              </span>
-              <span className='whitespace-nowrap text-sm text-perce-ink'>{customerEmail}</span>
-            </div>
-          )}
-          <div className='flex justify-between items-center flex-wrap gap-2'>
-            <span className='text-sm text-perce-ink-muted'>Status</span>
-            {isPaymentSuccess && (
-              <span className='inline-flex items-center gap-1.5 rounded-full bg-perce-surface px-2.5 py-0.5 text-sm font-medium text-perce-ink-secondary'>
-                <Package aria-hidden className='h-3.5 w-3.5' />
-                Processing
-              </span>
-            )}
-            {isPaymentPending && (
-              <span className='inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-perce-surface px-2.5 py-0.5 text-sm font-medium text-perce-ink-secondary'>
-                <Clock aria-hidden className='h-3.5 w-3.5' />
-                Awaiting payment
-              </span>
-            )}
-            {isPaymentFailed && (
-              <span className='inline-flex items-center gap-1.5 rounded-full bg-perce-surface px-2.5 py-0.5 text-sm font-medium text-perce-sale'>
-                <AlertTriangle aria-hidden className='h-3.5 w-3.5' />
-                Payment {paymentState === "cancelled" ? "cancelled" : "failed"}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Info text */}
-        {/* "We've sent a confirmation email … You'll receive shipping
-            updates as your order progresses" was asserted unconditionally.
-            The email only goes out when SMTP is configured, and there is no
-            shipping-update pipeline at all — so the page promised two things
-            an unconfigured store does not do. "Don't worry — no charges were
-            made" was likewise asserted for a *failed* payment, which this
-            page cannot know. */}
-        {isPaymentPending && (
-          <p className='mb-8 text-sm text-perce-ink-muted'>
-            A completed payment can take a few minutes to show here.
-          </p>
-        )}
-        {isPaymentFailed && (
-          <p className='mb-8 text-sm text-perce-ink-muted'>
-            Any amount the provider authorised is released by the provider, not
-            by this store.
-          </p>
-        )}
-
-        {/* Actions */}
-        <div className='mt-6 flex flex-col justify-center gap-3 sm:flex-row'>
-          <Button asChild variant='outline' className='min-h-11 gap-2'>
-            <Link href='/'>
-              <Home aria-hidden className='h-4 w-4' />
-              <span className='text-xs md:text-sm'>Back to home</span>
-            </Link>
-          </Button>
-          <Button asChild className='min-h-11 gap-2'>
-            <Link href='/shop'>
-              <ShoppingBag aria-hidden className='h-4 w-4' />
-              <span className='text-xs md:text-sm'>Continue shopping</span>
-            </Link>
-          </Button>
-        </div>
-      </div>
-    </div>
+    <OrderConfirmationCard
+      view={view}
+      shortId={shortId}
+      orderTotal={orderTotal}
+      customerEmail={customerEmail}
+    />
   );
 }

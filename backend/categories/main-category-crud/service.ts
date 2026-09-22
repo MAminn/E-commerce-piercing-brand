@@ -11,6 +11,7 @@ import { Effect } from "effect";
 import { z } from "zod";
 import slug from "slug";
 import { eq, and, count, sql } from "drizzle-orm";
+import { attachedToCategory } from "../category-products";
 
 /**
  * Create Main Category
@@ -266,11 +267,23 @@ export const deleteMainCategory = (
             });
           }
 
-          // Check for products
+          // Check for products.
+          //
+          // This used to test `product.category_id = <id>` only, so a product
+          // filed into the category through `product_category` — which is how
+          // the admin UI assigns categories — did not count as attached. The
+          // category deleted "empty", its products stayed live on the
+          // storefront, and the admin product list (which resolves categories
+          // through that same FK) stopped showing them.
+          //
+          // `attachedToCategory` is the shared predicate the public category
+          // count is also built from, so "not empty" now means the same thing
+          // in both places. It matches EITHER assignment path and counts each
+          // product once regardless of how many rows attach it.
           const productCount = await tx
             .select({ count: count() })
             .from(product)
-            .where(and(eq(product.categoryId, input.id), eq(product.deleted, false)))
+            .where(attachedToCategory(input.id))
             .then((data) => data[0]?.count || 0);
 
           if (Number(productCount) > 0) {

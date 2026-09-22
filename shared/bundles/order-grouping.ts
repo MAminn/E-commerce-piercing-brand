@@ -203,7 +203,7 @@ export function totalUnits<I extends GroupableOrderItem>(
 
 /** Admin-facing name of a snapshot's bundle type. */
 export function bundleTypeLabel(type: OrderBundleSnapshot["campaignType"]): string {
-  return type === "curated_stack" ? "Curated Stack" : "Build Your Stack";
+  return type === "curated_stack" ? "Ready Set" : "Pick Your Set";
 }
 
 /**

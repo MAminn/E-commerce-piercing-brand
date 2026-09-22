@@ -115,7 +115,17 @@ export const translations: Record<Locale, Record<string, string>> = {
     "checkout.place_order": "Place order",
     "checkout.place_order_pay": "Place order & pay",
     "checkout.processing": "Processing...",
-    "checkout.terms": "By placing your order, you agree to our terms and conditions",
+    /**
+     * Percé has no published terms-and-conditions document, so neither locale
+     * ships default copy here: claiming a shopper "agrees to our terms and
+     * conditions" at the moment they pay asserts an agreement that does not
+     * exist. The checkout template renders this line only when it is
+     * non-empty, so an admin who publishes real policy copy can supply it
+     * through the `checkout.terms` translation override and the line comes
+     * back. Do NOT restore a default string here — and do not point it at a
+     * page that has not been written.
+     */
+    "checkout.terms": "",
     "checkout.required": "*",
     "checkout.building_number": "Building number",
     "checkout.apartment": "Apartment / unit",
@@ -351,7 +361,8 @@ export const translations: Record<Locale, Record<string, string>> = {
     "checkout.place_order": "إتمام الطلب",
     "checkout.place_order_pay": "إتمام الطلب والدفع",
     "checkout.processing": "جاري المعالجة...",
-    "checkout.terms": "بإتمام الطلب، أنت توافق على الشروط والأحكام",
+    /** Empty by default — see the note on the English `checkout.terms`. */
+    "checkout.terms": "",
     "checkout.required": "*",
     "checkout.building_number": "رقم المبنى",
     "checkout.apartment": "رقم الشقة / الوحدة",

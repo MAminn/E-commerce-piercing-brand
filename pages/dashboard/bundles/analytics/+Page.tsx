@@ -60,8 +60,8 @@ const PERIODS: { value: BundleAnalyticsPeriod; label: string }[] = [
 ];
 
 const TYPE_LABEL: Record<string, string> = {
-  build_your_stack: "Build Your Stack",
-  curated_stack: "Curated Stack",
+  build_your_stack: "Pick Your Set",
+  curated_stack: "Ready Set",
 };
 
 const money = (n: number) => formatMoney(n, { currency: STORE_CURRENCY, alwaysShowFraction: true });
@@ -116,7 +116,7 @@ export function Page() {
     <div className='p-6 max-w-7xl mx-auto space-y-6' data-testid='bundle-analytics'>
       <div className='flex flex-wrap items-start justify-between gap-4'>
         <div>
-          <h1 className='text-2xl font-bold tracking-tight'>Bundles &amp; Stacks Analytics</h1>
+          <h1 className='text-2xl font-bold tracking-tight'>Bundles &amp; Sets Analytics</h1>
           <p className='text-muted-foreground text-sm'>
             Sales measured from placed orders and their bundle snapshots. {COUNTED_ORDER_RULE}
           </p>
@@ -199,7 +199,7 @@ export function Page() {
             <Metric
               label='Bundle instances'
               value={count(data.totals.instances)}
-              sub='Each stack bought counts once'
+              sub='Each set bought counts once'
               icon={<Layers className='h-4 w-4' />}
             />
             <Metric
@@ -332,7 +332,7 @@ export function Page() {
           {/* ── Type comparison ──────────────────────────────────────── */}
           <Card>
             <CardHeader>
-              <CardTitle className='text-base'>Build Your Stack vs Curated Stack</CardTitle>
+              <CardTitle className='text-base'>Pick Your Set vs Ready Set</CardTitle>
             </CardHeader>
             <CardContent className='p-0'>
               <Table>
@@ -372,7 +372,7 @@ export function Page() {
             <CardHeader>
               <CardTitle className='text-base'>Tier performance</CardTitle>
               <CardDescription>
-                Build Your Stack only, grouped by the tier size as sold. A repriced tier keeps every sale at the
+                Pick Your Set only, grouped by the tier size as sold. A repriced tier keeps every sale at the
                 price it was actually charged.
               </CardDescription>
             </CardHeader>
@@ -392,7 +392,7 @@ export function Page() {
                   {data.byTier.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={6} className='py-8 text-center text-sm text-muted-foreground'>
-                        No Build Your Stack sales in this range.
+                        No Pick Your Set sales in this range.
                       </TableCell>
                     </TableRow>
                   )}
@@ -414,13 +414,13 @@ export function Page() {
           {/* ── Product insight ──────────────────────────────────────── */}
           <div className='grid gap-6 lg:grid-cols-2'>
             <ProductTable
-              title='Most selected in Build Your Stack'
-              description='Products shoppers picked themselves inside a stack they built.'
+              title='Most selected in Pick Your Set'
+              description='Products shoppers picked themselves inside a set they built.'
               rows={data.mostSelectedInBuildYourStack}
             />
             <ProductTable
               title='Most included across all bundles'
-              description='Every product that shipped inside a bundle, including merchant-composed curated stacks.'
+              description='Every product that shipped inside a bundle, including merchant-composed ready sets.'
               rows={data.mostIncludedInBundles}
             />
           </div>

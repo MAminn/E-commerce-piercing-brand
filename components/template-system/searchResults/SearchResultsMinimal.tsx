@@ -241,17 +241,33 @@ export function SearchResultsMinimal({
               {/* Minimal Pagination */}
               {totalPages > 1 && (
                 <nav aria-label='Pagination' className='border-t border-perce-line pt-12'>
-                  <div className='flex items-center justify-center gap-4 sm:gap-6'>
+                  {/* This row used to be a single non-wrapping flex line:
+                      "Previous" + up to five 44px page buttons + two ellipses
+                      + "Next", with gap-4 between them. That is ~550px of
+                      intrinsic width, so from page 3 of a multi-page result
+                      it pushed past a 375–430px viewport and gave the whole
+                      DOCUMENT a horizontal scrollbar — the header, the grid
+                      and the footer slid sideways with it.
+
+                      Two changes keep it inside the viewport at any page
+                      count: the row wraps (so it can never be wider than its
+                      container), and the Previous/Next word is hidden below
+                      `sm` — the chevron plus the button's aria-label still
+                      name the control, so nothing is lost to a screen reader
+                      or to a pointer. min-w-11/min-h-11 keeps every control
+                      at a 44px tap target. */}
+                  <div className='flex flex-wrap items-center justify-center gap-2 sm:gap-6'>
                     <Button
                       variant='ghost'
                       disabled={currentPage === 1}
+                      aria-label='Previous page'
                       onClick={() => onPageChange?.(currentPage - 1)}
-                      className='min-h-11 rounded-none text-perce-ink-secondary hover:text-perce-ink disabled:opacity-30'>
-                      <ChevronLeft className='h-4 w-4 mr-1' />
-                      Previous
+                      className='min-h-11 min-w-11 rounded-none px-2 text-perce-ink-secondary hover:text-perce-ink disabled:opacity-30 sm:px-4'>
+                      <ChevronLeft className='h-4 w-4 sm:mr-1' />
+                      <span className='hidden sm:inline'>Previous</span>
                     </Button>
 
-                    <div className='flex items-center gap-2'>
+                    <div className='flex flex-wrap items-center justify-center gap-1 sm:gap-2'>
                       {Array.from({ length: totalPages }, (_, i) => i + 1)
                         .filter((page) => {
                           // Show first, last, current, and adjacent pages
@@ -273,7 +289,7 @@ export function SearchResultsMinimal({
                               size='sm'
                               aria-current={currentPage === page ? "page" : undefined}
                               onClick={() => onPageChange?.(page)}
-                              className={`h-11 min-w-11 rounded-none ${
+                              className={`h-11 min-w-11 shrink-0 rounded-none px-2 ${
                                 currentPage === page
                                   ? "bg-perce-cta text-perce-ink-inverse hover:bg-perce-cta-hover hover:text-perce-ink-inverse"
                                   : "text-perce-ink-secondary hover:text-perce-ink"
@@ -287,10 +303,11 @@ export function SearchResultsMinimal({
                     <Button
                       variant='ghost'
                       disabled={currentPage === totalPages}
+                      aria-label='Next page'
                       onClick={() => onPageChange?.(currentPage + 1)}
-                      className='min-h-11 rounded-none text-perce-ink-secondary hover:text-perce-ink disabled:opacity-30'>
-                      Next
-                      <ChevronRight className='h-4 w-4 ml-1' />
+                      className='min-h-11 min-w-11 rounded-none px-2 text-perce-ink-secondary hover:text-perce-ink disabled:opacity-30 sm:px-4'>
+                      <span className='hidden sm:inline'>Next</span>
+                      <ChevronRight className='h-4 w-4 sm:ml-1' />
                     </Button>
                   </div>
 

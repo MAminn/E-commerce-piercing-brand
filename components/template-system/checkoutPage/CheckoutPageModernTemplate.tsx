@@ -203,6 +203,25 @@ export function CheckoutPageModernTemplate({
   governorateRequired = false,
 }: CheckoutPageModernTemplateProps) {
   const { t, locale } = useMinimalI18n();
+
+  /**
+   * The checkout used to assert "By placing your order, you agree to our
+   * Terms & Conditions", linking to /links — the link-tree page, not a terms
+   * document. Percé has published no terms, so the sentence told a paying
+   * customer they had agreed to something that does not exist.
+   *
+   * Both locale defaults for `checkout.terms` are now empty strings, so this
+   * resolves to "" and the line is not rendered at all. It comes back only
+   * when an administrator supplies real policy copy through the
+   * `checkout.terms` translation override — and `t()` falls back to the key
+   * itself for an unknown key, so an accidentally *deleted* key would render
+   * the literal "checkout.terms"; guard against that and against a
+   * whitespace-only override here rather than at each of the two call sites.
+   */
+  const rawTerms = t("checkout.terms");
+  const termsCopy =
+    rawTerms && rawTerms !== "checkout.terms" ? rawTerms.trim() : "";
+
   const [couponCode, setCouponCode] = useState("");
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
   const [couponFeedback, setCouponFeedback] = useState<{
@@ -977,9 +996,9 @@ export function CheckoutPageModernTemplate({
                   agreement that does not exist. It renders only when an admin
                   has supplied real copy through the `checkout.terms`
                   translation override. */}
-              {t("checkout.terms") ? (
+              {termsCopy ? (
                 <p className='text-center text-xs text-perce-ink-muted'>
-                  {t("checkout.terms")}
+                  {termsCopy}
                 </p>
               ) : null}
             </div>
@@ -1072,9 +1091,9 @@ export function CheckoutPageModernTemplate({
                   agreement that does not exist. It renders only when an admin
                   has supplied real copy through the `checkout.terms`
                   translation override. */}
-              {t("checkout.terms") ? (
+              {termsCopy ? (
                 <p className='text-center text-xs text-perce-ink-muted'>
-                  {t("checkout.terms")}
+                  {termsCopy}
                 </p>
               ) : null}
             </div>

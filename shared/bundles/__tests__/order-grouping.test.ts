@@ -116,8 +116,11 @@ describe("groupOrderLines — one Curated Stack", () => {
     const g = groups[0]!;
     if (g.kind !== "bundle") throw new Error("expected bundle");
     expect(g.unitCount).toBe(4);
+    // The stored campaign type is an internal identifier and is deliberately
+    // unchanged; only the label an administrator reads was renamed.
     expect(g.bundle.campaignType).toBe("curated_stack");
-    expect(bundleTypeLabel(g.bundle.campaignType)).toBe("Curated Stack");
+    expect(bundleTypeLabel(g.bundle.campaignType)).toBe("Ready Set");
+    expect(bundleTypeLabel("build_your_stack")).toBe("Pick Your Set");
   });
 });
 

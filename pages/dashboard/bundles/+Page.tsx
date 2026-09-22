@@ -84,7 +84,7 @@ function valueSummary(c: BundleCampaign): { text: string; tone: "ok" | "warn" | 
       tone: sellable.length === c.tiers.length ? "ok" : "warn",
     };
   }
-  if (!c.valueRange) return { text: "Pool can't complete a stack", tone: "warn" };
+  if (!c.valueRange) return { text: "Pool can't complete a set", tone: "warn" };
   const { min, max } = c.valueRange;
   if (min <= price) return { text: `Separately ${money(min)}–${money(max)} · cheapest pick saves nothing`, tone: "warn" };
   return { text: `Separately ${money(min)}–${money(max)} · saves ${money(min - price)}–${money(max - price)}`, tone: "ok" };
@@ -174,10 +174,10 @@ export function Page() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Layers className="h-6 w-6" /> Bundles &amp; Stacks
+            <Layers className="h-6 w-6" /> Bundles &amp; Sets
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Build Your Stack (shopper picks N from a pool) and Curated Stacks (you fix the set) sold for one price. Live
+            Pick Your Set (shopper picks N from a pool) and Ready Sets (you fix the set) sold for one price. Live
             campaigns appear on /bundles, the homepage rail and any category you place them on. Generic cart rules
             (spend X get Y) live under Offers.
           </p>
@@ -202,7 +202,7 @@ export function Page() {
             </div>
           ) : campaigns.length === 0 ? (
             <div className="text-center p-12 text-muted-foreground">
-              No bundle campaigns yet. Click "New Campaign" to create your first Build Your Stack.
+              No bundle campaigns yet. Click "New Campaign" to create your first Pick Your Set.
             </div>
           ) : (
             <Table>
@@ -245,7 +245,7 @@ export function Page() {
                       <TableCell>
                         <Badge variant={isCurated ? "default" : "secondary"} className="mb-1 gap-1">
                           {isCurated ? <Sparkles className="h-3 w-3" /> : <Layers className="h-3 w-3" />}
-                          {isCurated ? "Curated Stack" : "Build Your Stack"}
+                          {isCurated ? "Ready Set" : "Pick Your Set"}
                         </Badge>
                         <div className="text-sm">{ruleSummary(c)}</div>
                         {unavailable > 0 && (
