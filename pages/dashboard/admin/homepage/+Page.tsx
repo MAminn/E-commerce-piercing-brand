@@ -48,6 +48,7 @@ import {
   type TemplateCategory,
 } from "#root/components/template-system/templateConfig";
 import { useTemplate } from "#root/frontend/contexts/TemplateContext";
+import { isHomepageSectionEditable } from "./section-visibility";
 import { HomepageProductPicker } from "#root/components/admin/HomepageProductPicker";
 import { HomepageBundlePicker } from "#root/components/admin/HomepageBundlePicker";
 import { DEFAULT_HOMEPAGE_CONTENT as HOMEPAGE_DEFAULTS } from "#root/shared/types/homepage-content";
@@ -1122,8 +1123,9 @@ export default function HomepageAdminPage() {
           </CardContent>
         </Card>
 
-        {/* Hero Section — only for non-minimal templates */}
-        {!isMinimal && (
+        {/* Hero Section — every template renders hero.* (landing-minimal
+            through PerceHero), see section-visibility.ts */}
+        {isHomepageSectionEditable("hero", selectedTemplateId) && (
           <Card>
             <CardHeader>
               <div className='flex items-center justify-between'>
@@ -1778,8 +1780,9 @@ export default function HomepageAdminPage() {
           </CardContent>
         </Card>
 
-        {/* Brand Statement Section — only for non-minimal templates */}
-        {!isMinimal && (
+        {/* Brand Statement Section — landing-minimal renders it as the
+            editorial block (PerceEditorialBlock), see section-visibility.ts */}
+        {isHomepageSectionEditable("brandStatement", selectedTemplateId) && (
           <Card>
             <CardHeader>
               <div className='flex items-center justify-between'>
@@ -1928,8 +1931,8 @@ export default function HomepageAdminPage() {
           </Card>
         )}
 
-        {/* Promo Banner Section — only for non-minimal templates */}
-        {!isMinimal && (
+        {/* Promo Banner Section — landing-minimal does not render it */}
+        {isHomepageSectionEditable("promoBanner", selectedTemplateId) && (
           <Card>
             <CardHeader>
               <div className='flex items-center justify-between'>
@@ -2015,8 +2018,8 @@ export default function HomepageAdminPage() {
           </Card>
         )}
 
-        {/* Value Propositions Section — only for non-minimal templates */}
-        {!isMinimal && (
+        {/* Value Propositions Section — landing-minimal does not render it */}
+        {isHomepageSectionEditable("valueProps", selectedTemplateId) && (
           <Card>
             <CardHeader>
               <div className='flex items-center justify-between'>

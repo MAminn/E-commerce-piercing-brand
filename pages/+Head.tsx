@@ -9,6 +9,7 @@ import {
   STORE_SOCIAL_LINKS,
 } from "#root/shared/config/branding";
 import { getPublicOrigin, toAbsoluteUrl } from "#root/shared/config/site-url";
+import { resolveMetaDescription } from "#root/pages/index/meta-description";
 import { buildTypographyHeadCss } from "#root/shared/typography/build-head-css";
 
 export default function HeadDefault() {
@@ -45,7 +46,11 @@ export default function HeadDefault() {
     pageContext.brandName ||
     layoutSettings?.siteTitle ||
     STORE_NAME;
+  // Site-level description, used for the WebSite structured data below.
   const siteDescription = STORE_DESCRIPTION;
+  // Per-page description: the homepage's CMS meta when set, else the same
+  // STORE_DESCRIPTION (pages/index/meta-description.ts).
+  const pageDescription = resolveMetaDescription(pageContext);
   const cmsShareImageUrl = layoutSettings?.shareImageUrl?.trim();
   const cmsLogoUrl = layoutSettings?.header?.logoUrl?.trim();
   // Prefer the dedicated share-preview banner. Only fall back to the navbar
@@ -181,13 +186,13 @@ export default function HeadDefault() {
         content='width=device-width, initial-scale=1.0, viewport-fit=cover'
       />
       <meta httpEquiv='Content-Type' content='text/html; charset=utf-8' />
-      <meta name='description' content={siteDescription} />
+      <meta name='description' content={pageDescription} />
 
       {/* Open Graph / social link previews */}
       <meta property='og:type' content='website' />
       <meta property='og:site_name' content={siteTitle} />
       <meta property='og:title' content={siteTitle} />
-      <meta property='og:description' content={siteDescription} />
+      <meta property='og:description' content={pageDescription} />
       <meta property='og:url' content={canonicalUrl} />
       {ogImageUrl && (
         <>
@@ -220,7 +225,7 @@ export default function HeadDefault() {
       {/* Twitter / X card */}
       <meta name='twitter:card' content={ogImageUrl ? "summary_large_image" : "summary"} />
       <meta name='twitter:title' content={siteTitle} />
-      <meta name='twitter:description' content={siteDescription} />
+      <meta name='twitter:description' content={pageDescription} />
       {ogImageUrl && <meta name='twitter:image' content={ogImageUrl} />}
 
       {/* Browser chrome matches the dark brand frame (Percé Ground). */}
