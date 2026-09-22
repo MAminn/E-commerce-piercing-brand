@@ -87,9 +87,11 @@ export function MinimalFooter() {
   const { t, locale, dir } = useMinimalI18n();
   const { urlPathname } = usePageContext();
   const footer = layoutSettings.footer;
-  // The /offers page has its own newsletter signup box, so hide the
-  // duplicate one here to avoid showing it twice on that page.
-  const hideNewsletter = urlPathname.startsWith("/offers");
+  // Dashboard > Layout Settings > Footer > "Show newsletter" is the switch.
+  // The /offers page has its own newsletter signup box, so the duplicate is
+  // also hidden there to avoid showing it twice on that page.
+  const showNewsletter =
+    footer.showNewsletter !== false && !urlPathname.startsWith("/offers");
 
   const logoText = locale === "ar" && footer.logoTextAr
     ? footer.logoTextAr
@@ -150,19 +152,17 @@ export function MinimalFooter() {
   return (
     <footer className='bg-perce-ground text-perce-frame-ink border-t border-perce-frame-line'>
       {/* ── Newsletter signup ── */}
-      {!hideNewsletter && (
+      {showNewsletter && (
         <div className='border-b border-perce-frame-line'>
           <div className='max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-10'>
             <div className='flex flex-col md:flex-row items-start md:items-center justify-between gap-4'>
               <div>
+                {/* Heading only. The subtitle used to promise "offers" —
+                    there is no offers/pricing programme yet, so no marketing
+                    line ships by default. */}
                 <h4 className='text-sm font-medium text-perce-frame-ink'>
                   {locale === "ar" ? "اشتركي في النشرة" : "Join the list"}
                 </h4>
-                <p className='text-sm text-perce-frame-ink-muted mt-1'>
-                  {locale === "ar"
-                    ? "الجديد والعروض في بريدك."
-                    : "New pieces and offers, in your inbox."}
-                </p>
               </div>
               <form
                 onSubmit={handleNewsletterSubmit}

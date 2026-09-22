@@ -376,12 +376,11 @@ export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
     heroSlides: [],
   },
   brandStatement: {
-    // Plain statement of what the shop is. No material, quality or
-    // "timeless" claims — those need supplier documentation first.
+    // No default copy. The editorial block renders nothing until an admin
+    // publishes a heading or an image from Dashboard > Homepage.
     enabled: true,
-    title: "A proper shop, not an inbox.",
-    description:
-      "Prices on the page, sizes listed, delivery across Egypt, cash on delivery. Pick one piece or pick a set.",
+    title: "",
+    description: "",
     // No default image. This pointed at "/uploads/homepage/brand-statement.jpg",
     // a file that does not exist in this repo — so an unconfigured store
     // rendered a broken-image icon with the heading spilling across it as alt
@@ -434,7 +433,8 @@ export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
   newsletter: {
     enabled: true,
     title: "Join the list",
-    subtitle: "New pieces and offers, in your inbox.",
+    // No marketing subtitle by default — no offers programme exists yet.
+    subtitle: "",
     placeholderText: "Your email address",
     ctaText: "Subscribe",
     privacyText: "Unsubscribe at any time.",
@@ -491,20 +491,22 @@ export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
   contactBanner: {
     enabled: true,
     slides: [],
-    heading: "Questions? Ask.",
-    headingAr: "تواصلي معنا",
+    // Neutral copy — the Percé contact-page wording has not been approved
+    // yet, so the pre-rebrand text stays until it is.
+    heading: "We Would Love To Hear From You",
+    headingAr: "نود أن نسمع منك",
     description:
-      "Sizes, delivery, an order — send a message and we'll get back to you.",
+      "Have a question, feedback, or just want to say hello? Drop us a message and we'll get back to you as soon as possible.",
     descriptionAr:
-      "للاستفسار عن المقاسات أو التوصيل أو طلبك، أرسلي رسالة وسنرد عليك.",
+      "هل لديك سؤال أو ملاحظة أو تريد فقط أن تقول مرحبا؟ أرسل لنا رسالة وسنعود إليك في أقرب وقت ممكن.",
     directionsUrl: "",
   },
   aboutUs: {
     enabled: false,
     title: "About Percé",
     titleAr: "عن Percé",
-    description:
-      "Percé sells piercing jewellery online in Egypt — a proper shop, with prices on the page and delivery to your door. Small pieces, made to mix.",
+    // No default body — the about copy is written from Dashboard > Homepage.
+    description: "",
     descriptionAr: "",
     imageUrl: "",
   },

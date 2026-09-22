@@ -196,7 +196,9 @@ export const DEFAULT_LAYOUT_SETTINGS: LayoutSettings = {
     // Matches STORE_DESCRIPTION in shared/config/branding.ts — the safer
     // brand subheading, with no photography, material or policy claims.
     description: "Piercing jewellery, delivered across Egypt.",
-    descriptionAr: "مجوهرات بيرسينج، توصيل لكل مصر.",
+    // No Arabic marketing description by default — an admin writes one from
+    // Dashboard > Layout Settings once the Arabic copy is approved.
+    descriptionAr: "",
     copyright: "",
     showNewsletter: true,
     footerStyle: "default",
@@ -218,7 +220,6 @@ export const DEFAULT_LAYOUT_SETTINGS: LayoutSettings = {
           { id: "all-products", label: "Shop all", labelAr: "كل المنتجات", url: "/shop" },
           { id: "new-in", label: "New in", labelAr: "جديد", url: "/shop?section=newarrivals" },
           { id: "sets", label: "Sets", labelAr: "الأطقم", url: "/bundles" },
-          { id: "offers", label: "Offers", labelAr: "العروض", url: "/offers" },
         ],
       },
       {

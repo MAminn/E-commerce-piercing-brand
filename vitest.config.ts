@@ -7,6 +7,10 @@ export default defineConfig({
       "#root": path.resolve(__dirname),
     },
   },
+  // tsconfig has `jsx: "preserve"` (Vite's React plugin handles JSX in the
+  // app build); vitest transforms .tsx itself, so tell it to use the
+  // automatic runtime or components fail with "React is not defined".
+  esbuild: { jsx: "automatic" },
   test: {
     globals: true,
     environment: "node",

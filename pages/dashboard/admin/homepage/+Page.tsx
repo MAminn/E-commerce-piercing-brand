@@ -311,6 +311,11 @@ export default function HomepageAdminPage() {
       // Auto-trim whitespace from text fields (use ?? '' to guard against null from DB)
       const trimmedContent: HomepageContent = {
         ...content,
+        meta: {
+          ...content.meta,
+          pageTitle: (content.meta.pageTitle ?? "").trim(),
+          pageDescription: (content.meta.pageDescription ?? "").trim(),
+        },
         hero: {
           ...content.hero,
           title: (content.hero.title ?? "").trim(),
@@ -448,6 +453,11 @@ export default function HomepageAdminPage() {
             // Auto-trim whitespace from text fields
             const trimmedContent: HomepageContent = {
               ...content,
+              meta: {
+                ...content.meta,
+                pageTitle: (content.meta.pageTitle ?? "").trim(),
+                pageDescription: (content.meta.pageDescription ?? "").trim(),
+              },
               hero: {
                 ...content.hero,
                 title: content.hero.title.trim(),
@@ -1061,6 +1071,57 @@ export default function HomepageAdminPage() {
       )}
 
       <div className='space-y-6'>
+        {/* ── SEO / Meta ──────────── */}
+        {/* Edits homepage_content.content.meta. The homepage <title> reads
+            meta.pageTitle (pages/index/+title.ts) and falls back to the
+            brand name + brand line when it is empty. These fields already
+            existed in every stored row but had no inputs, so stale copy
+            could only be fixed with raw SQL. */}
+        <Card>
+          <CardHeader>
+            <CardTitle>SEO / Meta</CardTitle>
+          </CardHeader>
+          <CardContent className='space-y-4'>
+            <div>
+              <Label htmlFor='meta-page-title'>Page Title</Label>
+              <Input
+                id='meta-page-title'
+                value={content.meta.pageTitle ?? ""}
+                onChange={(e) =>
+                  setContent((prev) => ({
+                    ...prev,
+                    meta: { ...prev.meta, pageTitle: e.target.value },
+                  }))
+                }
+                placeholder={DEFAULT_HOMEPAGE_CONTENT.meta.pageTitle}
+              />
+              <p className='text-xs text-muted-foreground mt-1'>
+                The browser tab / search result title for the homepage. Leave
+                empty to use the default.
+              </p>
+            </div>
+            <div>
+              <Label htmlFor='meta-page-description'>Page Description</Label>
+              <Textarea
+                id='meta-page-description'
+                value={content.meta.pageDescription ?? ""}
+                onChange={(e) =>
+                  setContent((prev) => ({
+                    ...prev,
+                    meta: { ...prev.meta, pageDescription: e.target.value },
+                  }))
+                }
+                placeholder={DEFAULT_HOMEPAGE_CONTENT.meta.pageDescription}
+                rows={2}
+              />
+              <p className='text-xs text-muted-foreground mt-1'>
+                Short summary for search engines. Leave empty to use the
+                default.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Hero Section — only for non-minimal templates */}
         {!isMinimal && (
           <Card>
@@ -2357,6 +2418,24 @@ export default function HomepageAdminPage() {
                     disabled={!content.categories.enabled}
                   />
                 </div>
+              </div>
+              <div>
+                <Label htmlFor='categories-subtitle'>Subtitle</Label>
+                <Input
+                  id='categories-subtitle'
+                  value={content.categories.subtitle ?? ""}
+                  onChange={(e) =>
+                    setContent((prev) => ({
+                      ...prev,
+                      categories: {
+                        ...prev.categories,
+                        subtitle: e.target.value,
+                      },
+                    }))
+                  }
+                  placeholder='Optional line under the title'
+                  disabled={!content.categories.enabled}
+                />
               </div>
               <div className='bg-muted p-3 rounded-md'>
                 <p className='text-sm text-muted-foreground'>
