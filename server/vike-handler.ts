@@ -2,7 +2,7 @@
 import { renderPage } from "vike/server";
 import { createMiddleware } from "hono/factory";
 import { getTemplateSelectionRaw } from "#root/backend/settings/get-template-selection-raw.js";
-import { getLayoutSettingsRaw } from "#root/backend/layout/get-layout-settings-raw.js";
+import { getStorefrontLayoutSettingsRaw } from "#root/backend/layout/get-layout-settings-raw.js";
 import { getLinkTreeConfigRaw } from "#root/backend/settings/get-link-tree-config.js";
 import { getStoreOwnerId } from "#root/shared/config/store.js";
 import {
@@ -17,11 +17,12 @@ export const vikeHonoMiddleware = createMiddleware(
     // Fetch template selection for SSR to prevent hydration flicker
     const templateSelection = await getTemplateSelectionRaw(c.var.db);
     // Fetch layout settings for SSR to prevent navbar/footer flicker
-    const activeLandingTemplate = templateSelection?.landing;
-    const layoutSettingsData = await getLayoutSettingsRaw(
+    // Resolved from the selection the same way the dashboard picks the row
+    // it edits — see getStorefrontLayoutSettingsRaw.
+    const layoutSettingsData = await getStorefrontLayoutSettingsRaw(
       c.var.db,
       getStoreOwnerId(),
-      activeLandingTemplate,
+      templateSelection,
     );
     // Fetch brand name from link-tree config for dynamic page titles
     const linkTreeConfig = await getLinkTreeConfigRaw(c.var.db);

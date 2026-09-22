@@ -7,6 +7,34 @@ import {
   DEFAULT_LOGO_SIZE,
   DEFAULT_FOOTER_LOGO_SIZE,
 } from "#root/shared/types/layout-settings";
+import { resolveLandingTemplateId } from "#root/shared/config/storefront";
+
+/**
+ * The layout settings the storefront shell renders, resolved from the stored
+ * template selection.
+ *
+ * Both SSR entry points used to pass `templateSelection?.landing` straight
+ * through. On a store that has never saved a template selection that is
+ * `undefined`, so the storefront read the legacy `"default"` row (or the
+ * hardcoded defaults) — while Dashboard > Layout Settings resolves the same
+ * unset selection to the Percé preset (`landing-minimal`) and writes there.
+ * An admin switching the footer newsletter OFF saved `showNewsletter: false`
+ * into a row the storefront never looked at, and the shipped default (`true`)
+ * kept rendering the signup. Resolving with the same helper the dashboard and
+ * the homepage `+data.ts` use makes both sides agree on the row; the
+ * `"default"` row is still the fallback when no template row exists.
+ */
+export async function getStorefrontLayoutSettingsRaw(
+  db: DatabaseClient,
+  merchantId: string,
+  templateSelection: Record<string, string> | undefined | null,
+): Promise<LayoutSettings> {
+  return getLayoutSettingsRaw(
+    db,
+    merchantId,
+    resolveLandingTemplateId(templateSelection),
+  );
+}
 
 /**
  * Direct database query for SSR layout-settings injection.
