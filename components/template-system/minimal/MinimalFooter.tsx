@@ -167,9 +167,26 @@ export function MinimalFooter() {
               <form
                 onSubmit={handleNewsletterSubmit}
                 className='flex w-full md:w-auto max-w-md gap-2'>
+                {/* Named and labelled so the browser can tell this apart
+                    from the OTHER email box on pages that have one (the
+                    contact form). Two anonymous type="email" inputs in one
+                    document is what sends Chromium's autofill classifier
+                    guessing and lets it blank a React-controlled field while
+                    the customer types. */}
+                <label htmlFor='footer-newsletter-email' className='sr-only'>
+                  {locale === "ar" ? "بريدك الإلكتروني" : "Your email address"}
+                </label>
                 <input
+                  id='footer-newsletter-email'
+                  name='newsletter_email'
+                  autoComplete='email'
+                  inputMode='email'
+                  autoCapitalize='off'
+                  autoCorrect='off'
+                  spellCheck={false}
                   type='email'
                   required
+                  dir='ltr'
                   value={newsletterEmail}
                   onChange={(e) => setNewsletterEmail(e.target.value)}
                   placeholder={locale === "ar" ? "بريدك الإلكتروني" : "Your email address"}

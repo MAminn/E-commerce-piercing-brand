@@ -121,7 +121,13 @@ function Page() {
             <form onSubmit={handleSubmit} className='space-y-6'>
               <div className='grid grid-cols-1 sm:grid-cols-2 gap-6'>
                 <div>
+                  <label htmlFor='contact-name' className='sr-only'>
+                    {isAr ? "الاسم" : "Name"}
+                  </label>
                   <input
+                    id='contact-name'
+                    name='name'
+                    autoComplete='name'
                     type='text'
                     value={name}
                     onChange={(e) => setName(e.target.value)}
@@ -133,7 +139,33 @@ function Page() {
                   />
                 </div>
                 <div>
+                  {/* Every attribute a browser uses to work out what this
+                      field IS — id, name, label, autocomplete — was missing,
+                      here and on the footer newsletter input that shares the
+                      page. Two anonymous type="email" boxes in one document
+                      is the exact input to Chromium's autofill classifier
+                      that makes it guess, group them, and drive its
+                      preview/revert cycle over a React-controlled value it
+                      never told React about: the field goes blank as you
+                      type. Edge and the ChatGPT in-app browser both ship that
+                      autofill on by default, which is where this was seen.
+                      Naming the field is the fix; do not remove these.
+
+                      dir is forced to ltr rather than following the locale:
+                      an email address is LTR text even in Arabic, and bidi
+                      reordering of "@" and "." inside an RTL box garbles what
+                      the customer sees while they type. */}
+                  <label htmlFor='contact-email' className='sr-only'>
+                    {isAr ? "البريد الإلكتروني" : "Email"}
+                  </label>
                   <input
+                    id='contact-email'
+                    name='email'
+                    autoComplete='email'
+                    inputMode='email'
+                    autoCapitalize='off'
+                    autoCorrect='off'
+                    spellCheck={false}
                     type='email'
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -141,13 +173,19 @@ function Page() {
                     required
                     maxLength={200}
                     className='w-full border-b border-perce-line-strong bg-transparent py-3 text-sm placeholder:text-gray-400 focus:border-black focus:outline-none transition-colors'
-                    dir={dir}
+                    dir='ltr'
                   />
                 </div>
               </div>
 
               <div>
+                <label htmlFor='contact-message' className='sr-only'>
+                  {isAr ? "الرسالة" : "Message"}
+                </label>
                 <textarea
+                  id='contact-message'
+                  name='message'
+                  autoComplete='off'
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   placeholder={isAr ? "الرسالة" : "Message"}
