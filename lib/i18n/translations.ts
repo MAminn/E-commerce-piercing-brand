@@ -84,6 +84,8 @@ export const translations: Record<Locale, Record<string, string>> = {
     "cart.product": "Product",
     "cart.quantity": "Quantity",
     "cart.free_shipping": "Free shipping",
+    "cart.shipping_calculated_at_checkout": "Calculated at checkout",
+    "cart.shipping_unavailable": "Not available for this destination",
 
     // Checkout page
     "checkout.title": "Checkout",
@@ -95,6 +97,9 @@ export const translations: Record<Locale, Record<string, string>> = {
     "checkout.street": "Street address",
     "checkout.city": "City",
     "checkout.state": "Governorate",
+    "checkout.select_governorate": "Select governorate",
+    "checkout.shipping_unavailable_destination": "We don't deliver to this governorate yet. Please choose another destination.",
+    "checkout.shipping_select_to_calculate": "Select your governorate to see the shipping fee.",
     "checkout.postal_code": "Postal code",
     "checkout.country": "Country",
     "checkout.order_notes": "Order notes",
@@ -125,6 +130,7 @@ export const translations: Record<Locale, Record<string, string>> = {
     "validation.address_required": "Shipping address is required",
     "validation.city_required": "City is required",
     "validation.state_required": "State / Governorate is required",
+    "validation.governorate_required": "Please select your governorate",
     "validation.postal_code_required": "Postal code is required",
     "validation.country_required": "Country is required",
     "validation.building_required": "Building number is required",
@@ -314,6 +320,8 @@ export const translations: Record<Locale, Record<string, string>> = {
     "cart.product": "المنتج",
     "cart.quantity": "الكمية",
     "cart.free_shipping": "شحن مجاني",
+    "cart.shipping_calculated_at_checkout": "يُحسب عند إتمام الطلب",
+    "cart.shipping_unavailable": "غير متاح لهذه الوجهة",
 
     // Checkout page
     "checkout.title": "إتمام الطلب",
@@ -325,6 +333,9 @@ export const translations: Record<Locale, Record<string, string>> = {
     "checkout.street": "العنوان",
     "checkout.city": "المدينة",
     "checkout.state": "المحافظة",
+    "checkout.select_governorate": "اختر المحافظة",
+    "checkout.shipping_unavailable_destination": "لا نقوم بالتوصيل إلى هذه المحافظة حاليًا. يرجى اختيار وجهة أخرى.",
+    "checkout.shipping_select_to_calculate": "اختر محافظتك لمعرفة رسوم الشحن.",
     "checkout.postal_code": "الرمز البريدي",
     "checkout.country": "الدولة",
     "checkout.order_notes": "ملاحظات الطلب",
@@ -355,6 +366,7 @@ export const translations: Record<Locale, Record<string, string>> = {
     "validation.address_required": "عنوان الشحن مطلوب",
     "validation.city_required": "المدينة مطلوبة",
     "validation.state_required": "المحافظة مطلوبة",
+    "validation.governorate_required": "يرجى اختيار المحافظة",
     "validation.postal_code_required": "الرمز البريدي مطلوب",
     "validation.country_required": "الدولة مطلوبة",
     "validation.building_required": "رقم المبنى مطلوب",

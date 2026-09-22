@@ -407,6 +407,13 @@
       "when": 1789747315582,
       "tag": "0057_variant_aware_bundles",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1790073423734,
+      "tag": "0058_shipping_zones",
+      "breakpoints": true
     }
   ]
 }

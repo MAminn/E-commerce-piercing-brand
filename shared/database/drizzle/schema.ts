@@ -13,6 +13,8 @@ import {
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { v7 } from "uuid";
+import type { ShippingSnapshot } from "#root/shared/shipping/quote";
+import type { ShippingRulesConfig } from "#root/shared/shipping/rules";
 
 export const userRole = pgEnum("user_role", ["admin", "vendor", "user", "superadmin"]);
 
@@ -427,14 +429,28 @@ export const order = pgTable("order", {
   shippingDistrict: text("shipping_district").notNull().default(""),
   shippingPostalCode: text("shipping_postal_code").notNull(),
   shippingCountry: text("shipping_country").notNull(),
+  /**
+   * Canonical destination (shared/shipping/egypt-governorates.ts). NULL on
+   * orders placed before zone shipping existed and on flat-mode orders whose
+   * checkout did not pick a governorate. `shipping_state` keeps holding the
+   * display name for the address views and the Bosta dispatch path.
+   */
+  shippingGovernorateCode: text("shipping_governorate_code"),
   subtotal: decimal("subtotal", {
     precision: 10,
     scale: 2,
   }).notNull(),
+  /** The amount actually charged for delivery. Snapshot — never recomputed from rules. */
   shipping: decimal("shipping", {
     precision: 10,
     scale: 2,
   }).notNull(),
+  /**
+   * How `shipping` was derived at checkout (provider, rule fee, whether a
+   * free-shipping offer zeroed it). NULL = legacy order priced by the flat
+   * fee before this column existed. Rule edits never touch it.
+   */
+  shippingQuote: jsonb("shipping_quote").$type<ShippingSnapshot>(),
   tax: decimal("tax", {
     precision: 10,
     scale: 2,
@@ -1448,12 +1464,18 @@ export const storeSettings = pgTable("store_settings", {
     .$defaultFn(() => v7())
     .primaryKey(),
   key: text("key").unique().notNull().default("default"),
+  /** Flat-mode fee only. Ignored entirely once `shippingRules.mode === "zones"`. */
   shippingFee: decimal("shipping_fee", {
     precision: 10,
     scale: 2,
   })
     .notNull()
     .default("0"),
+  /**
+   * Destination-based rates (shared/shipping/rules.ts). NULL = never
+   * configured = flat mode, exactly the pre-zones behaviour.
+   */
+  shippingRules: jsonb("shipping_rules").$type<ShippingRulesConfig>(),
   templateSelection: jsonb("template_selection").default({}),
   linkTreeConfig: jsonb("link_tree_config").default({}),
   variantPresets: jsonb("variant_presets")

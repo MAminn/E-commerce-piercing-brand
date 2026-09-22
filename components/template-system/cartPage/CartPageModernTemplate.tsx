@@ -1,4 +1,5 @@
 import React from "react";
+import type { ShippingLineStatus } from "#root/shared/shipping/checkout-shipping";
 import { OfferProgressBanner } from "./OfferProgressBanner";
 import { CartBundleGroup, type CartPageBundleGroup } from "./CartBundleGroup";
 import {
@@ -43,6 +44,13 @@ export interface CartPageTotals {
   subtotal: number;
   discount?: number;
   shipping?: number;
+  /**
+   * "pending" — the fee depends on a governorate the shopper has not chosen
+   * yet (zone shipping); the line reads "Calculated at checkout" and
+   * `grandTotal` is the goods total. "quoted" — `shipping` is exact.
+   * Absent = legacy caller; treated as "quoted".
+   */
+  shippingStatus?: ShippingLineStatus;
   grandTotal: number;
   /** Σ (regular value − fixed price) over the bundle instances in the cart. */
   bundleSavings?: number;
@@ -600,7 +608,16 @@ export function CartPageModernTemplate({
                 />
 
                 {/* Shipping */}
-                {totals.shipping !== undefined && (
+                {totals.shippingStatus === "pending" ? (
+                  <div className='flex justify-between'>
+                    <span className='text-muted-foreground'>
+                      {t("cart.shipping") || "Shipping"}
+                    </span>
+                    <span className='text-muted-foreground'>
+                      {t("cart.shipping_calculated_at_checkout") || "Calculated at checkout"}
+                    </span>
+                  </div>
+                ) : totals.shipping !== undefined ? (
                   <div className='flex justify-between'>
                     <span className='text-muted-foreground'>
                       {t("cart.shipping") || "Shipping"}
@@ -611,7 +628,7 @@ export function CartPageModernTemplate({
                         : `${currency}${totals.shipping.toFixed(2)}`}
                     </span>
                   </div>
-                )}
+                ) : null}
               </div>
 
               {/* Total */}

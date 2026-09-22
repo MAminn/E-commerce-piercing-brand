@@ -29,6 +29,7 @@ export default function CartPage() {
     promoCodeNotice,
     clearPromoCodeNotice,
     shipping,
+    shippingLine,
     appliedOffers,
     freeQuantities,
     bundles,
@@ -104,11 +105,14 @@ export default function CartPage() {
       subtotal,
       discount: discount > 0 ? discount : undefined,
       shipping: shipping > 0 ? shipping : undefined,
+      // No destination is known on the cart page, so in zones mode the fee
+      // is "pending" and the templates say "Calculated at checkout".
+      shippingStatus: shippingLine.status,
       grandTotal: total,
       appliedOffers: appliedOffers.length > 0 ? appliedOffers : undefined,
       bundleSavings: bundleSavings !== 0 ? bundleSavings : undefined,
     };
-  }, [subtotal, discount, shipping, total, appliedOffers, bundleSavings]);
+  }, [subtotal, discount, shipping, shippingLine.status, total, appliedOffers, bundleSavings]);
 
   // Handle quantity change
   const handleQuantityChange = (

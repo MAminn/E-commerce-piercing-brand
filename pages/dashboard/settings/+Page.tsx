@@ -13,7 +13,7 @@ import {
 import { Button } from "#root/components/ui/button";
 import { Input } from "#root/components/ui/input";
 import { Label } from "#root/components/ui/label";
-import { Loader2, Save, Truck, Plus, Trash2, Tags, Globe, PackageX, Mail, Send, Users, FileText } from "lucide-react";
+import { Loader2, Save, Plus, Trash2, Tags, Globe, PackageX, Mail, Send, Users, FileText } from "lucide-react";
 import { Textarea } from "#root/components/ui/textarea";
 import {
   Dialog,
@@ -25,11 +25,10 @@ import {
 } from "#root/components/ui/dialog";
 import { STORE_CURRENCY } from "#root/shared/config/branding";
 import { v7 } from "uuid";
+import { ShippingSettingsCard } from "./ShippingSettingsCard";
 
 export default function SettingsPage() {
-  const [shippingFee, setShippingFee] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
 
   // Variant presets state
   interface PresetValue {
@@ -85,13 +84,12 @@ export default function SettingsPage() {
   const [faqs, setFaqs] = useState<Faq[]>([]);
   const [isSavingPageContent, setIsSavingPageContent] = useState(false);
 
-  // Fetch current shipping fee on mount
+  // Fetch settings on mount (shipping loads inside ShippingSettingsCard)
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [feeResult, presetsResult] = await Promise.all([
-          trpc.settings.getShippingFee.query(),
+        const [presetsResult] = await Promise.all([
           trpc.settings.getVariantPresets.query(),
           trpc.settings.getComingSoonMode.query().then((r) => {
             if (r.success) setComingSoonModeState(r.result);
@@ -110,9 +108,6 @@ export default function SettingsPage() {
           }).catch(() => {}),
         ]);
         if (cancelled) return;
-        if (feeResult.success) {
-          setShippingFee(String(feeResult.result));
-        }
         if (presetsResult.success) {
           setVariantPresets(presetsResult.result as VariantPreset[]);
         }
@@ -127,30 +122,6 @@ export default function SettingsPage() {
       cancelled = true;
     };
   }, []);
-
-  const handleSave = async () => {
-    const fee = Number.parseFloat(shippingFee);
-    if (Number.isNaN(fee) || fee < 0) {
-      toast.error("Please enter a valid shipping fee (0 or more)");
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      const result = await trpc.settings.updateShippingFee.mutate({ fee });
-      if (result.success) {
-        toast.success("Shipping fee updated successfully");
-        setShippingFee(String(result.result.shippingFee));
-      } else {
-        toast.error(result.error || "Failed to update shipping fee");
-      }
-    } catch (err) {
-      console.error("Failed to update shipping fee:", err);
-      toast.error("Failed to update shipping fee");
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   const handleSavePageContent = async () => {
     setIsSavingPageContent(true);
@@ -382,56 +353,7 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className='flex items-center gap-2'>
-            <Truck className='h-5 w-5' />
-            Shipping Fee
-          </CardTitle>
-          <CardDescription>
-            Set a flat shipping fee applied to every order. Set to 0 for free
-            shipping.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className='space-y-4'>
-          <div className='space-y-2'>
-            <Label htmlFor='shippingFee'>Shipping Fee ({STORE_CURRENCY})</Label>
-            <div className='flex items-center gap-3'>
-              <Input
-                id='shippingFee'
-                type='number'
-                min='0'
-                step='0.01'
-                value={shippingFee}
-                onChange={(e) => setShippingFee(e.target.value)}
-                placeholder='0.00'
-                className='max-w-[200px]'
-              />
-              <span className='text-sm text-muted-foreground'>
-                {STORE_CURRENCY}
-              </span>
-            </div>
-            <p className='text-xs text-muted-foreground'>
-              This fee is added to every order at checkout. Enter 0 to offer
-              free shipping.
-            </p>
-          </div>
-
-          <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving ? (
-              <>
-                <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className='mr-2 h-4 w-4' />
-                Save Changes
-              </>
-            )}
-          </Button>
-        </CardContent>
-      </Card>
+      <ShippingSettingsCard />
 
       {/* Product Page Content Card */}
       <Card>

@@ -486,14 +486,21 @@ export function OrderEditPanel({
         <h3 className='font-medium text-sm mb-3'>Order Summary</h3>
         <div className='grid grid-cols-1 sm:grid-cols-3 gap-3'>
           <div className='space-y-1'>
-            <Label className='text-xs'>Shipping</Label>
+            <Label htmlFor='edit-shipping' className='text-xs'>Shipping</Label>
             <Input
+              id='edit-shipping'
               type='number'
               min={0}
               step='0.01'
               value={shipping}
               onChange={(e) => setShipping(e.target.value)}
             />
+            {/* The quoted fee is frozen on the order (shipping_quote). Editing
+                the address here never re-runs the shipping rules — what is
+                typed in this box is what the order is charged. */}
+            <p className='text-[11px] text-muted-foreground'>
+              Manual override — not re-quoted
+            </p>
           </div>
           <div className='space-y-1'>
             <Label className='text-xs'>Tax</Label>

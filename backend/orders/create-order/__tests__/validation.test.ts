@@ -183,3 +183,49 @@ describe("createOrderSchema — address fields backed by NOT NULL columns", () =
     });
   });
 });
+
+describe("createOrderSchema — destination-based shipping fields", () => {
+  it("accepts a canonical governorate code", () => {
+    const parsed = createOrderSchema.safeParse(checkoutPayload({ shippingGovernorateCode: "CAI" }));
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.shippingGovernorateCode).toBe("CAI");
+  });
+
+  it("rejects an arbitrary governorate NAME — only codes reach pricing", () => {
+    expect(errorPaths(checkoutPayload({ shippingGovernorateCode: "Cairo" }))).toContain(
+      "shippingGovernorateCode",
+    );
+    expect(errorPaths(checkoutPayload({ shippingGovernorateCode: "cai" }))).toContain(
+      "shippingGovernorateCode",
+    );
+    expect(errorPaths(checkoutPayload({ shippingGovernorateCode: "ZZZ" }))).toContain(
+      "shippingGovernorateCode",
+    );
+  });
+
+  it("keeps the code optional at the schema level (flat mode / pre-zones clients)", () => {
+    expect(createOrderSchema.safeParse(checkoutPayload()).success).toBe(true);
+    expect(createOrderSchema.safeParse(checkoutPayload({ shippingGovernorateCode: null })).success).toBe(true);
+  });
+
+  it("accepts expectedShippingFee as a non-negative drift assertion only", () => {
+    expect(createOrderSchema.safeParse(checkoutPayload({ expectedShippingFee: 60 })).success).toBe(true);
+    expect(createOrderSchema.safeParse(checkoutPayload({ expectedShippingFee: 0 })).success).toBe(true);
+    expect(errorPaths(checkoutPayload({ expectedShippingFee: -1 }))).toContain("expectedShippingFee");
+    expect(errorPaths(checkoutPayload({ expectedShippingFee: "60" }))).toContain("expectedShippingFee");
+  });
+
+  it("has no field through which a client could set the shipping amount or total", () => {
+    const parsed = createOrderSchema.safeParse(
+      checkoutPayload({ shipping: 0, total: 1, shippingFee: 0, grandTotal: 1 }),
+    );
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      const data = parsed.data as Record<string, unknown>;
+      expect(data).not.toHaveProperty("shipping");
+      expect(data).not.toHaveProperty("total");
+      expect(data).not.toHaveProperty("shippingFee");
+      expect(data).not.toHaveProperty("grandTotal");
+    }
+  });
+});

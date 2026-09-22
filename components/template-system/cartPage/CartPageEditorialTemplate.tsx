@@ -298,7 +298,12 @@ export function CartPageEditorialTemplate({
                     </span>
                   </div>
                 ))}
-                {totals.shipping != null && (
+                {totals.shippingStatus === "pending" ? (
+                  <div className="flex justify-between text-stone-600">
+                    <span>Shipping</span>
+                    <span>Calculated at checkout</span>
+                  </div>
+                ) : totals.shipping != null ? (
                   <div className="flex justify-between text-stone-600">
                     <span>Shipping</span>
                     <span>
@@ -307,7 +312,7 @@ export function CartPageEditorialTemplate({
                         : formatPrice(totals.shipping, currency)}
                     </span>
                   </div>
-                )}
+                ) : null}
               </div>
 
               <div className="mt-4 h-px w-full bg-stone-200" />

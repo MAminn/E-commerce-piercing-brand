@@ -24,6 +24,7 @@ import { broadcastRouter } from "#root/backend/email-automations/broadcast/trpc"
 import { emailAutomationSettingsRouter } from "#root/backend/email-automations/settings-trpc";
 import { emailQueueRouter } from "#root/backend/email-automations/queue/trpc";
 import { typographyRouter } from "#root/backend/typography/trpc";
+import { shippingRouter } from "#root/backend/shipping/trpc";
 import { publicProcedure, router, t } from "./server";
 
 const authRouter = t.router({
@@ -60,6 +61,7 @@ export const appRouter = router({
   emailAutomationSettings: emailAutomationSettingsRouter,
   emailQueue: emailQueueRouter,
   typography: typographyRouter,
+  shipping: shippingRouter,
 });
 
 export type AppRouter = typeof appRouter;

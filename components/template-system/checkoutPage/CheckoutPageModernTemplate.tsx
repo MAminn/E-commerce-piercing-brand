@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Input } from "#root/components/ui/input";
-import { CityCombobox } from "#root/components/checkout/CityCombobox";
+import { GovernorateSelect } from "#root/components/checkout/GovernorateSelect";
+import { getGovernorate, type GovernorateCode } from "#root/shared/shipping/egypt-governorates";
+import type { ShippingLineStatus } from "#root/shared/shipping/checkout-shipping";
 import { Textarea } from "#root/components/ui/textarea";
 import { Button } from "#root/components/ui/button";
 import { Alert, AlertDescription } from "#root/components/ui/alert";
@@ -66,6 +68,15 @@ export interface CheckoutTotals {
   subtotal: number;
   discount?: number;
   shipping?: number;
+  /**
+   * "pending" — no governorate chosen yet under zone shipping; the line reads
+   * "Calculated at checkout". "quoted" — `shipping` is the exact fee.
+   * "unavailable" — the store does not deliver there; ordering is blocked.
+   * Absent = legacy caller; treated as "quoted".
+   */
+  shippingStatus?: ShippingLineStatus;
+  /** True while a fresh quote is in flight after a governorate change. */
+  shippingLoading?: boolean;
   grandTotal: number;
   appliedOffers?: Array<{
     name: string;
@@ -111,6 +122,11 @@ export interface CheckoutPageModernTemplateProps {
   /** A code that stopped being valid on its own (cart edited, code expired, etc). */
   couponNotice?: string | null;
   onDismissCouponNotice?: () => void;
+  /** Canonical governorate currently selected (owned by the page so the cart can re-quote). */
+  governorateCode?: GovernorateCode | null;
+  onGovernorateChange?: (code: GovernorateCode | null) => void;
+  /** Zone shipping is on: a governorate must be chosen before the order can be placed. */
+  governorateRequired?: boolean;
 }
 
 
@@ -182,8 +198,11 @@ export function CheckoutPageModernTemplate({
   onRemoveCoupon,
   couponNotice,
   onDismissCouponNotice,
+  governorateCode = null,
+  onGovernorateChange,
+  governorateRequired = false,
 }: CheckoutPageModernTemplateProps) {
-  const { t } = useMinimalI18n();
+  const { t, locale } = useMinimalI18n();
   const [couponCode, setCouponCode] = useState("");
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
   const [couponFeedback, setCouponFeedback] = useState<{
@@ -267,6 +286,11 @@ export function CheckoutPageModernTemplate({
       errors.address = "Please enter a full street address (at least 5 characters)";
     }
     if (!form.city.trim()) errors.city = t("validation.city_required");
+    if (governorateRequired && !governorateCode) {
+      errors.state = t("validation.governorate_required");
+    } else if (totals.shippingStatus === "unavailable") {
+      errors.state = t("checkout.shipping_unavailable_destination");
+    }
 
     setFieldErrors(errors);
 
@@ -334,6 +358,11 @@ export function CheckoutPageModernTemplate({
   );
   const originalTotal = originalCartTotal + (totals.shipping ?? 0);
   const hasDiscount = originalTotal > totals.grandTotal + 0.001;
+  // Ordering is blocked while the destination cannot be served or a fresh
+  // quote is still in flight — never on "pending", so the shopper can press
+  // the button and be pointed at the governorate field by validation.
+  const shippingBlocksOrder =
+    totals.shippingStatus === "unavailable" || totals.shippingLoading === true;
 
   // Section number component
   const SectionNum = ({ n }: { n: number }) => (
@@ -424,18 +453,38 @@ export function CheckoutPageModernTemplate({
         appliedOffers={appliedOffers}
         currency={currency}
       />
-      {totals.shipping !== undefined && (
-        <div className='flex justify-between'>
+      {totals.shippingStatus === "pending" ? (
+        <div className='flex justify-between' data-testid='shipping-line'>
+          <span className='text-muted-foreground'>
+            {t("cart.shipping") || "Shipping"}
+          </span>
+          <span className='text-muted-foreground'>
+            {t("cart.shipping_calculated_at_checkout") || "Calculated at checkout"}
+          </span>
+        </div>
+      ) : totals.shippingStatus === "unavailable" ? (
+        <div className='flex justify-between text-perce-sale' data-testid='shipping-line'>
+          <span className='font-medium'>
+            {t("cart.shipping") || "Shipping"}
+          </span>
+          <span className='font-semibold'>
+            {t("cart.shipping_unavailable") || "Not available for this destination"}
+          </span>
+        </div>
+      ) : totals.shipping !== undefined ? (
+        <div className='flex justify-between' data-testid='shipping-line'>
           <span className='text-muted-foreground'>
             {t("cart.shipping") || "Shipping"}
           </span>
           <span className='font-semibold'>
-            {totals.shipping === 0
-              ? t("cart.free") || "Free"
-              : formatMoney(totals.shipping, { currency })}
+            {totals.shippingLoading
+              ? "…"
+              : totals.shipping === 0
+                ? t("cart.free") || "Free"
+                : formatMoney(totals.shipping, { currency })}
           </span>
         </div>
-      )}
+      ) : null}
     </div>
   );
 
@@ -716,24 +765,41 @@ export function CheckoutPageModernTemplate({
                     <FieldError id='city-error' message={fieldErrors.city} />
                   </div>
                   <div className='space-y-1.5'>
-                    <FieldLabel htmlFor='state' optional>
+                    <FieldLabel htmlFor='state' optional={!governorateRequired}>
                       {t("checkout.state") || "Governorate"}
                     </FieldLabel>
-                    {/* Free text with suggestions from Bosta's city list when
-                        Bosta is configured; a plain text input when it is not.
-                        Deliberately not a fixed 27-governorate <select>: the
-                        order schema stores whatever is typed and nothing
-                        downstream validates against a canonical list, so a
-                        closed list here would reject addresses the business
-                        can actually deliver to. */}
-                    <CityCombobox
+                    {/* The canonical 27-governorate list — the shipping fee
+                        is priced from this code, so free text would leave the
+                        order unpriceable. Under flat shipping the pick is
+                        optional and only stored on the address. */}
+                    <GovernorateSelect
                       id='state'
                       name='address-level1'
                       autoComplete='address-level1'
-                      placeholder={t("checkout.state") || "Governorate"}
-                      value={form.state}
-                      onChange={(v) => updateField("state", v)}
+                      locale={locale}
+                      required={governorateRequired}
+                      aria-invalid={!!fieldErrors.state}
+                      aria-describedby='state-error'
+                      value={governorateCode}
+                      onChange={(code) => {
+                        updateField("state", code ? getGovernorate(code)?.nameEn ?? "" : "");
+                        onGovernorateChange?.(code);
+                      }}
+                      className={fieldErrors.state ? "border-destructive" : ""}
                     />
+                    {governorateRequired && !governorateCode && !fieldErrors.state && (
+                      <p className='text-xs text-perce-ink-muted'>
+                        {t("checkout.shipping_select_to_calculate") ||
+                          "Select your governorate to see the shipping fee."}
+                      </p>
+                    )}
+                    {totals.shippingStatus === "unavailable" && !fieldErrors.state && (
+                      <p className='text-xs text-perce-sale'>
+                        {t("checkout.shipping_unavailable_destination") ||
+                          "We don't deliver to this governorate yet. Please choose another destination."}
+                      </p>
+                    )}
+                    <FieldError id='state-error' message={fieldErrors.state} />
                   </div>
                 </div>
               </div>
@@ -888,7 +954,7 @@ export function CheckoutPageModernTemplate({
                 type='submit'
                 className='w-full font-bold'
                 size='lg'
-                disabled={isSubmitting || items.length === 0}>
+                disabled={isSubmitting || items.length === 0 || shippingBlocksOrder}>
                 {isSubmitting ? (
                   <span className='flex items-center gap-2'>
                     <Loader2 className='w-4 h-4 animate-spin' />
@@ -983,7 +1049,7 @@ export function CheckoutPageModernTemplate({
                 type='submit'
                 className='w-full font-bold'
                 size='lg'
-                disabled={isSubmitting || items.length === 0}>
+                disabled={isSubmitting || items.length === 0 || shippingBlocksOrder}>
                 {isSubmitting ? (
                   <span className='flex items-center gap-2'>
                     <Loader2 className='w-4 h-4 animate-spin' />

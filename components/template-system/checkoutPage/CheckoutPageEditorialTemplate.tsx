@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { Button } from "#root/components/ui/button";
 import { Input } from "#root/components/ui/input";
-import { CityCombobox } from "#root/components/checkout/CityCombobox";
+import { GovernorateSelect } from "#root/components/checkout/GovernorateSelect";
+import { getGovernorate, type GovernorateCode } from "#root/shared/shipping/egypt-governorates";
 import { Skeleton } from "#root/components/ui/skeleton";
 import { Alert, AlertDescription } from "#root/components/ui/alert";
 import { AlertCircle, Loader2, Shield, ChevronLeft, ChevronDown, ShoppingBag } from "lucide-react";
@@ -41,6 +42,9 @@ export interface CheckoutPageEditorialTemplateProps {
   onRemoveCoupon?: () => void;
   couponNotice?: string | null;
   onDismissCouponNotice?: () => void;
+  governorateCode?: GovernorateCode | null;
+  onGovernorateChange?: (code: GovernorateCode | null) => void;
+  governorateRequired?: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -72,6 +76,9 @@ export function CheckoutPageEditorialTemplate({
   onRemoveCoupon,
   couponNotice,
   onDismissCouponNotice,
+  governorateCode = null,
+  onGovernorateChange,
+  governorateRequired = false,
 }: CheckoutPageEditorialTemplateProps) {
   /* Internal form state — field names match the Modern template so
      pages/checkout/+Page.tsx's submit handler works for either template. */
@@ -94,10 +101,26 @@ export function CheckoutPageEditorialTemplate({
     setFormValues((prev) => ({ ...prev, [key]: value }));
   };
 
+  const [governorateError, setGovernorateError] = useState<string | null>(null);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (governorateRequired && !governorateCode) {
+      setGovernorateError("Please select your governorate");
+      document.getElementById("checkout-state")?.focus();
+      return;
+    }
+    if (totals.shippingStatus === "unavailable") {
+      setGovernorateError("We don't deliver to this governorate yet. Please choose another destination.");
+      document.getElementById("checkout-state")?.focus();
+      return;
+    }
+    setGovernorateError(null);
     onSubmit?.(formValues);
   };
+
+  const shippingBlocksOrder =
+    totals.shippingStatus === "unavailable" || totals.shippingLoading === true;
 
   /* Pill-style input classes */
   const inputCls =
@@ -199,16 +222,28 @@ export function CheckoutPageEditorialTemplate({
             </span>
           </div>
         ))}
-      {totals.shipping != null && (
-        <div className='flex justify-between text-stone-600'>
+      {totals.shippingStatus === "pending" ? (
+        <div className='flex justify-between text-stone-600' data-testid='shipping-line'>
+          <span>Shipping</span>
+          <span>Calculated at checkout</span>
+        </div>
+      ) : totals.shippingStatus === "unavailable" ? (
+        <div className='flex justify-between text-red-700' data-testid='shipping-line'>
+          <span>Shipping</span>
+          <span>Not available for this destination</span>
+        </div>
+      ) : totals.shipping != null ? (
+        <div className='flex justify-between text-stone-600' data-testid='shipping-line'>
           <span>Shipping</span>
           <span>
-            {totals.shipping === 0
-              ? "Free"
-              : formatPrice(totals.shipping, currency)}
+            {totals.shippingLoading
+              ? "…"
+              : totals.shipping === 0
+                ? "Free"
+                : formatPrice(totals.shipping, currency)}
           </span>
         </div>
-      )}
+      ) : null}
     </div>
   );
 
@@ -441,15 +476,36 @@ export function CheckoutPageEditorialTemplate({
                           />
                         </div>
                         <div>
-                          <CityCombobox
+                          <GovernorateSelect
                             id='checkout-state'
                             name='address-level1'
                             autoComplete='address-level1'
-                            value={formValues.state}
-                            onChange={(v) => updateField("state", v)}
-                            className={inputCls}
-                            placeholder='Governorate'
+                            required={governorateRequired}
+                            aria-invalid={!!governorateError}
+                            value={governorateCode}
+                            onChange={(code) => {
+                              setGovernorateError(null);
+                              updateField("state", code ? getGovernorate(code)?.nameEn ?? "" : "");
+                              onGovernorateChange?.(code);
+                            }}
+                            className={cn(inputCls, governorateError && "border-red-500")}
+                            placeholder={governorateRequired ? "Governorate *" : "Governorate"}
                           />
+                          {governorateRequired && !governorateCode && !governorateError && (
+                            <p className='mt-1.5 text-xs text-stone-500'>
+                              Select your governorate to see the shipping fee.
+                            </p>
+                          )}
+                          {totals.shippingStatus === "unavailable" && !governorateError && (
+                            <p className='mt-1.5 text-xs text-red-700'>
+                              We don't deliver to this governorate yet. Please choose another destination.
+                            </p>
+                          )}
+                          {governorateError && (
+                            <p className='mt-1.5 text-xs text-red-700' role='alert'>
+                              {governorateError}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -573,7 +629,7 @@ export function CheckoutPageEditorialTemplate({
                     type='submit'
                     size='lg'
                     className='mt-6 w-full rounded-full py-6 text-sm tracking-wide'
-                    disabled={isSubmitting}>
+                    disabled={isSubmitting || shippingBlocksOrder}>
                     {isSubmitting ? (
                       <>
                         <Loader2 className='me-2 h-4 w-4 animate-spin' />
@@ -646,7 +702,7 @@ export function CheckoutPageEditorialTemplate({
                     type='submit'
                     size='lg'
                     className='w-full rounded-full py-6 text-sm tracking-wide'
-                    disabled={isSubmitting}>
+                    disabled={isSubmitting || shippingBlocksOrder}>
                     {isSubmitting ? (
                       <>
                         <Loader2 className='me-2 h-4 w-4 animate-spin' />

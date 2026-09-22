@@ -485,20 +485,24 @@ export function CartPageMinimalTemplate({
                     appliedOffers={appliedOffers}
                     currency={currency}
                   />
-                  {/* Shown only when the store has a shipping fee configured.
-                      This used to read "Calculated at checkout" whenever the
-                      fee was zero or unknown — but checkout applies the same
-                      single flat fee from store_settings.shipping_fee and
-                      calculates nothing, so the line promised a step that
-                      does not exist. */}
-                  {totals.shipping != null && totals.shipping > 0 && (
+                  {/* "Calculated at checkout" is shown ONLY when it is true:
+                      zone shipping is on and the fee depends on the
+                      governorate chosen at checkout. In flat mode the line
+                      appears only once a fee is configured, exactly as
+                      before. */}
+                  {totals.shippingStatus === "pending" ? (
+                    <div className="flex justify-between text-[13px] text-perce-ink-secondary">
+                      <span>Shipping</span>
+                      <span>Calculated at checkout</span>
+                    </div>
+                  ) : totals.shipping != null && totals.shipping > 0 ? (
                     <div className="flex justify-between text-[13px] text-perce-ink-secondary">
                       <span>Shipping</span>
                       <span>
                         {formatMoney(totals.shipping, { currency })}
                       </span>
                     </div>
-                  )}
+                  ) : null}
                   <div className="pt-3 border-t border-perce-line flex justify-between text-[15px] font-semibold text-perce-ink">
                     <span>Total</span>
                     <span>{formatMoney(totals.grandTotal, { currency })}</span>

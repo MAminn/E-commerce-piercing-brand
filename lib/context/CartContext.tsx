@@ -1,10 +1,14 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from "react";
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from "react";
 import type { ReactNode } from "react";
 import type { Product } from "../mock-data/products";
 import { trpc } from "#root/shared/trpc/client";
 import type { AppliedOffer } from "#root/backend/offers/service";
 import { getCartSessionToken } from "#root/lib/cart-session";
-import { deriveEffectiveShipping, computeFreeItemQuantities } from "#root/shared/pricing/cart-math";
+import { computeFreeItemQuantities } from "#root/shared/pricing/cart-math";
+import type { GovernorateCode } from "#root/shared/shipping/egypt-governorates";
+import type { ShippingQuoteResponse } from "#root/shared/shipping/quote";
+import type { ShippingMode } from "#root/shared/shipping/rules";
+import { deriveShippingLine, type ShippingLine } from "#root/shared/shipping/checkout-shipping";
 import {
   addBundleInstance,
   bundleRegularTotal,
@@ -80,8 +84,17 @@ interface CartContextType {
   totalItems: number;
   subtotal: number;
   discount: number;
+  /** The shipping amount currently in `total`. 0 while no quote is usable — read `shippingLine.status` to tell "free" from "not yet known". */
   shipping: number;
   total: number;
+  /** Server quote state for the summary line: pending / quoted / unavailable. */
+  shippingLine: ShippingLine;
+  /** "flat" until the first quote answers; "zones" means a governorate is required before ordering. */
+  shippingMode: ShippingMode;
+  shippingDestination: GovernorateCode | null;
+  /** Re-quotes shipping for the chosen governorate; `null` clears it. */
+  setShippingDestination: (code: GovernorateCode | null) => void;
+  isShippingQuoteLoading: boolean;
   promoCode: PromoCodeInfo | null;
   applyPromoCode: (code: string) => Promise<PromoCodeApplyResult>;
   removePromoCode: () => void;
@@ -137,11 +150,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [bundlesHydrated, setBundlesHydrated] = useState(false);
   const [promoCode, setPromoCode] = useState<PromoCodeInfo | null>(null);
   const [promoCodeNotice, setPromoCodeNotice] = useState<string | null>(null);
-  // The store's configured shipping fee, fetched once. Never mutate this
-  // directly to reflect "free shipping right now" — `shipping` below derives
-  // that from current offer state instead, so it can never get stuck at 0
-  // after a free-shipping offer stops applying (see appliedOffers).
-  const [baseShippingFee, setBaseShippingFee] = useState<number>(0);
+  // The latest server shipping quote. In flat mode it answers on mount with
+  // the store fee (the cart shows it up front, as before); in zones mode it
+  // answers "destination required" until `setShippingDestination` is called
+  // from checkout. Never mutated to reflect "free shipping right now" —
+  // `shipping` below derives that from current offer state instead, so it
+  // can never get stuck at 0 after a free-shipping offer stops applying.
+  const [shippingResponse, setShippingResponse] = useState<ShippingQuoteResponse | null>(null);
+  const [shippingDestination, setShippingDestinationState] = useState<GovernorateCode | null>(null);
+  const [isShippingQuoteLoading, setIsShippingQuoteLoading] = useState(false);
+  // Quotes are requested as the shopper changes governorate; only the newest
+  // request may write state, or a slow earlier answer would overwrite it.
+  const shippingRequestSeq = useRef(0);
   const [appliedOffers, setAppliedOffers] = useState<AppliedOffer[]>([]);
   const [offerDiscount, setOfferDiscount] = useState<number>(0);
 
@@ -216,18 +236,41 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Fetch shipping fee from backend
-    trpc.settings.getShippingFee
-      .query()
+  }, []);
+
+  const requestShippingQuote = useCallback((code: GovernorateCode | null) => {
+    const seq = ++shippingRequestSeq.current;
+    setIsShippingQuoteLoading(true);
+    trpc.shipping.quote
+      .query({ governorateCode: code })
       .then((result) => {
-        if (result.success) {
-          setBaseShippingFee(result.result);
-        }
+        if (seq !== shippingRequestSeq.current) return;
+        if (result.success) setShippingResponse(result.result);
       })
       .catch((err) => {
-        console.error("Failed to fetch shipping fee:", err);
+        if (seq !== shippingRequestSeq.current) return;
+        // Leave the previous quote in place; the summary keeps saying
+        // "calculated at checkout" and the server re-quotes at order time.
+        console.error("Failed to fetch shipping quote:", err);
+      })
+      .finally(() => {
+        if (seq === shippingRequestSeq.current) setIsShippingQuoteLoading(false);
       });
   }, []);
+
+  // Initial quote with no destination: the flat fee in flat mode, or
+  // "destination required" in zones mode.
+  useEffect(() => {
+    requestShippingQuote(null);
+  }, [requestShippingQuote]);
+
+  const setShippingDestination = useCallback(
+    (code: GovernorateCode | null) => {
+      setShippingDestinationState(code);
+      requestShippingQuote(code);
+    },
+    [requestShippingQuote],
+  );
 
   // ─── Pricing inputs (shared with the server: shared/bundles/cart-pricing.ts) ──
   const regularLines = useMemo<PricingRegularLine[]>(
@@ -250,9 +293,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // invisible here by design.
   const offerInputs = useMemo(() => buildOfferInputs(regularLines, pricingBundles), [regularLines, pricingBundles]);
 
-  // Derived, not state: recomputes from current offers every render, so it
-  // can never get stuck at 0 after a free-shipping offer stops applying.
-  const shipping = deriveEffectiveShipping(baseShippingFee, appliedOffers);
+  // Derived, not state: recomputes from the latest quote and current offers
+  // every render, so it can never get stuck at 0 after a free-shipping offer
+  // stops applying. While no quote is usable the fee is 0 and
+  // `shippingLine.status` tells the UI to say "calculated at checkout".
+  const shippingLine = useMemo(
+    () => deriveShippingLine(shippingResponse, appliedOffers),
+    [shippingResponse, appliedOffers],
+  );
+  const baseShippingFee = shippingLine.baseFee;
+  const shipping = shippingLine.fee;
+  const shippingMode: ShippingMode = shippingResponse?.mode ?? "flat";
 
   // Derived, not state — see shared/bundles/cart-pricing.ts for the order of operations.
   const totals = useMemo(
@@ -658,6 +709,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
         discount,
         shipping,
         total,
+        shippingLine,
+        shippingMode,
+        shippingDestination,
+        setShippingDestination,
+        isShippingQuoteLoading,
         promoCode,
         applyPromoCode,
         removePromoCode,

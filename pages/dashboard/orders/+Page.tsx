@@ -18,6 +18,8 @@ import {
 } from "#root/components/ui/table";
 import { Button } from "#root/components/ui/button";
 import { Input } from "#root/components/ui/input";
+import { describeShippingSnapshot } from "#root/shared/shipping/describe-snapshot";
+import type { ShippingSnapshot } from "#root/shared/shipping/quote";
 import {
   Select,
   SelectContent,
@@ -107,8 +109,12 @@ interface Order {
   shippingState: string | null;
   shippingPostalCode: string | null;
   shippingCountry: string | null;
+  /** Canonical governorate the fee was quoted for; null on legacy / flat-mode orders. */
+  shippingGovernorateCode?: string | null;
   subtotal: string;
   shipping: string;
+  /** Frozen pricing derivation (see shared/shipping/quote.ts); null on legacy orders. */
+  shippingQuote?: ShippingSnapshot | null;
   tax: string;
   discount: string | null;
   promoCodeId: string | null;
@@ -1144,6 +1150,9 @@ export default function Orders() {
                           EGP
                         </span>
                       </div>
+                      <p className='text-xs text-muted-foreground text-right -mt-1'>
+                        {describeShippingSnapshot(selectedOrder.shippingQuote)}
+                      </p>
 
                       <div className='flex justify-between font-bold'>
                         <span>Total:</span>
@@ -1492,6 +1501,9 @@ export default function Orders() {
                           EGP
                         </span>
                       </div>
+                      <p className='text-xs text-muted-foreground text-right -mt-1'>
+                        {describeShippingSnapshot(selectedOrder.shippingQuote)}
+                      </p>
                       <div className='flex justify-between font-bold pt-1 border-t'>
                         <span>Total</span>
                         <span>

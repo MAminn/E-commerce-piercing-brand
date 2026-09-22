@@ -95,14 +95,31 @@ actually configured.
 
 ## 5. SHIPPING
 
-There is **no rate engine**. `store_settings.shipping_fee` is a single flat
-decimal applied to every order, read by `getShippingFeeRaw()`. Bosta and
-Fincart are *dispatch* integrations — they create a delivery after the order
-exists; neither is consulted for a price. There is no per-governorate table.
+Shipping is priced server-side by `backend/shipping/service.ts` (`quoteShipping`),
+the single entry point used by both the public `shipping.quote` endpoint the
+cart/checkout render from and by create-order, which re-quotes inside the
+order transaction and never reads a fee from the client. Two modes, chosen at
+Dashboard → Settings → Shipping and stored in `store_settings.shipping_rules`:
+
+- **Flat fee for all orders** (`mode: "flat"`, and what a `NULL` column means):
+  `store_settings.shipping_fee` for every order, governorate optional — the
+  pre-zones behaviour, unchanged.
+- **By governorate** (`mode: "zones"`): a rate per governorate from the
+  canonical 27-entry list (`shared/shipping/egypt-governorates.ts`), an explicit
+  "other governorates" fee, and per-governorate / fallback "not available".
+  The flat fee is **not** consulted in this mode. Governorate becomes required
+  at checkout; the cart says "Calculated at checkout" until one is picked.
+
+Every order freezes what it was charged and why in `order.shipping` (amount),
+`order.shipping_governorate_code` and `order.shipping_quote` (rule fee, rate
+source, whether a free-shipping offer waived it). Editing rates never changes an
+existing order. Bosta and Fincart remain *dispatch* integrations — they create
+a delivery after the order exists; neither is consulted for a price.
 
 | Item | Where it is read | Current state | Status |
 |---|---|---|---|
-| Flat shipping fee | `store_settings.shipping_fee`, edited at Dashboard → Settings | `0.00` | **REQUIRED FOR FIRST SALE** — at `0` the cart and checkout omit the shipping line entirely and the customer is charged nothing for delivery. |
+| Shipping mode + governorate rates | `store_settings.shipping_rules`, edited at Dashboard → Settings → Shipping | `NULL` (= flat) | **REQUIRED FOR FIRST SALE** — enter the real per-governorate rates and switch to "By governorate", or set a flat fee. The admin card refuses zones mode with no rates and no fallback. |
+| Flat shipping fee | `store_settings.shipping_fee` (flat mode only) | `0.00` | Used only while the mode is flat — at `0` the cart and checkout omit the shipping line entirely and the customer is charged nothing for delivery. |
 | **Bosta** | `SYN_BOSTA_KEY` → `isBostaEnabled()` | **IMPLEMENTED BUT UNCONFIGURED** — creates a delivery after order creation; also supplies the city suggestions behind the checkout governorate field, which silently degrades to a plain text input when absent | OPTIONAL FOR FIRST SALE (orders can be dispatched manually) |
 | Bosta pickup address | `BOSTA_PICKUP_CITY`, `BOSTA_PICKUP_ZONE_ID`, `BOSTA_PICKUP_DISTRICT_ID`, `BOSTA_PICKUP_FIRST_LINE`, `BOSTA_PICKUP_BUILDING_NUMBER`, `BOSTA_PICKUP_FLOOR`, `BOSTA_PICKUP_APARTMENT`, `BOSTA_PICKUP_LOCATION_ID`, `BOSTA_EGYPT_COUNTRY_ID` | unset | **REQUIRED** if Bosta is enabled |
 | `BOSTA_WEBHOOK_SECRET` | webhook endpoint; disabled without `SYN_BOSTA_KEY` | unset | **REQUIRED** if Bosta is enabled |

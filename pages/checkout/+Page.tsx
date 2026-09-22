@@ -81,6 +81,11 @@ export default function CheckoutPage() {
     bundles,
     merchandiseSubtotal,
     bundleChargedValue,
+    shippingLine,
+    shippingMode,
+    shippingDestination,
+    setShippingDestination,
+    isShippingQuoteLoading,
   } = useCart();
   const { getTemplateId } = useTemplate();
   const { trackEvent } = useTracking();
@@ -239,11 +244,27 @@ export default function CheckoutPage() {
     return {
       subtotal: bundles.length > 0 ? merchandiseSubtotal + bundleChargedValue : subtotal,
       discount: discount > 0 ? discount : undefined,
+      // Unchanged rule: a numeric line only for a non-zero fee (a
+      // free-shipping offer is announced by AppliedOffersSavings instead).
+      // shippingStatus tells the templates when to render status text.
       shipping: shipping > 0 ? shipping : undefined,
+      shippingStatus: shippingLine.status,
+      shippingLoading: isShippingQuoteLoading,
       grandTotal: total,
       appliedOffers: appliedOffers.length > 0 ? appliedOffers : undefined,
     };
-  }, [subtotal, merchandiseSubtotal, bundleChargedValue, bundles.length, discount, shipping, total, appliedOffers]);
+  }, [
+    subtotal,
+    merchandiseSubtotal,
+    bundleChargedValue,
+    bundles.length,
+    discount,
+    shipping,
+    shippingLine,
+    isShippingQuoteLoading,
+    total,
+    appliedOffers,
+  ]);
 
   // Handle form submit
   const handleSubmit = async (
@@ -298,6 +319,12 @@ export default function CheckoutPage() {
         shippingAddress: formValues.address || "",
         shippingCity: formValues.city || "",
         shippingState: formValues.state ?? "",
+        // The canonical destination the fee was quoted for; the server
+        // re-quotes from it and never reads a fee from this request.
+        shippingGovernorateCode: shippingDestination,
+        // Drift assertion only: what the summary showed. A different server
+        // figure comes back as a 409 with the new amount, never a silent charge.
+        expectedShippingFee: shippingLine.status === "quoted" ? shippingLine.fee : undefined,
         shippingPostalCode: formValues.postalCode ?? "",
         shippingCountry: formValues.country || "Egypt",
         items: orderItemsPayload,
@@ -402,7 +429,14 @@ export default function CheckoutPage() {
       );
     } catch (error) {
       console.error("[Checkout] Order submission failed:", error);
-      setErrorMessage(parseOrderError(error));
+      const message = parseOrderError(error);
+      setErrorMessage(message);
+      // The server refused because its shipping figure differs from the one
+      // we showed (409). Re-quote so the summary now shows the current fee
+      // and the next submit asserts the right number.
+      if (/shipping fee changed/i.test(message)) {
+        setShippingDestination(shippingDestination);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -454,6 +488,9 @@ export default function CheckoutPage() {
     onRemoveCoupon: removePromoCode,
     couponNotice: promoCodeNotice,
     onDismissCouponNotice: clearPromoCodeNotice,
+    governorateCode: shippingDestination,
+    onGovernorateChange: setShippingDestination,
+    governorateRequired: shippingMode === "zones",
   };
 
   return <Template.component {...templateProps} />;

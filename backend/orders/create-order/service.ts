@@ -43,7 +43,13 @@ import {
   resolveSelectedOptions,
 } from "#root/shared/products/options";
 import { loadPurchasableOptionGroups } from "#root/backend/products/option-groups";
-import { getShippingFeeRaw } from "#root/backend/settings/get-shipping-fee";
+import {
+  buildShippingSnapshot,
+  describeUnavailableQuote,
+  quoteShipping,
+} from "#root/backend/shipping/service";
+import { getGovernorate } from "#root/shared/shipping/egypt-governorates";
+import { governorateCodeSchema } from "#root/shared/shipping/rules";
 import { createBostaDelivery, isBostaEnabled } from "#root/backend/orders/bosta/service";
 import { persistBostaSyncStatus } from "#root/backend/orders/bosta/sync-status";
 import { isFincartEnabled } from "#root/backend/orders/fincart/config";
@@ -132,6 +138,21 @@ export const createOrderSchema = z.object({
   shippingPostalCode: z.string().trim(),
   /** Always populated by checkout (the store is Egypt-only), and a blank country is meaningless — so this one is non-empty. */
   shippingCountry: z.string().trim().min(1),
+  /**
+   * Canonical destination (shared/shipping/egypt-governorates.ts). The value
+   * is validated against the list here, so an arbitrary governorate NAME can
+   * never reach pricing. Optional at the schema level so flat-mode stores and
+   * pre-zones clients keep working; the service refuses a missing code when
+   * zone shipping is on.
+   */
+  shippingGovernorateCode: governorateCodeSchema.optional().nullable(),
+  /**
+   * Drift assertion only: the shipping line the customer was shown. Never a
+   * price input. The server quotes from its own rules and, if that differs,
+   * answers 409 so the shopper re-reads the total instead of being charged
+   * something else.
+   */
+  expectedShippingFee: z.number().nonnegative().optional(),
   /** Ordinary lines. May be empty when the order is bundles only. */
   items: z.array(OrderItemSchema),
   bundles: z.array(OrderBundleSchema).max(20).default([]),
@@ -689,7 +710,32 @@ export const createOrder = (
             })),
           }));
 
-          const shipping = await getShippingFeeRaw(tx);
+          // ─── Shipping: server-authoritative quote ─────────────────────────
+          // Same service, same inputs as the public `shipping.quote` the
+          // checkout rendered from. The client's fee is never read as a
+          // price — only compared, further down, once offers are known.
+          const governorateCode = input.shippingGovernorateCode ?? null;
+          const shippingQuoteResult = await quoteShipping(tx, {
+            governorateCode,
+            cart: {
+              subtotal: regularLines.reduce((s, l) => s + l.price * l.quantity, 0) +
+                pricingBundles.reduce((s, b) => s + b.bundleTotal, 0),
+              itemCount:
+                regularLines.reduce((s, l) => s + l.quantity, 0) +
+                pricingBundles.reduce((s, b) => s + b.items.reduce((n, i) => n + i.quantity, 0), 0),
+            },
+          });
+          const shippingQuote = shippingQuoteResult.response.quote;
+          if (!shippingQuote.available) {
+            throw new ServerError({
+              tag: "ShippingUnavailable",
+              message: `Shipping quote unavailable: ${shippingQuote.reason} (governorate=${governorateCode ?? "none"})`,
+              statusCode: 400,
+              clientMessage: describeUnavailableQuote(shippingQuote),
+            });
+          }
+          const shipping = shippingQuote.amount;
+          const governorate = governorateCode ? getGovernorate(governorateCode) : undefined;
 
           // ─── Evaluate automatic cart offers server-side ───────────────────────
           // Evaluated before the promo code discount below so the promo code's
@@ -904,6 +950,32 @@ export const createOrder = (
             freeShipping: hasFreeShippingFromOffer,
           });
           const effectiveShipping = pricing.shipping;
+
+          // ─── Shipping drift ───────────────────────────────────────────────
+          // The customer saw a shipping line; if ours differs (a rule edit, a
+          // free-shipping offer that expired) we refuse rather than charge a
+          // number they never agreed to. Compared on the CHARGED amount so a
+          // free-shipping offer that applies on both sides compares 0 to 0.
+          if (
+            input.expectedShippingFee !== undefined &&
+            Math.abs(input.expectedShippingFee - effectiveShipping) >= 0.005
+          ) {
+            throw new ServerError({
+              tag: "ShippingFeeChanged",
+              message: `Shipping drift: client expected ${input.expectedShippingFee}, server quoted ${effectiveShipping}`,
+              statusCode: 409,
+              clientMessage: `Shipping fee changed to ${formatMoney(effectiveShipping)}. Please review your order.`,
+            });
+          }
+
+          const shippingSnapshot = buildShippingSnapshot({
+            quote: shippingQuote,
+            mode: shippingQuoteResult.response.mode,
+            freeShippingApplied: hasFreeShippingFromOffer,
+            chargedFee: effectiveShipping,
+            rulesUpdatedAt: shippingQuoteResult.stored.updatedAt,
+          });
+
           // order.subtotal = Σ regular line values (incl. bundle children at
           // regular price); order.discount = bundle savings + offers + promo.
           const orderSubtotal = pricing.subtotal;
@@ -926,7 +998,10 @@ export const createOrder = (
               apartment: input.apartment,
             }),
             shippingCity: input.shippingCity,
-            shippingState: input.shippingState,
+            // A canonical pick wins over whatever free text the form held, so
+            // the address views and the Bosta dispatch path see one spelling.
+            shippingState: governorate?.nameEn ?? input.shippingState,
+            shippingGovernorateCode: governorate?.code ?? null,
             shippingDistrict: input.shippingDistrict,
             shippingPostalCode: input.shippingPostalCode,
             shippingCountry: input.shippingCountry,
@@ -934,6 +1009,7 @@ export const createOrder = (
             discount: combinedDiscount > 0 ? combinedDiscount.toFixed(2) : null,
             promoCodeId: input.promoCodeId || null,
             shipping: effectiveShipping.toFixed(2),
+            shippingQuote: shippingSnapshot,
             tax: "0",
             total: total.toFixed(2),
             notes: input.notes,
