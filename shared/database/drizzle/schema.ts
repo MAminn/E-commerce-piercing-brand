@@ -594,6 +594,22 @@ export const orderItem = pgTable("order_item", {
     scale: 2,
   }),
   name: text("name").notNull(),
+  /**
+   * Merchant-only SNAPSHOT of the product's `internal_code` as it stood when
+   * this line was placed — the same treatment `name` and `price` already get.
+   * Admin history must never be rewritten by a later edit to the product, so
+   * nothing reads this by joining back to `product`: if the merchant renames
+   * PC001 to PC101 tomorrow, every order placed today still reads PC001.
+   *
+   * NULL for lines placed before this column existed and for products that
+   * had no code at the time of purchase. Not backfilled — a code assigned
+   * after the fact was NOT the code the line was sold under.
+   *
+   * Merchant-only, exactly like the product column it copies: never returned
+   * to a storefront client. `order.create` is a PUBLIC procedure that returns
+   * its inserted rows, so see `backend/orders/merchant-fields.ts`.
+   */
+  internalCode: text("internal_code"),
   createdAt: timestamp("created_at", {
     withTimezone: true,
     mode: "date",

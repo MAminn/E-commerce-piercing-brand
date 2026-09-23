@@ -218,6 +218,7 @@ export const editOrder = (
                 price: product.price,
                 discountPrice: product.discountPrice,
                 stock: product.stock,
+                internalCode: product.internalCode,
               })
               .from(product)
               .where(eq(product.id, addition.productId))
@@ -263,6 +264,10 @@ export const editOrder = (
                   : (productData.discountPrice?.toString() ?? null),
               name: productData.name,
               vendorName: null,
+              // Snapshotted at the moment the admin adds the line, the same
+              // way `name` and `price` beside it are. Null when the product
+              // has no code.
+              internalCode: productData.internalCode ?? null,
             });
           }
 

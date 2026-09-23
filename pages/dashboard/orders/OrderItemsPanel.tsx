@@ -47,6 +47,29 @@ export interface AdminOrderItem extends GroupableOrderItem {
   productImage?: string | null;
   /** Phase 7 snapshot of the bought options; null on simple and pre-Phase-7 lines. */
   selectedOptions?: Record<string, string> | null;
+  /**
+   * Merchant-only internal code as it stood when the line was placed. Null on
+   * legacy lines and on products that had no code at purchase time — the
+   * label is omitted entirely in that case rather than showing a blank.
+   *
+   * This is the line's OWN snapshot; it is never looked up from the live
+   * product, so it keeps reading PC001 after the product becomes PC101.
+   */
+  internalCode?: string | null;
+}
+
+/**
+ * The line's internal code, for picking and supplier reference. Merchant-only
+ * — this panel renders inside /dashboard, and the field is stripped from
+ * every customer-facing order payload on the server.
+ */
+function LineCode({ item }: { item: AdminOrderItem }) {
+  if (!item.internalCode) return null;
+  return (
+    <span className='block text-[11px] font-mono text-muted-foreground'>
+      Code: {item.internalCode}
+    </span>
+  );
 }
 
 /** Name + options from the line's own snapshot (never the live product). */
@@ -56,6 +79,7 @@ function LineName({ item, campaignTitle }: { item: AdminOrderItem; campaignTitle
     <span className='min-w-0'>
       <span className='block'>{display.name}</span>
       {display.options && <span className='block text-xs text-muted-foreground'>{display.options}</span>}
+      <LineCode item={item} />
     </span>
   );
 }
@@ -251,6 +275,7 @@ export function OrderItemsList({
               <Thumb item={item} size='lg' />
               <div className='min-w-0 flex-1'>
                 <p className='text-sm font-medium truncate'>{item.name}</p>
+                <LineCode item={item} />
                 <p className='text-xs text-muted-foreground'>
                   {item.quantity} × {unit.toFixed(2)} = {money(standaloneLineTotal(item))}
                 </p>
@@ -282,6 +307,7 @@ export function OrderItemsList({
                             {orderLineDisplay(item.name, item.selectedOptions, group.bundle.campaignTitle).options}
                           </p>
                         )}
+                        <LineCode item={item} />
                         <p className='text-[11px] text-muted-foreground'>
                           regular {unit.toFixed(2)} {STORE_CURRENCY} each
                         </p>

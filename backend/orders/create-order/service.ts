@@ -30,6 +30,7 @@ import {
   type PricingBundle,
   type PricingRegularLine,
 } from "#root/shared/bundles/cart-pricing";
+import { stripOrderItemsMerchantFields } from "../merchant-fields";
 import {
   loadAndValidateBundleSelection,
   type ValidatedBundle,
@@ -1046,6 +1047,41 @@ export const createOrder = (
             });
           }
 
+          // ─── Internal-code snapshot source ───────────────────────────────
+          //
+          // Read here, inside the same transaction that writes the lines, so
+          // every line records the code the product carried at the instant it
+          // was sold. Nothing downstream joins back to `product` to display
+          // it: a later rename (PC001 → PC101) must not rewrite this order.
+          //
+          // Deliberately NOT taken from `ValidatedBundleItem`. That type is
+          // the response body of `bundle.evaluateSelection`, a PUBLIC
+          // procedure, so carrying a merchant-only code on it would publish
+          // the whole catalogue's codes to the storefront. Bundle children
+          // get their snapshot from this server-side map instead.
+          const snapshotProductIds = [
+            ...new Set([
+              ...resolvedLines.map((line) => line.productId),
+              ...validatedBundles.flatMap((b) =>
+                b.items.map((item) => item.productId),
+              ),
+            ]),
+          ];
+          const internalCodeByProduct = new Map<string, string | null>(
+            snapshotProductIds.length === 0
+              ? []
+              : (
+                  await tx
+                    .select({
+                      id: product.id,
+                      internalCode: product.internalCode,
+                    })
+                    .from(product)
+                    .where(inArray(product.id, snapshotProductIds))
+                    .execute()
+                ).map((row) => [row.id, row.internalCode]),
+          );
+
           const orderItems = await Promise.all(
             resolvedLines.map(async (item) => {
               const productData = item.product;
@@ -1081,6 +1117,10 @@ export const createOrder = (
                   name: itemName,
                   vendorName: null, // Single-shop: no vendor names
                   selectedOptions: item.selectedOptions,
+                  // Snapshot, not a live reference. Null when the product has
+                  // no code yet — never invented, never backfilled later.
+                  internalCode:
+                    internalCodeByProduct.get(item.productId) ?? null,
                 })
                 .returning();
 
@@ -1155,6 +1195,11 @@ export const createOrder = (
                   vendorName: null,
                   orderBundleId: snapshot.id,
                   selectedOptions: hasOptions ? item.selectedOptions : null,
+                  // A stack is stored as its individual product lines, so each
+                  // one snapshots its own code — the picker needs to identify
+                  // every constituent piece, not the campaign.
+                  internalCode:
+                    internalCodeByProduct.get(item.productId) ?? null,
                 })
                 .returning();
               if (!row) {
@@ -1170,8 +1215,16 @@ export const createOrder = (
           }
 
           return {
+            // `order.create` is a public procedure — this object is the
+            // checkout response the shopper's browser receives. The inserted
+            // rows carry every `order_item` column, including the merchant-
+            // only snapshot, so the lines are stripped before they leave.
+            // The admin reads the code back through `order.view` instead.
             ...newOrder,
-            items: [...orderItems, ...bundleOrderItems],
+            items: stripOrderItemsMerchantFields([
+              ...orderItems,
+              ...bundleOrderItems,
+            ]),
           };
         });
       }),

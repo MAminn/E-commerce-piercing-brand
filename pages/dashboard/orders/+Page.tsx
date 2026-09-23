@@ -92,6 +92,11 @@ interface OrderItem {
   /** Phase 7 snapshot of the bought options; null on simple and pre-Phase-7 lines. */
   selectedOptions?: Record<string, string> | null;
   /**
+   * Merchant-only internal code snapshotted when the line was placed. Absent
+   * on legacy lines, and the server omits it entirely for non-admin callers.
+   */
+  internalCode?: string | null;
+  /**
    * Set on a line bought as part of a bundle; points at the order's
    * `order_bundle` snapshot. The line stays an individual, pickable SKU —
    * this only decides which group it renders under.

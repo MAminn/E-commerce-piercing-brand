@@ -23,6 +23,7 @@ import {
   type SQL,
 } from "drizzle-orm";
 import { Effect } from "effect";
+import { stripOrderItemMerchantFields } from "../merchant-fields";
 import { z } from "zod";
 import type { ClientSession } from "#root/backend/auth/shared/entities";
 import { ServerError } from "#root/shared/error/server";
@@ -193,6 +194,14 @@ export const viewOrders = (
                     discountPrice: orderItem.discountPrice,
                     name: orderItem.name,
                     /**
+                     * Merchant-only snapshot of the product's internal code at
+                     * purchase time. Stripped below for anyone who is not an
+                     * admin — this procedure is `protectedProcedure`, so an
+                     * ordinary signed-in shopper reaches it for their own
+                     * orders through this very query.
+                     */
+                    internalCode: orderItem.internalCode,
+                    /**
                      * Links this line to its `order_bundle` snapshot. The line
                      * stays a normal, individually pickable SKU — this only
                      * tells the admin UI which visual group it belongs to.
@@ -260,8 +269,15 @@ export const viewOrders = (
 
               const itemsWithImage = items.map((it) => {
                 const { productImageDiskname, orderId: _orderId, ...rest } = it;
+                // The internal code is merchant-only. A customer reading their
+                // own order history comes through here too, so the key is
+                // removed outright rather than nulled — a null would still
+                // tell them the field exists and superjson would ship it.
+                const visible = isAdmin
+                  ? rest
+                  : stripOrderItemMerchantFields(rest);
                 return {
-                  ...rest,
+                  ...visible,
                   productImage: productImageDiskname
                     ? `/uploads/${productImageDiskname}`
                     : null,

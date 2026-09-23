@@ -421,6 +421,13 @@
       "when": 1790163051166,
       "tag": "0059_product_internal_code_cost",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1790181457304,
+      "tag": "0060_order_item_internal_code",
+      "breakpoints": true
     }
   ]
 }

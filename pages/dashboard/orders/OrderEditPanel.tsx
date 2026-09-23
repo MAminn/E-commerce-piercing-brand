@@ -48,6 +48,8 @@ export interface EditableOrder {
     name: string;
     discountPrice?: string | null;
     productImage?: string | null;
+    /** Merchant-only snapshot from the moment the line was placed. */
+    internalCode?: string | null;
   }[];
 }
 
@@ -55,6 +57,11 @@ interface DraftItem {
   orderItemId: string;
   name: string;
   productImage?: string | null;
+  /**
+   * Carried through the draft read-only: the admin edits quantity and price,
+   * never the snapshot. Rewriting it would falsify what the line was sold as.
+   */
+  internalCode?: string | null;
   quantity: number;
   /** Unit price charged for this line, as typed. */
   unitPrice: string;
@@ -109,6 +116,7 @@ export function OrderEditPanel({
       orderItemId: it.id,
       name: it.name,
       productImage: it.productImage,
+      internalCode: it.internalCode,
       quantity: it.quantity,
       unitPrice: num(it.discountPrice || it.price).toFixed(2),
       removed: false,
@@ -329,6 +337,13 @@ export function OrderEditPanel({
               </div>
               <div className='min-w-[120px] flex-1'>
                 <p className='text-sm font-medium truncate'>{it.name}</p>
+                {/* Merchant-only, and read-only: the snapshot records what the
+                    line was sold as, so editing the order must not rewrite it. */}
+                {it.internalCode && (
+                  <p className='text-[11px] font-mono text-muted-foreground'>
+                    Code: {it.internalCode}
+                  </p>
+                )}
                 <p className='text-xs text-muted-foreground'>
                   {(num(it.unitPrice) * (it.removed ? 0 : it.quantity)).toFixed(
                     2,
