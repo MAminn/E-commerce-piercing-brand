@@ -414,6 +414,13 @@
       "when": 1790073423734,
       "tag": "0058_shipping_zones",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1790163051166,
+      "tag": "0059_product_internal_code_cost",
+      "breakpoints": true
     }
   ]
 }

@@ -363,8 +363,31 @@ export const product = pgTable("product", {
   bestLayeredWithIds: jsonb("best_layered_with_ids")
     .default([])
     .$type<string[]>(),
+  /**
+   * Merchant-only internal reference code (e.g. FB001, ER001) for the
+   * inventory/supplier system. This is NOT the customer-facing "SKU" the
+   * product-page templates render — it must never reach a storefront client.
+   * Unique when present; NULL means "not entered yet", and Postgres exempts
+   * NULLs from a unique index so any number of rows may be blank.
+   */
+  internalCode: text("internal_code"),
+  /**
+   * Merchant-only unit cost in EGP. NULL means "not entered yet" and is
+   * deliberately NOT defaulted to 0 — 0 is a real value (a genuinely
+   * zero-cost item), so defaulting would contaminate future margin
+   * reporting. Never returned to storefront clients, and never an input to
+   * any selling price, bundle, discount, cart, shipping or payment figure.
+   */
+  costPrice: decimal("cost_price", {
+    precision: 10,
+    scale: 2,
+  }),
 }, (table) => ({
   slugUnique: uniqueIndex("product_slug_idx").on(table.slug),
+  /** Enforces "no duplicate non-empty internal codes"; NULLs are exempt. */
+  internalCodeUnique: uniqueIndex("product_internal_code_idx").on(
+    table.internalCode,
+  ),
   /** Backs category browsing and the Phase 4 dynamic bundle-eligibility scan. */
   categoryIdx: index("product_category_idx").on(table.categoryId),
 }));

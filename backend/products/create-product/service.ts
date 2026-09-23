@@ -10,6 +10,16 @@ import { ServerError } from "#root/shared/error/server";
 import { Effect } from "effect";
 import { z } from "zod";
 import { validateProductRules, fragranceInfoSchema } from "../shared";
+import {
+  costPriceInputSchema,
+  costPriceToColumn,
+  internalCodeInputSchema,
+  normalizeInternalCode,
+} from "../merchant-fields";
+import {
+  assertInternalCodeAvailable,
+  rethrowInternalCodeConflict,
+} from "../internal-code";
 import { getStoreOwnerId } from "#root/shared/config/store";
 import { generateUniqueProductSlug } from "../slug";
 import { eq } from "drizzle-orm";
@@ -55,6 +65,10 @@ export const createProductSchema = z.object({
   hidden: z.boolean().optional().default(false),
   fragranceInfo: fragranceInfoSchema,
   bestLayeredWithIds: z.array(z.string().uuid()).optional(),
+  /** Merchant-only. Trimmed and upper-cased by the schema; blank stores NULL. */
+  internalCode: internalCodeInputSchema,
+  /** Merchant-only, EGP. Blank stores NULL — never 0. */
+  costPrice: costPriceInputSchema,
 });
 
 export const createProduct = (
@@ -79,6 +93,21 @@ export const createProduct = (
 
     return yield* $(
       query(async (db) => {
+        // Normalized HERE rather than trusting the input schema's transform.
+        // That transform only runs for callers who go through tRPC; the seed
+        // script, a future bulk import or any other service calls this
+        // function directly, and an unnormalized code would make the unique
+        // index meaningless ("fb001" and "FB001" as two rows) and store ""
+        // where NULL belongs.
+        const internalCode = normalizeInternalCode(data.internalCode);
+
+        // Checked before the transaction opens so the admin gets the specific
+        // "already used by <name>" message instead of a raw unique-index
+        // violation. The insert is still guarded by the index itself, which
+        // is what settles a race between two concurrent saves — hence the
+        // catch below.
+        await assertInternalCodeAvailable(db, internalCode);
+
         const newProduct = await db.transaction(async (tx) => {
           const newProduct = await tx
             .insert(product)
@@ -98,6 +127,9 @@ export const createProduct = (
               hidden: data.hidden ?? false,
               fragranceInfo: data.fragranceInfo ?? null,
               bestLayeredWithIds: data.bestLayeredWithIds ?? [],
+              internalCode,
+              // NULL when the admin left it blank; deliberately not 0.
+              costPrice: costPriceToColumn(data.costPrice),
             })
             .returning()
             .then((data) => data[0]);
@@ -177,7 +209,9 @@ export const createProduct = (
           }
 
           return newProduct;
-        });
+        }).catch((error) =>
+          rethrowInternalCodeConflict(error, internalCode),
+        );
 
         return newProduct;
       }),

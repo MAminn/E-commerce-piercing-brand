@@ -14,6 +14,11 @@ export const viewProductsProcedure = publicProcedure
 			input.includeHidden && !isAdmin ? { ...input, includeHidden: false } : input;
 
 		return await runBackendEffect(
-			viewProducts(safeInput).pipe(provideDatabase(ctx)),
+			viewProducts(safeInput, {
+				// Public procedure — internal codes and costs are merchant-only,
+				// so they are attached only for an authenticated admin. Derived
+				// from the session here, never from the input.
+				includeMerchantFields: isAdmin,
+			}).pipe(provideDatabase(ctx)),
 		).then(serializeBackendEffectResult);
 	});

@@ -286,7 +286,7 @@ export default function Products() {
         <CardContent>
           <div className='mb-4 flex items-center justify-center space-x-4'>
             <Input
-              placeholder='Search products...'
+              placeholder='Search by name, description or internal code...'
               value={search}
               onChange={handleSearchChange}
               className='max-w-sm'
@@ -305,6 +305,8 @@ export default function Products() {
               <TableRow>
                 <TableHead>Image</TableHead>
                 <TableHead>Name</TableHead>
+                {/* Merchant-only — this table is inside the admin dashboard. */}
+                <TableHead>Internal Code</TableHead>
                 <TableHead>Price</TableHead>
                 <TableHead>Discount Price</TableHead>
                 <TableHead>Stock</TableHead>
@@ -327,6 +329,15 @@ export default function Products() {
                     />
                   </TableCell>
                   <TableCell>{product.name}</TableCell>
+                  <TableCell>
+                    {product.internalCode ? (
+                      <span className='font-mono text-xs'>
+                        {product.internalCode}
+                      </span>
+                    ) : (
+                      <span className='text-xs text-muted-foreground'>—</span>
+                    )}
+                  </TableCell>
                   <TableCell>{product.price} EGP</TableCell>
                   <TableCell>
                     {product.discountPrice
@@ -406,6 +417,14 @@ export default function Products() {
                   : null,
                 sortOrder: selectedProductData.product.sortOrder ?? undefined,
                 hidden: selectedProductData.product.hidden ?? false,
+                internalCode: selectedProductData.product.internalCode ?? "",
+                // Kept as null (not 0) when unset — the form renders an empty
+                // cost input rather than a cost the admin never entered.
+                costPrice:
+                  selectedProductData.product.costPrice === null ||
+                  selectedProductData.product.costPrice === undefined
+                    ? null
+                    : Number(selectedProductData.product.costPrice),
                 imageId: selectedProductData.file?.id ?? "",
                 productImages: productImages,
                 categoryIds: selectedProductCategories,

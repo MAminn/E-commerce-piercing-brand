@@ -11,6 +11,16 @@ import { and, eq, inArray, not } from "drizzle-orm";
 import { Effect } from "effect";
 import { z } from "zod";
 import { validateProductRules, fragranceInfoSchema } from "../shared";
+import {
+  costPriceInputSchema,
+  costPriceToColumn,
+  internalCodeInputSchema,
+  normalizeInternalCode,
+} from "../merchant-fields";
+import {
+  assertInternalCodeAvailable,
+  rethrowInternalCodeConflict,
+} from "../internal-code";
 
 export const editProductSchema = z.object({
   id: z.string().uuid(),
@@ -54,6 +64,18 @@ export const editProductSchema = z.object({
   hidden: z.boolean().optional().default(false),
   fragranceInfo: fragranceInfoSchema,
   bestLayeredWithIds: z.array(z.string().uuid()).optional(),
+  /**
+   * Merchant-only. Trimmed and upper-cased by the schema; an empty string
+   * clears the code back to NULL. Omitting the key entirely leaves the stored
+   * value untouched, so an older client that doesn't know about the field
+   * cannot wipe it.
+   */
+  internalCode: internalCodeInputSchema,
+  /**
+   * Merchant-only, EGP. `null` clears it back to NULL — never to 0. Omitting
+   * the key leaves the stored value untouched.
+   */
+  costPrice: costPriceInputSchema,
 });
 
 export const editProduct = (
@@ -78,6 +100,22 @@ export const editProduct = (
 
     return yield* $(
       query(async (db) => {
+        // `internalCode` is optional on this contract, so "key absent" means
+        // "leave it alone" — `undefined` has to survive, while a sent value
+        // is normalized here rather than at the tRPC edge so direct callers
+        // get the same guarantee (see the note in create-product).
+        const internalCode =
+          data.internalCode === undefined
+            ? undefined
+            : normalizeInternalCode(data.internalCode);
+
+        // Only validate uniqueness when a value was actually sent. Re-saving
+        // a product with its own code is not a conflict, hence excluding its
+        // own id.
+        if (internalCode !== undefined) {
+          await assertInternalCodeAvailable(db, internalCode, data.id);
+        }
+
         const existingProduct = await db
           .select()
           .from(product)
@@ -118,6 +156,14 @@ export const editProduct = (
                 : {}),
               ...(data.bestLayeredWithIds !== undefined
                 ? { bestLayeredWithIds: data.bestLayeredWithIds }
+                : {}),
+              // Merchant-only fields. Same "omitted means leave alone"
+              // rule as the legacy columns above: a client that doesn't
+              // send them must not clear them. Sending an empty code, or a
+              // null cost, DOES clear the stored value back to NULL.
+              ...(internalCode !== undefined ? { internalCode } : {}),
+              ...(data.costPrice !== undefined
+                ? { costPrice: costPriceToColumn(data.costPrice) }
                 : {}),
               updatedAt: new Date(),
             })
@@ -229,7 +275,9 @@ export const editProduct = (
           // We only update variants if explicitly provided - otherwise keep existing ones
 
           return updatedProduct;
-        });
+        }).catch((error) =>
+          rethrowInternalCodeConflict(error, internalCode ?? null),
+        );
 
         return updatedProduct;
       }),

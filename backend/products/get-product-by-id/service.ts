@@ -12,6 +12,7 @@ import { and, eq, inArray, or } from "drizzle-orm";
 import { Effect } from "effect";
 import { z } from "zod";
 import { ServerError } from "#root/shared/error/server";
+import { stripMerchantFields } from "../merchant-fields";
 
 // Accepts either the product's slug (new URLs) or its raw UUID (old
 // bookmarked/shared links) — the single query below matches either.
@@ -138,9 +139,15 @@ export const getProductById = (input: z.infer<typeof getProductByIdSchema>) =>
                 )
             : [];
 
-        // Format the final product object
+        // Format the final product object.
+        //
+        // `foundProduct` is the WHOLE product row (the select above asks for
+        // `product: product`), and this procedure is public — it backs the
+        // storefront product page and its SSR payload. Spreading the raw row
+        // would publish every column added to the table from now on, so the
+        // merchant-only ones are removed first.
         const formattedProduct = {
-          ...foundProduct,
+          ...stripMerchantFields(foundProduct),
           price: Number(foundProduct.price),
           discountPrice: foundProduct.discountPrice
             ? Number(foundProduct.discountPrice)

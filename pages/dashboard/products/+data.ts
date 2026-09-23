@@ -34,6 +34,11 @@ export async function data(ctx: PageContext) {
     } as const;
   }
 
+  // The dashboard guard already turns non-admins away; this is the check that
+  // decides whether the merchant-only product columns get loaded, so it is
+  // made explicitly here rather than inherited.
+  const isAdmin = session.role === "admin" || session.role === "superadmin";
+
   // Parse page and limit from URL query, providing defaults
   const currentPage =
     Number.parseInt(ctx.urlParsed.search.page || "1", 10) || 1;
@@ -64,6 +69,12 @@ export async function data(ctx: PageContext) {
       search: ctx.urlParsed.search.search,
       sortBy: validatedSortBy, // Pass validated value
       includeHidden: true,
+    }, {
+      // This loader only runs inside /dashboard, which pages/dashboard/+guard.ts
+      // restricts to admin and superadmin, so the merchant-only columns are
+      // safe to load here — the edit form and the Internal Code column need
+      // them. The role is re-checked below regardless.
+      includeMerchantFields: isAdmin,
     }).pipe(Effect.provideService(DatabaseClientService, ctx.db))
   ).then(serializeBackendEffectResult);
 

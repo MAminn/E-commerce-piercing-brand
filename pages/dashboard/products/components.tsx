@@ -191,6 +191,10 @@ export function ProductForm({
     sortOrder?: number;
     hidden?: boolean;
     bestLayeredWithIds?: string[] | null;
+    /** Merchant-only internal reference code, e.g. FB001. */
+    internalCode?: string | null;
+    /** Merchant-only unit cost in EGP. `null` = not entered yet. */
+    costPrice?: number | string | null;
   }>;
   categories: { id: string; name: string }[];
   vendors?: { id: string; name: string }[];
@@ -243,6 +247,36 @@ export function ProductForm({
     sortOrder: z.coerce.number().int().min(0).optional(),
     hidden: z.boolean().default(false),
     bestLayeredWithIds: z.array(z.string()).optional().default([]),
+    /**
+     * Merchant-only. Normalized again on the server; doing it here too means
+     * the admin sees the canonical form ("FB001") before saving.
+     */
+    internalCode: z
+      .string()
+      .max(64, "Internal code must be 64 characters or fewer")
+      .optional()
+      .default(""),
+    /**
+     * Merchant-only unit cost in EGP.
+     *
+     * A cleared number input reads back as `NaN` (`valueAsNumber` on an empty
+     * field) and an untouched one as `""`. Both mean "not entered" and must
+     * become `null`, NOT 0 — `z.coerce.number()` would turn `""` into 0 and
+     * silently record a zero cost on every product the admin never filled in.
+     */
+    costPrice: z.preprocess(
+      (v) =>
+        v === "" ||
+        v === null ||
+        v === undefined ||
+        (typeof v === "number" && Number.isNaN(v))
+          ? null
+          : Number(v),
+      z
+        .number({ invalid_type_error: "Cost must be a number" })
+        .min(0, "Cost cannot be negative")
+        .nullable(),
+    ),
   });
 
   // Debug initial values
@@ -282,6 +316,14 @@ export function ProductForm({
       bestLayeredWithIds: Array.isArray(initialValues?.bestLayeredWithIds)
         ? initialValues.bestLayeredWithIds
         : [],
+      internalCode: initialValues?.internalCode ?? "",
+      // A stored NULL cost stays null in the form so the input renders empty
+      // rather than showing a 0 the admin never entered.
+      costPrice:
+        initialValues?.costPrice === null ||
+        initialValues?.costPrice === undefined
+          ? null
+          : Number(initialValues.costPrice),
     },
   });
 
@@ -404,6 +446,12 @@ export function ProductForm({
           variants: values.variants || [],
           // Convert null to undefined for type compatibility
           discountPrice: values.discountPrice ?? undefined,
+          // Merchant-only. Sent on every save so clearing either field
+          // actually clears it — the edit contract treats an ABSENT key as
+          // "leave alone", which is what protects clients that predate the
+          // fields. Blank cost stays null, never 0.
+          internalCode: values.internalCode ?? "",
+          costPrice: values.costPrice ?? null,
         };
         result = await trpc.product.edit.mutate(payload);
       } else {
@@ -413,6 +461,8 @@ export function ProductForm({
           imageId: values.imageId,
           // Convert null to undefined for type compatibility
           discountPrice: values.discountPrice ?? undefined,
+          internalCode: values.internalCode ?? "",
+          costPrice: values.costPrice ?? null,
         });
       }
 
@@ -560,6 +610,86 @@ export function ProductForm({
                       }}
                     />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          {/*
+            Merchant-only fields. Neither is ever sent to a storefront client
+            and neither takes part in any price the customer pays.
+          */}
+          <div className='grid grid-cols-2 gap-4 rounded-lg border border-dashed p-3'>
+            <div className='col-span-2 -mb-1'>
+              <p className='text-xs font-medium text-muted-foreground'>
+                Internal only — never shown to customers
+              </p>
+            </div>
+
+            <FormField
+              control={form.control}
+              name='internalCode'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Internal Product Code</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder='e.g. FB001'
+                      value={field.value ?? ""}
+                      onChange={(e) => field.onChange(e.target.value)}
+                      onBlur={(e) => {
+                        // Show the canonical form the server will store, so
+                        // the admin isn't surprised by " fb001 " becoming
+                        // FB001 after the save.
+                        field.onChange(e.target.value.trim().toUpperCase());
+                        field.onBlur();
+                      }}
+                    />
+                  </FormControl>
+                  <p className='text-xs text-muted-foreground'>
+                    Must be unique. Leave blank if not assigned yet.
+                  </p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name='costPrice'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Product Cost (EGP)</FormLabel>
+                  <FormControl>
+                    <div className='relative'>
+                      <Input
+                        type='number'
+                        min='0'
+                        step='0.01'
+                        placeholder='0.00'
+                        className='pr-12'
+                        value={
+                          field.value === null || field.value === undefined
+                            ? ""
+                            : field.value
+                        }
+                        onChange={(e) => {
+                          // Empty input → null, NOT 0. A zero cost is a real
+                          // value and has to stay distinguishable from "not
+                          // entered yet".
+                          const raw = e.target.value;
+                          field.onChange(raw === "" ? null : Number(raw));
+                        }}
+                      />
+                      <span className='pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground'>
+                        EGP
+                      </span>
+                    </div>
+                  </FormControl>
+                  <p className='text-xs text-muted-foreground'>
+                    Our unit cost. Leave blank if unknown.
+                  </p>
                   <FormMessage />
                 </FormItem>
               )}

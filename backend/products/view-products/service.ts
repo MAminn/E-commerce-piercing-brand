@@ -20,6 +20,43 @@ import {
 } from "drizzle-orm";
 import { Effect } from "effect";
 import { z } from "zod";
+import {
+  stripMerchantFields,
+  type MerchantOnlyProductField,
+} from "../merchant-fields";
+
+/**
+ * Shape of the `product` row in a `viewProducts` result.
+ *
+ * The merchant-only columns are OPTIONAL rather than present, because they
+ * are attached only when the caller both asked for them and is an admin. A
+ * consumer therefore has to cope with them being absent, which is the honest
+ * shape — on the public path `stripMerchantFields` deletes the keys outright,
+ * so they are `undefined` and never serialized.
+ */
+export type ViewProductsRow = Omit<
+  typeof product.$inferSelect,
+  MerchantOnlyProductField
+> &
+  Partial<Pick<typeof product.$inferSelect, MerchantOnlyProductField>>;
+
+/**
+ * Caller-supplied, never client-supplied.
+ *
+ * `includeMerchantFields` is a second argument rather than a field on
+ * `viewProductsSchema` on purpose: anything on that schema is tRPC input and
+ * is therefore settable by whoever calls `product.view`, which is a PUBLIC
+ * procedure. Keeping it out of the schema means a storefront client has no
+ * way to ask for the merchant columns at all.
+ */
+export type ViewProductsOptions = {
+  /**
+   * Include `internalCode` / `costPrice` on each row. Only ever true for an
+   * authenticated admin — the tRPC procedure derives it from the session, and
+   * the admin dashboard's data loader sets it behind the dashboard guard.
+   */
+  includeMerchantFields?: boolean;
+};
 
 export const viewProductsSchema = z.object({
   limit: z.number().min(1).max(100).optional(),
@@ -58,8 +95,12 @@ export const viewProductsSchema = z.object({
  * into this query, which is precisely how a count query starts
  * double-counting products.
  */
-export const viewProducts = (input: z.infer<typeof viewProductsSchema>) =>
+export const viewProducts = (
+  input: z.infer<typeof viewProductsSchema>,
+  options: ViewProductsOptions = {},
+) =>
   Effect.gen(function* ($) {
+    const includeMerchantFields = options.includeMerchantFields === true;
     return yield* $(
       query(async (db) => {
         return await db.transaction(async (tx) => {
@@ -75,6 +116,14 @@ export const viewProducts = (input: z.infer<typeof viewProductsSchema>) =>
                 ilike(product.name, `%${input.search}%`),
                 ilike(product.description, `%${input.search}%`),
                 ilike(category.name, `%${input.search}%`),
+                // Admins can find a product by its internal code (FB001…).
+                // Gated on the same flag that decides whether the column may
+                // be READ: without the gate a storefront client could not see
+                // the codes but could still confirm one exists by searching
+                // for it, which leaks them a guess at a time.
+                ...(includeMerchantFields
+                  ? [ilike(product.internalCode, `%${input.search}%`)]
+                  : []),
               ),
             );
           }
@@ -202,6 +251,13 @@ export const viewProducts = (input: z.infer<typeof viewProductsSchema>) =>
               productCategoryMap.get(productData.product.id) || [];
             return {
               ...productData,
+              // The product select above is `.select()` — the WHOLE row —
+              // so every column, including the merchant-only ones, is here
+              // by default. This is the only thing standing between
+              // `cost_price` and a storefront client.
+              product: (includeMerchantFields
+                ? productData.product
+                : stripMerchantFields(productData.product)) as ViewProductsRow,
               // Null whenever the product's category row was hard-deleted or
               // the FK was never set — the LEFT join no longer drops the
               // product on that account, so the shape has to admit it.
