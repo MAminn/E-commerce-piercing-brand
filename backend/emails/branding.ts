@@ -4,6 +4,7 @@ import { getEmailAutomationSettingsRaw } from "#root/backend/email-automations/s
 import { db } from "#root/shared/database/drizzle/db";
 import { getStoreOwnerId } from "#root/shared/config/store";
 import {
+  DEFAULT_STORE_NAME,
   STORE_NAME,
   STORE_CURRENCY,
   SUPPORT_EMAIL,
@@ -18,14 +19,14 @@ export interface EmailBranding {
   logoUrl: string | undefined;
   contactEmail: string | undefined;
   currency: string;
-  isMinimal: boolean;
   socialLinks: Array<{ platform: string; url: string }>;
 }
 
 /**
  * Resolves branding values for email templates from layout settings.
  * Returns store name (from siteTitle or STORE_NAME env), logo URL, contact
- * email, currency, and whether the minimal template is active.
+ * email and currency. Every customer email uses the same brand templates
+ * whatever navbar style the storefront has — nothing here depends on it.
  */
 export async function getEmailBranding(): Promise<EmailBranding> {
   try {
@@ -37,8 +38,7 @@ export async function getEmailBranding(): Promise<EmailBranding> {
     const templateSelection = await getTemplateSelectionRaw(db());
     const activeLandingTemplate = resolveLandingTemplateId(templateSelection);
     const settings = await getLayoutSettings(getStoreOwnerId(), activeLandingTemplate);
-    const isMinimal = settings.header.navbarStyle === "minimal";
-    const storeName = settings.siteTitle || STORE_NAME || "Store";
+    const storeName = resolveStoreName(settings.siteTitle);
 
     // Gmail, Outlook.com, and Yahoo all strip `data:` URI images out of HTML
     // emails (a known anti-phishing measure — they refuse to render an image
@@ -69,10 +69,8 @@ export async function getEmailBranding(): Promise<EmailBranding> {
       // CMS value first, then the configured support inbox. Stays undefined
       // when neither exists so templates omit the contact line entirely
       // rather than printing a previous brand's address.
-      contactEmail:
-        settings.header.contactEmail || SUPPORT_EMAIL || undefined,
+      contactEmail: resolveContactEmail(settings.header.contactEmail),
       currency: STORE_CURRENCY,
-      isMinimal,
       // CMS links win; anything the admin hasn't filled in (empty or the
       // seeded "#" placeholder) is dropped rather than rendered as a dead
       // link. Falls back to the env-configured profiles, which are empty
@@ -81,14 +79,72 @@ export async function getEmailBranding(): Promise<EmailBranding> {
     };
   } catch {
     return {
-      storeName: STORE_NAME || "Store",
+      storeName: resolveStoreName(undefined),
       logoUrl: undefined,
-      contactEmail: SUPPORT_EMAIL || undefined,
+      contactEmail: resolveContactEmail(undefined),
       currency: STORE_CURRENCY,
-      isMinimal: false,
       socialLinks: resolveSocialLinks(undefined),
     };
   }
+}
+
+/*
+ * Identity of the projects this codebase was copied from
+ * (docs/CURRENT_PROJECT.md, "Relationship to previous brands"). Layout
+ * settings rows can predate the rebrand, so a stored site title or contact
+ * address may still carry one of them; nothing matching is ever emailed to a
+ * customer. Kept server-side only so it never reaches the client bundle.
+ */
+
+/** Previous brand names, matched as whole words in a store name. */
+const PREVIOUS_BRAND_NAME_PATTERN =
+  /\b(lebsy|lebsey|synt|zeli)\b|syntperfumes|perce-eg\.com/i;
+
+/**
+ * Retired inboxes and domains. Addresses are matched exactly and domains by
+ * the part after "@" (subdomains included) — never by the local part, so a
+ * current-brand address that happens to contain an old word still works.
+ */
+const RETIRED_EMAIL_ADDRESSES = [
+  "support@lebsy.com",
+  "cs@lebsey.com",
+  "syntperfumes@gmail.com",
+];
+const RETIRED_EMAIL_DOMAINS = [
+  "perce-eg.com",
+  "syntperfumes.com",
+  "lebsy.com",
+  "lebsey.com",
+];
+
+function isRetiredEmail(email: string): boolean {
+  const address = email.toLowerCase();
+  const domain = address.slice(address.lastIndexOf("@") + 1);
+  return (
+    RETIRED_EMAIL_ADDRESSES.includes(address) ||
+    RETIRED_EMAIL_DOMAINS.some((d) => domain === d || domain.endsWith(`.${d}`))
+  );
+}
+
+/** CMS site title → STORE_NAME → the brand's own name, skipping blanks and previous brands. */
+function resolveStoreName(cmsTitle: string | undefined): string {
+  for (const candidate of [cmsTitle, STORE_NAME]) {
+    const name = candidate?.trim();
+    if (name && !PREVIOUS_BRAND_NAME_PATTERN.test(name)) return name;
+  }
+  return DEFAULT_STORE_NAME;
+}
+
+/**
+ * CMS contact email → SUPPORT_EMAIL. Undefined when neither is a usable
+ * current-brand address; there is deliberately no default inbox.
+ */
+function resolveContactEmail(cmsEmail: string | undefined): string | undefined {
+  for (const candidate of [cmsEmail, SUPPORT_EMAIL]) {
+    const email = candidate?.trim();
+    if (email?.includes("@") && !isRetiredEmail(email)) return email;
+  }
+  return undefined;
 }
 
 /**

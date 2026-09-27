@@ -11,7 +11,6 @@ import {
   EmailService,
   renderEmailTemplate,
 } from "#root/shared/email/service.js";
-import { EmailVerificationTemplate } from "./email-template";
 import { MinimalEmailVerificationTemplate } from "#root/backend/emails/minimal/email-verification";
 import { ComingSoonWelcomeTemplate } from "#root/backend/emails/minimal/coming-soon-welcome";
 import { getEmailBranding } from "#root/backend/emails/branding";
@@ -136,18 +135,12 @@ export const register = ({
 
       const emailTemplate = yield* $(
         renderEmailTemplate(
-          branding.isMinimal
-            ? MinimalEmailVerificationTemplate({
-                storeName: branding.storeName,
-                logoUrl: branding.logoUrl,
-                userName: newUser.name,
-                verificationUrl,
-              })
-            : EmailVerificationTemplate({
-                storeName: branding.storeName,
-                userName: newUser.name,
-                verificationUrl,
-              })
+          MinimalEmailVerificationTemplate({
+            storeName: branding.storeName,
+            logoUrl: branding.logoUrl,
+            userName: newUser.name,
+            verificationUrl,
+          })
         )
       );
 

@@ -44,9 +44,12 @@ function readEnv(...keys: string[]): string | undefined {
 
 // ─── Core identity ──────────────────────────────────────────────────────────
 
+/** The brand's own name — what STORE_NAME is when nothing overrides it. */
+export const DEFAULT_STORE_NAME = "Percé";
+
 /** Customer-facing brand name, with the accent. Override with VITE_STORE_NAME. */
 export const STORE_NAME =
-  readEnv("VITE_STORE_NAME", "STORE_NAME") ?? "Percé";
+  readEnv("VITE_STORE_NAME", "STORE_NAME") ?? DEFAULT_STORE_NAME;
 
 /**
  * The typographic wordmark — lowercase, no icon, no monogram. Used wherever

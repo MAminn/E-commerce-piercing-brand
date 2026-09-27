@@ -18,7 +18,6 @@ import type { ClientSession } from "#root/backend/auth/shared/entities";
 import { ServerError } from "#root/shared/error/server";
 import { EmailService, renderEmailTemplate } from "#root/shared/email/service";
 import { STORE_NAME } from "#root/shared/config/branding";
-import { NewOrderEmailTemplate } from "./email-template";
 import { MinimalOrderEmailTemplate } from "#root/backend/emails/minimal/order-confirmation";
 import { getEmailBranding } from "#root/backend/emails/branding";
 import axios from "axios";
@@ -1262,43 +1261,24 @@ export const createOrder = (
 
     const emailTemplate = yield* $(
       renderEmailTemplate(
-        branding.isMinimal
-          ? MinimalOrderEmailTemplate({
-              storeName: branding.storeName,
-              logoUrl: branding.logoUrl,
-              contactEmail: branding.contactEmail,
-              currency: branding.currency,
-              items: orderItems,
-              shippingFees: Number.parseFloat(result.shipping),
-              subTotal: Number.parseFloat(result.subtotal),
-              total: Number.parseFloat(result.total),
-              address: result.shippingAddress,
-              city: result.shippingCity,
-              state: result.shippingState,
-              country: result.shippingCountry,
-              postalCode: result.shippingPostalCode,
-              customerName: result.customerName,
-              customerEmail: result.customerEmail,
-              customerPhone: result.customerPhone,
-            })
-          : NewOrderEmailTemplate({
-              storeName: branding.storeName,
-              logoUrl: branding.logoUrl,
-              contactEmail: branding.contactEmail,
-              currency: branding.currency,
-              items: orderItems,
-              shippingFees: Number.parseFloat(result.shipping),
-              subTotal: Number.parseFloat(result.subtotal),
-              total: Number.parseFloat(result.total),
-              address: result.shippingAddress,
-              city: result.shippingCity,
-              state: result.shippingState,
-              country: result.shippingCountry,
-              postalCode: result.shippingPostalCode,
-              customerName: result.customerName,
-              customerEmail: result.customerEmail,
-              customerPhone: result.customerPhone,
-            }),
+        MinimalOrderEmailTemplate({
+          storeName: branding.storeName,
+          logoUrl: branding.logoUrl,
+          contactEmail: branding.contactEmail,
+          currency: branding.currency,
+          items: orderItems,
+          shippingFees: Number.parseFloat(result.shipping),
+          subTotal: Number.parseFloat(result.subtotal),
+          total: Number.parseFloat(result.total),
+          address: result.shippingAddress,
+          city: result.shippingCity,
+          state: result.shippingState,
+          country: result.shippingCountry,
+          postalCode: result.shippingPostalCode,
+          customerName: result.customerName,
+          customerEmail: result.customerEmail,
+          customerPhone: result.customerPhone,
+        }),
       ),
     );
 

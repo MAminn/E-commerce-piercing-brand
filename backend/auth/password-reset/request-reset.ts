@@ -9,7 +9,6 @@ import {
   EmailService,
   renderEmailTemplate,
 } from "#root/shared/email/service.js";
-import { PasswordResetTemplate } from "./email-template";
 import { MinimalPasswordResetTemplate } from "#root/backend/emails/minimal/password-reset";
 import { getEmailBranding } from "#root/backend/emails/branding";
 
@@ -81,18 +80,12 @@ export const requestPasswordReset = (
 
     const emailHtml = yield* $(
       renderEmailTemplate(
-        branding.isMinimal
-          ? MinimalPasswordResetTemplate({
-              storeName: branding.storeName,
-              logoUrl: branding.logoUrl,
-              userName: existingUser.name,
-              resetUrl,
-            })
-          : PasswordResetTemplate({
-              storeName: branding.storeName,
-              userName: existingUser.name,
-              resetUrl,
-            }),
+        MinimalPasswordResetTemplate({
+          storeName: branding.storeName,
+          logoUrl: branding.logoUrl,
+          userName: existingUser.name,
+          resetUrl,
+        }),
       ),
     );
 
