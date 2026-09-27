@@ -207,10 +207,11 @@ export const DEFAULT_LAYOUT_SETTINGS: LayoutSettings = {
     // at "#" — footer links that looked real and did nothing. Policy and
     // company pages belong here once they exist; admins add them from
     // Dashboard > Layout Settings.
-    // Terms, Privacy and Delivery pages do not exist in this codebase and
-    // /return-policy only renders once an admin publishes real terms — so
-    // none of them are linked here. Linking a policy that is not written is
-    // worse than the link being absent. See docs/CURRENT_PROJECT.md.
+    // Policy pages (/return-policy, /terms, /privacy) are not seeded here:
+    // the Percé footer adds a "Policies" link for each one only once it is
+    // published (shared/legal/legal-pages.ts). Linking a policy that is not
+    // written is worse than the link being absent. No Delivery page exists.
+    // See docs/CURRENT_PROJECT.md.
     footerLinkGroups: [
       {
         id: "shop",

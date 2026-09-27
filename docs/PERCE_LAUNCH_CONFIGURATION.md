@@ -161,7 +161,8 @@ Everything here lives in the database and is entered through the dashboard.
 | Shipping copy (product page accordion) | Dashboard → Settings → product page content | empty → section hidden | **REQUIRED FOR FIRST SALE** once a delivery policy exists |
 | Returns copy (product page accordion) | same | empty → section hidden | **REQUIRED FOR FIRST SALE** once a returns policy exists |
 | Return-policy page | Dashboard → Homepage → Return Policy (`enabled` + body) | disabled → `/return-policy` shows "not available yet" | **REQUIRED FOR FIRST SALE** |
-| Terms & conditions | **no page exists in the app** | — | **REQUIRED FOR FIRST SALE** as a business decision. Checkout no longer links to a non-existent terms document. |
+| Terms & conditions | Dashboard → Homepage → Terms & Conditions Page (`/terms`) | ships as a **disabled draft**: verified store behaviour plus `[Owner input required: …]` placeholders; `/terms` shows "not available yet" and is not linked | **REQUIRED FOR FIRST SALE** as a business decision — seller identity, delivery times, cancellations, returns summary, governing law, contact. The page goes live only once switched on **and** every placeholder is replaced or its section deleted. Checkout does not link to it. |
+| Privacy policy | Dashboard → Homepage → Privacy Policy Page (`/privacy`) | ships as a **disabled draft** describing what the code actually collects, plus placeholders | **REQUIRED FOR FIRST SALE** — responsible business, analytics/advertising services in use, service providers, retention periods, how to request a copy or deletion. Same publish rule as Terms. |
 | FAQs | Dashboard → Settings | empty → FAQ section renders nothing | OPTIONAL FOR FIRST SALE |
 | Testimonials / reviews | Dashboard → Homepage → Testimonials; `product_review` table | **0 rows** — nothing renders | CAN WAIT. Do not seed. |
 | Announcement banner / marquee | Dashboard → Layout Settings | empty | CAN WAIT |

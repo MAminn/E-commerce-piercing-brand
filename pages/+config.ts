@@ -28,6 +28,7 @@ export default {
     "clientSession",
     "templateSelection",
     "layoutSettingsData",
+    "legalPages",
     "brandName",
     "ssrLocale",
     "typographySettings",

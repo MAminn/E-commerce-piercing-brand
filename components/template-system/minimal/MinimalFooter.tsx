@@ -11,6 +11,7 @@ import {
   isUsableUrl,
 } from "#root/shared/config/branding";
 import { isUsableHref } from "#root/shared/config/storefront";
+import { withLegalFooterLinks } from "#root/shared/legal/legal-pages";
 import type { SocialPlatform } from "#root/shared/types/layout-settings";
 import { Mail, Phone, Loader2, Send } from "lucide-react";
 import { trpc } from "#root/shared/trpc/client";
@@ -85,7 +86,7 @@ const socialIconMap: Record<SocialPlatform | "whatsapp", React.FC> = {
 export function MinimalFooter() {
   const layoutSettings = useLayoutSettings();
   const { t, locale, dir } = useMinimalI18n();
-  const { urlPathname } = usePageContext();
+  const { urlPathname, legalPages } = usePageContext();
   const footer = layoutSettings.footer;
   // Dashboard > Layout Settings > Footer > "Show newsletter" is the switch.
   // The /offers page has its own newsletter signup box, so the duplicate is
@@ -100,9 +101,15 @@ export function MinimalFooter() {
   const showLogo = !!footer.logoUrl;
   // Drop links pointing at placeholders, then drop any group left empty —
   // the footer shows fewer columns rather than links that go nowhere.
-  const linkGroups = (footer.footerLinkGroups ?? [])
-    .map((g) => ({ ...g, links: g.links.filter((l) => isUsableHref(l.url)) }))
-    .filter((g) => g.links.length > 0);
+  // Legal pages follow what is actually published: links to an unpublished
+  // /return-policy, /terms or /privacy are dropped, and live ones the CMS
+  // does not already link are added under "Policies".
+  const linkGroups = withLegalFooterLinks(
+    (footer.footerLinkGroups ?? [])
+      .map((g) => ({ ...g, links: g.links.filter((l) => isUsableHref(l.url)) }))
+      .filter((g) => g.links.length > 0),
+    legalPages ?? [],
+  );
   // Placeholder ("#") and blank URLs are dropped — an unconfigured profile
   // should be absent, not a dead icon. CMS links win; the env-configured
   // profiles (STORE_SOCIAL_LINKS) are the fallback so the footer, /links and

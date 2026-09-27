@@ -20,6 +20,7 @@ import { backfillProductSlugs } from "#root/backend/products/slug.js";
 import { getTemplateSelectionRaw } from "#root/backend/settings/get-template-selection-raw.js";
 import { getStorefrontLayoutSettingsRaw } from "#root/backend/layout/get-layout-settings-raw.js";
 import { getLinkTreeConfigRaw } from "#root/backend/settings/get-link-tree-config.js";
+import { getPublishedLegalPagesRaw } from "#root/backend/homepage/legal-pages.js";
 import {
   getTypographySettingsRaw,
   listCustomFontsRaw,
@@ -390,6 +391,11 @@ async function buildServer() {
         getStoreOwnerId(),
         templateSelection,
       );
+      // Legal pages that are live, so the footer links only to published ones.
+      const legalPages = await getPublishedLegalPagesRaw(
+        request.db,
+        templateSelection,
+      );
       // Fetch brand name from link-tree config for dynamic page titles
       const linkTreeConfig = await getLinkTreeConfigRaw(request.db);
       const brandName = linkTreeConfig.brandName || undefined;
@@ -416,6 +422,7 @@ async function buildServer() {
         clientSession: request.clientSession,
         templateSelection,
         layoutSettingsData,
+        legalPages,
         brandName,
         ssrLocale,
         typographySettings,

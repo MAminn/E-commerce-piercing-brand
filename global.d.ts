@@ -1,6 +1,7 @@
 import type { ClientSession } from "./backend/auth/shared/entities";
 import type { DatabaseClient } from "./shared/database/drizzle/db";
 import type { LayoutSettings } from "./shared/types/layout-settings";
+import type { PublishedLegalPage } from "./shared/legal/legal-pages";
 import type {
   CustomFontFileRow,
   TypographySettings,
@@ -13,6 +14,8 @@ declare global {
       clientSession?: ClientSession;
       templateSelection?: Record<string, string>;
       layoutSettingsData?: LayoutSettings;
+      /** Legal pages that are live — drives the footer's policy links. */
+      legalPages?: PublishedLegalPage[];
       brandName?: string;
       ssrLocale?: "en" | "ar";
       typographySettings?: TypographySettings;

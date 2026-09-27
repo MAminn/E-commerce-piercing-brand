@@ -49,6 +49,7 @@ import {
 } from "#root/components/template-system/templateConfig";
 import { useTemplate } from "#root/frontend/contexts/TemplateContext";
 import { isHomepageSectionEditable } from "./section-visibility";
+import { LegalPageEditor } from "./LegalPageEditor";
 import { HomepageProductPicker } from "#root/components/admin/HomepageProductPicker";
 import { HomepageBundlePicker } from "#root/components/admin/HomepageBundlePicker";
 import { DEFAULT_HOMEPAGE_CONTENT as HOMEPAGE_DEFAULTS } from "#root/shared/types/homepage-content";
@@ -5022,6 +5023,24 @@ export default function HomepageAdminPage() {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* ── Terms & Privacy Pages (Minimal only) ──────────── */}
+        {isMinimal && (
+          <>
+            <LegalPageEditor
+              heading='Terms & Conditions Page'
+              route='/terms'
+              value={content.terms ?? DEFAULT_HOMEPAGE_CONTENT.terms!}
+              onChange={(terms) => setContent((prev) => ({ ...prev, terms }))}
+            />
+            <LegalPageEditor
+              heading='Privacy Policy Page'
+              route='/privacy'
+              value={content.privacy ?? DEFAULT_HOMEPAGE_CONTENT.privacy!}
+              onChange={(privacy) => setContent((prev) => ({ ...prev, privacy }))}
+            />
+          </>
         )}
 
         {/* ── i18n Translation Overrides — Other UI Labels ──────────── */}

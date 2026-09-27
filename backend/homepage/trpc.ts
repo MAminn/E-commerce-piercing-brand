@@ -12,6 +12,25 @@ import { Effect } from "effect";
 
 // Zod schema for validating homepage content
 /** Exported for the schema contract test — the CMS payload must round-trip every field the type declares. */
+/** /terms and /privacy — see HomepageLegalPageContent. */
+const legalPageSchema = z.object({
+  enabled: z.boolean(),
+  title: z.string(),
+  titleAr: z.string().nullish(),
+  lastUpdated: z.string().nullish(),
+  lastUpdatedAr: z.string().nullish(),
+  intro: z.string(),
+  introAr: z.string().nullish(),
+  sections: z.array(
+    z.object({
+      title: z.string(),
+      titleAr: z.string().nullish(),
+      body: z.string(),
+      bodyAr: z.string().nullish(),
+    }),
+  ),
+});
+
 export const HomepageContentSchema = z.object({
   meta: z.object({
     enabled: z.boolean(),
@@ -224,6 +243,8 @@ export const HomepageContentSchema = z.object({
       contactLinkUrl: z.string(),
     })
     .nullish(),
+  terms: legalPageSchema.nullish(),
+  privacy: legalPageSchema.nullish(),
   productCarouselTitle: z.string().nullish(),
   productCarouselTitleAr: z.string().nullish(),
   testimonials: z.object({

@@ -116,6 +116,19 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
   brand's merchant accounts and would route this shop's money, shipments and
   analytics to them.
 
+### Required before taking real orders
+
+The app boots without these, but a live store must not run without them —
+see `docs/PERCE_LAUNCH_CONFIGURATION.md` §1 and §3.
+
+| Variable | Why |
+|---|---|
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` | Without all four the server logs `Missing SMTP configuration environment variables` and installs a dummy mailer: **no order confirmation, password reset or email verification is sent**, and nothing tells the customer. Both mail paths connect with implicit TLS (`secure: true`), so use the provider's TLS port (usually `465`), not a STARTTLS port such as `587`. |
+| `VITE_SUPPORT_EMAIL` | The customer-facing support address. It has **no default**: while unset, customer emails omit the contact line entirely. Never reuse a previous brand's inbox. |
+
+`EMAIL_FROM_ADDRESS` / `EMAIL_FROM_NAME` stay optional (they default to the
+SMTP account).
+
 ### Optional — leave unset until the brand actually has them
 
 Every one of these is inert when unset; the app logs a warning and disables the
@@ -123,7 +136,7 @@ feature rather than failing to boot.
 
 | Group | Variables | Effect when unset |
 |---|---|---|
-| Email | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME` | Outbound email skipped |
+| Email sender | `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME` | Sent from the SMTP account itself |
 | Stripe | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `VITE_STRIPE_PUBLIC_KEY` | Stripe checkout hidden |
 | Paymob | `PAYMOB_SECRET_KEY`, `PAYMOB_PUBLIC_KEY`, `PAYMOB_CARD_INTEGRATION_ID`, `PAYMOB_WALLET_INTEGRATION_ID`, `PAYMOB_HMAC_SECRET`, `PAYMOB_BASE_URL` | Paymob checkout hidden |
 | Fincart | `FINCART_ENABLED`, `FINCART_API_URL`, `FINCART_API_KEY`, `FINCART_WEBHOOK_SECRET`, `FINCART_PICKUP_ID`, `FINCART_MERCHANT_LOCATION` | Shipping integration off |

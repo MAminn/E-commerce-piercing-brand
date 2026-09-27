@@ -5,6 +5,11 @@
  * Layout and styling are NOT part of this schema - only editable content.
  */
 
+import {
+  DEFAULT_PRIVACY_PAGE,
+  DEFAULT_TERMS_PAGE,
+} from "#root/shared/legal/default-legal-pages";
+
 /**
  * Meta information for SEO and page head
  */
@@ -305,6 +310,32 @@ export interface HomepageReturnPolicyContent {
 }
 
 /**
+ * One heading + body block of a legal page (Terms, Privacy).
+ */
+export interface HomepageLegalPageSection {
+  title: string;
+  titleAr?: string;
+  body: string;
+  bodyAr?: string;
+}
+
+/**
+ * A plain legal document page (minimal template) — /terms and /privacy.
+ * Arabic fields fall back to the English text when left empty.
+ */
+export interface HomepageLegalPageContent {
+  enabled: boolean;
+  title: string;
+  titleAr?: string;
+  /** Free text shown under the title, e.g. "Last updated 1 March 2027". Hidden when empty. */
+  lastUpdated?: string;
+  lastUpdatedAr?: string;
+  intro: string;
+  introAr?: string;
+  sections: HomepageLegalPageSection[];
+}
+
+/**
  * Complete homepage content structure
  */
 export interface HomepageContent {
@@ -333,6 +364,10 @@ export interface HomepageContent {
   aboutUs?: HomepageAboutUsContent;
   /** Return Policy page (minimal template) */
   returnPolicy?: HomepageReturnPolicyContent;
+  /** Terms & conditions page — /terms (minimal template) */
+  terms?: HomepageLegalPageContent;
+  /** Privacy policy page — /privacy (minimal template) */
+  privacy?: HomepageLegalPageContent;
   /** Product page inline carousel custom title */
   productCarouselTitle?: string;
   productCarouselTitleAr?: string;
@@ -578,6 +613,9 @@ export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
     contactLinkLabelAr: "صفحة اتصل بنا",
     contactLinkUrl: "/contact",
   },
+  // Both ship DISABLED as drafts — see shared/legal/default-legal-pages.ts.
+  terms: DEFAULT_TERMS_PAGE,
+  privacy: DEFAULT_PRIVACY_PAGE,
   testimonials: {
     // Ships DISABLED with no items. The previous defaults were six invented
     // reviews under invented customer names — publishing those as genuine

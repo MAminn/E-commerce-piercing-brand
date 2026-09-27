@@ -4,6 +4,7 @@ import { createMiddleware } from "hono/factory";
 import { getTemplateSelectionRaw } from "#root/backend/settings/get-template-selection-raw.js";
 import { getStorefrontLayoutSettingsRaw } from "#root/backend/layout/get-layout-settings-raw.js";
 import { getLinkTreeConfigRaw } from "#root/backend/settings/get-link-tree-config.js";
+import { getPublishedLegalPagesRaw } from "#root/backend/homepage/legal-pages.js";
 import { getStoreOwnerId } from "#root/shared/config/store.js";
 import {
   getTypographySettingsRaw,
@@ -24,6 +25,8 @@ export const vikeHonoMiddleware = createMiddleware(
       getStoreOwnerId(),
       templateSelection,
     );
+    // Legal pages that are live, so the footer links only to published ones.
+    const legalPages = await getPublishedLegalPagesRaw(c.var.db, templateSelection);
     // Fetch brand name from link-tree config for dynamic page titles
     const linkTreeConfig = await getLinkTreeConfigRaw(c.var.db);
     const brandName = linkTreeConfig.brandName || undefined;
@@ -50,6 +53,7 @@ export const vikeHonoMiddleware = createMiddleware(
       headersOriginal: c.req.raw.headers,
       templateSelection,
       layoutSettingsData,
+      legalPages,
       brandName,
       ssrLocale,
       typographySettings,
