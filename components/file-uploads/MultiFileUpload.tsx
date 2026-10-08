@@ -1,8 +1,16 @@
 import { useState, useEffect } from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Input } from "../ui/input";
 import { toast } from "sonner";
 import { Loader2Icon, Upload, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "../ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogOverlay,
+  DialogPortal,
+  DialogTitle,
+} from "../ui/dialog";
 
 interface FileMetadata {
   id: string;
@@ -29,6 +37,9 @@ export const MultiFileUploadInput = ({
   maxSize?: number;
 }) => {
   const [uploading, setUploading] = useState(false);
+  const [preview, setPreview] = useState<{ url: string; alt: string } | null>(
+    null
+  );
 
   // Debug when value changes or on component mount
   useEffect(() => {
@@ -219,23 +230,40 @@ export const MultiFileUploadInput = ({
               className={`relative rounded-lg overflow-hidden border group ${file.isPrimary ? "ring-2 ring-primary" : ""}`}
             >
               {file.url ? (
-                <img
-                  src={file.url}
-                  alt={`Product item ${index + 1}`}
-                  className="w-full h-32 object-cover"
-                  onError={(e) => {
-                    console.error(`Failed to load image: ${file.url}`);
-                    (e.target as HTMLImageElement).src = "/placeholder.svg";
-                  }}
-                />
+                // Sibling of the hover overlay (not its parent), so the overlay
+                // buttons never nest inside it or bubble a click into it.
+                <button
+                  type="button"
+                  className="block w-full cursor-zoom-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+                  aria-label={`Preview product image ${index + 1}`}
+                  onClick={() =>
+                    setPreview({
+                      url: file.url!,
+                      alt: `Product item ${index + 1}`,
+                    })
+                  }
+                >
+                  <img
+                    src={file.url}
+                    alt={`Product item ${index + 1}`}
+                    className="w-full h-32 object-cover"
+                    onError={(e) => {
+                      console.error(`Failed to load image: ${file.url}`);
+                      (e.target as HTMLImageElement).src = "/placeholder.svg";
+                    }}
+                  />
+                </button>
               ) : (
                 <div className="w-full h-32 bg-gray-200 flex items-center justify-center">
                   <span className="text-gray-400">No preview available</span>
                 </div>
               )}
-              <div className="absolute p-2 inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+              {/* Clicks on the overlay's empty space fall through to the
+                  preview button underneath; its controls stay clickable. */}
+              <div className="absolute p-2 inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 pointer-events-none *:pointer-events-auto">
                 <div className="flex gap-1 w-full">
                   <Button
+                    type="button"
                     size="sm"
                     variant="secondary"
                     className="flex-1 text-[8px] px-1"
@@ -245,6 +273,7 @@ export const MultiFileUploadInput = ({
                     <ChevronLeft className="h-3 w-3" />
                   </Button>
                   <Button
+                    type="button"
                     size="sm"
                     variant="secondary"
                     className="flex-1 text-[8px] px-1"
@@ -256,6 +285,7 @@ export const MultiFileUploadInput = ({
                 </div>
                 {!file.isPrimary && (
                   <Button
+                    type="button"
                     size="sm"
                     variant="secondary"
                     className="w-full text-[8px]"
@@ -265,6 +295,7 @@ export const MultiFileUploadInput = ({
                   </Button>
                 )}
                 <Button
+                  type="button"
                   size="sm"
                   variant="destructive"
                   className="w-full text-[8px]"
@@ -287,6 +318,47 @@ export const MultiFileUploadInput = ({
           ))}
         </div>
       )}
+
+      {/* Nested Radix dialog: Escape / backdrop close only this preview,
+          leaving the parent Edit Product dialog open. */}
+      <Dialog
+        open={preview !== null}
+        onOpenChange={(open) => {
+          if (!open) setPreview(null);
+        }}
+      >
+        <DialogPortal>
+          <DialogOverlay className="bg-black/80" />
+          <DialogPrimitive.Content
+            aria-describedby={undefined}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setPreview(null);
+            }}
+          >
+            <DialogTitle className="sr-only">Image preview</DialogTitle>
+            {preview && (
+              <div className="relative">
+                <img
+                  src={preview.url}
+                  alt={preview.alt}
+                  className="block w-auto h-auto max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = "/placeholder.svg";
+                  }}
+                />
+                <DialogClose
+                  type="button"
+                  className="absolute top-2 right-2 rounded-full bg-black/60 p-2 text-white hover:bg-black/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                  aria-label="Close preview"
+                >
+                  <X className="h-5 w-5" />
+                </DialogClose>
+              </div>
+            )}
+          </DialogPrimitive.Content>
+        </DialogPortal>
+      </Dialog>
     </div>
   );
 };
