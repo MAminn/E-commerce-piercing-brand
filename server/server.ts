@@ -32,6 +32,7 @@ import { trackBeaconPlugin } from "#root/server/routes/track.js";
 import { envSyncApiPlugin } from "#root/backend/env-sync/api.js";
 import { heroVideoUploadApiPlugin } from "#root/backend/homepage/upload-hero-video/api.js";
 import { parseByteRange } from "#root/server/routes/byte-range.js";
+import { resolveUploadPath } from "#root/server/routes/upload-path.js";
 import { bootstrapSuperadmin } from "#root/backend/auth/superadmin-bootstrap.js";
 import { startEmailAutomationWorker } from "#root/backend/email-automations/worker.js";
 import { emailUnsubscribeApiPlugin } from "#root/backend/email-subscription/api.js";
@@ -217,9 +218,16 @@ async function buildServer() {
   // Dynamic route for uploaded files (wildcard: false only registers files existing at boot)
   instance.get("/uploads/*", async (request, reply) => {
     const filePath = (request.params as { "*": string })["*"];
-    const fullPath = `${root}/uploads/${filePath}`;
+    // Confined to uploads/: `/uploads/%2e%2e/.env` used to read any file on disk.
+    const fullPath = resolveUploadPath(`${root}/uploads`, filePath);
+    if (!fullPath) {
+      return reply.code(404).send({ error: "File not found" });
+    }
     reply.header("Cross-Origin-Resource-Policy", "cross-origin");
     const { createReadStream, existsSync, statSync } = await import("node:fs");
+    if (existsSync(fullPath) && !statSync(fullPath).isFile()) {
+      return reply.code(404).send({ error: "File not found" });
+    }
     if (!existsSync(fullPath)) {
       // Dev-only: DB records synced down from prod (see env-sync) reference
       // files that intentionally stay on prod's storage rather than being

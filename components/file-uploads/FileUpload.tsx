@@ -64,6 +64,7 @@ export const FileUploadInput = ({
       <Input
         disabled={uploading}
         type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
         id={id}
         onChange={(e) => {
           if (e.target.files) {

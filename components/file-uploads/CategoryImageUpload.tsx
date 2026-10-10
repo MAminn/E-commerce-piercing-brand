@@ -147,7 +147,7 @@ export function CategoryImageUpload({
               id={inputId}
               type='file'
               className='hidden'
-              accept='image/*'
+              accept='image/jpeg,image/png,image/webp,image/gif,image/avif'
               disabled={disabled || uploading}
               onChange={(e) => {
                 if (e.target.files && e.target.files[0]) {

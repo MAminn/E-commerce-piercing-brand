@@ -1,22 +1,29 @@
 import { runBackendEffect } from "#root/shared/backend/effect";
-import type { FastifyInstance } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 import { createWriteStream } from "node:fs";
-import { unlink } from "node:fs/promises";
+import { open, unlink } from "node:fs/promises";
+import { pipeline } from "node:stream/promises";
 import { v7 } from "uuid";
 import { createFile } from "./createFile";
 import { DatabaseClientService } from "#root/shared/database/drizzle/db";
 import { Effect, pipe } from "effect";
 import { imageOptimizationService } from "#root/shared/backend/image-optimization";
+import { isSingleShopMode } from "#root/shared/config/app";
 import path from "node:path";
 import fs from "node:fs";
 import { ServerError } from "#root/shared/error/server";
+import {
+  FILE_UPLOAD_MAX_BYTES,
+  FileUploadError,
+  assertContentMatches,
+  canUploadFiles,
+  validateDeclaredImage,
+} from "./validate";
 
 // Function to clean up temporary files older than a specified time
-export const cleanupTempFiles = async (maxAgeMs = 3600000) => {
+export const cleanupTempFiles = async (maxAgeMs = 3600000, uploadsDir = "./uploads") => {
   // Default: 1 hour
   try {
-    const uploadsDir = "./uploads";
-
     // Ensure uploads directory exists
     if (!fs.existsSync(uploadsDir)) {
       return;
@@ -46,134 +53,124 @@ export const cleanupTempFiles = async (maxAgeMs = 3600000) => {
   }
 };
 
-export const uploadFileApiPlugin = (app: FastifyInstance) => {
+const SNIFF_BYTES = 64;
+
+async function readHead(filePath: string): Promise<Uint8Array> {
+  const handle = await open(filePath, "r");
+  try {
+    const buffer = new Uint8Array(SNIFF_BYTES);
+    const { bytesRead } = await handle.read(buffer, 0, SNIFF_BYTES, 0);
+    return buffer.subarray(0, bytesRead);
+  } finally {
+    await handle.close();
+  }
+}
+
+/**
+ * POST /file — the dashboard's generic image upload (category images, bundle
+ * images, the category-type image field).
+ *
+ * Images only, and only for dashboard roles (see canUploadFiles). The file
+ * must be an allowed image by extension, MIME type and content, and is then
+ * re-encoded by sharp — so what lands on disk is always a freshly written
+ * WebP (or GIF, to keep animation) under a server-generated name, never the
+ * uploaded bytes or the client's filename.
+ *
+ * This route used to accept any file from anyone and store non-images
+ * verbatim with the client's extension, which made it possible to host
+ * HTML/script on the storefront's own origin. Files already stored keep
+ * working; the static /uploads serving is unchanged.
+ */
+export const uploadFileApiPlugin: FastifyPluginAsync<{
+  uploadsDir?: string;
+}> = async (app, opts) => {
+  const uploadsDir = opts.uploadsDir ?? "./uploads";
+
   // Set up periodic cleanup - run every 30 minutes
   const CLEANUP_INTERVAL = 30 * 60 * 1000; // 30 minutes
-  setInterval(() => {
-    cleanupTempFiles().catch((err) => {
+  const cleanupTimer = setInterval(() => {
+    cleanupTempFiles(undefined, uploadsDir).catch((err) => {
       console.error("Background temp file cleanup failed:", err);
     });
   }, CLEANUP_INTERVAL);
+  cleanupTimer.unref?.();
+  app.addHook("onClose", async () => clearInterval(cleanupTimer));
 
   // Run initial cleanup on startup
-  cleanupTempFiles().catch((err) => {
+  cleanupTempFiles(undefined, uploadsDir).catch((err) => {
     console.error("Initial temp file cleanup failed:", err);
   });
 
   app.post("/file", async (req, res) => {
     const session = req.clientSession;
-
-    const data = await req.file();
-    if (!data) {
-      return res
-        .status(400)
-        .send({ success: false, error: "No file provided" });
+    if (!session) {
+      return res.status(401).send({ success: false, error: "Please sign in to upload files" });
+    }
+    if (!canUploadFiles(session.role, isSingleShopMode())) {
+      return res.status(403).send({
+        success: false,
+        error: "You don't have permission to upload files",
+      });
+    }
+    if (!req.isMultipart()) {
+      return res.status(400).send({ success: false, error: "No file provided" });
     }
 
-    // if (!data.type.startsWith("image/")) {
-    // 	return res
-    // 		.status(400)
-    // 		.send({ success: false, error: "Invalid file type" });
-    // }
+    const fileId = v7();
+    const tempFilePath = path.join(uploadsDir, `temp_${fileId}`);
+    let outputPath: string | null = null;
+    // Built inside the try and sent only after the temp/output cleanup in
+    // `finally`, so a rejected upload is gone from disk before the client hears back.
+    let response: { status: number; body: unknown };
 
     try {
-      const fileId = v7();
-
-      // Determine if this is an image file
-      const mimeType = data.mimetype?.toLowerCase() || "";
-      const isImage = mimeType.startsWith("image/");
-
-      // Determine output type based on mime type
-      let outputFormat = "default";
-      if (
-        mimeType === "image/jpeg" ||
-        mimeType === "image/jpg" ||
-        mimeType === "image/png" ||
-        mimeType === "image/webp" ||
-        mimeType === "image/avif" ||
-        mimeType === "image/gif" ||
-        mimeType === "image/svg+xml"
-      ) {
-        outputFormat = "default";
-      }
-
-      // For non-image files or special formats, just save the original
-      if (!isImage) {
-        const tempFilePath = `./uploads/temp_${fileId}`;
-        const finalFileName = `${fileId}${path.extname(data.filename || "")}`;
-        const finalFilePath = `./uploads/${finalFileName}`;
-
-        // Save the uploaded file to a temporary location
-        await new Promise<void>((resolve, reject) => {
-          const writeStream = createWriteStream(tempFilePath);
-          data.file.pipe(writeStream).on("finish", resolve).on("error", reject);
-        }).catch(async (err) => {
-          console.error("Error saving temporary file:", err);
-          throw err;
-        });
-
-        try {
-          // Move the file to its final location
-          await fs.promises.rename(tempFilePath, finalFilePath);
-        } catch (err) {
-          // If rename fails, try to clean up and throw
-          try {
-            await unlink(tempFilePath);
-          } catch (cleanupErr) {
-            console.warn(
-              "Failed to clean up temp file after rename error:",
-              tempFilePath
-            );
-          }
-          throw err;
-        }
-
-        const result = await runBackendEffect(
-          createFile({
-            diskname: finalFileName,
-          }).pipe(Effect.provideService(DatabaseClientService, req.db))
-        );
-
-        if (!result.success) {
-          await unlink(finalFilePath);
-          return res
-            .status(500)
-            .send({ success: false, error: "Failed to upload file" });
-        }
-
-        return res.status(200).send({
-          success: true,
-          result: result.result,
-        });
-      }
-
-      // For image files, optimize using our service
-      // First save to a temporary file
-      const tempFilePath = `./uploads/temp_${fileId}`;
-      await new Promise<void>((resolve, reject) => {
-        const writeStream = createWriteStream(tempFilePath);
-        data.file.pipe(writeStream).on("finish", resolve).on("error", reject);
-      }).catch(async (err) => {
-        console.error("Error saving temporary file:", err);
-        throw err;
+      const data = await req.file({
+        limits: { fileSize: FILE_UPLOAD_MAX_BYTES, files: 1 },
       });
+      if (!data) {
+        throw new FileUploadError("No file provided", 400);
+      }
 
-      // Determine output format and filename
-      const outputFilename = `${fileId}.webp`;
-      const outputPath = `./uploads/${outputFilename}`;
+      let declared: ReturnType<typeof validateDeclaredImage>;
+      try {
+        declared = validateDeclaredImage(data.filename ?? "", data.mimetype ?? "");
+      } catch (err) {
+        // Drain the unread body so the client gets the error, not a reset.
+        data.file.on("error", () => {});
+        data.file.resume();
+        throw err;
+      }
 
-      // Optimize the image using our service
+      await fs.promises.mkdir(uploadsDir, { recursive: true });
+      try {
+        await pipeline(data.file, createWriteStream(tempFilePath));
+      } catch (err) {
+        if ((err as { code?: string }).code === "FST_REQ_FILE_TOO_LARGE") {
+          throw new FileUploadError(
+            `File too large. Maximum size is ${FILE_UPLOAD_MAX_BYTES / (1024 * 1024)}MB.`,
+            413,
+          );
+        }
+        throw err;
+      }
+      if (data.file.truncated) {
+        throw new FileUploadError(
+          `File too large. Maximum size is ${FILE_UPLOAD_MAX_BYTES / (1024 * 1024)}MB.`,
+          413,
+        );
+      }
+
+      const format = assertContentMatches(declared, await readHead(tempFilePath));
+
+      // GIFs stay GIF to keep animation; everything else becomes WebP.
+      const outputFilename = `${fileId}.${format === "gif" ? "gif" : "webp"}`;
+      outputPath = path.join(uploadsDir, outputFilename);
+
       const optimizationResult = await runBackendEffect(
         pipe(
-          imageOptimizationService.optimizeFile(
-            tempFilePath,
-            outputPath,
-            "default", // Use default optimization settings
-            {
-              // For GIFs, preserve animation by using GIF format
-              format: mimeType === "image/gif" ? "gif" : "webp",
-            }
-          ),
+          imageOptimizationService.optimizeFile(tempFilePath, outputPath, "default", {
+            format: format === "gif" ? "gif" : "webp",
+          }),
           Effect.mapError(
             (err) =>
               new ServerError({
@@ -181,74 +178,61 @@ export const uploadFileApiPlugin = (app: FastifyInstance) => {
                 message: "Failed to optimize image",
                 clientMessage: "Failed to optimize image",
                 cause: err,
-              })
-          )
-        )
+              }),
+          ),
+        ),
       );
 
-      // Clean up temporary file
-      try {
-        // Add a small delay to ensure file handles are released
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        await unlink(tempFilePath);
-      } catch (err) {
-        // Just log but don't fail the upload if temp deletion fails
-        console.warn(
-          "Warning: Could not delete temp file, will be cleaned up later:",
-          tempFilePath
-        );
+      // optimizeFile reports decode failures as success:false rather than throwing.
+      if (!optimizationResult.success || !optimizationResult.result.success) {
+        throw new FileUploadError("This file couldn't be processed as an image.", 415);
       }
 
-      // If optimization failed, return error
-      if (!optimizationResult.success) {
-        return res.status(500).send({
-          success: false,
-          error:
-            optimizationResult.error?.clientMessage ||
-            "Failed to optimize image",
-        });
-      }
-
-      // Get actual output filename considering format
-      const actualOutput = path.basename(
-        optimizationResult.result.outputPath || outputPath
-      );
-
-      // Save to database
       const result = await runBackendEffect(
-        createFile({
-          diskname: actualOutput,
-        }).pipe(Effect.provideService(DatabaseClientService, req.db))
+        createFile({ diskname: outputFilename }).pipe(
+          Effect.provideService(DatabaseClientService, req.db),
+        ),
       );
-
       if (!result.success) {
-        // Delete the file if database insert fails
-        await unlink(outputPath);
-        return res
-          .status(500)
-          .send({ success: false, error: "Failed to upload file" });
+        throw new FileUploadError("Failed to upload file", 500);
       }
+      outputPath = null; // Keep the stored file.
 
-      // Return file info and optimization stats
-      return res.status(200).send({
-        success: true,
-        result: {
-          ...result.result,
-          optimization: {
-            originalSize: optimizationResult.result.originalSize,
-            optimizedSize: optimizationResult.result.optimizedSize,
-            compressionRatio: optimizationResult.result.compressionRatio,
-            width: optimizationResult.result.width,
-            height: optimizationResult.result.height,
-            format: optimizationResult.result.format,
+      const optimization = optimizationResult.result;
+      response = {
+        status: 200,
+        body: {
+          success: true,
+          result: {
+            ...result.result,
+            optimization: {
+              originalSize: optimization.originalSize,
+              optimizedSize: optimization.optimizedSize,
+              compressionRatio: optimization.compressionRatio,
+              width: optimization.width,
+              height: optimization.height,
+              format: optimization.format,
+            },
           },
         },
-      });
+      };
     } catch (err) {
-      console.error("Error processing file upload:", err);
-      return res
-        .status(500)
-        .send({ success: false, error: "Failed to upload file" });
+      if (err instanceof FileUploadError) {
+        response = {
+          status: err.statusCode,
+          body: { success: false, error: err.message },
+        };
+      } else {
+        console.error("Error processing file upload:", err);
+        response = {
+          status: 500,
+          body: { success: false, error: "Failed to upload file" },
+        };
+      }
+    } finally {
+      await unlink(tempFilePath).catch(() => {});
+      if (outputPath) await unlink(outputPath).catch(() => {});
     }
+    return res.status(response.status).send(response.body);
   });
 };
