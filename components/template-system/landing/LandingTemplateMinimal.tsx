@@ -227,6 +227,15 @@ export function LandingTemplateMinimal({
     return slides;
   })();
 
+  // Hero background video. The slides above stay as its poster and fallback.
+  const heroVideoSrc = resolveImageUrl(content.hero.backgroundVideo);
+  const heroVideo = heroVideoSrc
+    ? {
+        src: heroVideoSrc,
+        mobileSrc: resolveImageUrl(content.hero.mobileBackgroundVideo),
+      }
+    : undefined;
+
   // Convert newArrivals to MinimalProduct[] for the carousel
   const newArrivalProducts: MinimalProduct[] = newArrivals.map((p) => ({
     id: p.id,
@@ -287,6 +296,7 @@ export function LandingTemplateMinimal({
       <PerceHero
         hero={content.hero}
         slides={heroSlides}
+        video={heroVideo}
         onCtaClick={onCtaClick}
       />
 

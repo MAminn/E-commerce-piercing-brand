@@ -50,6 +50,8 @@ import {
 import { useTemplate } from "#root/frontend/contexts/TemplateContext";
 import { isHomepageSectionEditable } from "./section-visibility";
 import { LegalPageEditor } from "./LegalPageEditor";
+import { HeroVideoField } from "./HeroVideoField";
+import { HERO_VIDEO_MAX_BYTES } from "#root/shared/homepage/hero-video";
 import { HomepageProductPicker } from "#root/components/admin/HomepageProductPicker";
 import { HomepageBundlePicker } from "#root/components/admin/HomepageBundlePicker";
 import { DEFAULT_HOMEPAGE_CONTENT as HOMEPAGE_DEFAULTS } from "#root/shared/types/homepage-content";
@@ -1478,6 +1480,51 @@ export default function HomepageAdminPage() {
                   </div>
                 )}
               </div>
+
+              {/* Background video — plays over the images above, which stay
+                  as its poster and fallback */}
+              <HeroVideoField
+                id='hero-bg-video'
+                label='Background Video URL (optional)'
+                variant='desktop'
+                value={content.hero.backgroundVideo}
+                onChange={(url) =>
+                  setContent((prev) => ({
+                    ...prev,
+                    hero: { ...prev.hero, backgroundVideo: url },
+                  }))
+                }
+                disabled={!content.hero.enabled}
+                placeholder='/uploads/homepage/hero-video.mp4 or https://...'
+                description={`MP4 (H.264) or WebM • Max size: ${HERO_VIDEO_MAX_BYTES / (1024 * 1024)}MB. Plays muted and looped with no controls. The background image above is shown while it loads, if it can't play, and for visitors who prefer reduced motion.`}
+                missingPosterWarning={
+                  !content.hero.backgroundImage &&
+                  !(content.hero.heroSlides ?? []).some((s) => s.imageUrl)
+                    ? "Add a background image too — it's the poster and the fallback when the video can't play."
+                    : null
+                }
+              />
+
+              <HeroVideoField
+                id='hero-mobile-bg-video'
+                label='Mobile Background Video (optional)'
+                variant='mobile'
+                value={content.hero.mobileBackgroundVideo}
+                onChange={(url) =>
+                  setContent((prev) => ({
+                    ...prev,
+                    hero: { ...prev.hero, mobileBackgroundVideo: url },
+                  }))
+                }
+                disabled={!content.hero.enabled}
+                placeholder='/uploads/homepage/hero-video-mobile.mp4 or https://...'
+                description='Used on mobile screens only (≤767px). Falls back to the desktop hero video if empty.'
+                missingPosterWarning={
+                  !content.hero.backgroundVideo
+                    ? "Mobile video is only used when a desktop Background Video is also set."
+                    : null
+                }
+              />
             </CardContent>
           </Card>
         )}

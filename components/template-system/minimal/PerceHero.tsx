@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "#root/lib/utils";
 import type { HomepageHeroContent } from "#root/shared/types/homepage-content";
+import { PerceHeroVideo } from "./PerceHeroVideo";
 
 export interface PerceHeroSlide {
   imageUrl: string;
@@ -9,9 +10,19 @@ export interface PerceHeroSlide {
   alt?: string;
 }
 
+export interface PerceHeroVideoSource {
+  src: string;
+  mobileSrc?: string;
+}
+
 export interface PerceHeroProps {
   hero: HomepageHeroContent;
   slides: PerceHeroSlide[];
+  /**
+   * Background video for the hero frame. When set, the frame shows the first
+   * slide as a still poster (no carousel) and the video plays over it.
+   */
+  video?: PerceHeroVideoSource;
   /** Overrides navigation for admin preview contexts. */
   onCtaClick?: (link: string) => void;
   className?: string;
@@ -53,7 +64,8 @@ export interface PerceHeroProps {
  */
 export function PerceHero({
   hero,
-  slides,
+  slides: allSlides,
+  video,
   onCtaClick,
   className,
 }: PerceHeroProps) {
@@ -61,8 +73,13 @@ export function PerceHero({
   const [paused, setPaused] = useState(false);
   const touchStartX = useRef(0);
 
+  const hasVideo = Boolean(video?.src);
+  // With a video the frame holds one still — the poster/fallback — rather
+  // than a carousel cycling invisibly underneath it.
+  const slides = hasVideo ? allSlides.slice(0, 1) : allSlides;
   const total = slides.length;
   const hasImages = total > 0;
+  const hasMedia = hasImages || hasVideo;
 
   const title = hero.title?.trim() ?? "";
   const subtitle = hero.subtitle?.trim() ?? "";
@@ -91,7 +108,7 @@ export function PerceHero({
   }, [total, paused]);
 
   if (!hero.enabled) return null;
-  if (!hasImages && !hasCopy) return null;
+  if (!hasMedia && !hasCopy) return null;
 
   const handleCta = (e: React.MouseEvent) => {
     if (!onCtaClick) return;
@@ -100,7 +117,7 @@ export function PerceHero({
   };
 
   // ── Typographic hero: no imagery uploaded yet ──
-  if (!hasImages) {
+  if (!hasMedia) {
     return (
       <section
         className={cn(
@@ -187,6 +204,8 @@ export function PerceHero({
           </div>
         );
       })}
+
+      {video?.src && <PerceHeroVideo src={video.src} mobileSrc={video.mobileSrc} />}
 
       {total > 1 && (
         <div className='absolute inset-x-0 bottom-4 z-20 flex items-center justify-center gap-2'>

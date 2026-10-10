@@ -9,6 +9,15 @@ import { updateHomepageContent } from "./update-homepage-content";
 import { uploadHeroImage } from "./upload-hero-image";
 import { ValuePropIconType, type HomepageContent } from "#root/shared/types/homepage-content";
 import { Effect } from "effect";
+import { isAllowedHeroVideoUrl } from "#root/shared/homepage/hero-video";
+
+/** A same-origin path or an https URL — see isAllowedHeroVideoUrl. */
+const heroVideoUrlSchema = z
+  .string()
+  .refine(isAllowedHeroVideoUrl, {
+    message: "Hero video URL must start with / or https://",
+  })
+  .nullish();
 
 // Zod schema for validating homepage content
 /** Exported for the schema contract test — the CMS payload must round-trip every field the type declares. */
@@ -45,6 +54,8 @@ export const HomepageContentSchema = z.object({
     ctaLink: z.string(),
     backgroundImage: z.string().nullish(),
     mobileBackgroundImage: z.string().nullish(),
+    backgroundVideo: heroVideoUrlSchema,
+    mobileBackgroundVideo: heroVideoUrlSchema,
     heroSlides: z
       .array(
         z.object({

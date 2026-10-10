@@ -42,6 +42,13 @@ export interface HomepageHeroContent {
   backgroundImage?: string;
   /** Mobile-specific hero background image. Falls back to backgroundImage if empty. */
   mobileBackgroundImage?: string;
+  /**
+   * Hero background video (MP4/WebM). Plays muted and looped over the hero
+   * image, which stays as the poster and the fallback when the video can't play.
+   */
+  backgroundVideo?: string;
+  /** Mobile-specific hero video. Falls back to backgroundVideo if empty. */
+  mobileBackgroundVideo?: string;
   /** Multiple hero carousel slides (takes priority over backgroundImage if non-empty) */
   heroSlides?: HeroSlideContent[];
 }
@@ -408,6 +415,8 @@ export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
     ctaLink: "/shop",
     backgroundImage: undefined,
     mobileBackgroundImage: undefined,
+    backgroundVideo: undefined,
+    mobileBackgroundVideo: undefined,
     heroSlides: [],
   },
   brandStatement: {

@@ -30,6 +30,8 @@ import { PixelPlatform } from "#root/shared/types/pixel-tracking.js";
 import { getStoreOwnerId } from "#root/shared/config/store.js";
 import { trackBeaconPlugin } from "#root/server/routes/track.js";
 import { envSyncApiPlugin } from "#root/backend/env-sync/api.js";
+import { heroVideoUploadApiPlugin } from "#root/backend/homepage/upload-hero-video/api.js";
+import { parseByteRange } from "#root/server/routes/byte-range.js";
 import { bootstrapSuperadmin } from "#root/backend/auth/superadmin-bootstrap.js";
 import { startEmailAutomationWorker } from "#root/backend/email-automations/worker.js";
 import { emailUnsubscribeApiPlugin } from "#root/backend/email-subscription/api.js";
@@ -217,7 +219,7 @@ async function buildServer() {
     const filePath = (request.params as { "*": string })["*"];
     const fullPath = `${root}/uploads/${filePath}`;
     reply.header("Cross-Origin-Resource-Policy", "cross-origin");
-    const { createReadStream, existsSync } = await import("node:fs");
+    const { createReadStream, existsSync, statSync } = await import("node:fs");
     if (!existsSync(fullPath)) {
       // Dev-only: DB records synced down from prod (see env-sync) reference
       // files that intentionally stay on prod's storage rather than being
@@ -245,7 +247,6 @@ async function buildServer() {
       }
       return reply.code(404).send({ error: "File not found" });
     }
-    const stream = createReadStream(fullPath);
     // Determine content type from extension
     const ext = fullPath.split(".").pop()?.toLowerCase();
     const mimeTypes: Record<string, string> = {
@@ -257,8 +258,34 @@ async function buildServer() {
       svg: "image/svg+xml",
       avif: "image/avif",
       ico: "image/x-icon",
+      mp4: "video/mp4",
+      webm: "video/webm",
     };
     const contentType = mimeTypes[ext || ""] || "application/octet-stream";
+
+    // Videos (the homepage hero) need byte ranges: iOS Safari will not play a
+    // <video> whose server answers Range requests with a plain 200. Files that
+    // existed at boot are served by @fastify/static above, which handles
+    // ranges itself; this covers videos uploaded since the last restart.
+    if (contentType.startsWith("video/")) {
+      const size = statSync(fullPath).size;
+      const range = parseByteRange(request.headers.range, size);
+      reply.header("Accept-Ranges", "bytes");
+      if (range.kind === "unsatisfiable") {
+        return reply.code(416).header("Content-Range", `bytes */${size}`).send();
+      }
+      if (range.kind === "partial") {
+        return reply
+          .code(206)
+          .type(contentType)
+          .header("Content-Range", `bytes ${range.start}-${range.end}/${size}`)
+          .header("Content-Length", range.end - range.start + 1)
+          .send(createReadStream(fullPath, { start: range.start, end: range.end }));
+      }
+      reply.header("Content-Length", size);
+    }
+
+    const stream = createReadStream(fullPath);
     return reply.type(contentType).send(stream);
   });
 
@@ -311,6 +338,12 @@ async function buildServer() {
   });
 
   await instance.register(uploadFileApiPlugin);
+
+  // Admin-only homepage hero video upload (streamed multipart, MP4/WebM)
+  await instance.register(heroVideoUploadApiPlugin, {
+    prefix: "/api/homepage",
+    rootDir: root,
+  });
 
   // Register Fincart webhook endpoint
   await instance.register(fincartWebhookPlugin, {
