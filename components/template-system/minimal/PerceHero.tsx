@@ -29,38 +29,30 @@ export interface PerceHeroProps {
 }
 
 /**
- * Percé hero — the top of the dark brand frame.
+ * Percé hero — full-bleed campaign media with the copy overlaid.
  *
- * Ground background, Paper type, the campaign image in a light window beside
- * (desktop) or above (mobile) the copy. Headline is the H1 from the Brand
- * Source of Truth by default ("Small pieces. Made to mix."), editable in
- * Dashboard > Homepage.
+ * The image (or background video, with the image as its poster/fallback)
+ * fills the whole hero; the headline, subtitle and CTA sit on top of it in
+ * the lower-left, over a soft local scrim rather than a panel. Headline is the
+ * H1 from the Brand Source of Truth by default ("Small pieces. Made to mix."),
+ * editable in Dashboard > Homepage.
  *
- * Replaces the generic `HeroCarousel` on the homepage. That component rendered
- * images and nothing else — in a store with hero images uploaded, the CMS
- * title, subtitle and CTA were never shown at all, so the homepage opened on a
- * bare 16:9 banner. On a 375px phone a 16:9 crop is ~211px tall, which is a
- * strip, not a campaign.
- *
- * What this does instead:
- *
- * - **Separate mobile and desktop compositions.** Mobile is a tall 4:5 portrait
- *   crop (a phone-shaped frame for a close-up ear shot); desktop is a wide
- *   cinematic frame capped so the hero never eats a whole laptop screen and
- *   traps the user above the fold. These are different crops of the same or
- *   different images, not one image squeezed.
- * - **Text lives beside the image, not on top of it, on desktop**, and below it
- *   on mobile. Overlaying type on jewelry photography hides exactly the detail
- *   the photo exists to sell, and guarantees an unpredictable contrast ratio
- *   against an image nobody has seen yet. The one exception is when the CMS
- *   supplies no text at all, where the image simply runs full-bleed.
+ * - **Sized by CSS, not by the media** (`.perce-hero-frame` in
+ *   layouts/style.css): on phones it fills the space between the header and
+ *   the bottom nav, capped at 9:16 of the width so a 9:16 reel shows whole;
+ *   from 768px it is ~88% of the viewport. Nothing shifts while media loads.
+ * - **Separate mobile and desktop media.** `mobileImageUrl` / the mobile video
+ *   below 768px, the desktop ones above — different crops for different
+ *   frame shapes, not one asset squeezed.
+ * - **Readable over any frame**: white type on a lower-left scrim
+ *   (`.perce-hero-scrim`) with a faint text halo; the rest of the media is
+ *   left untouched.
  * - **LCP-correct**: the first slide is eager + high fetch priority and is
- *   never lazy-loaded; later slides are lazy. `aspect-ratio` on the frame
- *   reserves the box so there is no layout shift while it decodes.
+ *   never lazy-loaded; later slides are lazy.
  *
- * It degrades in both directions: images with no copy render as a clean
- * full-bleed image; copy with no images renders as a typographic hero. No
- * placeholder imagery and no invented copy.
+ * It degrades in both directions: media with no copy runs clean, without the
+ * scrim; copy with no media renders as a typographic hero. No placeholder
+ * imagery and no invented copy.
  */
 export function PerceHero({
   hero,
@@ -139,14 +131,15 @@ export function PerceHero({
     );
   }
 
-  const imageFrame = (
-    <div
+  return (
+    <section
       className={cn(
-        "relative w-full overflow-hidden bg-perce-surface",
-        // Portrait on phones, cinematic from md up. Two crops, one element.
-        "aspect-[4/5] sm:aspect-[3/4] md:aspect-[16/9]",
-        "md:max-h-[72vh]",
+        "perce-header-offset perce-hero-frame relative w-full overflow-hidden bg-perce-ground",
+        className,
       )}
+      // The h1 names a hero with copy; bare media and carousels get a label.
+      aria-label={total > 1 ? "Highlights" : hasCopy ? undefined : "Highlight"}
+      // Carousel handlers live on the whole frame now that it is full-bleed.
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
@@ -162,7 +155,6 @@ export function PerceHero({
         ? {
             role: "region",
             "aria-roledescription": "carousel",
-            "aria-label": "Highlights",
           }
         : {})}>
       {slides.map((slide, i) => {
@@ -191,10 +183,10 @@ export function PerceHero({
                 <img
                   src={slide.imageUrl}
                   // Decorative when the slide carries no alt: the headline
-                  // beside it already names the campaign, so an invented
+                  // over it already names the campaign, so an invented
                   // description would only add noise for screen readers.
                   alt={slide.alt ?? ""}
-                  className='h-full w-full object-cover object-center'
+                  className='perce-hero-media h-full w-full object-cover'
                   loading={i === 0 ? "eager" : "lazy"}
                   fetchPriority={i === 0 ? "high" : "low"}
                   decoding={i === 0 ? "sync" : "async"}
@@ -207,8 +199,35 @@ export function PerceHero({
 
       {video?.src && <PerceHeroVideo src={video.src} mobileSrc={video.mobileSrc} />}
 
+      {hasCopy && (
+        <>
+          <div className='perce-hero-scrim pointer-events-none absolute inset-0 z-20' aria-hidden='true' />
+          {/* Pointer events pass through to the slide link except on the copy itself. */}
+          <div className='pointer-events-none absolute inset-x-0 bottom-0 z-30'>
+            <div className='perce-container pb-10 sm:pb-12 md:pb-16 lg:pb-20'>
+              <div className='perce-hero-copy pointer-events-auto max-w-xl text-perce-paper'>
+                {title && <h1 className='perce-display text-balance'>{title}</h1>}
+                {subtitle && (
+                  <p className='mt-4 max-w-prose text-base leading-relaxed text-perce-paper/85'>
+                    {subtitle}
+                  </p>
+                )}
+                {hasCta && <HeroCta text={ctaText} href={ctaLink} onClick={handleCta} />}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
       {total > 1 && (
-        <div className='absolute inset-x-0 bottom-4 z-20 flex items-center justify-center gap-2'>
+        <div
+          className={cn(
+            "absolute z-30 flex items-center gap-2",
+            // Clear of the lower-left copy: bottom-right when there is text.
+            hasCopy
+              ? "bottom-6 right-(--perce-gutter) md:bottom-8"
+              : "inset-x-0 bottom-4 justify-center",
+          )}>
           {slides.map((slide, i) => (
             <button
               key={`dot-${slide.imageUrl}-${i}`}
@@ -225,39 +244,6 @@ export function PerceHero({
           ))}
         </div>
       )}
-    </div>
-  );
-
-  // ── Image with no copy: let it run full-bleed ──
-  if (!hasCopy) {
-    return (
-      <section className={cn("perce-header-offset", className)} aria-label='Highlight'>
-        {imageFrame}
-      </section>
-    );
-  }
-
-  // ── Editorial split: image + copy, stacked on mobile ──
-  return (
-    <section className={cn("perce-header-offset bg-perce-ground text-perce-frame-ink", className)}>
-      <div className='md:grid md:grid-cols-12 md:items-center'>
-        <div className='md:col-span-7'>{imageFrame}</div>
-        <div
-          className={cn(
-            "md:col-span-5",
-            "px-[var(--perce-gutter)] py-10 md:py-12 lg:px-12",
-          )}>
-          {title && (
-            <h1 className='perce-display text-perce-frame-ink text-balance'>{title}</h1>
-          )}
-          {subtitle && (
-            <p className='mt-4 max-w-prose text-base leading-relaxed text-perce-frame-ink-muted'>
-              {subtitle}
-            </p>
-          )}
-          {hasCta && <HeroCta text={ctaText} href={ctaLink} onClick={handleCta} />}
-        </div>
-      </div>
     </section>
   );
 }

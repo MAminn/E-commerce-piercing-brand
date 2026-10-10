@@ -472,6 +472,85 @@ html[data-page-transition="out"] body {
   .perce-header-offset {
     margin-block-start: var(--perce-header-offset);
   }
+
+  /* Homepage hero (PerceHero): full-bleed media with the copy overlaid.
+     The height is fixed by CSS, never by the media, so nothing shifts while
+     the image decodes or the video starts. It subtracts the static header
+     tokens, not the runtime-measured --perce-header-offset, so the height is
+     already final on the server render. `vh` lines are fallbacks for
+     browsers without small-viewport units.
+
+     Phones: fill the space between the header and the fixed bottom nav, but
+     never taller than 9:16 of the width — so a 9:16 reel is shown whole
+     instead of being cropped at the sides. */
+  .perce-hero-frame {
+    height: min(calc(100vh - var(--perce-header-h) - 4rem), 177.78vw);
+    height: min(
+      calc(100svh - var(--perce-header-h) - 4rem - env(safe-area-inset-bottom)),
+      177.78vw
+    );
+    min-height: 26rem;
+  }
+
+  /* Tablet/desktop: cinematic, ~88% of the viewport including the header,
+     so the next section still shows and the page reads as scrollable. */
+  @media (min-width: 768px) {
+    .perce-hero-frame {
+      height: clamp(32rem, calc(88vh - var(--perce-header-h-desktop)), 62rem);
+      height: clamp(32rem, calc(88svh - var(--perce-header-h-desktop)), 62rem);
+    }
+  }
+
+  /* Where the cover crop lands, shared by the hero video and its poster
+     image so the fade from one to the other never jumps. Tuned for the
+     9:16 launch reel ("Reel One"), used as the single hero video at every
+     width:
+     - Phones: 75% down. On a 390×844 phone the frame is exactly 9:16 and
+       nothing is cropped; on shorter phones (375×667) this keeps the whole
+       ear stack in frame and the lobe charms clear of the copy.
+     - 768px+: a full-width 9:16 video shows only ~26–28% of its height, so
+       the whole ear stack can't fit. 35% down keeps the eyes, the crescent,
+       the cuff and the lobe hoops; centring showed cheek and jaw instead. */
+  .perce-hero-media {
+    object-position: 50% 75%;
+  }
+
+  @media (min-width: 768px) {
+    .perce-hero-media {
+      object-position: 50% 35%;
+    }
+  }
+
+  /* Readability without a panel: a soft scrim only where the copy sits —
+     the lower part on phones, the lower-left on wider screens. The rest of
+     the frame is untouched. */
+  .perce-hero-scrim {
+    background: linear-gradient(
+      to top,
+      rgb(0 0 0 / 0.62) 0%,
+      rgb(0 0 0 / 0.38) 28%,
+      rgb(0 0 0 / 0.12) 50%,
+      transparent 62%
+    );
+  }
+
+  @media (min-width: 768px) {
+    .perce-hero-scrim {
+      background:
+        radial-gradient(
+          ellipse 75% 85% at 0% 100%,
+          rgb(0 0 0 / 0.55) 0%,
+          rgb(0 0 0 / 0.28) 45%,
+          transparent 75%
+        ),
+        linear-gradient(to top, rgb(0 0 0 / 0.25) 0%, transparent 35%);
+    }
+  }
+
+  /* A faint halo so a bright frame in the loop never washes the type out. */
+  .perce-hero-copy {
+    text-shadow: 0 1px 24px rgb(0 0 0 / 0.28);
+  }
 }
 
 /* ── Typography utilities ────────────────────────────────────────────────

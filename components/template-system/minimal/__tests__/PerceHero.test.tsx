@@ -38,10 +38,47 @@ describe("PerceHero media", () => {
     expect(html).toContain(">Shop all</a>");
   });
 
-  it("keeps the same frame (no layout change) with and without a video", () => {
-    const frame = 'aspect-[4/5] sm:aspect-[3/4] md:aspect-[16/9]';
-    expect(render({ slides: [slide] })).toContain(frame);
-    expect(render({ slides: [slide], video })).toContain(frame);
+  it("keeps the same CSS-sized frame (no layout change) with and without a video", () => {
+    expect(render({ slides: [slide] })).toContain("perce-hero-frame");
+    expect(render({ slides: [slide], video })).toContain("perce-hero-frame");
+  });
+
+  it("overlays the copy on the media inside one full-bleed section — no split column", () => {
+    const html = render({ slides: [slide], video });
+    // One section holds media, scrim and copy; the old two-column grid is gone.
+    expect(html.match(/<section/g)).toHaveLength(1);
+    expect(html).not.toContain("md:grid-cols-12");
+    expect(html).not.toContain("md:col-span-7");
+    const media = html.indexOf("hero-a.webp");
+    const scrim = html.indexOf("perce-hero-scrim");
+    const heading = html.indexOf("<h1");
+    expect(media).toBeGreaterThan(-1);
+    expect(scrim).toBeGreaterThan(media);
+    expect(heading).toBeGreaterThan(scrim);
+  });
+
+  it("lets clicks through the overlay except on the copy and CTA", () => {
+    const html = render({ slides: [slide] });
+    expect(html).toMatch(/perce-hero-scrim pointer-events-none/);
+    expect(html).toMatch(/pointer-events-none absolute inset-x-0 bottom-0/);
+    expect(html).toMatch(/perce-hero-copy pointer-events-auto/);
+  });
+
+  it("drops the scrim when there is no copy, so bare media stays clean", () => {
+    const html = render({ hero: { ...hero, title: "", subtitle: "" }, slides: [slide] });
+    expect(html).toContain("hero-a.webp");
+    expect(html).not.toContain("perce-hero-scrim");
+    expect(html).not.toContain("<h1");
+  });
+
+  it("crops the poster image with the same responsive position as the video", () => {
+    // PerceHeroVideo carries the same class, so the fade from poster to video never jumps.
+    expect(render({ slides: [slide], video })).toMatch(/<img[^>]*class="perce-hero-media /);
+  });
+
+  it("moves carousel dots clear of the lower-left copy", () => {
+    const slides = [slide, { imageUrl: "/b.webp" }];
+    expect(render({ slides })).toContain("right-(--perce-gutter)");
   });
 
   it("shows only the first slide as a still when a video is set — no carousel underneath", () => {
@@ -58,7 +95,7 @@ describe("PerceHero media", () => {
 
   it("renders the media frame, not the typographic hero, for a video with no image", () => {
     const html = render({ video });
-    expect(html).toContain("aspect-[4/5]");
+    expect(html).toContain("perce-hero-frame");
     expect(html).not.toContain("min-h-[58vh]");
   });
 

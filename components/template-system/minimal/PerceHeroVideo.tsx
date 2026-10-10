@@ -115,7 +115,7 @@ export function PerceHeroVideo({ src, mobileSrc }: PerceHeroVideoProps) {
       onError={() => setFailedSrc(renderSrc)}
       className={cn(
         "pointer-events-none absolute inset-0 z-15 h-full w-full",
-        "object-cover object-center",
+        "perce-hero-media object-cover",
         "transition-opacity duration-700 ease-out",
         playingSrc === renderSrc ? "opacity-100" : "opacity-0",
       )}
