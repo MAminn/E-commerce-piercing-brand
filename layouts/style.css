@@ -473,31 +473,90 @@ html[data-page-transition="out"] body {
     margin-block-start: var(--perce-header-offset);
   }
 
-  /* Homepage hero (PerceHero): full-bleed media with the copy overlaid.
-     The height is fixed by CSS, never by the media, so nothing shifts while
-     the image decodes or the video starts. It subtracts the static header
-     tokens, not the runtime-measured --perce-header-offset, so the height is
-     already final on the server render. `vh` lines are fallbacks for
-     browsers without small-viewport units.
-
-     Phones: fill the space between the header and the fixed bottom nav, but
-     never taller than 9:16 of the width — so a 9:16 reel is shown whole
-     instead of being cropped at the sides. */
-  .perce-hero-frame {
-    height: min(calc(100vh - var(--perce-header-h) - 4rem), 177.78vw);
-    height: min(
-      calc(100svh - var(--perce-header-h) - 4rem - env(safe-area-inset-bottom)),
-      177.78vw
-    );
-    min-height: 26rem;
+  /* Same clearance as padding, for a dark block that should run up behind
+     the transparent header rather than start below it. */
+  .perce-header-pad {
+    padding-block-start: var(--perce-header-offset);
   }
 
-  /* Tablet/desktop: cinematic, ~88% of the viewport including the header,
-     so the next section still shows and the page reads as scrollable. */
+  /* Header bar (MinimalNavbar). Solid ground by default. On the homepage it
+     floats over the hero: while the page is at the top (`data-at-top`, set
+     only on overlay routes) AND a hero is actually under the header
+     (`.perce-hero-under-header`), the bar is transparent and the hero media
+     shows through. `:has()` keeps that decision in CSS, so the server render
+     is already right and a page whose hero is disabled never gets light type
+     on a light page. Muted links go full Paper over media for contrast. */
+  .perce-nav {
+    background-color: var(--perce-brand-ground);
+    border-bottom: 1px solid var(--perce-frame-line);
+    transition:
+      background-color var(--perce-duration-slow) var(--perce-ease),
+      border-color var(--perce-duration-slow) var(--perce-ease);
+  }
+
+  :root:has(.perce-hero-under-header) .perce-nav[data-at-top] {
+    background-color: transparent;
+    border-bottom-color: transparent;
+    --perce-frame-ink-muted: var(--perce-frame-ink);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .perce-nav {
+      transition: none;
+    }
+  }
+
+  /* Homepage hero (PerceHero): full-bleed media with the copy overlaid,
+     starting at the very top of the page — the fixed header floats over it.
+     The height is fixed by CSS, never by the media, so nothing shifts while
+     the image decodes or the video starts. It uses the static header tokens,
+     not the runtime-measured --perce-header-offset, so the height is already
+     final on the server render. `vh` lines are fallbacks for browsers
+     without small-viewport units.
+
+     Phones: reach down to the fixed bottom nav, but never taller than 9:16
+     of the width — so a 9:16 reel is shown whole instead of being cropped at
+     the sides (its top now sits behind the transparent header). */
+  .perce-hero-frame {
+    height: min(calc(100vh - 4rem), 177.78vw);
+    height: min(
+      calc(100svh - 4rem - env(safe-area-inset-bottom)),
+      177.78vw
+    );
+    min-height: calc(26rem + var(--perce-header-h));
+  }
+
+  /* Tablet/desktop: cinematic, ending ~88% down the viewport (the same
+     bottom edge as when the hero started below the header), so the next
+     section still shows and the page reads as scrollable. */
   @media (min-width: 768px) {
     .perce-hero-frame {
-      height: clamp(32rem, calc(88vh - var(--perce-header-h-desktop)), 62rem);
-      height: clamp(32rem, calc(88svh - var(--perce-header-h-desktop)), 62rem);
+      height: calc(
+        clamp(32rem, calc(88vh - var(--perce-header-h-desktop)), 62rem) +
+          var(--perce-header-h-desktop)
+      );
+      height: calc(
+        clamp(32rem, calc(88svh - var(--perce-header-h-desktop)), 62rem) +
+          var(--perce-header-h-desktop)
+      );
+    }
+  }
+
+  /* A short fade behind the floating header so the logo, links and icons
+     stay readable over a bright frame. Fades out well above the copy. */
+  .perce-hero-top-scrim {
+    height: calc(var(--perce-header-h) * 2.25);
+    background: linear-gradient(
+      to bottom,
+      rgb(0 0 0 / 0.42) 0%,
+      rgb(0 0 0 / 0.18) 55%,
+      transparent 100%
+    );
+  }
+
+  @media (min-width: 768px) {
+    .perce-hero-top-scrim {
+      height: calc(var(--perce-header-h-desktop) * 2.25);
     }
   }
 
@@ -589,6 +648,17 @@ html[data-page-transition="out"] body {
     font-weight: var(--perce-weight-semibold);
     letter-spacing: -0.03em;
     text-transform: lowercase;
+    line-height: 1;
+  }
+
+  /* The header's text logo (shown only when no logo image is uploaded).
+     Wordmark styling WITHOUT the forced lowercase: it renders exactly what
+     it is given — "Percé" by default, or the admin's Text Logo as typed. */
+  .perce-logo-text {
+    font-family: var(--font-heading, inherit);
+    font-weight: var(--perce-weight-semibold);
+    letter-spacing: -0.03em;
+    text-transform: none;
     line-height: 1;
   }
 

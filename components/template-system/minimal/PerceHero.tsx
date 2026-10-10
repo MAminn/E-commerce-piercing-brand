@@ -37,10 +37,13 @@ export interface PerceHeroProps {
  * H1 from the Brand Source of Truth by default ("Small pieces. Made to mix."),
  * editable in Dashboard > Homepage.
  *
+ * - **Runs up behind the header.** The fixed header floats over the top of
+ *   the frame (transparent until the page scrolls), so the media starts at
+ *   the very top of the page; the copy sits low, well clear of it.
  * - **Sized by CSS, not by the media** (`.perce-hero-frame` in
- *   layouts/style.css): on phones it fills the space between the header and
- *   the bottom nav, capped at 9:16 of the width so a 9:16 reel shows whole;
- *   from 768px it is ~88% of the viewport. Nothing shifts while media loads.
+ *   layouts/style.css): on phones it reaches down to the bottom nav, capped
+ *   at 9:16 of the width so a 9:16 reel shows whole; from 768px it ends ~88%
+ *   down the viewport. Nothing shifts while media loads.
  * - **Separate mobile and desktop media.** `mobileImageUrl` / the mobile video
  *   below 768px, the desktop ones above — different crops for different
  *   frame shapes, not one asset squeezed.
@@ -113,7 +116,9 @@ export function PerceHero({
     return (
       <section
         className={cn(
-          "perce-header-offset bg-perce-ground text-perce-frame-ink",
+          // Padding, not margin: the ground runs up behind the transparent
+          // header instead of leaving a page-coloured strip under it.
+          "perce-header-pad perce-hero-under-header bg-perce-ground text-perce-frame-ink",
           "flex min-h-[58vh] items-center",
           className,
         )}
@@ -134,7 +139,7 @@ export function PerceHero({
   return (
     <section
       className={cn(
-        "perce-header-offset perce-hero-frame relative w-full overflow-hidden bg-perce-ground",
+        "perce-hero-frame perce-hero-under-header relative w-full overflow-hidden bg-perce-ground",
         className,
       )}
       // The h1 names a hero with copy; bare media and carousels get a label.
@@ -198,6 +203,10 @@ export function PerceHero({
       })}
 
       {video?.src && <PerceHeroVideo src={video.src} mobileSrc={video.mobileSrc} />}
+
+      {/* The header floats over the top of the frame: a short fade keeps the
+          logo, links and icons readable over a bright frame. */}
+      <div className='perce-hero-top-scrim pointer-events-none absolute inset-x-0 top-0 z-20' aria-hidden='true' />
 
       {hasCopy && (
         <>

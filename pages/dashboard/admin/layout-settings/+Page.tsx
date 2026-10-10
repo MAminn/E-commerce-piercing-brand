@@ -904,14 +904,14 @@ export default function LayoutSettingsPage() {
             <CardContent className='space-y-4'>
               <div>
                 <Label htmlFor='header-logo-text'>
-                  Displayed as the logo when no image is uploaded. Falls back to
-                  the store name if empty.
+                  Displayed as the logo only when no logo image is uploaded,
+                  exactly as typed. Falls back to “Percé” if empty.
                 </Label>
                 <Input
                   id='header-logo-text'
                   value={settings.header.logoText ?? ""}
                   onChange={(e) => updateHeader("logoText", e.target.value)}
-                  placeholder='e.g. YOUR BRAND'
+                  placeholder='Percé'
                   className='mt-1'
                 />
               </div>

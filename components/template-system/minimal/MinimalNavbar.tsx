@@ -32,7 +32,8 @@ import { formatMoney } from "#root/shared/pricing/format-money";
  *
  * Ground (#0E0E0E) bar, Paper type, one hairline. The only accent on the
  * bar is the cart count. Search results and the mobile drawer open as light
- * "windows" over it, like every product surface.
+ * "windows" over it, like every product surface. Over the homepage hero the
+ * bar starts transparent and turns solid on scroll.
  *
  * Layout: [icons (left)]  ·  [nav links (centre-right)]  ·  [wordmark (far right)]
  * Flips naturally with RTL via the i18n dir attribute.
@@ -179,6 +180,22 @@ export function MinimalNavbar() {
 
   const handleCloseSheet = () => setIsSheetOpen(false);
 
+  // Overlay routes (the homepage) float the bar over a full-bleed hero: it is
+  // transparent while the page sits at the top and turns solid as soon as the
+  // page scrolls. `data-at-top` only marks the state — the transparency itself
+  // is gated in CSS on a hero actually being under the header (`.perce-nav`
+  // in layouts/style.css), so a page without one never gets white-on-white.
+  // Starts `true` so the server render matches a fresh load at the top.
+  const isOverlay = mode === "overlay";
+  const [atTop, setAtTop] = useState(true);
+  useEffect(() => {
+    if (!isOverlay) return;
+    const update = () => setAtTop(window.scrollY <= 8);
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    return () => window.removeEventListener("scroll", update);
+  }, [isOverlay]);
+
   const marqueeEnabled = layoutSettings.header.marqueeEnabled;
   const marqueeText = locale === "ar" && layoutSettings.header.marqueeTextAr
     ? layoutSettings.header.marqueeTextAr
@@ -207,7 +224,8 @@ export function MinimalNavbar() {
 
       <nav
         aria-label='Main'
-        className='w-full bg-perce-ground text-perce-frame-ink border-b border-perce-frame-line'
+        className='perce-nav w-full text-perce-frame-ink'
+        data-at-top={isOverlay && atTop ? "" : undefined}
         dir={dir === "rtl" ? "ltr" : "rtl"}>
         <div className='perce-container'>
           <div className='flex items-center justify-between h-16 sm:h-[72px]'>
@@ -482,10 +500,10 @@ export function MinimalNavbar() {
 
             {/* ── Far Right: Logo + Mobile hamburger ── */}
             <div className='flex items-center gap-2'>
-              {/* Desktop Logo */}
+              {/* Logo — CMS mobile size below lg (hamburger layout), desktop size above */}
               <HeaderLogo
-                variant='desktop'
-                textClassName='perce-wordmark text-2xl sm:text-[28px] text-perce-frame-ink hover:text-perce-frame-ink-muted transition-colors'
+                variant='responsive'
+                textClassName='perce-logo-text text-2xl sm:text-[28px] text-perce-frame-ink hover:text-perce-frame-ink-muted transition-colors'
               />
 
               {/* Mobile hamburger */}
@@ -509,7 +527,7 @@ export function MinimalNavbar() {
                             handleCloseSheet();
                             navigate('/');
                           }}
-                          textClassName='perce-wordmark text-xl text-perce-ink'
+                          textClassName='perce-logo-text text-xl text-perce-ink'
                         />
                         <button
                           type='button'
