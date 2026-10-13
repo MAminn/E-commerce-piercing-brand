@@ -32,6 +32,20 @@ interface PublicPromoCode {
   discountType: "percentage" | "fixed_amount";
   discountValue: number;
   minPurchaseAmount: number | null;
+  freeShipping?: boolean;
+  eligibleMinQuantity?: number | null;
+  eligibleMaxQuantity?: number | null;
+}
+
+/** "exactly 6 pieces" / "6 قطع بالضبط" — the code's eligible-quantity rule, or "". */
+function quantityRuleText(pc: PublicPromoCode, isAr: boolean): string {
+  const min = pc.eligibleMinQuantity ?? null;
+  const max = pc.eligibleMaxQuantity ?? null;
+  if (min === null && max === null) return "";
+  if (min !== null && max !== null && min === max) return isAr ? ` — عند اختيار ${min} قطع بالضبط` : ` — exactly ${min} pieces`;
+  if (min !== null && max !== null) return isAr ? ` — من ${min} إلى ${max} قطع` : ` — ${min}–${max} pieces`;
+  if (min !== null) return isAr ? ` — ${min} قطع على الأقل` : ` — at least ${min} pieces`;
+  return isAr ? ` — حتى ${max} قطع` : ` — up to ${max} pieces`;
 }
 
 const BADGE_LABELS = ["BEST DEAL", "MOST LOVED", "EVERYDAY DEAL"];
@@ -268,6 +282,8 @@ export default function OffersPage() {
                       {pc.discountType === "percentage"
                         ? `${pc.discountValue}% off`
                         : `${formatMoney(pc.discountValue, { locale: isAr ? "ar" : "en" })} off`}
+                      {pc.freeShipping ? (isAr ? " + شحن مجاني" : " + free shipping") : ""}
+                      {quantityRuleText(pc, isAr)}
                       {pc.minPurchaseAmount
                         ? isAr
                           ? ` — بحد أدنى ${formatMoney(pc.minPurchaseAmount, { locale: "ar" })}`

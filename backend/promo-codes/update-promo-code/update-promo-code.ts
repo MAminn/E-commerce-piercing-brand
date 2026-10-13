@@ -4,8 +4,11 @@ import {
   promoCode,
   promoCodeProducts,
   promoCodeCategories,
+  promoCodeExcludedProducts,
   user,
 } from "#root/shared/database/drizzle/schema";
+import { validateQuantityRule } from "#root/shared/pricing/eligible-units";
+import { eligibleQuantitySchema } from "../create-promo-code/create-promo-code";
 import { ServerError } from "#root/shared/error/server";
 import { Effect } from "effect";
 import { z } from "zod";
@@ -67,7 +70,13 @@ export const updatePromoCodeSchema = z
     appliesToAllProducts: z.boolean().optional(),
     applicableProductIds: z.array(z.string().uuid()).optional(),
     applicableCategoryIds: z.array(z.string().uuid()).optional(),
+    /** Replaces the exclusion list when present; omit to keep it. */
+    excludedProductIds: z.array(z.string().uuid()).max(500).optional(),
     showOnOffersPage: z.boolean().optional(),
+    /** `null` clears a bound; omit to keep it. */
+    eligibleMinQuantity: eligibleQuantitySchema,
+    eligibleMaxQuantity: eligibleQuantitySchema,
+    freeShipping: z.boolean().optional(),
   })
   .refine(
     (data) => {
@@ -202,6 +211,32 @@ export const updatePromoCode = (
       input.applicableCategoryIds ??
       currentApplicableCategoryIds.map((c) => c.id);
 
+    // Quantity rule checked against the MERGED values, so editing one bound
+    // can't leave min > max with the stored other bound.
+    const finalMinQuantity =
+      input.eligibleMinQuantity === undefined
+        ? existingPromo.eligibleMinQuantity
+        : input.eligibleMinQuantity;
+    const finalMaxQuantity =
+      input.eligibleMaxQuantity === undefined
+        ? existingPromo.eligibleMaxQuantity
+        : input.eligibleMaxQuantity;
+    const quantityRuleError = validateQuantityRule({
+      minQuantity: finalMinQuantity ?? null,
+      maxQuantity: finalMaxQuantity ?? null,
+    });
+    if (quantityRuleError) {
+      return yield* $(
+        Effect.fail(
+          new ServerError({
+            tag: "BadRequest",
+            statusCode: 400,
+            clientMessage: quantityRuleError,
+          })
+        )
+      );
+    }
+
     if (
       !finalAppliesToAll &&
       finalProductIds.length === 0 &&
@@ -244,6 +279,12 @@ export const updatePromoCode = (
       valuesToUpdate.appliesToAllProducts = input.appliesToAllProducts;
     if (input.showOnOffersPage !== undefined)
       valuesToUpdate.showOnOffersPage = input.showOnOffersPage;
+    if (input.eligibleMinQuantity !== undefined)
+      valuesToUpdate.eligibleMinQuantity = input.eligibleMinQuantity;
+    if (input.eligibleMaxQuantity !== undefined)
+      valuesToUpdate.eligibleMaxQuantity = input.eligibleMaxQuantity;
+    if (input.freeShipping !== undefined)
+      valuesToUpdate.freeShipping = input.freeShipping;
 
     if (
       input.status === undefined &&
@@ -327,6 +368,22 @@ export const updatePromoCode = (
           const newAppliesToAll =
             valuesToUpdate.appliesToAllProducts ??
             finalUpdatedPromoCode.appliesToAllProducts;
+
+          // Exclusions are independent of the all/some applicability switch:
+          // they narrow either one.
+          if (input.excludedProductIds !== undefined) {
+            await tx
+              .delete(promoCodeExcludedProducts)
+              .where(eq(promoCodeExcludedProducts.promoCodeId, input.id));
+            if (input.excludedProductIds.length > 0) {
+              await tx.insert(promoCodeExcludedProducts).values(
+                [...new Set(input.excludedProductIds)].map((productId) => ({
+                  promoCodeId: input.id,
+                  productId,
+                }))
+              );
+            }
+          }
 
           let applicabilityChanged = false;
           if (
@@ -414,6 +471,14 @@ export const updatePromoCode = (
 
     let applicablePds: string[] = [];
     let applicableCats: string[] = [];
+    const excludedResult = yield* $(
+      query((db) =>
+        db
+          .select({ id: promoCodeExcludedProducts.productId })
+          .from(promoCodeExcludedProducts)
+          .where(eq(promoCodeExcludedProducts.promoCodeId, base.id))
+      )
+    );
 
     if (!base.appliesToAllProducts) {
       const pdsResult = yield* $(
@@ -443,5 +508,6 @@ export const updatePromoCode = (
         : null,
       applicableProductIds: applicablePds,
       applicableCategoryIds: applicableCats,
+      excludedProductIds: excludedResult.map((p) => p.id),
     };
   });

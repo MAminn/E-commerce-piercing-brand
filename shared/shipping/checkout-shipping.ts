@@ -10,7 +10,8 @@ import type { ShippingQuoteResponse } from "./quote";
  *                 the quote has not come back): "Calculated at checkout".
  *                 `fee` is 0 so totals are the goods total.
  *   quoted      — the exact fee is known. `baseFee` is the rule fee; `fee`
- *                 is what will be charged after a free-shipping offer.
+ *                 is what will be charged after a free-shipping offer or
+ *                 free-shipping promo code.
  *   unavailable — the merchant does not deliver to this destination; the
  *                 order cannot be placed.
  */
@@ -30,6 +31,12 @@ export type ShippingLineStatus = ShippingLine["status"];
 export function deriveShippingLine(
   response: ShippingQuoteResponse | null | undefined,
   appliedOffers: readonly { freeShipping: boolean }[],
+  /**
+   * A qualifying promo code with free shipping (e.g. PICK6). Like an offer it
+   * only ever zeroes an AVAILABLE quote: an unavailable destination stays
+   * unavailable, and a pending quote stays pending.
+   */
+  options: { promoFreeShipping?: boolean } = {},
 ): ShippingLine {
   if (!response) return { status: "pending", fee: 0, baseFee: 0 };
   const { quote } = response;
@@ -39,7 +46,7 @@ export function deriveShippingLine(
     }
     return { status: "pending", fee: 0, baseFee: 0 };
   }
-  const fee = deriveEffectiveShipping(quote.amount, appliedOffers);
+  const fee = options.promoFreeShipping ? 0 : deriveEffectiveShipping(quote.amount, appliedOffers);
   return {
     status: "quoted",
     baseFee: quote.amount,

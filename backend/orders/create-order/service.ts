@@ -6,8 +6,6 @@ import {
   user,
   type orderStatus,
   promoCode,
-  promoCodeProducts,
-  promoCodeCategories,
   cartOffer,
   orderBundle,
 } from "#root/shared/database/drizzle/schema";
@@ -26,9 +24,15 @@ import { applyOffersToCart } from "#root/backend/offers/service";
 import {
   buildOfferInputs,
   computeCartTotals,
+  planPromo,
+  type CartPromoInput,
   type PricingBundle,
   type PricingRegularLine,
+  type PromoPlan,
 } from "#root/shared/bundles/cart-pricing";
+import { loadPromoEligibility, toCartPromoInput } from "#root/backend/promo-codes/eligibility";
+import { quantityRuleRejection } from "#root/shared/pricing/eligible-units";
+import { effectiveUnitPrice } from "#root/shared/pricing/effective-price";
 import { stripOrderItemsMerchantFields } from "../merchant-fields";
 import {
   loadAndValidateBundleSelection,
@@ -589,9 +593,14 @@ export const createOrder = (
             const selectedOptions: SelectedOptions | null =
               Object.keys(resolved.selectedOptions).length > 0 ? resolved.selectedOptions : null;
             const basePrice = Number.parseFloat(productData.price.toString());
-            const baseDiscount = productData.discountPrice
-              ? Number.parseFloat(productData.discountPrice.toString())
-              : null;
+            // Only a VALID sale price is snapshotted as the line's discount, so
+            // order edits and admin grouping (which read the snapshot) agree
+            // with what was charged.
+            const rawDiscount =
+              productData.discountPrice === null
+                ? null
+                : Number.parseFloat(productData.discountPrice.toString());
+            const baseDiscount = effectiveUnitPrice(basePrice, rawDiscount) < basePrice ? rawDiscount : null;
             return {
               productId: item.productId,
               quantity: item.quantity,
@@ -600,7 +609,10 @@ export const createOrder = (
               // Regular price and discount of THIS configuration.
               price: resolvePurchasableLinePrice(basePrice, resolved.priceModifier),
               discountPrice: baseDiscount === null ? null : resolvePurchasableLinePrice(baseDiscount, resolved.priceModifier),
-              unitPrice: resolvePurchasableLinePrice(baseDiscount ?? basePrice, resolved.priceModifier),
+              // The ONE effective-price rule (shared/pricing/effective-price.ts):
+              // a valid sale price, else the regular price — what the product
+              // page displayed and the base every promotion is computed on.
+              unitPrice: resolvePurchasableLinePrice(effectiveUnitPrice(basePrice, baseDiscount), resolved.priceModifier),
             };
           });
 
@@ -737,48 +749,30 @@ export const createOrder = (
           const shipping = shippingQuote.amount;
           const governorate = governorateCode ? getGovernorate(governorateCode) : undefined;
 
-          // ─── Evaluate automatic cart offers server-side ───────────────────────
-          // Evaluated before the promo code discount below so the promo code's
-          // percentage/fixed discount applies to what's left *after* automatic
-          // offers, not the raw subtotal (matches the shopper-facing cart math).
-          // Exclusive bundles are invisible to the engine; stackable bundles
-          // appear as their children at bundle-share prices.
-          const now = new Date();
-          const activeOffers = await tx
-            .select()
-            .from(cartOffer)
-            .where(
-              and(
-                eq(cartOffer.isActive, true),
-                or(isNull(cartOffer.startsAt), lte(cartOffer.startsAt, now)),
-                or(isNull(cartOffer.endsAt), gte(cartOffer.endsAt, now)),
-              ),
-            )
-            .orderBy(asc(cartOffer.priority))
-            .execute();
+          // ─── Promo code: re-validated from scratch, server-side ────────────
+          // Loaded BEFORE automatic offers because a qualifying set code
+          // (eligible-quantity rule, e.g. PICK6) owns its eligible units and
+          // those units must be hidden from the offer engine — the one-
+          // discount-per-unit rule in shared/bundles/cart-pricing.ts. The
+          // client's copy of the code, its discount and its eligibility are
+          // never read: only `promoCodeId`.
+          //
+          // Promo-code minimum-purchase checks look at the same value offers
+          // always did — an exclusive bundle counts toward neither, a
+          // stackable one toward both.
+          const subtotal = buildOfferInputs(regularLines, pricingBundles).subtotal;
 
-          const offerInputs = buildOfferInputs(regularLines, pricingBundles);
-          const cartItemsForOffers = offerInputs.cartItems;
-
-          const appliedOffers = applyOffersToCart(activeOffers, cartItemsForOffers, offerInputs.subtotal);
-          const offerDiscount = appliedOffers.reduce((s, o) => s + o.discountAmount, 0);
-          const hasFreeShippingFromOffer = appliedOffers.some((o) => o.freeShipping);
-
-          // Promo-code minimum-purchase and applicability checks look at the
-          // same value/items offers do — an exclusive bundle counts toward
-          // neither, a stackable one toward both.
-          const subtotal = offerInputs.subtotal;
-
-          // Check if a promo code is applied
-          let promoCodeData = null;
+          let promoCodeData: typeof promoCode.$inferSelect | null = null;
+          let cartPromo: CartPromoInput | null = null;
+          let promoPlan: PromoPlan | null = null;
 
           if (input.promoCodeId) {
-            // Get the promo code first to get its code
-            promoCodeData = await tx
-              .select()
-              .from(promoCode)
-              .where(eq(promoCode.id, input.promoCodeId))
-              .then((res) => res[0]);
+            promoCodeData =
+              (await tx
+                .select()
+                .from(promoCode)
+                .where(eq(promoCode.id, input.promoCodeId))
+                .then((res) => res[0])) ?? null;
 
             // A promo code id that doesn't resolve means the client sent
             // something stale or tampered with — never silently ignore it.
@@ -790,6 +784,7 @@ export const createOrder = (
                   "The promo code on your order is no longer available. Please remove it and try again.",
               });
             }
+            const code = promoCodeData;
 
             const nowForPromo = new Date();
 
@@ -797,34 +792,23 @@ export const createOrder = (
             // have changed since the code was applied, and the client's copy
             // of the discount is never trusted.
             const rejection: string | null = (() => {
-              if (
-                promoCodeData.status !== "active" &&
-                promoCodeData.status !== "scheduled"
-              ) {
-                return promoCodeData.status === "expired"
+              if (code.status !== "active" && code.status !== "scheduled") {
+                return code.status === "expired"
                   ? "This promo code has expired."
-                  : promoCodeData.status === "exhausted"
+                  : code.status === "exhausted"
                     ? "This promo code has reached its usage limit and can no longer be used."
                     : "This promo code isn't active right now.";
               }
-              if (
-                promoCodeData.startDate &&
-                promoCodeData.startDate > nowForPromo
-              ) {
+              if (code.startDate && code.startDate > nowForPromo) {
                 return "This promo code isn't active yet.";
               }
-              if (promoCodeData.endDate && promoCodeData.endDate < nowForPromo) {
+              if (code.endDate && code.endDate < nowForPromo) {
                 return "This promo code has expired.";
               }
-              if (
-                promoCodeData.usageLimit !== null &&
-                promoCodeData.usedCount >= promoCodeData.usageLimit
-              ) {
+              if (code.usageLimit !== null && code.usedCount >= code.usageLimit) {
                 return "This promo code has reached its usage limit and can no longer be used.";
               }
-              const minPurchase = promoCodeData.minPurchaseAmount
-                ? Number(promoCodeData.minPurchaseAmount)
-                : 0;
+              const minPurchase = code.minPurchaseAmount ? Number(code.minPurchaseAmount) : 0;
               if (minPurchase > 0 && subtotal < minPurchase) {
                 return `This promo code needs a minimum order of ${formatMoney(minPurchase)}.`;
               }
@@ -841,13 +825,13 @@ export const createOrder = (
 
             // Per-user usage limit — signed-in shoppers by user id, guests by
             // the email they're checking out with.
-            if (promoCodeData.usageLimitPerUser !== null) {
+            if (code.usageLimitPerUser !== null) {
               const previousUses = await tx
                 .select({ id: order.id })
                 .from(order)
                 .where(
                   and(
-                    eq(order.promoCodeId, promoCodeData.id),
+                    eq(order.promoCodeId, code.id),
                     userId
                       ? eq(order.userId, userId)
                       : eq(order.customerEmail, input.customerEmail),
@@ -855,66 +839,38 @@ export const createOrder = (
                 )
                 .execute();
 
-              if (previousUses.length >= promoCodeData.usageLimitPerUser) {
+              if (previousUses.length >= code.usageLimitPerUser) {
                 throw new ServerError({
                   tag: "PromoCodeValidationFailed",
                   statusCode: 400,
                   clientMessage:
-                    promoCodeData.usageLimitPerUser === 1
+                    code.usageLimitPerUser === 1
                       ? "You've already used this promo code."
-                      : `You've already used this promo code the maximum of ${promoCodeData.usageLimitPerUser} times.`,
+                      : `You've already used this promo code the maximum of ${code.usageLimitPerUser} times.`,
                 });
               }
             }
 
-            // Product / category applicability — this was previously skipped
-            // at order time, letting a restricted code through on any cart.
-            if (!promoCodeData.appliesToAllProducts) {
-              const cartProductIds = [...new Set(cartItemsForOffers.map((item) => item.id))];
+            // Eligibility (products / categories / exclusions) and the
+            // eligible-UNIT quantity rule, judged by the shared pricing layer
+            // on the server-resolved lines — the same functions the cart ran.
+            const eligibility = await loadPromoEligibility(tx, code);
+            cartPromo = toCartPromoInput(code, eligibility);
+            promoPlan = planPromo(regularLines, pricingBundles, cartPromo);
 
-              const applicableProducts = await tx
-                .select({ productId: promoCodeProducts.productId })
-                .from(promoCodeProducts)
-                .where(
-                  and(
-                    eq(promoCodeProducts.promoCodeId, promoCodeData.id),
-                    inArray(promoCodeProducts.productId, cartProductIds),
-                  ),
-                )
-                .execute();
-
-              const cartCategoryIds = [
-                ...new Set(cartItemsForOffers.flatMap((item) => item.categoryIds ?? [])),
-              ];
-
-              const applicableCategories =
-                cartCategoryIds.length > 0
-                  ? await tx
-                      .select({ categoryId: promoCodeCategories.categoryId })
-                      .from(promoCodeCategories)
-                      .where(
-                        and(
-                          eq(promoCodeCategories.promoCodeId, promoCodeData.id),
-                          inArray(
-                            promoCodeCategories.categoryId,
-                            cartCategoryIds,
-                          ),
-                        ),
-                      )
-                      .execute()
-                  : [];
-
-              if (
-                applicableProducts.length === 0 &&
-                applicableCategories.length === 0
-              ) {
-                throw new ServerError({
-                  tag: "PromoCodeValidationFailed",
-                  statusCode: 400,
-                  clientMessage:
-                    "This promo code doesn't apply to any of the items in your cart.",
-                });
-              }
+            if (promoPlan.eligibleUnits === 0) {
+              throw new ServerError({
+                tag: "PromoCodeValidationFailed",
+                statusCode: 400,
+                clientMessage: "This promo code doesn't apply to any of the items in your cart.",
+              });
+            }
+            if (!promoPlan.quantity.ok) {
+              throw new ServerError({
+                tag: "PromoCodeValidationFailed",
+                statusCode: 400,
+                clientMessage: quantityRuleRejection(code.code, promoPlan.quantity),
+              });
             }
 
             // The discount itself is computed by computeCartTotals below from
@@ -924,28 +880,48 @@ export const createOrder = (
             await tx
               .update(promoCode)
               .set({
-                usedCount: promoCodeData.usedCount + 1,
+                usedCount: code.usedCount + 1,
                 // If this was the last use, set status to exhausted
                 status:
-                  promoCodeData.usageLimit !== null &&
-                  promoCodeData.usedCount + 1 >= promoCodeData.usageLimit
+                  code.usageLimit !== null && code.usedCount + 1 >= code.usageLimit
                     ? "exhausted"
-                    : promoCodeData.status,
+                    : code.status,
               })
-              .where(eq(promoCode.id, promoCodeData.id));
+              .where(eq(promoCode.id, code.id));
           }
+
+          // ─── Evaluate automatic cart offers server-side ───────────────────────
+          // Evaluated on what offers may see: ordinary lines and stackable
+          // bundle children — minus the lines a qualifying set code owns.
+          // Exclusive bundles are invisible to the engine; stackable bundles
+          // appear as their children at bundle-share prices. An ordinary promo
+          // code then discounts what is left of its eligible value AFTER the
+          // offers (matches the shopper-facing cart math).
+          const now = new Date();
+          const activeOffers = await tx
+            .select()
+            .from(cartOffer)
+            .where(
+              and(
+                eq(cartOffer.isActive, true),
+                or(isNull(cartOffer.startsAt), lte(cartOffer.startsAt, now)),
+                or(isNull(cartOffer.endsAt), gte(cartOffer.endsAt, now)),
+              ),
+            )
+            .orderBy(asc(cartOffer.priority))
+            .execute();
+
+          const offerInputs = buildOfferInputs(regularLines, pricingBundles, promoPlan);
+          const appliedOffers = applyOffersToCart(activeOffers, offerInputs.cartItems, offerInputs.subtotal);
+          const offerDiscount = appliedOffers.reduce((s, o) => s + o.discountAmount, 0);
+          const hasFreeShippingFromOffer = appliedOffers.some((o) => o.freeShipping);
 
           // ─── Totals — single source of truth shared with the cart UI ───────
           const pricing = computeCartTotals({
             regularLines,
             bundles: pricingBundles,
             offerDiscount,
-            promo: promoCodeData
-              ? {
-                  discountType: promoCodeData.discountType,
-                  discountValue: Number(promoCodeData.discountValue),
-                }
-              : null,
+            promo: cartPromo,
             baseShippingFee: shipping,
             freeShipping: hasFreeShippingFromOffer,
           });
@@ -971,7 +947,8 @@ export const createOrder = (
           const shippingSnapshot = buildShippingSnapshot({
             quote: shippingQuote,
             mode: shippingQuoteResult.response.mode,
-            freeShippingApplied: hasFreeShippingFromOffer,
+            freeShippingApplied: pricing.freeShippingSource !== null,
+            freeShippingSource: pricing.freeShippingSource,
             chargedFee: effectiveShipping,
             rulesUpdatedAt: shippingQuoteResult.stored.updatedAt,
           });
@@ -1155,6 +1132,10 @@ export const createOrder = (
                 requiredQuantity: b.tierQuantity,
                 regularTotal: b.regularTotal.toFixed(2),
                 bundleTotal: b.bundleTotal.toFixed(2),
+                // How it was priced, frozen: a later switch of the campaign
+                // between fixed and percentage pricing can't reword history.
+                pricingType: b.pricingType,
+                discountPercent: b.discountPercent === null ? null : b.discountPercent.toFixed(2),
                 offerStacking: b.offerStacking,
               })
               .returning();

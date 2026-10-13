@@ -33,7 +33,48 @@ export function bundleHref(slug: string): string {
 /** The tier facts a card needs. Structurally compatible with `BundleTierDto`. */
 export interface BundleCardTier {
   quantity: number;
-  price: number;
+  /** Fixed-total tiers; null on a percentage tier. */
+  price: number | null;
+  /** Percentage tiers; null/absent on a fixed tier. */
+  discountPercent?: number | null;
+}
+
+/** "15%" / "12.5%" — how every bundle surface prints a tier percentage. */
+export function formatBundlePercent(percent: number): string {
+  return `${Number(percent.toFixed(2))}%`;
+}
+
+/**
+ * The card summary of a PERCENTAGE-priced Pick Your Set: one tier says
+ * exactly what it offers ("Choose 6 pieces · 15% off"); several tiers state
+ * the span and the best percentage ("Up to 20% off" / "3–6 pieces"). There
+ * is no fixed price to quote, so none is invented.
+ */
+export function summarizePercentageTiers(
+  tiers: readonly BundleCardTier[],
+  t: (key: string) => string,
+): { price: string; sizes: string | null } | null {
+  const percents = tiers
+    .map((tier) => tier.discountPercent)
+    .filter((p): p is number => typeof p === "number" && p > 0);
+  if (percents.length === 0 || percents.length !== tiers.length) return null;
+  const sorted = [...tiers].sort((a, b) => a.quantity - b.quantity);
+  const smallest = sorted[0];
+  const largest = sorted[sorted.length - 1];
+  if (smallest === undefined || largest === undefined) return null;
+  if (sorted.length === 1) {
+    return {
+      price: fillTemplate(t("bundle.choose_pct"), {
+        count: smallest.quantity,
+        percent: formatBundlePercent(smallest.discountPercent as number),
+      }),
+      sizes: null,
+    };
+  }
+  return {
+    price: fillTemplate(t("bundles.up_to_pct"), { percent: formatBundlePercent(Math.max(...percents)) }),
+    sizes: fillTemplate(t("bundles.tier_range"), { min: smallest.quantity, max: largest.quantity }),
+  };
 }
 
 /**
@@ -62,7 +103,9 @@ export function summarizeBundleTiers(
   const smallest = sorted[0];
   const largest = sorted[sorted.length - 1];
   if (smallest === undefined || largest === undefined) return null;
-  const cheapest = sorted.reduce((a, b) =>
+  const priced = sorted.filter((tier): tier is BundleCardTier & { price: number } => tier.price !== null);
+  if (priced.length === 0) return null;
+  const cheapest = priced.reduce((a, b) =>
     Math.round(b.price * 100) < Math.round(a.price * 100) ? b : a,
   );
   return {

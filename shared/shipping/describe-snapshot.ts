@@ -22,7 +22,8 @@ export function describeShippingSnapshot(snapshot: ShippingSnapshot | null | und
   }
 
   if (snapshot.freeShippingApplied) {
-    return `${base} · ${snapshot.ruleFee.toFixed(2)} EGP waived by a free-shipping offer`;
+    const by = snapshot.freeShippingSource === "promo_code" ? "a free-shipping promo code" : "a free-shipping offer";
+    return `${base} · ${snapshot.ruleFee.toFixed(2)} EGP waived by ${by}`;
   }
   return base;
 }

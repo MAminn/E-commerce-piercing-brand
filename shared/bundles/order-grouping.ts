@@ -51,6 +51,10 @@ export interface OrderBundleSnapshot {
   requiredQuantity: number;
   regularTotal: string;
   bundleTotal: string;
+  /** Snapshotted pricing model; absent/fixed_total on every order before percentage pricing. */
+  pricingType?: "fixed_total" | "percentage_discount";
+  /** Snapshotted percentage of a percentage-priced tier (decimal string), else null. */
+  discountPercent?: string | null;
   offerStacking: "exclusive" | "stackable";
 }
 
@@ -215,6 +219,9 @@ export function bundleTypeLabel(type: OrderBundleSnapshot["campaignType"]): stri
 export function bundleTierLabel(bundle: OrderBundleSnapshot): string | null {
   if (bundle.campaignType === "curated_stack") return null;
   if (!Number.isInteger(bundle.requiredQuantity) || bundle.requiredQuantity < 1) return null;
+  if (bundle.pricingType === "percentage_discount" && bundle.discountPercent) {
+    return `${bundle.requiredQuantity}-piece tier · ${Number(bundle.discountPercent)}% off`;
+  }
   return `${bundle.requiredQuantity}-piece tier`;
 }
 

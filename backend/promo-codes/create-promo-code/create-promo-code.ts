@@ -4,12 +4,20 @@ import {
   promoCode,
   promoCodeProducts,
   promoCodeCategories,
+  promoCodeExcludedProducts,
   user,
 } from "#root/shared/database/drizzle/schema";
 import { ServerError } from "#root/shared/error/server";
 import { Effect } from "effect";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
+import { validateQuantityRule } from "#root/shared/pricing/eligible-units";
+
+/**
+ * Eligible-unit quantity bounds (inclusive). Exact N is min = max = N. Both
+ * omitted/null = no quantity rule — every code created before this existed.
+ */
+export const eligibleQuantitySchema = z.number().int().min(1).max(1000).nullable().optional();
 
 // Define enum values directly for Zod, matching the Drizzle schema pgEnums
 const discountTypes = ["percentage", "fixed_amount"] as const;
@@ -57,7 +65,13 @@ export const createPromoCodeSchema = z
     appliesToAllProducts: z.boolean().default(true),
     applicableProductIds: z.array(z.string().uuid()).optional().default([]),
     applicableCategoryIds: z.array(z.string().uuid()).optional().default([]),
+    /** Never counted or discounted, whatever the applicability above says. */
+    excludedProductIds: z.array(z.string().uuid()).max(500).optional().default([]),
     showOnOffersPage: z.boolean().default(false),
+    eligibleMinQuantity: eligibleQuantitySchema,
+    eligibleMaxQuantity: eligibleQuantitySchema,
+    /** Also waive shipping on a deliverable destination when the code qualifies. */
+    freeShipping: z.boolean().default(false),
   })
   .refine(
     (data) => {
@@ -85,6 +99,17 @@ export const createPromoCodeSchema = z
       message:
         "Percentage discount must be between 0 (exclusive) and 100 (inclusive)",
       path: ["discountValue"],
+    }
+  )
+  .refine(
+    (data) =>
+      validateQuantityRule({
+        minQuantity: data.eligibleMinQuantity ?? null,
+        maxQuantity: data.eligibleMaxQuantity ?? null,
+      }) === null,
+    {
+      message: "The minimum eligible quantity cannot be greater than the maximum.",
+      path: ["eligibleMinQuantity"],
     }
   )
   .refine(
@@ -200,11 +225,15 @@ export const createPromoCode = (
     const newPromo = yield* $(
       query(async (db) =>
         db.transaction(async (tx) => {
+          const { excludedProductIds, applicableProductIds, applicableCategoryIds, ...columns } = input;
           const [insertedPromoCode] = await tx
             .insert(promoCode)
             .values({
-              ...input,
+              ...columns,
               code: upperCaseCode,
+              eligibleMinQuantity: input.eligibleMinQuantity ?? null,
+              eligibleMaxQuantity: input.eligibleMaxQuantity ?? null,
+              freeShipping: input.freeShipping,
               discountValue: String(input.discountValue),
               minPurchaseAmount: input.minPurchaseAmount
                 ? String(input.minPurchaseAmount)
@@ -223,24 +252,33 @@ export const createPromoCode = (
             throw new Error("Promo code creation failed unexpectedly.");
           }
 
+          if (excludedProductIds.length > 0) {
+            await tx.insert(promoCodeExcludedProducts).values(
+              [...new Set(excludedProductIds)].map((productId) => ({
+                promoCodeId: insertedPromoCode.id,
+                productId,
+              }))
+            );
+          }
+
           if (!input.appliesToAllProducts) {
             if (
-              input.applicableProductIds &&
-              input.applicableProductIds.length > 0
+              applicableProductIds &&
+              applicableProductIds.length > 0
             ) {
               await tx.insert(promoCodeProducts).values(
-                input.applicableProductIds.map((productId) => ({
+                applicableProductIds.map((productId) => ({
                   promoCodeId: insertedPromoCode.id,
                   productId: productId,
                 }))
               );
             }
             if (
-              input.applicableCategoryIds &&
-              input.applicableCategoryIds.length > 0
+              applicableCategoryIds &&
+              applicableCategoryIds.length > 0
             ) {
               await tx.insert(promoCodeCategories).values(
-                input.applicableCategoryIds.map((categoryId) => ({
+                applicableCategoryIds.map((categoryId) => ({
                   promoCodeId: insertedPromoCode.id,
                   categoryId: categoryId,
                 }))

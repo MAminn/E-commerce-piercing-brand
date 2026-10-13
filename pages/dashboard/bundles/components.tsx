@@ -7,6 +7,7 @@ import { STORE_CURRENCY } from "#root/shared/config/branding";
 import type { BundleCampaignDto } from "#root/backend/bundles/service";
 import {
   type BundleCampaignType,
+  type BundlePricingType,
   type BundleTier,
   curatedUnitCount,
   describeBundleCampaign,
@@ -421,10 +422,17 @@ export interface CampaignFormState {
   imageUrl: string | null;
   isActive: boolean;
   /**
-   * Build Your Stack pricing tiers. Strings so a half-typed row does not fight
-   * the input; parsed and validated in `buildCampaignPayload`.
+   * Build Your Stack pricing mode. Ready Sets are always fixed_total.
+   * fixed_total: each tier is a total price. percentage_discount: each tier
+   * takes a percentage off the selected pieces' current prices.
    */
-  tiers: { quantity: string; price: string }[];
+  pricingType: BundlePricingType;
+  /**
+   * Build Your Stack pricing tiers. Strings so a half-typed row does not fight
+   * the input; parsed and validated in `buildCampaignPayload`. Only the field
+   * matching `pricingType` is read.
+   */
+  tiers: TierFormRow[];
   /** Legacy single-quantity field, still used by the curated form. */
   requiredQuantity: string;
   /** Curated stacks: THE price. Build Your Stack derives it from the lowest tier. */
@@ -451,6 +459,8 @@ export interface CampaignFormState {
   eligibilityMaxPrice: string;
 }
 
+export type TierFormRow = { quantity: string; price: string; discountPercent: string };
+
 export const emptyCampaignForm: CampaignFormState = {
   type: "build_your_stack",
   internalName: "",
@@ -463,7 +473,8 @@ export const emptyCampaignForm: CampaignFormState = {
   imageId: null,
   imageUrl: null,
   isActive: false,
-  tiers: [{ quantity: "6", price: "" }],
+  pricingType: "fixed_total",
+  tiers: [{ quantity: "6", price: "", discountPercent: "" }],
   requiredQuantity: "6",
   fixedBundlePrice: "",
   allowDuplicates: false,
@@ -512,10 +523,21 @@ export function campaignToForm(c: BundleCampaign): CampaignFormState {
     // Tiers come back ascending from the service. A campaign that predates
     // Phase 5 was backfilled with exactly one tier, so its form looks the same
     // as it always did — one quantity, one price.
+    pricingType: isCurated ? "fixed_total" : c.pricingType,
     tiers:
       isCurated || c.tiers.length === 0
-        ? [{ quantity: String(c.requiredQuantity || 6), price: c.fixedBundlePrice === null ? "" : String(c.fixedBundlePrice) }]
-        : c.tiers.map((tier) => ({ quantity: String(tier.quantity), price: String(tier.price) })),
+        ? [
+            {
+              quantity: String(c.requiredQuantity || 6),
+              price: c.fixedBundlePrice === null ? "" : String(c.fixedBundlePrice),
+              discountPercent: "",
+            },
+          ]
+        : c.tiers.map((tier) => ({
+            quantity: String(tier.quantity),
+            price: tier.price === null ? "" : String(tier.price),
+            discountPercent: tier.discountPercent === null ? "" : String(tier.discountPercent),
+          })),
     requiredQuantity: String(c.requiredQuantity || 6),
     fixedBundlePrice: c.fixedBundlePrice === null ? "" : String(c.fixedBundlePrice),
     allowDuplicates: isCurated ? false : c.allowDuplicates,
@@ -546,7 +568,8 @@ export type CampaignPayload = {
   imageId: string | null;
   isActive: boolean;
   requiredQuantity?: number;
-  tiers: { quantity: number; price: number }[];
+  pricingType: BundlePricingType;
+  tiers: { quantity: number; price: number | null; discountPercent: number | null }[];
   fixedBundlePrice?: number;
   allowDuplicates: boolean;
   maxPerProduct: number | null;
@@ -602,19 +625,28 @@ export function buildCampaignPayload(form: CampaignFormState): { payload: Campai
   // Build Your Stack: the tier rows. Every row must parse before anything is
   // sent, and the tier invariants are the SAME domain function the server
   // enforces, so the admin sees the real message without a round trip.
-  const tiers: { quantity: number; price: number }[] = [];
+  const pricingType: BundlePricingType = isCurated ? "fixed_total" : form.pricingType;
+  const isPercentage = pricingType === "percentage_discount";
+  const tiers: { quantity: number; price: number | null; discountPercent: number | null }[] = [];
   if (!isCurated) {
     for (const row of form.tiers) {
-      if (row.quantity.trim() === "" && row.price.trim() === "") continue;
+      const valueField = isPercentage ? row.discountPercent : row.price;
+      if (row.quantity.trim() === "" && valueField.trim() === "") continue;
       const quantity = Number(row.quantity);
-      const price = Number(row.price);
+      const value = Number(valueField);
       if (!Number.isFinite(quantity)) return { error: "Every tier needs a quantity." };
-      if (!Number.isFinite(price)) return { error: "Every tier needs a price." };
-      tiers.push({ quantity, price });
+      if (valueField.trim() === "" || !Number.isFinite(value)) {
+        return { error: isPercentage ? "Every tier needs a discount percentage." : "Every tier needs a price." };
+      }
+      tiers.push({
+        quantity,
+        price: isPercentage ? null : value,
+        discountPercent: isPercentage ? value : null,
+      });
     }
     const tierError = validateBundleTiers(
       tiers.map((tier) => ({ id: null, ...tier })),
-      { requireAtLeastOne: form.isActive },
+      { requireAtLeastOne: form.isActive, pricingType },
     );
     if (tierError) return { error: tierError };
     if (tiers.length === 0 && form.isActive) {
@@ -634,8 +666,13 @@ export function buildCampaignPayload(form: CampaignFormState): { payload: Campai
     if (!(curatedPrice > 0)) return { error: "A ready set needs a price greater than 0." };
   }
   // The legacy mirror the server also derives — sent so an older payload shape
-  // stays valid, never authored independently.
-  const fixedBundlePrice = isCurated ? curatedPrice : lowest?.price;
+  // stays valid, never authored independently. A percentage campaign has none.
+  const fixedBundlePrice = isCurated ? curatedPrice : (lowest?.price ?? undefined);
+  if (isPercentage && form.offerStacking === "stackable") {
+    return {
+      error: "Percentage-priced sets cannot stack with offers or promo codes — set offer stacking to Exclusive.",
+    };
+  }
 
   const startsAt = fromLocalInputValue(form.startsAt);
   const endsAt = fromLocalInputValue(form.endsAt);
@@ -673,7 +710,7 @@ export function buildCampaignPayload(form: CampaignFormState): { payload: Campai
     {
       type: form.type,
       requiredQuantity,
-      pricingType: "fixed_total",
+      pricingType,
       fixedBundlePrice: fixedBundlePrice ?? null,
       tiers: isCurated ? [] : sortedTiers.map((tier) => ({ id: null, ...tier })),
       allowDuplicates: isCurated ? true : form.allowDuplicates,
@@ -698,6 +735,7 @@ export function buildCampaignPayload(form: CampaignFormState): { payload: Campai
       imageId: form.imageId,
       isActive: form.isActive,
       requiredQuantity: isCurated ? undefined : requiredQuantity,
+      pricingType,
       tiers: isCurated ? [] : sortedTiers,
       fixedBundlePrice,
       allowDuplicates: isCurated ? true : form.allowDuplicates,
@@ -741,26 +779,41 @@ function PricingTierEditor({
   tiers,
   onChange,
   isActive,
+  pricingType,
+  onPricingTypeChange,
 }: {
-  tiers: { quantity: string; price: string }[];
-  onChange: (next: { quantity: string; price: string }[]) => void;
+  tiers: TierFormRow[];
+  onChange: (next: TierFormRow[]) => void;
   isActive: boolean;
+  pricingType: BundlePricingType;
+  onPricingTypeChange: (next: BundlePricingType) => void;
 }) {
-  const update = (index: number, patch: Partial<{ quantity: string; price: string }>) => {
+  const isPercentage = pricingType === "percentage_discount";
+  const valueOf = (row: TierFormRow) => (isPercentage ? row.discountPercent : row.price);
+  const update = (index: number, patch: Partial<TierFormRow>) => {
     onChange(tiers.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   };
   const remove = (index: number) => onChange(tiers.filter((_, i) => i !== index));
-  const add = () => onChange([...tiers, { quantity: "", price: "" }]);
+  const add = () => onChange([...tiers, { quantity: "", price: "", discountPercent: "" }]);
 
   // Same invariants the server enforces, reported while typing.
   const parsed: BundleTier[] = tiers
-    .filter((row) => row.quantity.trim() !== "" || row.price.trim() !== "")
-    .map((row) => ({ id: null, quantity: Number(row.quantity), price: Number(row.price) }));
-  const anyUnparseable = parsed.some((t) => !Number.isFinite(t.quantity) || !Number.isFinite(t.price));
+    .filter((row) => row.quantity.trim() !== "" || valueOf(row).trim() !== "")
+    .map((row) => ({
+      id: null,
+      quantity: Number(row.quantity),
+      price: isPercentage ? null : Number(row.price),
+      discountPercent: isPercentage ? Number(row.discountPercent) : null,
+    }));
+  const anyUnparseable = parsed.some(
+    (t) => !Number.isFinite(t.quantity) || !Number.isFinite(isPercentage ? (t.discountPercent ?? Number.NaN) : (t.price ?? Number.NaN)),
+  );
   const error = anyUnparseable
-    ? "Every tier needs a numeric quantity and price."
-    : validateBundleTiers(parsed, { requireAtLeastOne: isActive });
-  const preview = sortTiers(parsed.filter((t) => Number.isFinite(t.quantity) && Number.isFinite(t.price)));
+    ? isPercentage
+      ? "Every tier needs a numeric quantity and discount percentage."
+      : "Every tier needs a numeric quantity and price."
+    : validateBundleTiers(parsed, { requireAtLeastOne: isActive, pricingType });
+  const preview = anyUnparseable ? [] : sortTiers(parsed);
 
   return (
     <section className="space-y-3">
@@ -770,9 +823,24 @@ function PricingTierEditor({
           + Add tier
         </Button>
       </div>
+      <div className="space-y-1">
+        <Label className="text-xs">Pricing mode</Label>
+        <Select value={pricingType} onValueChange={(v) => onPricingTypeChange(v as BundlePricingType)}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="fixed_total">Fixed total — each size costs a set price</SelectItem>
+            <SelectItem value="percentage_discount">Percentage discount — % off the chosen pieces</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
       <p className="text-xs text-muted-foreground">
-        Each tier is an exact number of pieces at a total price. A shopper who picks a quantity you have not listed
-        cannot complete a set — nothing is rounded down to the tier below.
+        {isPercentage
+          ? "Each tier is an exact number of pieces and a percentage taken off those pieces' current prices (a valid sale price counts as the current price). The discount is rounded once, to the piaster. Percentage sets are always exclusive of other offers and promo codes."
+          : "Each tier is an exact number of pieces at a total price."}{" "}
+        A shopper who picks a quantity you have not listed cannot complete a set — nothing is rounded down to the tier
+        below.
       </p>
 
       <div className="space-y-2">
@@ -793,17 +861,32 @@ function PricingTierEditor({
                 onChange={(e) => update(index, { quantity: e.target.value })}
               />
             </div>
-            <div className="flex-1 space-y-1">
-              <Label className="text-xs">Total ({STORE_CURRENCY})</Label>
-              <Input
-                type="number"
-                min={0.01}
-                step={0.01}
-                value={row.price}
-                placeholder="480.00"
-                onChange={(e) => update(index, { price: e.target.value })}
-              />
-            </div>
+            {isPercentage ? (
+              <div className="flex-1 space-y-1">
+                <Label className="text-xs">Discount (%)</Label>
+                <Input
+                  type="number"
+                  min={0.01}
+                  max={99.99}
+                  step={0.01}
+                  value={row.discountPercent}
+                  placeholder="15"
+                  onChange={(e) => update(index, { discountPercent: e.target.value })}
+                />
+              </div>
+            ) : (
+              <div className="flex-1 space-y-1">
+                <Label className="text-xs">Total ({STORE_CURRENCY})</Label>
+                <Input
+                  type="number"
+                  min={0.01}
+                  step={0.01}
+                  value={row.price}
+                  placeholder="480.00"
+                  onChange={(e) => update(index, { price: e.target.value })}
+                />
+              </div>
+            )}
             <Button
               type="button"
               variant="ghost"
@@ -822,7 +905,11 @@ function PricingTierEditor({
         <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
           Shoppers will see:{" "}
           <span className="font-medium text-foreground">
-            {preview.map((t) => `${t.quantity} for ${t.price.toFixed(2)} ${STORE_CURRENCY}`).join(" · ")}
+            {preview
+              .map((t) =>
+                isPercentage ? `${t.quantity} pieces · ${t.discountPercent}% off` : `${t.quantity} for ${(t.price ?? 0).toFixed(2)} ${STORE_CURRENCY}`,
+              )
+              .join(" · ")}
           </span>
         </p>
       )}
@@ -843,7 +930,8 @@ type EligibilityPreview = {
   unusableManualProducts: { productId: string; name: string; reason: "deleted" | "hidden" }[];
   tiers: {
     quantity: number;
-    price: number;
+    price: number | null;
+    discountPercent: number | null;
     availability: "available" | "sold_out";
     valueRange: { min: number; max: number } | null;
   }[];
@@ -876,10 +964,17 @@ function EligibilitySection({
   const previewTiers = useMemo(
     () =>
       form.tiers
-        .map((row) => ({ quantity: Number(row.quantity), price: Number(row.price) }))
-        .filter((t) => Number.isInteger(t.quantity) && t.quantity >= 1 && Number.isFinite(t.price) && t.price > 0)
+        .map((row) =>
+          form.pricingType === "percentage_discount"
+            ? { quantity: Number(row.quantity), price: null, discountPercent: Number(row.discountPercent) }
+            : { quantity: Number(row.quantity), price: Number(row.price), discountPercent: null },
+        )
+        .filter((t) => {
+          const value = t.price ?? t.discountPercent;
+          return Number.isInteger(t.quantity) && t.quantity >= 1 && value !== null && Number.isFinite(value) && value > 0;
+        })
         .sort((a, b) => a.quantity - b.quantity),
-    [form.tiers],
+    [form.tiers, form.pricingType],
   );
   const requiredQuantity = previewTiers[0]?.quantity ?? Number(form.requiredQuantity);
   const maxPerProduct = form.allowDuplicates && form.maxPerProduct.trim() !== "" ? Number(form.maxPerProduct) : null;
@@ -1077,7 +1172,8 @@ function EligibilityPreviewPanel({
           {preview.tiers.map((tier) => (
             <li key={tier.quantity} className="flex items-center gap-1.5">
               <span className="font-medium">
-                {tier.quantity} pieces · {tier.price.toFixed(2)} {STORE_CURRENCY}
+                {tier.quantity} pieces ·{" "}
+                {tier.price === null ? `${tier.discountPercent ?? "—"}% off` : `${tier.price.toFixed(2)} ${STORE_CURRENCY}`}
               </span>
               <span className={tier.availability === "available" ? "text-green-700" : "text-amber-700"}>
                 · {tier.availability === "available" ? "available" : "sold out"}
@@ -1466,6 +1562,17 @@ export function CampaignFormDialog({
                   tiers={form.tiers}
                   onChange={(next) => update("tiers", next)}
                   isActive={form.isActive}
+                  pricingType={form.pricingType}
+                  onPricingTypeChange={(next) =>
+                    // Percentage sets are always exclusive (see the service):
+                    // switch the stacking control with the mode so the form
+                    // never offers a combination the server refuses.
+                    setForm((f) => ({
+                      ...f,
+                      pricingType: next,
+                      offerStacking: next === "percentage_discount" ? "exclusive" : f.offerStacking,
+                    }))
+                  }
                 />
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex items-start justify-between gap-3 rounded-md border p-3">
@@ -1491,7 +1598,10 @@ export function CampaignFormDialog({
                   </div>
                   <div className="space-y-1">
                     <Label>Other offers &amp; promo codes</Label>
-                    <Select value={form.offerStacking} onValueChange={(v) => update("offerStacking", v as CampaignFormState["offerStacking"])}>
+                    <Select
+                      value={form.offerStacking}
+                      disabled={form.pricingType === "percentage_discount"}
+                      onValueChange={(v) => update("offerStacking", v as CampaignFormState["offerStacking"])}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -1500,7 +1610,11 @@ export function CampaignFormDialog({
                         <SelectItem value="stackable">Stackable — offers/codes may apply on top</SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">Exclusive is the safe default.</p>
+                    <p className="text-xs text-muted-foreground">
+                      {form.pricingType === "percentage_discount"
+                        ? "Percentage sets are always exclusive, so the same pieces are never discounted twice."
+                        : "Exclusive is the safe default."}
+                    </p>
                   </div>
                 </div>
               </section>

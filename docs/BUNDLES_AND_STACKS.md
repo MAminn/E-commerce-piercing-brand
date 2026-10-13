@@ -176,6 +176,13 @@ which both `CartContext` and `create-order` use. The offers engine itself
 Promo codes follow the same policy as offers; there is no separate switch.
 The enum can grow (e.g. `promo_codes_only`) without a schema redesign.
 
+Phase 8 refinements (see `docs/PROMOTIONS_PRICING_RULES.md`): a
+percentage-priced set is always `exclusive`; a promo code with an
+eligible-quantity rule (a "set code", e.g. PICK6) never counts or discounts
+units inside ANY bundle, and while it qualifies the ordinary lines it owns are
+hidden from the offers engine; every promo code now discounts only its
+eligible value.
+
 ## API — `backend/bundles/trpc.ts` (`trpc.bundle.*`)
 
 | Procedure | Auth | Purpose |
@@ -1319,6 +1326,22 @@ hand-written files are not in Drizzle's journal
 The boot migrator reads the folder, not the journal, which is why it works.
 `drizzle-kit generate` (drift check) and the journal/snapshots remain correct
 for `0051`–`0057`.
+
+## Phase 8 — percentage Pick Your Set
+
+`bundle_campaign.pricing_type` gained `percentage_discount` (migration
+`0061_pick_set_percentage_promo_rules`). In that mode each tier stores
+`discount_percent` instead of a `price` (the column is now nullable; every
+existing row keeps its price), and the evaluator prices a matched tier as
+*selected effective subtotal − percentage*, rounded once to the piaster
+(`tierChargeMinor`, shared with promo codes). Exact tier matching, duplicate
+and per-product caps, repeatability and server re-validation are unchanged;
+`fixed_bundle_price` stays null. Ready Sets cannot use percentage pricing, and
+a percentage set cannot be `stackable`. `order_bundle` snapshots
+`pricing_type` and `discount_percent`; the admin order view labels the tier
+"6-piece tier · 15% off". The builder shows the selected subtotal, the
+percentage, the discount amount and the set total live. Full rules, including
+the stacking and sale-price rules: `docs/PROMOTIONS_PRICING_RULES.md`.
 
 ## Not built (genuinely post-Bundles work)
 

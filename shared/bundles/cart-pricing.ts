@@ -17,16 +17,50 @@
  *       exclusive bundles → invisible (no lines, no value in the base)
  *       stackable bundles → children as lines at their share of the bundle
  *                           price (never regular price), value in the base
- *  5. promoDiscount        = computePromoDiscount(type, value, offerBase, offerDiscount)
+ *  5. promoDiscount        — ONLY on the code's eligible units (see planPromo):
+ *       percentage → % of the eligible value, rounded once to the piaster
+ *       fixed      → the amount, capped at the eligible value
  *     — promo codes follow the same offer_stacking policy as offers.
- *  6. shipping             = 0 if an applied offer grants free shipping, else the store fee
+ *  6. shipping             = 0 if an applied offer, or a qualifying promo code
+ *                            with free shipping, grants it; else the quoted fee.
+ *                            Free shipping only ever zeroes an AVAILABLE quote —
+ *                            an undeliverable destination is refused before
+ *                            pricing (create-order) and never reaches here.
  *  7. total                = max(0, merchandise + bundleCharged − offerDiscount − promoDiscount) + shipping
  *                          = max(0, subtotal − bundleSavings − offerDiscount − promoDiscount) + shipping
+ *
+ * Discount ownership — one promotional discount per unit
+ * ──────────────────────────────────────────────────────
+ *   • A unit inside a bundle instance is priced by its bundle. An EXCLUSIVE
+ *     bundle (the default, and the only mode a percentage-priced Pick Your
+ *     Set may use) is invisible to offers and promo codes: its units neither
+ *     count toward their conditions nor receive their discounts.
+ *   • A STACKABLE fixed-total bundle is the merchant's explicit opt-in to let
+ *     offers and ordinary promo codes discount its bundle price (unchanged).
+ *   • A SET CODE — a promo code with an eligible-quantity rule (PICK3/PICK6) —
+ *     owns its eligible units the way an exclusive bundle does: it counts and
+ *     discounts ordinary cart lines only (never units already inside a
+ *     bundle), and while it qualifies those lines are removed from the
+ *     automatic-offer engine's input, so no offer can discount, or be
+ *     triggered by, the same units. Unrelated lines stay visible to offers.
+ *   • An ordinary promo code (no quantity rule) keeps the existing sequential
+ *     rule: it applies to its eligible value after that value's share of the
+ *     automatic-offer discount (allocated pro rata), never to the raw amount.
  *
  * All money math is in integer minor units.
  */
 
-import { computePromoDiscount, type PromoDiscountType } from "#root/shared/pricing/cart-math";
+import type { PromoDiscountType } from "#root/shared/pricing/cart-math";
+import {
+  ALL_PRODUCTS_ELIGIBLE,
+  type EligibleQuantityRule,
+  type PromoEligibilityRules,
+  type QuantityCheck,
+  checkEligibleQuantity,
+  hasQuantityRule,
+  percentOfMinor,
+  summarizeEligibleUnits,
+} from "#root/shared/pricing/eligible-units";
 import type { BundleOfferStacking } from "./evaluate";
 import { fromMinorUnits, toMinorUnits } from "./evaluate";
 
@@ -106,38 +140,140 @@ export function allocateBundleUnitLines(bundle: PricingBundle): OfferInputLine[]
   });
 }
 
+// ─── Promo codes ──────────────────────────────────────────────────────────────
+
+/**
+ * A promo code as the pricing layer sees it. Only `discountType` and
+ * `discountValue` are required, so a pre-existing caller that passes just
+ * those still gets an all-products code with no quantity rule and no free
+ * shipping — exactly the old behaviour (now restricted to eligible value).
+ */
+export interface CartPromoInput {
+  discountType: PromoDiscountType;
+  discountValue: number;
+  /** Omitted → every product is eligible. */
+  eligibility?: PromoEligibilityRules;
+  /** Exact / min / max eligible UNITS. Omitted or both-null → no rule. */
+  quantityRule?: EligibleQuantityRule | null;
+  /** A qualifying code also zeroes an available shipping quote. */
+  freeShipping?: boolean;
+}
+
+export interface PromoPlan {
+  /** True when the code has a quantity rule: it owns its eligible units (see file header). */
+  isSetCode: boolean;
+  /** Eligible UNITS the code counts. */
+  eligibleUnits: number;
+  eligibleSubtotal: number;
+  quantity: QuantityCheck;
+  /** The cart satisfies the code's content rules: at least one eligible unit, and the quantity rule. */
+  qualifies: boolean;
+  /**
+   * Indexes into `regularLines` of the lines a QUALIFYING set code owns —
+   * removed from the automatic-offer input. Empty for an ordinary code or a
+   * set code that does not qualify.
+   */
+  ownedLineIndexes: number[];
+  /** Product ids of the eligible lines (for the storefront's per-line display). */
+  eligibleProductIds: string[];
+}
+
+/**
+ * Which units a promo code counts, whether the cart meets its quantity rule,
+ * and which ordinary lines it takes ownership of. Pure — run identically by
+ * CartContext and create-order.
+ */
+export function planPromo(
+  regularLines: readonly PricingRegularLine[],
+  bundles: readonly PricingBundle[],
+  promo: CartPromoInput,
+): PromoPlan {
+  const rules = promo.eligibility ?? ALL_PRODUCTS_ELIGIBLE;
+  const isSetCode = hasQuantityRule(promo.quantityRule);
+  // A set code prices a set of loose units, like a Pick Your Set does — units
+  // already inside ANY bundle are priced by that bundle and never count. An
+  // ordinary code keeps the existing policy: ordinary lines plus stackable
+  // bundle children at their bundle-share prices.
+  const lines: { id: string; quantity: number; price: number; categoryIds?: string[] }[] = isSetCode
+    ? regularLines.map((l) => ({ id: l.id, quantity: l.quantity, price: l.price, categoryIds: l.categoryIds }))
+    : buildOfferInputs(regularLines, bundles).cartItems;
+  const summary = summarizeEligibleUnits(lines, rules);
+  const quantity = checkEligibleQuantity(promo.quantityRule, summary.units);
+  const qualifies = summary.units > 0 && quantity.ok;
+  return {
+    isSetCode,
+    eligibleUnits: summary.units,
+    eligibleSubtotal: fromMinorUnits(summary.subtotalMinor),
+    quantity,
+    qualifies,
+    // For a set code, `lines` IS `regularLines`, so its indexes line up.
+    ownedLineIndexes: isSetCode && qualifies ? summary.lineIndexes : [],
+    eligibleProductIds: [...new Set(summary.lineIndexes.flatMap((i) => lines[i]?.id ?? []))],
+  };
+}
+
+// ─── Offers input ─────────────────────────────────────────────────────────────
+
+export interface OfferInputs {
+  cartItems: OfferInputLine[];
+  subtotal: number;
+  /**
+   * For each of the first `regularLineIndexes.length` entries of `cartItems`,
+   * the index of the ordinary cart line it came from. Lets the storefront map
+   * a "free item" back to its line even when a set code removed some lines.
+   */
+  regularLineIndexes: number[];
+}
+
 /**
  * What the existing offers engine (and promo-code applicability) should see.
  * Exclusive bundles contribute nothing; stackable bundles contribute their
- * children at bundle-share prices.
+ * children at bundle-share prices; lines owned by a qualifying set code
+ * (`plan.ownedLineIndexes`) are left out entirely.
  */
 export function buildOfferInputs(
   regularLines: readonly PricingRegularLine[],
   bundles: readonly PricingBundle[],
-): { cartItems: OfferInputLine[]; subtotal: number } {
-  const cartItems: OfferInputLine[] = regularLines.map((line) => ({
-    id: line.id,
-    name: line.name,
-    quantity: line.quantity,
-    price: line.price,
-    categoryIds: line.categoryIds,
-  }));
-  let subtotalMinor = regularLines.reduce((s, l) => s + toMinorUnits(l.price) * l.quantity, 0);
+  plan?: Pick<PromoPlan, "ownedLineIndexes"> | null,
+): OfferInputs {
+  const owned = new Set(plan?.ownedLineIndexes ?? []);
+  const cartItems: OfferInputLine[] = [];
+  const regularLineIndexes: number[] = [];
+  let subtotalMinor = 0;
+  regularLines.forEach((line, index) => {
+    if (owned.has(index)) return;
+    cartItems.push({
+      id: line.id,
+      name: line.name,
+      quantity: line.quantity,
+      price: line.price,
+      categoryIds: line.categoryIds,
+    });
+    regularLineIndexes.push(index);
+    subtotalMinor += toMinorUnits(line.price) * line.quantity;
+  });
   for (const bundle of bundles) {
     if (bundle.offerStacking !== "stackable") continue;
     cartItems.push(...allocateBundleUnitLines(bundle));
     subtotalMinor += toMinorUnits(bundle.bundleTotal);
   }
-  return { cartItems, subtotal: fromMinorUnits(subtotalMinor) };
+  return { cartItems, subtotal: fromMinorUnits(subtotalMinor), regularLineIndexes };
 }
+
+// ─── Totals ───────────────────────────────────────────────────────────────────
 
 export interface CartTotalsInput {
   regularLines: readonly PricingRegularLine[];
   bundles: readonly PricingBundle[];
-  /** Σ discountAmount of the offers the engine applied to `buildOfferInputs()`. */
+  /**
+   * Σ discountAmount of the offers the engine applied to
+   * `buildOfferInputs(regularLines, bundles, planPromo(...))` — i.e. WITHOUT
+   * the lines a qualifying set code owns.
+   */
   offerDiscount: number;
-  promo: { discountType: PromoDiscountType; discountValue: number } | null;
+  promo: CartPromoInput | null;
   baseShippingFee: number;
+  /** An applied automatic offer grants free shipping. */
   freeShipping: boolean;
 }
 
@@ -148,10 +284,16 @@ export interface CartTotals {
   bundleSavings: number;
   /** merchandise + bundle regular value — what `order.subtotal` stores. */
   subtotal: number;
-  /** The value offers/promo codes were allowed to discount. */
+  /** The value automatic offers were allowed to discount (excludes set-code-owned lines). */
   offerBase: number;
   offerDiscount: number;
   promoDiscount: number;
+  /** The promo code's eligibility outcome; null without a code. */
+  promoPlan: PromoPlan | null;
+  /** A qualifying promo code granted free shipping. */
+  promoFreeShipping: boolean;
+  /** Where a zero shipping charge came from, when one applied. */
+  freeShippingSource: "offer" | "promo_code" | null;
   shipping: number;
   total: number;
 }
@@ -164,22 +306,39 @@ export function computeCartTotals(input: CartTotalsInput): CartTotals {
     .filter((b) => b.offerStacking === "stackable")
     .reduce((s, b) => s + toMinorUnits(b.bundleTotal), 0);
 
-  const offerBaseMinor = merchandiseMinor + stackableChargedMinor;
+  const plan = input.promo ? planPromo(input.regularLines, input.bundles, input.promo) : null;
+  const owned = new Set(plan?.ownedLineIndexes ?? []);
+  const ownedMinor = input.regularLines.reduce(
+    (s, l, i) => (owned.has(i) ? s + toMinorUnits(l.price) * l.quantity : s),
+    0,
+  );
+
+  const offerBaseMinor = merchandiseMinor - ownedMinor + stackableChargedMinor;
   // The engine never discounts more than the base it saw; clamp defensively.
   const offerDiscountMinor = Math.min(Math.max(0, toMinorUnits(input.offerDiscount)), offerBaseMinor);
 
-  const promoDiscountMinor = input.promo
-    ? toMinorUnits(
-        computePromoDiscount(
-          input.promo.discountType,
-          input.promo.discountValue,
-          fromMinorUnits(offerBaseMinor),
-          fromMinorUnits(offerDiscountMinor),
-        ),
-      )
-    : 0;
+  let promoDiscountMinor = 0;
+  if (input.promo && plan?.qualifies) {
+    const eligibleMinor = toMinorUnits(plan.eligibleSubtotal);
+    // A set code's units were hidden from offers, so nothing was taken off
+    // them yet. An ordinary code discounts what is left of its eligible value
+    // after that value's pro-rata share of the offer discount — for an
+    // all-products code that is exactly (offerBase − offerDiscount), the
+    // pre-existing rule.
+    const offerShareMinor =
+      plan.isSetCode || offerBaseMinor === 0
+        ? 0
+        : Math.round((offerDiscountMinor * Math.min(eligibleMinor, offerBaseMinor)) / offerBaseMinor);
+    const baseMinor = Math.max(0, eligibleMinor - offerShareMinor);
+    promoDiscountMinor =
+      input.promo.discountType === "percentage"
+        ? percentOfMinor(baseMinor, input.promo.discountValue)
+        : Math.min(Math.max(0, toMinorUnits(input.promo.discountValue)), baseMinor);
+  }
 
-  const shippingMinor = input.freeShipping ? 0 : toMinorUnits(input.baseShippingFee);
+  const promoFreeShipping = Boolean(input.promo?.freeShipping && plan?.qualifies);
+  const freeShippingSource = input.freeShipping ? "offer" : promoFreeShipping ? "promo_code" : null;
+  const shippingMinor = freeShippingSource ? 0 : toMinorUnits(input.baseShippingFee);
   const goodsMinor = Math.max(0, merchandiseMinor + bundleChargedMinor - offerDiscountMinor - promoDiscountMinor);
 
   return {
@@ -191,6 +350,9 @@ export function computeCartTotals(input: CartTotalsInput): CartTotals {
     offerBase: fromMinorUnits(offerBaseMinor),
     offerDiscount: fromMinorUnits(offerDiscountMinor),
     promoDiscount: fromMinorUnits(promoDiscountMinor),
+    promoPlan: plan,
+    promoFreeShipping,
+    freeShippingSource,
     shipping: fromMinorUnits(shippingMinor),
     total: fromMinorUnits(goodsMinor + shippingMinor),
   };

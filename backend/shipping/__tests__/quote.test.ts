@@ -155,6 +155,8 @@ describe("buildShippingSnapshot — what gets frozen on the order", () => {
       rateSource: "governorate_rate",
       ruleFee: 60,
       freeShippingApplied: true,
+      // A caller that does not say who waived it is the pre-promo-code path: an offer.
+      freeShippingSource: "offer",
       chargedFee: 0,
       currency: "EGP",
       quotedAt: "2026-09-22T12:00:00.000Z",

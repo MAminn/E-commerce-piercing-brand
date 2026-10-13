@@ -247,6 +247,8 @@ export const viewOrders = (
                     requiredQuantity: orderBundle.requiredQuantity,
                     regularTotal: orderBundle.regularTotal,
                     bundleTotal: orderBundle.bundleTotal,
+                    pricingType: orderBundle.pricingType,
+                    discountPercent: orderBundle.discountPercent,
                     offerStacking: orderBundle.offerStacking,
                     createdAt: orderBundle.createdAt,
                   })

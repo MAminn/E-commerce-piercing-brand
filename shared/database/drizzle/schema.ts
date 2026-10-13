@@ -943,6 +943,24 @@ export const promoCode = pgTable(
     // "Active Promo Codes" section of the /offers page.
     showOnOffersPage: boolean("show_on_offers_page").notNull().default(false),
 
+    /**
+     * Eligible-UNIT quantity rule (inclusive bounds; null = unbounded). Units
+     * are counted over the code's eligible products only — never cart lines,
+     * never non-eligible products. min = max is an exact rule (PICK3 = 3/3).
+     * Both null (every pre-existing code) = no quantity rule. A code WITH a
+     * rule is a "set code" and owns its eligible units: see
+     * shared/bundles/cart-pricing.ts for the stacking rule.
+     */
+    eligibleMinQuantity: integer("eligible_min_quantity"),
+    eligibleMaxQuantity: integer("eligible_max_quantity"),
+
+    /**
+     * When the code qualifies it also zeroes the shipping charge of an
+     * already-deliverable destination. Never makes an unavailable destination
+     * deliverable. Combines with the percentage/fixed discount above.
+     */
+    freeShipping: boolean("free_shipping").notNull().default(false),
+
     createdBy: text("created_by").references(() => user.id, {
       onDelete: "set null",
       onUpdate: "cascade",
@@ -1032,6 +1050,47 @@ export const promoCodeCategories = pgTable(
       promoCodeCategoryUnique: uniqueIndex("promo_code_category_unique_idx").on(
         table.promoCodeId,
         table.categoryId,
+      ),
+    };
+  },
+);
+
+/**
+ * Products a promo code never counts or discounts, whatever its product /
+ * category / all-products applicability says (exclusions win). Lets a code
+ * cover "every earring except the fixed 3-piece sets" without listing every
+ * single piece.
+ */
+export const promoCodeExcludedProducts = pgTable(
+  "promo_code_excluded_product",
+  {
+    id: uuid("id")
+      .$defaultFn(() => v7())
+      .primaryKey(),
+    promoCodeId: uuid("promo_code_id")
+      .notNull()
+      .references(() => promoCode.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => product.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => {
+    return {
+      promoCodeExcludedProductUnique: uniqueIndex("promo_code_excluded_product_unique_idx").on(
+        table.promoCodeId,
+        table.productId,
       ),
     };
   },
@@ -1646,7 +1705,7 @@ export const cartOffer = pgTable("cart_offer", {
   /**
    * Condition JSONB — one of:
    *   { type: "always" }
-   *   { type: "quantity_threshold"; minQuantity: number; productIds?: string[]; categoryIds?: string[]; repeatsPerMultiple?: boolean }
+   *   { type: "quantity_threshold"; minQuantity: number; maxQuantity?: number; productIds?: string[]; categoryIds?: string[]; repeatsPerMultiple?: boolean }
    *   { type: "cart_total"; minTotal: number }
    *   { type: "product_bundle"; requiredProductIds: string[] }
    *
@@ -1682,6 +1741,8 @@ export type OfferCondition =
   | {
       type: "quantity_threshold";
       minQuantity: number;
+      /** Optional inclusive upper bound on the relevant units (min = max → exact). Absent on every pre-existing offer. */
+      maxQuantity?: number;
       productIds?: string[];
       categoryIds?: string[];
       /** Multiply the reward by how many times the threshold is met (e.g. Buy 2 Get 1: 6 in cart → 2x reward). Not related to offer-vs-offer stacking. */
@@ -1719,6 +1780,11 @@ export const bundleCampaignType = pgEnum("bundle_campaign_type", [
 export const bundleCampaignPricingType = pgEnum("bundle_campaign_pricing_type", [
   /** Exactly `requiredQuantity` qualifying units cost `fixedBundlePrice` in total. */
   "fixed_total",
+  /**
+   * Pick Your Set only: each tier takes `bundle_campaign_tier.discount_percent`
+   * off the selected units' effective prices. `fixed_bundle_price` stays null.
+   */
+  "percentage_discount",
 ]);
 
 /**
@@ -1941,8 +2007,14 @@ export const bundleCampaignTier = pgTable(
       .references(() => bundleCampaign.id, { onDelete: "cascade", onUpdate: "cascade" }),
     /** Qualifying UNITS this tier prices. A selection must match it exactly. */
     quantity: integer("quantity").notNull(),
-    /** Total charged for those units. */
-    price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+    /**
+     * Total charged for those units — fixed_total campaigns. Null on a
+     * percentage_discount tier (every row written before percentage pricing
+     * has a price, so nothing existing changes).
+     */
+    price: decimal("price", { precision: 10, scale: 2 }),
+    /** % off the selected units' effective prices — percentage_discount campaigns only. */
+    discountPercent: decimal("discount_percent", { precision: 5, scale: 2 }),
     /** Display position. Tiers are authored and shown ascending by quantity; this keeps that order explicit and stable. */
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
@@ -2051,6 +2123,10 @@ export const orderBundle = pgTable(
     regularTotal: decimal("regular_total", { precision: 10, scale: 2 }).notNull(),
     /** What the shopper was charged for the bundle. */
     bundleTotal: decimal("bundle_total", { precision: 10, scale: 2 }).notNull(),
+    /** Snapshotted pricing model. Every order placed before percentage pricing was fixed_total. */
+    pricingType: bundleCampaignPricingType("pricing_type").notNull().default("fixed_total"),
+    /** Snapshotted percentage of a percentage_discount tier; null for fixed-total bundles. */
+    discountPercent: decimal("discount_percent", { precision: 5, scale: 2 }),
     offerStacking: bundleCampaignOfferStacking("offer_stacking").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
       .defaultNow()

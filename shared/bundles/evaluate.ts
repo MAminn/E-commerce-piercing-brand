@@ -13,6 +13,8 @@
  * never drifts the way raw float addition does.
  */
 
+import { percentOfMinor, validateDiscountPercent } from "#root/shared/pricing/eligible-units";
+
 // ─── Money helpers ────────────────────────────────────────────────────────────
 
 /** 12.34 → 1234. Rounds to the nearest minor unit to absorb float noise on input. */
@@ -29,8 +31,9 @@ export function fromMinorUnits(minor: number): number {
 
 /**
  * One quantity → price step of a Build Your Stack campaign, e.g.
- * "3 pieces for 270". A campaign may define several; the shopper pays the
- * price of the tier whose quantity their selection matches EXACTLY.
+ * "3 pieces for 270" (fixed total) or "3 pieces, 20% off" (percentage). A
+ * campaign may define several; the shopper pays according to the tier whose
+ * quantity their selection matches EXACTLY.
  *
  * `id` is the `bundle_campaign_tier` row id, or null for a tier the domain
  * synthesised (a legacy single-price campaign, or a curated stack — see
@@ -40,8 +43,48 @@ export interface BundleTier {
   id: string | null;
   /** Qualifying UNITS this tier prices. Whole number ≥ 1. */
   quantity: number;
-  /** What those units cost in total. Store currency, two decimals, > 0. */
-  price: number;
+  /**
+   * `fixed_total` campaigns: what those units cost in total. Store currency,
+   * two decimals, > 0. Null on a `percentage_discount` tier.
+   */
+  price: number | null;
+  /**
+   * `percentage_discount` campaigns: % taken off the selected units'
+   * effective prices, in (0, 100), two decimals max. Null/absent on a
+   * fixed-total tier.
+   */
+  discountPercent?: number | null;
+}
+
+/** The tier's discount percentage, or null for a fixed-total tier. */
+export function tierDiscountPercent(tier: Pick<BundleTier, "discountPercent">): number | null {
+  return typeof tier.discountPercent === "number" && tier.discountPercent > 0 ? tier.discountPercent : null;
+}
+
+/**
+ * What one tier charges for a selection whose counted units are worth
+ * `regularTotalMinor` (Σ effective prices) — in minor units, for
+ * `completeBundles` repeats of the tier.
+ *
+ *   fixed_total          → tier price × bundles (independent of the units)
+ *   percentage_discount  → regular value − percent of it, rounded once,
+ *                          half-up, to the piaster (shared with promo codes)
+ *
+ * Null when the tier cannot price under the campaign's pricing type.
+ */
+export function tierChargeMinor(
+  pricingType: BundlePricingType,
+  tier: BundleTier,
+  regularTotalMinor: number,
+  completeBundles: number,
+): number | null {
+  if (pricingType === "percentage_discount") {
+    const percent = tierDiscountPercent(tier);
+    if (percent === null) return null;
+    return regularTotalMinor - percentOfMinor(regularTotalMinor, percent);
+  }
+  if (tier.price === null || !(tier.price > 0)) return null;
+  return toMinorUnits(tier.price) * completeBundles;
 }
 
 /** Ascending by quantity — the order tiers are stored, priced and displayed in. */
@@ -104,16 +147,24 @@ export function highestBundleTier(tiers: readonly BundleTier[]): BundleTier | nu
  */
 export function validateBundleTiers(
   tiers: readonly BundleTier[],
-  options: { requireAtLeastOne: boolean },
+  options: { requireAtLeastOne: boolean; pricingType?: BundlePricingType },
 ): string | null {
   if (options.requireAtLeastOne && tiers.length === 0) {
     return "Add at least one pricing tier before activating the campaign.";
   }
+  const percentage = options.pricingType === "percentage_discount";
   for (const tier of tiers) {
     if (!Number.isInteger(tier.quantity) || tier.quantity < 1) {
       return "Every tier needs a whole quantity of at least 1.";
     }
-    if (!Number.isFinite(tier.price) || tier.price <= 0) {
+    if (percentage) {
+      const percentError = validateDiscountPercent(
+        typeof tier.discountPercent === "number" ? tier.discountPercent : Number.NaN,
+      );
+      if (percentError) return `Every tier needs a valid discount. ${percentError}`;
+      continue;
+    }
+    if (tier.price === null || !Number.isFinite(tier.price) || tier.price <= 0) {
       return "Every tier needs a price greater than 0.";
     }
     // `price * 100` is not exact in binary floating point (79.99 * 100 is
@@ -134,7 +185,13 @@ export function validateBundleTiers(
 // ─── Campaign config ──────────────────────────────────────────────────────────
 
 export type BundleCampaignType = "build_your_stack" | "curated_stack";
-export type BundlePricingType = "fixed_total";
+/**
+ * fixed_total          — each tier is a total price for its units (every
+ *                        campaign before percentage pricing; Ready Sets).
+ * percentage_discount  — each tier takes a percentage off the selected units'
+ *                        effective prices (Pick Your Set only).
+ */
+export type BundlePricingType = "fixed_total" | "percentage_discount";
 export type BundleOfferStacking = "exclusive" | "stackable";
 
 /**
@@ -248,6 +305,12 @@ export function validateBundleCampaignConfig(
   config: BundleCampaignConfig,
   options: { requireCompletablePool: boolean },
 ): string | null {
+  // Percentage pricing needs a shopper-chosen selection to take a percentage
+  // OF; a curated stack has one fixed price by definition.
+  if (config.pricingType === "percentage_discount" && config.type === "curated_stack") {
+    return "A Ready Set is sold at one fixed price; percentage pricing is for Pick Your Set campaigns.";
+  }
+
   if (config.pricingType === "fixed_total") {
     // Build Your Stack is priced by its tiers; `fixedBundlePrice` is only a
     // derived mirror, so a missing price there is really a missing tier and
@@ -286,6 +349,7 @@ export function validateBundleCampaignConfig(
   const tiers = resolveCampaignTiers(config);
   const tierError = validateBundleTiers(config.tiers ?? [], {
     requireAtLeastOne: options.requireCompletablePool && (config.tiers ?? []).length === 0 && tiers.length === 0,
+    pricingType: config.pricingType,
   });
   if (tierError) return tierError;
   if (options.requireCompletablePool && tiers.length === 0) {
@@ -577,14 +641,16 @@ export function evaluateBundleSelection(
 
   let bundleTotal: number | null = null;
   let discountAmount: number | null = null;
-  if (qualifies && tier !== null && config.pricingType === "fixed_total") {
+  const chargeMinor =
+    qualifies && tier !== null ? tierChargeMinor(config.pricingType, tier, regularTotalMinor, completeBundles) : null;
+  if (chargeMinor !== null) {
     // The matched tier is the only source of the charge. Savings are reported
-    // truthfully and are never clamped: a tier priced above the selection's
-    // regular value yields a negative discountAmount, which the storefront is
-    // responsible for wording honestly.
-    const bundleTotalMinor = toMinorUnits(tier.price) * completeBundles;
-    bundleTotal = fromMinorUnits(bundleTotalMinor);
-    discountAmount = fromMinorUnits(regularTotalMinor - bundleTotalMinor);
+    // truthfully and are never clamped: a fixed tier priced above the
+    // selection's regular value yields a negative discountAmount, which the
+    // storefront is responsible for wording honestly. A percentage tier takes
+    // its percentage off the counted units' effective prices, rounded once.
+    bundleTotal = fromMinorUnits(chargeMinor);
+    discountAmount = fromMinorUnits(regularTotalMinor - chargeMinor);
   }
 
   return {
@@ -657,6 +723,7 @@ export function curatedEvaluationConfig(config: BundleCampaignConfig): BundleCam
     // `bundle_campaign_tier` rows and the CMS never offers them one — the tier
     // abstraction is reused here purely so both types price through identical
     // code, with no second pricing path to keep in sync.
+    pricingType: "fixed_total",
     tiers:
       config.fixedBundlePrice === null
         ? []
@@ -836,11 +903,38 @@ export function describeBundleTiers(
   const lowest = sorted[0];
   const highest = sorted[sorted.length - 1];
   if (lowest === undefined || highest === undefined) return null;
-  if (sorted.length === 1) {
-    return `${lowest.quantity} piece${lowest.quantity === 1 ? "" : "s"} for ${lowest.price.toFixed(2)} ${currency}`;
+  const percents = sorted.map(tierDiscountPercent);
+  if (percents.every((p) => p !== null)) {
+    // Percentage pricing: the discount is the message — there is no fixed price.
+    if (sorted.length === 1) {
+      return `${lowest.quantity} piece${lowest.quantity === 1 ? "" : "s"} - ${formatPercent(percents[0] as number)} off`;
+    }
+    const best = Math.max(...(percents as number[]));
+    return `${lowest.quantity}-${highest.quantity} pieces - up to ${formatPercent(best)} off`;
   }
-  const cheapest = sorted.reduce((a, b) => (toMinorUnits(b.price) < toMinorUnits(a.price) ? b : a));
+  const priced = sorted.filter((t): t is BundleTier & { price: number } => t.price !== null);
+  const first = priced[0];
+  if (first === undefined) return null;
+  if (sorted.length === 1) {
+    return `${lowest.quantity} piece${lowest.quantity === 1 ? "" : "s"} for ${first.price.toFixed(2)} ${currency}`;
+  }
+  const cheapest = priced.reduce((a, b) => (toMinorUnits(b.price) < toMinorUnits(a.price) ? b : a));
   return `${lowest.quantity}-${highest.quantity} pieces - from ${cheapest.price.toFixed(2)} ${currency}`;
+}
+
+/** 20 → "20%", 12.5 → "12.5%". */
+export function formatPercent(percent: number): string {
+  return `${Number(percent.toFixed(2))}%`;
+}
+
+/**
+ * How one tier's offer is worded wherever a single tier is shown:
+ * "480.00 EGP" for a fixed total, "15% off" for a percentage tier.
+ */
+export function describeTierOffer(tier: BundleTier, currency: string): string {
+  const percent = tierDiscountPercent(tier);
+  if (percent !== null) return `${formatPercent(percent)} off`;
+  return tier.price === null ? "—" : `${tier.price.toFixed(2)} ${currency}`;
 }
 
 export function describeBundleCampaign(
@@ -851,12 +945,14 @@ export function describeBundleCampaign(
   eligibleProductCount: number,
   currency: string,
 ): string {
-  const singlePrice =
-    resolveCampaignTiers(config as BundleCampaignConfig)[0]?.price ?? config.fixedBundlePrice;
+  const firstTier = resolveCampaignTiers(config as BundleCampaignConfig)[0];
+  const singlePrice = firstTier?.price ?? config.fixedBundlePrice;
   const price =
-    config.pricingType === "fixed_total" && singlePrice !== null && singlePrice !== undefined
-      ? `${singlePrice.toFixed(2)} ${currency}`
-      : "—";
+    config.pricingType === "percentage_discount" && firstTier
+      ? describeTierOffer(firstTier, currency)
+      : config.pricingType === "fixed_total" && singlePrice !== null && singlePrice !== undefined
+        ? `${singlePrice.toFixed(2)} ${currency}`
+        : "—";
   if (config.type === "curated_stack") {
     const units = config.requiredQuantity;
     const base = `${eligibleProductCount} product${eligibleProductCount === 1 ? "" : "s"} · ${units} unit${units === 1 ? "" : "s"} · ${price}`;
@@ -866,9 +962,10 @@ export function describeBundleCampaign(
   const pool = `from ${eligibleProductCount} eligible product${eligibleProductCount === 1 ? "" : "s"}`;
   const pick = config.allowDuplicates ? "Choose" : "Choose any";
   // Several tiers: name them all rather than pretending one quantity applies.
+  const connector = config.pricingType === "percentage_discount" ? "at" : "for";
   const base =
     tiers.length > 1
-      ? `${tiers.map((t) => `${t.quantity} for ${t.price.toFixed(2)} ${currency}`).join(" · ")} ${pool}`
-      : `${pick} ${tiers[0]?.quantity ?? config.requiredQuantity} ${pool} for ${price}`;
+      ? `${tiers.map((t) => `${t.quantity} ${connector} ${describeTierOffer(t, currency)}`).join(" · ")} ${pool}`
+      : `${pick} ${tiers[0]?.quantity ?? config.requiredQuantity} ${pool} ${connector} ${price}`;
   return config.isRepeatable ? `${base} (repeatable)` : base;
 }

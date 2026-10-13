@@ -20,6 +20,9 @@ export const listPublicPromoCodes = () =>
             discountType: promoCode.discountType,
             discountValue: promoCode.discountValue,
             minPurchaseAmount: promoCode.minPurchaseAmount,
+            freeShipping: promoCode.freeShipping,
+            eligibleMinQuantity: promoCode.eligibleMinQuantity,
+            eligibleMaxQuantity: promoCode.eligibleMaxQuantity,
           })
           .from(promoCode)
           .where(

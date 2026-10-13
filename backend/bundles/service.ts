@@ -20,6 +20,7 @@ import {
   type BundleAvailability,
   type BundleCampaignConfig,
   type BundleCampaignState,
+  type BundlePricingType,
   type BundleTier,
   type CuratedCompositionLine,
   bundlePoolCapacity,
@@ -62,6 +63,7 @@ import {
   resolveSelectedOptions,
 } from "#root/shared/products/options";
 import { loadPurchasableOptionGroups } from "#root/backend/products/option-groups";
+import { effectiveUnitPrice } from "#root/shared/pricing/effective-price";
 import { and, asc, eq, gte, inArray, isNull, lte, or } from "drizzle-orm";
 import { Effect } from "effect";
 import slugify from "slug";
@@ -118,7 +120,13 @@ export const createBundleCampaignSchema = z
     isActive: z.boolean().default(false),
     /** Build Your Stack only; a curated stack derives it from its composition. */
     requiredQuantity: z.number().int().min(1).max(100).optional(),
-    pricingType: z.enum(["fixed_total"]).default("fixed_total"),
+    /**
+     * fixed_total: each tier is a total price (every campaign before this
+     * existed, and the only mode a Ready Set may use). percentage_discount:
+     * each tier takes `discountPercent` off the selected units' effective
+     * prices — Pick Your Set only, and always exclusive of offers/promo codes.
+     */
+    pricingType: z.enum(["fixed_total", "percentage_discount"]).default("fixed_total"),
     /**
      * Curated stacks: THE price. Build Your Stack: a legacy mirror of the
      * lowest tier, derived by the service — supply `tiers` instead. Optional
@@ -149,7 +157,10 @@ export const createBundleCampaignSchema = z
       .array(
         z.object({
           quantity: z.number().int().min(1).max(100),
-          price: z.number().positive().max(99_999_999).multipleOf(0.01),
+          /** fixed_total tiers only. */
+          price: z.number().positive().max(99_999_999).multipleOf(0.01).nullable().optional(),
+          /** percentage_discount tiers only: (0, 100), two decimals max. */
+          discountPercent: z.number().gt(0).lt(100).nullable().optional(),
         }),
       )
       .max(20)
@@ -173,14 +184,23 @@ export const createBundleCampaignSchema = z
     if (data.type === "curated_stack" && data.fixedBundlePrice === undefined) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["fixedBundlePrice"], message: "A curated stack needs a fixed price." });
     }
+    if (data.type === "curated_stack" && data.pricingType === "percentage_discount") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["pricingType"],
+        message: "A Ready Set is sold at one fixed price; percentage pricing is for Pick Your Set campaigns.",
+      });
+    }
+    const pricingError = percentagePricingStackingError(data.pricingType, data.offerStacking);
+    if (pricingError) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["offerStacking"], message: pricingError });
     if (data.type === "build_your_stack") {
-      const tierError = validateBundleTiers(
-        data.tiers.map((t) => ({ id: null, quantity: t.quantity, price: t.price })),
-        { requireAtLeastOne: false },
-      );
+      const tierError = validateBundleTiers(toTierRows(data.tiers, data.pricingType), {
+        requireAtLeastOne: false,
+        pricingType: data.pricingType,
+      });
       if (tierError) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["tiers"], message: tierError });
-      // Pricing must come from somewhere: tiers, or the legacy pair.
-      if (data.tiers.length === 0 && data.fixedBundlePrice === undefined) {
+      // Pricing must come from somewhere: tiers, or (fixed pricing only) the legacy pair.
+      if (data.tiers.length === 0 && (data.fixedBundlePrice === undefined || data.pricingType === "percentage_discount")) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["tiers"], message: "Add at least one pricing tier." });
       }
       if (data.tiers.length === 0 && data.requiredQuantity === undefined) {
@@ -207,6 +227,37 @@ export const createBundleCampaignSchema = z
   });
 
 export type CreateBundleCampaignInput = z.infer<typeof createBundleCampaignSchema>;
+
+type TierInput = CreateBundleCampaignInput["tiers"][number];
+
+/**
+ * Tier input rows → domain tiers for ONE pricing type. The field the other
+ * type would use is dropped, so a form that switched modes can never leave a
+ * stale price on a percentage tier (or vice versa).
+ */
+function toTierRows(tiers: readonly TierInput[], pricingType: BundlePricingType): BundleTier[] {
+  return tiers.map((t) => ({
+    id: null,
+    quantity: t.quantity,
+    price: pricingType === "fixed_total" ? (t.price ?? null) : null,
+    discountPercent: pricingType === "percentage_discount" ? (t.discountPercent ?? null) : null,
+  }));
+}
+
+/**
+ * Percentage-priced Pick Your Set is always EXCLUSIVE: its units already
+ * carry a percentage discount, so letting offers or promo codes discount them
+ * again would double-discount the same pieces (including through an
+ * equivalent PICK code). Fixed-total campaigns keep the merchant's choice.
+ */
+export function percentagePricingStackingError(
+  pricingType: BundlePricingType | undefined,
+  offerStacking: "exclusive" | "stackable" | undefined,
+): string | null {
+  return pricingType === "percentage_discount" && offerStacking === "stackable"
+    ? "Percentage-priced sets cannot stack with offers or promo codes — set offer stacking to Exclusive."
+    : null;
+}
 
 /**
  * Partial update. Invariants that span several fields (schedule window, pool
@@ -300,7 +351,10 @@ export interface BundleTierDto {
   /** Row id. Null only for the synthetic tier of a curated stack. */
   id: string | null;
   quantity: number;
-  price: number;
+  /** fixed_total: the tier's total. Null on a percentage tier. */
+  price: number | null;
+  /** percentage_discount: % off the selected units' effective prices. Null on a fixed tier. */
+  discountPercent: number | null;
   /** Can the effective pool fill this quantity right now? Stock only — the tier still belongs to the campaign either way. */
   availability: BundleAvailability;
   /** Cheapest/dearest separately-bought value of a stack of THIS quantity. Null when the pool cannot fill it. */
@@ -385,7 +439,7 @@ export type PublicBundleCampaignDto = Omit<BundleCampaignDto, "internalName">;
 type CampaignWithImage = { campaign: BundleCampaignRow; imageUrl: string | null };
 
 function effectivePrice(p: Pick<BundleCampaignProductSummary, "price" | "discountPrice">): number {
-  return p.discountPrice !== null && p.discountPrice < p.price ? p.discountPrice : p.price;
+  return effectiveUnitPrice(p.price, p.discountPrice);
 }
 
 /** Converts a DB row + pool to the shape the pure domain rules consume. */
@@ -425,23 +479,39 @@ async function loadTiers(db: Db, campaignIds: string[]): Promise<Map<string, Bun
       campaignId: bundleCampaignTier.bundleCampaignId,
       quantity: bundleCampaignTier.quantity,
       price: bundleCampaignTier.price,
+      discountPercent: bundleCampaignTier.discountPercent,
     })
     .from(bundleCampaignTier)
     .where(inArray(bundleCampaignTier.bundleCampaignId, campaignIds))
     .orderBy(asc(bundleCampaignTier.quantity));
   for (const r of rows) {
     const list = byCampaign.get(r.campaignId) ?? [];
-    list.push({ id: r.id, quantity: r.quantity, price: Number(r.price) });
+    list.push(tierFromRow(r));
     byCampaign.set(r.campaignId, list);
   }
   return byCampaign;
+}
+
+/** A stored tier row → domain tier. Shared with the checkout-path loader in selection.ts. */
+export function tierFromRow(r: {
+  id: string;
+  quantity: number;
+  price: string | null;
+  discountPercent: string | null;
+}): BundleTier {
+  return {
+    id: r.id,
+    quantity: r.quantity,
+    price: r.price === null ? null : Number(r.price),
+    discountPercent: r.discountPercent === null ? null : Number(r.discountPercent),
+  };
 }
 
 /** Replaces a campaign's tiers wholesale, stored ascending by quantity. */
 async function replaceTiers(
   db: Db,
   campaignId: string,
-  tiers: readonly { quantity: number; price: number }[],
+  tiers: readonly Pick<BundleTier, "quantity" | "price" | "discountPercent">[],
 ) {
   await db.delete(bundleCampaignTier).where(eq(bundleCampaignTier.bundleCampaignId, campaignId));
   if (tiers.length === 0) return;
@@ -450,7 +520,9 @@ async function replaceTiers(
     ordered.map((tier, index) => ({
       bundleCampaignId: campaignId,
       quantity: tier.quantity,
-      price: tier.price.toFixed(2),
+      price: tier.price === null ? null : tier.price.toFixed(2),
+      discountPercent:
+        tier.discountPercent === null || tier.discountPercent === undefined ? null : tier.discountPercent.toFixed(2),
       sortOrder: index,
     })),
   );
@@ -508,6 +580,7 @@ function toDto(
       id: tier.id,
       quantity: tier.quantity,
       price: tier.price,
+      discountPercent: tier.discountPercent ?? null,
       availability,
       valueRange: valueRangeForTier(effectiveConfig, availabilityProducts, tier.quantity),
     }),
@@ -1035,14 +1108,14 @@ export const createBundleCampaign = (input: CreateBundleCampaignInput) =>
     // does send the legacy pair, one tier is synthesised from it, so an older
     // client keeps working and the campaign still ends up with canonical
     // tier rows. Curated stacks keep their single `fixedBundlePrice`.
-    const tierInput = isCurated
+    const tierInput: TierInput[] = isCurated
       ? []
       : input.tiers.length > 0
         ? input.tiers
-        : input.fixedBundlePrice !== undefined && requiredQuantity >= 1
+        : input.fixedBundlePrice !== undefined && requiredQuantity >= 1 && input.pricingType === "fixed_total"
           ? [{ quantity: requiredQuantity, price: input.fixedBundlePrice }]
           : [];
-    const tiers: BundleTier[] = sortTiers(tierInput.map((t) => ({ id: null, ...t })));
+    const tiers: BundleTier[] = sortTiers(toTierRows(tierInput, input.pricingType));
     const lowest = tiers[0] ?? null;
     // Legacy mirrors, derived — never independently authored.
     const legacyQuantity = isCurated ? requiredQuantity : (lowest?.quantity ?? requiredQuantity);
@@ -1228,9 +1301,12 @@ export const updateBundleCampaign = (input: UpdateBundleCampaignInput) =>
       );
     }
 
+    const mergedPricingType: BundlePricingType = isCurated
+      ? "fixed_total"
+      : (patch.pricingType ?? existing.row.pricingType);
     const mergedTiers: BundleTier[] = (() => {
       if (isCurated) return [];
-      if (tierPatch !== undefined) return sortTiers(tierPatch.map((t) => ({ id: null, ...t })));
+      if (tierPatch !== undefined) return sortTiers(toTierRows(tierPatch, mergedPricingType));
       const only = existing.tiers.length === 1 ? existing.tiers[0] : undefined;
       if (only && patchesLegacyPricing) {
         return [
@@ -1238,6 +1314,7 @@ export const updateBundleCampaign = (input: UpdateBundleCampaignInput) =>
             id: only.id,
             quantity: patch.requiredQuantity ?? only.quantity,
             price: patch.fixedBundlePrice ?? only.price,
+            discountPercent: only.discountPercent ?? null,
           },
         ];
       }
@@ -1249,15 +1326,21 @@ export const updateBundleCampaign = (input: UpdateBundleCampaignInput) =>
           : existing.row.fixedBundlePrice === null
             ? null
             : Number(existing.row.fixedBundlePrice);
-      return legacyPrice !== null && legacyQty >= 1
-        ? [{ id: null, quantity: legacyQty, price: legacyPrice }]
+      return legacyPrice !== null && legacyQty >= 1 && mergedPricingType === "fixed_total"
+        ? [{ id: null, quantity: legacyQty, price: legacyPrice, discountPercent: null }]
         : [];
     })();
     const lowestTier = mergedTiers[0] ?? null;
     const tiersChanged =
-      tierPatch !== undefined || typeChanged || existing.tiers.length === 0 || patchesLegacyPricing;
+      tierPatch !== undefined ||
+      typeChanged ||
+      existing.tiers.length === 0 ||
+      patchesLegacyPricing ||
+      mergedPricingType !== existing.row.pricingType;
 
-    const tierError = isCurated ? null : validateBundleTiers(mergedTiers, { requireAtLeastOne: false });
+    const tierError = isCurated
+      ? null
+      : validateBundleTiers(mergedTiers, { requireAtLeastOne: false, pricingType: mergedPricingType });
     if (tierError) return yield* $(Effect.fail(validationError(tierError)));
 
     // Merge the patch over the stored row so every invariant is checked against
@@ -1277,7 +1360,7 @@ export const updateBundleCampaign = (input: UpdateBundleCampaignInput) =>
       requiredQuantity: isCurated
         ? curatedUnitCount(poolLines)
         : (lowestTier?.quantity ?? patch.requiredQuantity ?? existing.row.requiredQuantity),
-      pricingType: patch.pricingType ?? existing.row.pricingType,
+      pricingType: mergedPricingType,
       fixedBundlePrice: isCurated
         ? patch.fixedBundlePrice !== undefined
           ? patch.fixedBundlePrice
@@ -1328,6 +1411,8 @@ export const updateBundleCampaign = (input: UpdateBundleCampaignInput) =>
 
     const scheduleError = validateBundleCampaignSchedule(merged.startsAt, merged.endsAt);
     if (scheduleError) return yield* $(Effect.fail(validationError(scheduleError)));
+    const stackingError = percentagePricingStackingError(merged.pricingType, merged.offerStacking);
+    if (stackingError) return yield* $(Effect.fail(validationError(stackingError)));
 
     const mergedConfigBase = {
       type: merged.type,
@@ -1588,7 +1673,15 @@ export const previewBundleEligibilitySchema = z.object({
   manualProductIds: z.array(z.string().uuid()).max(500).default([]),
   /** The tier ladder as the form currently holds it. Empty falls back to `requiredQuantity`. */
   tiers: z
-    .array(z.object({ quantity: z.number().int().min(1).max(100), price: z.number().positive() }))
+    .array(
+      z.object({
+        quantity: z.number().int().min(1).max(100),
+        /** Fixed-total tiers. */
+        price: z.number().positive().nullable().optional(),
+        /** Percentage tiers. */
+        discountPercent: z.number().gt(0).lt(100).nullable().optional(),
+      }),
+    )
     .max(20)
     .default([]),
   requiredQuantity: z.number().int().min(1).max(100),
@@ -1617,7 +1710,10 @@ export interface BundleEligibilityPreview {
    */
   tiers: {
     quantity: number;
-    price: number;
+    /** Null on a percentage tier. */
+    price: number | null;
+    /** Null on a fixed-total tier. */
+    discountPercent: number | null;
     availability: BundleAvailability;
     valueRange: { min: number; max: number } | null;
   }[];
@@ -1707,12 +1803,20 @@ export const previewBundleEligibility = (input: PreviewBundleEligibilityInput) =
         // the single legacy quantity so the panel still says something useful.
         const previewTiers: BundleTier[] =
           input.tiers.length > 0
-            ? sortTiers(input.tiers.map((t) => ({ id: null, ...t })))
-            : [{ id: null, quantity: input.requiredQuantity, price: 1 }];
+            ? sortTiers(
+                input.tiers.map((t) => ({
+                  id: null,
+                  quantity: t.quantity,
+                  price: t.price ?? null,
+                  discountPercent: t.discountPercent ?? null,
+                })),
+              )
+            : [{ id: null, quantity: input.requiredQuantity, price: 1, discountPercent: null }];
         const smallestQuantity = previewTiers[0]?.quantity ?? input.requiredQuantity;
         const tierPreview = previewTiers.map((tier) => ({
           quantity: tier.quantity,
           price: tier.price,
+          discountPercent: tier.discountPercent ?? null,
           availability:
             availableCapacity >= tier.quantity ? ("available" as const) : ("sold_out" as const),
           valueRange: valueRangeForTier(capacityConfig, availabilityProducts, tier.quantity),
@@ -1724,12 +1828,13 @@ export const previewBundleEligibility = (input: PreviewBundleEligibilityInput) =
             requiredQuantity: smallestQuantity,
             pricingType: "fixed_total",
             // Pricing is validated by the form/service; the preview only cares
-            // about the pool, so pass a placeholder that clears the price rule.
+            // about the pool, so pass a placeholder that clears the price rule
+            // (percentage tiers get a placeholder price for the same reason).
             fixedBundlePrice: 1,
             allowDuplicates: isCurated ? true : input.allowDuplicates,
             maxPerProduct: isCurated ? null : maxPerProduct,
             isRepeatable: false,
-            tiers: isCurated ? [] : previewTiers,
+            tiers: isCurated ? [] : previewTiers.map((t) => ({ ...t, price: t.price ?? 1, discountPercent: null })),
             eligibleProductIds: effective.map((p) => p.productId),
             composition: isCurated ? effective.map((p) => ({ productId: p.productId, quantity: p.quantity })) : undefined,
           },

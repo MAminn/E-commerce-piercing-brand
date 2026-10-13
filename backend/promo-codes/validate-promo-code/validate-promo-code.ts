@@ -2,8 +2,6 @@ import type { ClientSession } from "#root/backend/auth/shared/entities";
 import { query } from "#root/shared/database/drizzle/db";
 import {
   promoCode,
-  promoCodeProducts,
-  promoCodeCategories,
   product,
   order,
   user,
@@ -13,11 +11,26 @@ import { Effect } from "effect";
 import { z } from "zod";
 import { and, eq, inArray, count } from "drizzle-orm";
 import { formatMoney } from "#root/shared/pricing/format-money";
+import {
+  checkEligibleQuantity,
+  hasQuantityRule,
+  percentOfMinor,
+  quantityRuleRejection,
+  summarizeEligibleUnits,
+} from "#root/shared/pricing/eligible-units";
+import { loadPromoEligibility, promoQuantityRule } from "../eligibility";
 
 const CartItemSchema = z.object({
   id: z.string().uuid(),
   quantity: z.number().min(1),
   price: z.number().min(0),
+  /**
+   * True for a unit that is a child of a (stackable) bundle instance rather
+   * than an ordinary cart line. A set code (quantity rule) never counts or
+   * discounts bundled units — see planPromo in shared/bundles/cart-pricing.ts.
+   * Absent on older clients, which never sent bundled units at all.
+   */
+  bundled: z.boolean().optional(),
 });
 
 export const validatePromoCodeSchema = z.object({
@@ -44,10 +57,14 @@ export type ValidatePromoCodeInput = z.infer<typeof validatePromoCodeSchema>;
 const describeDiscount = (
   discountType: "percentage" | "fixed_amount",
   discountValue: number,
-) =>
-  discountType === "percentage"
-    ? `${discountValue}% off`
-    : `${formatMoney(discountValue)} off`;
+  freeShipping = false,
+) => {
+  const discount =
+    discountType === "percentage"
+      ? `${discountValue}% off`
+      : `${formatMoney(discountValue)} off`;
+  return freeShipping ? `${discount} + free shipping` : discount;
+};
 
 /**
  * Validates a promo code against the current cart.
@@ -56,7 +73,7 @@ const describeDiscount = (
  * storefront can tell the shopper exactly why a code didn't work rather than
  * showing a generic "invalid code". Checks, in order: code exists → status →
  * date window → total usage limit → per-user usage limit → cart not empty →
- * minimum purchase → product/category applicability.
+ * minimum purchase → eligible units present → eligible-quantity rule.
  */
 export const validatePromoCode = (
   input: ValidatePromoCodeInput,
@@ -252,78 +269,83 @@ export const validatePromoCode = (
       );
     }
 
-    // ── Product / category applicability ──
-    if (!foundPromoCode.appliesToAllProducts) {
-      const cartProductIds = cartItems.map((item) => item.id);
-
-      const applicableProducts = yield* $(
-        query((db) =>
-          db
-            .select({ productId: promoCodeProducts.productId })
-            .from(promoCodeProducts)
-            .where(
-              and(
-                eq(promoCodeProducts.promoCodeId, foundPromoCode.id),
-                inArray(promoCodeProducts.productId, cartProductIds),
-              ),
-            ),
-        ),
-      );
-
-      const productCategories = yield* $(
+    // ── Eligible units ──
+    // Eligibility is the code's admin-controlled configuration (all products /
+    // listed products / listed categories, minus excluded products), judged
+    // per PRODUCT and counted in UNITS. The same loader and the same shared
+    // functions decide this at order time.
+    const eligibility = yield* $(query((db) => loadPromoEligibility(db, foundPromoCode)));
+    const quantityRule = promoQuantityRule(foundPromoCode);
+    const isSetCode = hasQuantityRule(quantityRule);
+    // A set code counts ordinary lines only; an ordinary code also sees
+    // stackable bundle children (planPromo's rule).
+    const candidateItems = isSetCode ? cartItems.filter((item) => !item.bundled) : cartItems;
+    const candidateIds = [...new Set(candidateItems.map((item) => item.id))];
+    const categoriesById = new Map<string, string[]>();
+    if (!eligibility.appliesToAllProducts && eligibility.categoryIds.length > 0 && candidateIds.length > 0) {
+      const rows = yield* $(
         query((db) =>
           db
             .select({ productId: product.id, categoryId: product.categoryId })
             .from(product)
-            .where(inArray(product.id, cartProductIds)),
+            .where(inArray(product.id, candidateIds)),
         ),
       );
-
-      const categoryIds = productCategories
-        .map((pc) => pc.categoryId)
-        .filter((id): id is string => id !== null);
-
-      const applicableCategories =
-        categoryIds.length > 0
-          ? yield* $(
-              query((db) =>
-                db
-                  .select({ categoryId: promoCodeCategories.categoryId })
-                  .from(promoCodeCategories)
-                  .where(
-                    and(
-                      eq(promoCodeCategories.promoCodeId, foundPromoCode.id),
-                      inArray(promoCodeCategories.categoryId, categoryIds),
-                    ),
-                  ),
-              ),
-            )
-          : [];
-
-      if (
-        applicableProducts.length === 0 &&
-        applicableCategories.length === 0
-      ) {
-        return yield* $(
-          Effect.fail(
-            new ServerError({
-              tag: "BadRequest",
-              statusCode: 400,
-              clientMessage:
-                "This promo code doesn't apply to any of the items in your cart.",
-            }),
-          ),
-        );
+      for (const row of rows) {
+        if (row.categoryId) categoriesById.set(row.productId, [row.categoryId]);
       }
+    }
+    const summary = summarizeEligibleUnits(
+      candidateItems.map((item) => ({
+        id: item.id,
+        quantity: item.quantity,
+        price: item.price,
+        categoryIds: categoriesById.get(item.id),
+      })),
+      eligibility,
+    );
+
+    if (summary.units === 0) {
+      return yield* $(
+        Effect.fail(
+          new ServerError({
+            tag: "BadRequest",
+            statusCode: 400,
+            clientMessage:
+              isSetCode && cartItems.some((item) => item.bundled)
+                ? "This promo code doesn't apply to any of the items in your cart. Pieces already inside a set don't count toward it."
+                : "This promo code doesn't apply to any of the items in your cart.",
+          }),
+        ),
+      );
+    }
+
+    const quantity = checkEligibleQuantity(quantityRule, summary.units);
+    if (!quantity.ok) {
+      return yield* $(
+        Effect.fail(
+          new ServerError({
+            tag: "BadRequest",
+            statusCode: 400,
+            clientMessage: quantityRuleRejection(foundPromoCode.code, quantity),
+          }),
+        ),
+      );
     }
 
     // ── Valid ──
     const discountType = foundPromoCode.discountType;
     const discountValue = Number(foundPromoCode.discountValue);
-    const discountAmount =
+    // Preview only, against the submitted prices and before automatic offers:
+    // the cart and create-order compute the real figure with
+    // computeCartTotals, from server prices at order time.
+    const discountMinor =
       discountType === "percentage"
-        ? (subtotal * discountValue) / 100
-        : Math.min(discountValue, subtotal);
+        ? percentOfMinor(summary.subtotalMinor, discountValue)
+        : Math.min(Math.round(discountValue * 100), summary.subtotalMinor);
+    const eligibleProductIds = [
+      ...new Set(summary.lineIndexes.flatMap((index) => candidateItems[index]?.id ?? [])),
+    ];
 
     return {
       id: foundPromoCode.id,
@@ -331,10 +353,22 @@ export const validatePromoCode = (
       discountType,
       discountValue,
       appliesToAllProducts: foundPromoCode.appliesToAllProducts,
-      /** Discount this code produces against the submitted subtotal. */
-      discountAmount,
+      /** Discount this code produces on the submitted eligible value (before offers). */
+      discountAmount: discountMinor / 100,
       /** e.g. "10% off" / "50.00 EGP off" — ready to show to the shopper. */
-      discountLabel: describeDiscount(discountType, discountValue),
+      discountLabel: describeDiscount(discountType, discountValue, foundPromoCode.freeShipping),
       description: foundPromoCode.description,
+      /** A qualifying code also waives the shipping charge of a deliverable destination. */
+      freeShipping: foundPromoCode.freeShipping,
+      eligibleMinQuantity: quantityRule.minQuantity,
+      eligibleMaxQuantity: quantityRule.maxQuantity,
+      /**
+       * Which of the SUBMITTED cart's products this code counts and
+       * discounts, resolved server-side from its products / categories /
+       * exclusions. The cart prices with exactly this list and re-validates
+       * on every change, so a product added later is judged by the server.
+       */
+      eligibleProductIds,
+      eligibleUnits: summary.units,
     };
   });

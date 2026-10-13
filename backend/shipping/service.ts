@@ -51,11 +51,12 @@ export function describeUnavailableQuote(quote: Extract<ShippingQuote, { availab
     : "We don't deliver to the selected destination yet.";
 }
 
-/** Freeze what was quoted, and what was charged after offers, onto the order. */
+/** Freeze what was quoted, and what was charged after offers / a free-shipping promo code, onto the order. */
 export function buildShippingSnapshot(input: {
   quote: Extract<ShippingQuote, { available: true }>;
   mode: ShippingMode;
   freeShippingApplied: boolean;
+  freeShippingSource?: "offer" | "promo_code" | null;
   chargedFee: number;
   rulesUpdatedAt: Date | null;
   now?: Date;
@@ -70,6 +71,7 @@ export function buildShippingSnapshot(input: {
     rateSource: input.quote.rateSource,
     ruleFee: input.quote.amount,
     freeShippingApplied: input.freeShippingApplied,
+    freeShippingSource: input.freeShippingApplied ? (input.freeShippingSource ?? "offer") : null,
     chargedFee: input.chargedFee,
     currency: input.quote.currency,
     quotedAt: (input.now ?? new Date()).toISOString(),

@@ -58,6 +58,9 @@ function conditionProgress(
   const cond = offer.condition;
 
   if (cond.type === "quantity_threshold") {
+    // Past an optional maximum the offer no longer applies, and there is no
+    // honest "add more" message to show.
+    if (cond.maxQuantity !== undefined && cartQuantity > cond.maxQuantity) return null;
     if (cartQuantity >= cond.minQuantity) return { met: true };
     const needed = cond.minQuantity - cartQuantity;
     const progress = Math.min(cartQuantity / cond.minQuantity, 0.99);

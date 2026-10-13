@@ -47,6 +47,13 @@ import {
 } from "#root/components/ui/popover";
 import { Calendar as CalendarComponent } from "#root/components/ui/calendar";
 import { cn } from "#root/lib/utils";
+import {
+  type EligibleQuantityRuleType,
+  describeQuantityRule,
+  quantityRuleFromType,
+  quantityRuleType,
+  validateQuantityRule,
+} from "#root/shared/pricing/eligible-units";
 
 type Product = {
   id: string;
@@ -67,6 +74,12 @@ interface PromoCodeFormProps {
   products: Product[];
   categories: Category[];
 }
+
+/** Optional whole-number input: "" → null. */
+const optionalCount = z.preprocess(
+  (v) => (v === "" || v === undefined || v === null || Number.isNaN(v) ? null : Number(v)),
+  z.number().int("Use a whole number").min(1, "Must be at least 1").max(1000).nullable(),
+);
 
 // Form schema with validation
 const formSchema = z.object({
@@ -100,9 +113,37 @@ const formSchema = z.object({
   productIds: z.array(z.string()).optional(),
   categoryIds: z.array(z.string()).optional(),
   showOnOffersPage: z.boolean().default(false),
+  /** Eligible-unit quantity rule: only the inputs the chosen type uses are read. */
+  quantityRuleType: z.enum(["none", "exact", "min", "max", "range"]).default("none"),
+  exactQuantity: optionalCount,
+  minQuantity: optionalCount,
+  maxQuantity: optionalCount,
+  freeShipping: z.boolean().default(false),
+}).superRefine((data, ctx) => {
+  const need = (field: "exactQuantity" | "minQuantity" | "maxQuantity", label: string) => {
+    if (data[field] === null) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [field], message: `Enter the ${label}` });
+  };
+  if (data.quantityRuleType === "exact") need("exactQuantity", "exact number of pieces");
+  if (data.quantityRuleType === "min" || data.quantityRuleType === "range") need("minQuantity", "minimum");
+  if (data.quantityRuleType === "max" || data.quantityRuleType === "range") need("maxQuantity", "maximum");
+  const rule = quantityRuleFromType(data.quantityRuleType, {
+    exact: data.exactQuantity,
+    min: data.minQuantity,
+    max: data.maxQuantity,
+  });
+  const error = validateQuantityRule(rule);
+  if (error) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["maxQuantity"], message: error });
 });
 
 type FormValues = z.infer<typeof formSchema>;
+
+const QUANTITY_RULE_LABELS: Record<EligibleQuantityRuleType, string> = {
+  none: "No quantity rule",
+  exact: "Exactly",
+  min: "At least",
+  max: "At most",
+  range: "Between (min – max)",
+};
 
 // Helper to format dates consistently
 const formatDate = (date: Date | null): string => {
@@ -126,6 +167,7 @@ export function PromoCodeForm({
   const [isLoading, setIsLoading] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [excludedProducts, setExcludedProducts] = useState<string[]>([]);
 
   // Initialize the form with default values
   const form = useForm<FormValues>({
@@ -145,6 +187,11 @@ export function PromoCodeForm({
       productIds: [],
       categoryIds: [],
       showOnOffersPage: false,
+      quantityRuleType: "none",
+      exactQuantity: null,
+      minQuantity: null,
+      maxQuantity: null,
+      freeShipping: false,
     },
   });
 
@@ -159,6 +206,11 @@ export function PromoCodeForm({
 
         if (result.success) {
           const promoCode = result.result;
+          const rule = {
+            minQuantity: promoCode.eligibleMinQuantity ?? null,
+            maxQuantity: promoCode.eligibleMaxQuantity ?? null,
+          };
+          const ruleType = quantityRuleType(rule);
           form.reset({
             code: promoCode.code,
             description: promoCode.description || "",
@@ -176,10 +228,16 @@ export function PromoCodeForm({
             productIds: promoCode.applicableProductIds,
             categoryIds: promoCode.applicableCategoryIds,
             showOnOffersPage: promoCode.showOnOffersPage,
+            quantityRuleType: ruleType,
+            exactQuantity: ruleType === "exact" ? rule.minQuantity : null,
+            minQuantity: ruleType === "min" || ruleType === "range" ? rule.minQuantity : null,
+            maxQuantity: ruleType === "max" || ruleType === "range" ? rule.maxQuantity : null,
+            freeShipping: promoCode.freeShipping ?? false,
           });
 
           setSelectedProducts(promoCode.applicableProductIds);
           setSelectedCategories(promoCode.applicableCategoryIds);
+          setExcludedProducts(promoCode.excludedProductIds ?? []);
         } else {
           toast.error(result.error || "Failed to load promo code");
         }
@@ -201,6 +259,13 @@ export function PromoCodeForm({
     setIsLoading(true);
 
     try {
+      // The rule type + inputs collapse to the stored (min, max) pair; "none"
+      // sends nulls so an edit can remove a rule.
+      const quantityRule = quantityRuleFromType(values.quantityRuleType, {
+        exact: values.exactQuantity,
+        min: values.minQuantity,
+        max: values.maxQuantity,
+      });
       // Prepare data for API - map from formSchema to the expected API structure
       const apiData = {
         code: values.code,
@@ -220,7 +285,11 @@ export function PromoCodeForm({
         applicableCategoryIds: values.appliesToAllProducts
           ? []
           : selectedCategories,
+        excludedProductIds: excludedProducts,
         showOnOffersPage: values.showOnOffersPage,
+        eligibleMinQuantity: quantityRule.minQuantity,
+        eligibleMaxQuantity: quantityRule.maxQuantity,
+        freeShipping: values.freeShipping,
       };
 
       if (promoCodeId) {
@@ -271,8 +340,24 @@ export function PromoCodeForm({
     );
   };
 
+  const toggleExcluded = (productId: string) => {
+    setExcludedProducts((prev) =>
+      prev.includes(productId)
+        ? prev.filter((id) => id !== productId)
+        : [...prev, productId]
+    );
+  };
+
   const appliesToAllProducts = form.watch("appliesToAllProducts");
   const discountType = form.watch("discountType");
+  const ruleType = form.watch("quantityRuleType");
+  const rulePreview = describeQuantityRule(
+    quantityRuleFromType(ruleType, {
+      exact: form.watch("exactQuantity"),
+      min: form.watch("minQuantity"),
+      max: form.watch("maxQuantity"),
+    }),
+  );
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -405,6 +490,137 @@ export function PromoCodeForm({
                       </div>
                     </FormControl>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Eligible quantity + free shipping */}
+            <div className="space-y-4 rounded-md border p-4">
+              <div>
+                <h4 className="text-sm font-medium">Eligible pieces</h4>
+                <p className="text-xs text-muted-foreground">
+                  Counts product UNITS of eligible products only (3 of one
+                  product = 3 pieces). Non-eligible products never count and
+                  are never discounted. A code with a rule is a “set code”: it
+                  only counts loose cart items (never pieces already inside a
+                  set) and automatic offers don’t also discount those pieces.
+                </p>
+              </div>
+              <FormField
+                control={form.control}
+                name="quantityRuleType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Quantity rule</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {(Object.keys(QUANTITY_RULE_LABELS) as EligibleQuantityRuleType[]).map((key) => (
+                          <SelectItem key={key} value={key}>
+                            {QUANTITY_RULE_LABELS[key]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {ruleType !== "none" && (
+                <div className="grid grid-cols-2 gap-4">
+                  {ruleType === "exact" && (
+                    <FormField
+                      control={form.control}
+                      name="exactQuantity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Exact pieces</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min={1}
+                              step={1}
+                              placeholder="3"
+                              value={field.value ?? ""}
+                              onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                  {(ruleType === "min" || ruleType === "range") && (
+                    <FormField
+                      control={form.control}
+                      name="minQuantity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Minimum pieces</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min={1}
+                              step={1}
+                              value={field.value ?? ""}
+                              onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                  {(ruleType === "max" || ruleType === "range") && (
+                    <FormField
+                      control={form.control}
+                      name="maxQuantity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Maximum pieces</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min={1}
+                              step={1}
+                              value={field.value ?? ""}
+                              onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </div>
+              )}
+              {rulePreview && (
+                <p className="text-xs text-muted-foreground">
+                  The code applies only when the cart holds{" "}
+                  <span className="font-medium text-foreground">{rulePreview}</span>.
+                </p>
+              )}
+              <FormField
+                control={form.control}
+                name="freeShipping"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                    <FormControl>
+                      <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>Free shipping</FormLabel>
+                      <FormDescription>
+                        When the code qualifies, the shipping charge of a
+                        destination you already deliver to becomes 0. It never
+                        makes an unavailable governorate deliverable.
+                      </FormDescription>
+                    </div>
                   </FormItem>
                 )}
               />
@@ -706,6 +922,44 @@ export function PromoCodeForm({
                         </div>
                       </div>
                     )}
+
+                    {/* Exclusions narrow either mode — e.g. every earring
+                        except the fixed 3-piece sets. */}
+                    <div>
+                      <h4 className="text-sm font-medium mb-1">Excluded products</h4>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Never counted toward the quantity rule and never
+                        discounted, even when their category is included.
+                      </p>
+                      <div className="border rounded-md p-2 max-h-40 overflow-y-auto">
+                        {products.length === 0 ? (
+                          <p className="text-sm text-muted-foreground p-2">No products available</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {products.map((product) => (
+                              <div key={product.id} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`excluded-${product.id}`}
+                                  checked={excludedProducts.includes(product.id)}
+                                  onCheckedChange={() => toggleExcluded(product.id)}
+                                />
+                                <label
+                                  htmlFor={`excluded-${product.id}`}
+                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                >
+                                  {product.name}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {excludedProducts.length > 0 && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {excludedProducts.length} product{excludedProducts.length === 1 ? "" : "s"} excluded
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </AccordionContent>
               </AccordionItem>

@@ -47,12 +47,17 @@ const money = (n: number) => formatMoney(n, { currency: STORE_CURRENCY, alwaysSh
  */
 function ruleSummary(c: BundleCampaign): string {
   const price = c.fixedBundlePrice === null ? "—" : money(c.fixedBundlePrice);
+  if (c.pricingType === "percentage_discount" && c.type !== "curated_stack") {
+    // "3 at 20% off · 6 at 15% off from 40" — the percentage IS the price.
+    const rungs = c.tiers.map((t) => `${t.quantity} at ${t.discountPercent ?? "—"}% off`).join(" · ");
+    return `${rungs || "No tiers"} from ${c.eligibleProductCount}`;
+  }
   if (c.type === "curated_stack") {
     return `${c.eligibleProductCount} product${c.eligibleProductCount === 1 ? "" : "s"} · ${c.unitCount} unit${c.unitCount === 1 ? "" : "s"} · ${price}`;
   }
   if (c.tiers.length > 1) {
     const sizes = c.tiers.map((t) => t.quantity).join("·");
-    const cheapest = Math.min(...c.tiers.map((t) => t.price));
+    const cheapest = Math.min(...c.tiers.flatMap((t) => (t.price === null ? [] : [t.price])));
     return `${sizes} pieces from ${c.eligibleProductCount} · from ${money(cheapest)}`;
   }
   return `Choose ${c.requiredQuantity} from ${c.eligibleProductCount} · ${price}`;
@@ -77,7 +82,16 @@ function valueSummary(c: BundleCampaign): { text: string; tone: "ok" | "warn" | 
     const sellable = c.tiers.filter((t) => t.availability === "available");
     if (sellable.length === 0) return { text: "No tier can be completed right now", tone: "warn" };
     const detail = c.tiers
-      .map((t) => `${t.quantity}: ${t.availability === "available" ? money(t.price) : "sold out"}`)
+      .map(
+        (t) =>
+          `${t.quantity}: ${
+            t.availability !== "available"
+              ? "sold out"
+              : t.price === null
+                ? `${t.discountPercent ?? "—"}% off`
+                : money(t.price)
+          }`,
+      )
       .join(" · ");
     return {
       text: detail,
@@ -86,6 +100,10 @@ function valueSummary(c: BundleCampaign): { text: string; tone: "ok" | "warn" | 
   }
   if (!c.valueRange) return { text: "Pool can't complete a set", tone: "warn" };
   const { min, max } = c.valueRange;
+  if (c.pricingType === "percentage_discount") {
+    // A percentage always saves exactly that share of whatever is picked.
+    return { text: `Separately ${money(min)}–${money(max)} · ${c.tiers[0]?.discountPercent ?? "—"}% off the pick`, tone: "ok" };
+  }
   if (min <= price) return { text: `Separately ${money(min)}–${money(max)} · cheapest pick saves nothing`, tone: "warn" };
   return { text: `Separately ${money(min)}–${money(max)} · saves ${money(min - price)}–${money(max - price)}`, tone: "ok" };
 }

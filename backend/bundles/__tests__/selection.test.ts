@@ -208,6 +208,7 @@ describe("validateBundleSelection — server authority", () => {
       slug: "build-your-ear-stack",
       title: "Build Your Ear Stack",
       type: "build_your_stack",
+      pricingType: "fixed_total",
       // No tier rows were supplied here; the domain falls back to the legacy
       // requiredQuantity/fixedBundlePrice pair for pricing.
       tiers: [],

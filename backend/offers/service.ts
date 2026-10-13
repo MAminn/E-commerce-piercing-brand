@@ -38,6 +38,8 @@ const conditionSchema: z.ZodType<OfferCondition> = z.discriminatedUnion("type", 
   z.object({
     type: z.literal("quantity_threshold"),
     minQuantity: z.number().int().min(1),
+    /** Optional inclusive upper bound (min = max → exactly N units). */
+    maxQuantity: z.number().int().min(1).optional(),
     productIds: z.array(z.string().uuid()).optional(),
     categoryIds: z.array(z.string().uuid()).optional(),
     repeatsPerMultiple: z.boolean().optional(),
@@ -50,7 +52,10 @@ const conditionSchema: z.ZodType<OfferCondition> = z.discriminatedUnion("type", 
     type: z.literal("product_bundle"),
     requiredProductIds: z.array(z.string().uuid()).min(2),
   }),
-]);
+]).refine(
+  (c) => c.type !== "quantity_threshold" || c.maxQuantity === undefined || c.maxQuantity >= c.minQuantity,
+  { message: "Maximum quantity cannot be lower than the minimum quantity", path: ["maxQuantity"] },
+);
 
 const rewardSchema: z.ZodType<OfferReward> = z.discriminatedUnion("type", [
   z.object({
@@ -121,7 +126,12 @@ function conditionMet(condition: OfferCondition, cartItems: CartItemInput[], sub
         );
       }
       const totalQty = relevantItems.reduce((s, i) => s + i.quantity, 0);
-      return totalQty >= condition.minQuantity;
+      // Units, not lines. `maxQuantity` is absent on every pre-existing offer,
+      // which keeps their minimum-only behaviour exactly.
+      return (
+        totalQty >= condition.minQuantity &&
+        (condition.maxQuantity === undefined || totalQty <= condition.maxQuantity)
+      );
     }
 
     case "cart_total":

@@ -84,8 +84,14 @@ export interface ShippingSnapshot {
   rateSource: ShippingRateSource;
   /** The quoted rule fee before offers. */
   ruleFee: number;
-  /** True when a free-shipping cart offer reduced the charge to 0. */
+  /** True when a free-shipping cart offer or promo code reduced the charge to 0. */
   freeShippingApplied: boolean;
+  /**
+   * What waived the fee when `freeShippingApplied`. Absent on snapshots
+   * written before promo codes could grant free shipping — those were always
+   * an offer.
+   */
+  freeShippingSource?: "offer" | "promo_code" | null;
   /** The amount actually charged — mirrors `order.shipping`. */
   chargedFee: number;
   currency: "EGP";

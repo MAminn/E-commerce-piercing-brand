@@ -76,7 +76,7 @@ type CartOfferRow = {
 
 const CONDITION_LABELS: Record<OfferCondition["type"], string> = {
   always: "Always",
-  quantity_threshold: "Min Quantity",
+  quantity_threshold: "Quantity (min / max)",
   cart_total: "Min Cart Total",
   product_bundle: "Product Bundle",
 };
@@ -287,6 +287,24 @@ function ConditionFields({
               onChange({ ...condition, minQuantity: Number(e.target.value) })
             }
           />
+          <Label>Max Quantity (optional)</Label>
+          <Input
+            type="number"
+            min={1}
+            placeholder="No maximum"
+            value={condition.maxQuantity ?? ""}
+            onChange={(e) =>
+              onChange({
+                ...condition,
+                maxQuantity: e.target.value === "" ? undefined : Number(e.target.value),
+              })
+            }
+          />
+          <p className="text-xs text-muted-foreground">
+            Counts units (not cart lines) of the matching products. Set min and
+            max to the same number for an exact quantity. Leave max blank for
+            the usual "at least" behaviour.
+          </p>
           <Label>Restrict to Product IDs (comma-separated, optional)</Label>
           <Input
             placeholder="Leave blank for any product"

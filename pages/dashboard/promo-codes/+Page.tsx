@@ -1,4 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from "react";
+import { describeQuantityRule } from "#root/shared/pricing/eligible-units";
 import { useData } from "vike-react/useData";
 import type { PromoCodesPageData } from "./+data";
 import { trpc } from "#root/shared/trpc/client";
@@ -71,6 +72,9 @@ type PromoCode = {
   updatedAt: Date | string | null;
   applicableProductIds: string[];
   applicableCategoryIds: string[];
+  eligibleMinQuantity?: number | null;
+  eligibleMaxQuantity?: number | null;
+  freeShipping?: boolean;
 };
 
 // Lazy load the form component
@@ -436,6 +440,20 @@ export default function PromoCodesPage() {
                           {promo.discountType === "percentage"
                             ? "%"
                             : " (fixed)"}
+                          {promo.freeShipping && (
+                            <span className="block text-xs text-muted-foreground">+ free shipping</span>
+                          )}
+                          {describeQuantityRule({
+                            minQuantity: promo.eligibleMinQuantity ?? null,
+                            maxQuantity: promo.eligibleMaxQuantity ?? null,
+                          }) && (
+                            <span className="block text-xs text-muted-foreground">
+                              {describeQuantityRule({
+                                minQuantity: promo.eligibleMinQuantity ?? null,
+                                maxQuantity: promo.eligibleMaxQuantity ?? null,
+                              })}
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell>
                           {promo.usedCount} / {promo.usageLimit ?? "∞"}

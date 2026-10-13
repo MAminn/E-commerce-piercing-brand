@@ -364,8 +364,10 @@ export default function SettingsPage() {
           </CardTitle>
           <CardDescription>
             Control the Shipping, Returns and FAQs text shown in the
-            accordion on every product page. Leave blank to use the
-            defaults.
+            accordion on every product page. Leave a field blank to hide
+            that section. Shipping prices and any free-shipping promotions
+            come from Shipping settings, Offers and Promo Codes — don't
+            promise free shipping here unless one of those grants it.
           </CardDescription>
         </CardHeader>
         <CardContent className='space-y-6'>
@@ -375,7 +377,7 @@ export default function SettingsPage() {
               id='shippingText'
               value={shippingText}
               onChange={(e) => setShippingText(e.target.value)}
-              placeholder='Free shipping with 2+ items.'
+              placeholder='e.g. Delivered in 2–5 working days. Shipping is calculated by governorate at checkout.'
               maxLength={2000}
               rows={2}
             />
@@ -385,7 +387,7 @@ export default function SettingsPage() {
               dir='rtl'
               value={shippingTextAr}
               onChange={(e) => setShippingTextAr(e.target.value)}
-              placeholder='شحن مجاني عند طلب قطعتين أو أكثر.'
+              placeholder='مثال: التوصيل خلال ٢–٥ أيام عمل. تُحسب رسوم الشحن حسب المحافظة عند إتمام الطلب.'
               maxLength={2000}
               rows={2}
             />

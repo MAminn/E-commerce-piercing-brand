@@ -38,8 +38,10 @@ import {
   evaluateBundleSelection,
   getBundleCampaignState,
   sortTiers,
+  tierDiscountPercent,
 } from "#root/shared/bundles/evaluate";
-import { toBundleCampaignConfig } from "./service";
+import { effectiveUnitPrice } from "#root/shared/pricing/effective-price";
+import { tierFromRow, toBundleCampaignConfig } from "./service";
 import {
   loadEligibilityCategories,
   resolveEligibleMembership,
@@ -107,8 +109,9 @@ export interface ValidatedBundleItem {
   quantity: number;
   /**
    * Server-derived regular unit price of THIS line: the product's effective
-   * price (discountPrice ?? price) plus the resolved option modifiers. What
-   * `regularTotal` and the separately-bought value are made of.
+   * price (`effectiveUnitPrice`: a valid sale price, else the regular price)
+   * plus the resolved option modifiers. What `regularTotal`, the separately-
+   * bought value and a percentage tier's discount are computed from.
    */
   unitPrice: number;
   /** The product's regular price and discount BEFORE option modifiers — snapshotted onto the order line with the modifier folded in. */
@@ -140,6 +143,10 @@ export interface ValidatedBundle {
   tierId: string | null;
   /** Units in one bundle: the matched tier's quantity. */
   tierQuantity: number;
+  /** Snapshotted onto `order_bundle`: how this bundle was priced. */
+  pricingType: BundleCampaignRow["pricingType"];
+  /** The matched tier's percentage for a percentage_discount campaign; null for fixed pricing. */
+  discountPercent: number | null;
   requiredQuantity: number;
   offerStacking: BundleCampaignRow["offerStacking"];
   isRepeatable: boolean;
@@ -154,6 +161,7 @@ export interface PublicCampaignSummary {
   slug: string;
   title: string;
   type: BundleCampaignRow["type"];
+  pricingType: BundleCampaignRow["pricingType"];
   /** The campaign's real pricing, ascending by quantity. */
   tiers: BundleTier[];
   requiredQuantity: number;
@@ -273,6 +281,7 @@ function summarize(c: BundleCampaignRow, tiers: readonly BundleTier[]): PublicCa
     slug: c.slug,
     title: c.title,
     type: c.type,
+    pricingType: c.pricingType,
     tiers: sortTiers(tiers),
     requiredQuantity: c.requiredQuantity,
     fixedBundlePrice: c.fixedBundlePrice === null ? null : Number(c.fixedBundlePrice),
@@ -315,7 +324,13 @@ export function validateBundleSelection(input: ValidateBundleSelectionInput): Se
   });
 
   if (getBundleCampaignState(campaign, now) !== "active") return reject("campaign_not_live");
+  // The legacy single-price mirror only exists for fixed-total pricing; a
+  // percentage campaign is priced from its tiers' percentages (checked by the
+  // evaluator, which refuses a tier it cannot price).
   if (campaign.pricingType === "fixed_total" && (campaign.fixedBundlePrice === null || Number(campaign.fixedBundlePrice) <= 0)) {
+    return reject("invalid_pricing");
+  }
+  if (campaign.pricingType === "percentage_discount" && campaign.type === "curated_stack") {
     return reject("invalid_pricing");
   }
 
@@ -368,8 +383,10 @@ export function validateBundleSelection(input: ValidateBundleSelectionInput): Se
 
     requestedPerProduct.set(row.id, (requestedPerProduct.get(row.id) ?? 0) + quantity);
     const price = Number(row.price);
-    const discountPrice = row.discountPrice === null ? null : Number(row.discountPrice);
-    const unitPrice = resolvePurchasableLinePrice(discountPrice ?? price, resolved.priceModifier);
+    const rawDiscount = row.discountPrice === null ? null : Number(row.discountPrice);
+    // Snapshot a sale price only when it is valid (effective-price rule).
+    const discountPrice = effectiveUnitPrice(price, rawDiscount) < price ? rawDiscount : null;
+    const unitPrice = resolvePurchasableLinePrice(effectiveUnitPrice(price, discountPrice), resolved.priceModifier);
     const hasOptions = Object.keys(resolved.selectedOptions).length > 0;
     items.push({
       productId: row.id,
@@ -431,6 +448,9 @@ export function validateBundleSelection(input: ValidateBundleSelectionInput): Se
       // evaluator — never taken from anything the client sent.
       tierId: evaluation.tier?.id ?? null,
       tierQuantity: evaluation.tier?.quantity ?? evaluation.requiredQuantity,
+      pricingType: campaign.pricingType,
+      discountPercent:
+        campaign.pricingType === "percentage_discount" && evaluation.tier ? tierDiscountPercent(evaluation.tier) : null,
       // The evaluated requirement (for curated stacks: the composition's unit
       // count), so an order snapshot never records a stale column value.
       requiredQuantity: evaluation.requiredQuantity,
@@ -489,15 +509,12 @@ export async function loadSelectionContext(
       id: bundleCampaignTier.id,
       quantity: bundleCampaignTier.quantity,
       price: bundleCampaignTier.price,
+      discountPercent: bundleCampaignTier.discountPercent,
     })
     .from(bundleCampaignTier)
     .where(eq(bundleCampaignTier.bundleCampaignId, campaignId))
     .orderBy(asc(bundleCampaignTier.quantity));
-  const tiers: BundleTier[] = tierRows.map((t) => ({
-    id: t.id,
-    quantity: t.quantity,
-    price: Number(t.price),
-  }));
+  const tiers: BundleTier[] = tierRows.map(tierFromRow);
 
   const pool = await db
     .select({

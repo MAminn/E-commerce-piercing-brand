@@ -4,6 +4,7 @@ import {
   promoCode,
   promoCodeProducts,
   promoCodeCategories,
+  promoCodeExcludedProducts,
   product,
   category,
 } from "#root/shared/database/drizzle/schema";
@@ -235,10 +236,20 @@ export const getPromoCodeById = (
       applicableCategoryIds = categories.map((c) => c.categoryId);
     }
 
+    const excluded = yield* $(
+      query((db) =>
+        db
+          .select({ productId: promoCodeExcludedProducts.productId })
+          .from(promoCodeExcludedProducts)
+          .where(eq(promoCodeExcludedProducts.promoCodeId, foundPromoCode.id))
+      )
+    );
+
     return {
       ...foundPromoCode,
       applicableProductIds,
       applicableCategoryIds,
+      excludedProductIds: excluded.map((p) => p.productId),
       discountValue: Number.parseFloat(foundPromoCode.discountValue),
       minPurchaseAmount: foundPromoCode.minPurchaseAmount
         ? Number.parseFloat(foundPromoCode.minPurchaseAmount)

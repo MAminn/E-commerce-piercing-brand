@@ -4,7 +4,14 @@ import { STORE_CURRENCY } from "#root/shared/config/branding";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { Link } from "#root/components/utils/Link";
 import { cn } from "#root/lib/utils";
-import { bundleHref, fillTemplate, formatMoney, resolveBundleImage, summarizeBundleTiers } from "./bundle-ui";
+import {
+  bundleHref,
+  fillTemplate,
+  formatMoney,
+  resolveBundleImage,
+  summarizeBundleTiers,
+  summarizePercentageTiers,
+} from "./bundle-ui";
 
 /**
  * The slice of a campaign a card needs — the summary fields `listLive`
@@ -19,6 +26,7 @@ export type BundleCardCampaign = Pick<
   | "badgeText"
   | "heroImageUrl"
   | "type"
+  | "pricingType"
   | "availability"
   | "requiredQuantity"
   | "unitCount"
@@ -52,11 +60,15 @@ export function BundleCampaignCard({ campaign, className, eager = false }: Bundl
   // Multi-tier summary, or null when one concrete price still describes the
   // whole campaign. `tiers` arrives on the card DTO already (batched with the
   // campaign query), so this costs no extra request.
-  const tierSummary = isCurated ? null : summarizeBundleTiers(campaign.tiers ?? [], currency, t);
+  const isPercentage = !isCurated && campaign.pricingType === "percentage_discount";
+  // Percentage-priced Pick Your Set: the discount IS the offer — there is no
+  // fixed price to quote or to compare a "separately" value against.
+  const percentSummary = isPercentage ? summarizePercentageTiers(campaign.tiers ?? [], t) : null;
+  const tierSummary = isCurated || isPercentage ? null : summarizeBundleTiers(campaign.tiers ?? [], currency, t);
   // The figure a "from X separately" line is measured against: the cheapest
   // price the shopper could actually pay.
   const price = tierSummary
-    ? Math.min(...(campaign.tiers ?? []).map((tier) => tier.price))
+    ? Math.min(...(campaign.tiers ?? []).flatMap((tier) => (tier.price === null ? [] : [tier.price])))
     : (campaign.fixedBundlePrice ?? 0);
 
   const piecesLabel = (count: number) => fillTemplate(t(count === 1 ? "bundles.piece" : "bundles.pieces"), { count });
@@ -71,7 +83,9 @@ export function BundleCampaignCard({ campaign, className, eager = false }: Bundl
     ? campaign.regularValue !== null && campaign.regularValue > price
       ? fillTemplate(t("bundles.separately"), { price: formatMoney(campaign.regularValue, currency) })
       : null
-    : campaign.valueRange && campaign.valueRange.min > price
+    : isPercentage
+      ? null
+      : campaign.valueRange && campaign.valueRange.min > price
       ? fillTemplate(t("bundles.from_separately"), { price: formatMoney(campaign.valueRange.min, currency) })
       : null;
 
@@ -119,16 +133,17 @@ export function BundleCampaignCard({ campaign, className, eager = false }: Bundl
         <p className="mt-2 text-[15px] font-semibold text-perce-ink" style={{ fontFamily: "var(--font-price)" }}>
           {isCurated
             ? formatMoney(price, currency)
-            : tierSummary
-              ? tierSummary.price
-              : fillTemplate(t("bundle.choose_any"), { count: campaign.requiredQuantity, price: formatMoney(price, currency) })}
+            : percentSummary
+              ? percentSummary.price
+              : tierSummary
+                ? tierSummary.price
+                : fillTemplate(t("bundle.choose_any"), { count: campaign.requiredQuantity, price: formatMoney(price, currency) })}
         </p>
         <p className="mt-0.5 text-[12px] text-perce-ink-muted">
           {isCurated
             ? piecesLabel(campaign.unitCount)
-            : tierSummary
-              ? tierSummary.sizes
-              : fillTemplate(t("bundles.pieces_to_choose"), { count: campaign.eligibleProductCount })}
+            : (percentSummary?.sizes ?? tierSummary?.sizes ??
+              fillTemplate(t("bundles.pieces_to_choose"), { count: campaign.eligibleProductCount }))}
           {separatelyLine && <> · {separatelyLine}</>}
         </p>
         {savingLine && <p className="mt-0.5 text-[12px] font-medium text-perce-success">{savingLine}</p>}

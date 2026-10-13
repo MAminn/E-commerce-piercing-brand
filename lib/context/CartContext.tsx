@@ -21,9 +21,13 @@ import {
 import {
   buildOfferInputs,
   computeCartTotals,
+  planPromo,
+  type CartPromoInput,
   type PricingBundle,
   type PricingRegularLine,
+  type PromoPlan,
 } from "#root/shared/bundles/cart-pricing";
+import { eligibilityFromProductIds } from "#root/shared/pricing/eligible-units";
 import { formatMoney } from "#root/shared/pricing/format-money";
 
 const CART_STORAGE_KEY = "cart";
@@ -55,6 +59,17 @@ export interface PromoCodeInfo {
   /** Human-readable discount, e.g. "10% off". Absent on older cached copies. */
   discountLabel?: string;
   description?: string | null;
+  /** A qualifying code also waives shipping on a deliverable destination. Absent on older cached copies. */
+  freeShipping?: boolean;
+  /** Eligible-UNIT quantity rule (inclusive). Both null/absent = none. */
+  eligibleMinQuantity?: number | null;
+  eligibleMaxQuantity?: number | null;
+  /**
+   * The cart products the server said this code counts and discounts, for
+   * the cart it validated. Absent on older cached copies (treated as "every
+   * product", the old behaviour, until the mount-time re-validation answers).
+   */
+  eligibleProductIds?: string[];
 }
 
 /**
@@ -107,6 +122,10 @@ interface CartContextType {
   ) => CartItem | undefined;
   appliedOffers: AppliedOffer[];
   offerDiscount: number;
+  /** The applied promo code's eligibility outcome for the current cart (eligible units, quantity rule). Null without a code. */
+  promoPlan: PromoPlan | null;
+  /** A qualifying promo code is waiving the shipping charge. */
+  promoFreeShipping: boolean;
   /** Completed Build Your Stack instances — grouped units, never flattened into `items`. */
   bundles: CartBundleInstance[];
   addBundle: (bundle: NewCartBundle) => AddBundleResult;
@@ -164,6 +183,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const shippingRequestSeq = useRef(0);
   const [appliedOffers, setAppliedOffers] = useState<AppliedOffer[]>([]);
   const [offerDiscount, setOfferDiscount] = useState<number>(0);
+  // The applied code's eligible product ids as the server resolved them for
+  // the CURRENT cart (re-validated on every change). Kept apart from
+  // `promoCode` so refreshing it can't re-trigger the validation effect.
+  const [promoEligibility, setPromoEligibility] = useState<{ code: string; productIds: string[] } | null>(null);
 
   useEffect(() => {
     const savedCart = localStorage.getItem(CART_STORAGE_KEY);
@@ -288,18 +311,62 @@ export function CartProvider({ children }: { children: ReactNode }) {
       })),
     [bundles],
   );
-  // What the offers engine / promo validation may see: ordinary lines plus
-  // stackable bundle children at bundle-share prices. Exclusive bundles are
-  // invisible here by design.
-  const offerInputs = useMemo(() => buildOfferInputs(regularLines, pricingBundles), [regularLines, pricingBundles]);
+  // What promo validation may see: ordinary lines plus stackable bundle
+  // children at bundle-share prices (flagged `bundled`, which a set code never
+  // counts). Exclusive bundles are invisible here by design.
+  const promoValidationItems = useMemo(() => {
+    const visible = buildOfferInputs(regularLines, pricingBundles);
+    return visible.cartItems.map((item, index) => ({
+      id: item.id,
+      quantity: item.quantity,
+      price: item.price,
+      bundled: index >= visible.regularLineIndexes.length,
+    }));
+  }, [regularLines, pricingBundles]);
+  const promoValidationSubtotal = useMemo(
+    () => buildOfferInputs(regularLines, pricingBundles).subtotal,
+    [regularLines, pricingBundles],
+  );
 
-  // Derived, not state: recomputes from the latest quote and current offers
-  // every render, so it can never get stuck at 0 after a free-shipping offer
-  // stops applying. While no quote is usable the fee is 0 and
-  // `shippingLine.status` tells the UI to say "calculated at checkout".
+  // The applied code as the SHARED pricing layer consumes it — the same shape
+  // create-order builds from the database, with eligibility as the server
+  // resolved it for this cart.
+  const cartPromo = useMemo<CartPromoInput | null>(() => {
+    if (!promoCode) return null;
+    const eligibleIds =
+      promoEligibility?.code === promoCode.code ? promoEligibility.productIds : promoCode.eligibleProductIds;
+    return {
+      discountType: promoCode.discountType,
+      discountValue: promoCode.discountValue,
+      eligibility: eligibleIds ? eligibilityFromProductIds(eligibleIds) : undefined,
+      quantityRule: {
+        minQuantity: promoCode.eligibleMinQuantity ?? null,
+        maxQuantity: promoCode.eligibleMaxQuantity ?? null,
+      },
+      freeShipping: promoCode.freeShipping ?? false,
+    };
+  }, [promoCode, promoEligibility]);
+  const promoPlan = useMemo(
+    () => (cartPromo ? planPromo(regularLines, pricingBundles, cartPromo) : null),
+    [cartPromo, regularLines, pricingBundles],
+  );
+  const promoFreeShipping = Boolean(cartPromo?.freeShipping && promoPlan?.qualifies);
+
+  // What the offers engine may see: the promo-visible lines MINUS the lines a
+  // qualifying set code owns (one discount per unit — see cart-pricing.ts).
+  const offerInputs = useMemo(
+    () => buildOfferInputs(regularLines, pricingBundles, promoPlan),
+    [regularLines, pricingBundles, promoPlan],
+  );
+
+  // Derived, not state: recomputes from the latest quote, current offers and
+  // the code's qualification every render, so it can never get stuck at 0
+  // after a free-shipping offer or code stops applying. While no quote is
+  // usable the fee is 0 and `shippingLine.status` tells the UI to say
+  // "calculated at checkout"; an unavailable destination stays unavailable.
   const shippingLine = useMemo(
-    () => deriveShippingLine(shippingResponse, appliedOffers),
-    [shippingResponse, appliedOffers],
+    () => deriveShippingLine(shippingResponse, appliedOffers, { promoFreeShipping }),
+    [shippingResponse, appliedOffers, promoFreeShipping],
   );
   const baseShippingFee = shippingLine.baseFee;
   const shipping = shippingLine.fee;
@@ -312,24 +379,28 @@ export function CartProvider({ children }: { children: ReactNode }) {
         regularLines,
         bundles: pricingBundles,
         offerDiscount,
-        promo: promoCode ? { discountType: promoCode.discountType, discountValue: promoCode.discountValue } : null,
+        promo: cartPromo,
         baseShippingFee,
         freeShipping: appliedOffers.some((o) => o.freeShipping),
       }),
-    [regularLines, pricingBundles, offerDiscount, promoCode, baseShippingFee, appliedOffers],
+    [regularLines, pricingBundles, offerDiscount, cartPromo, baseShippingFee, appliedOffers],
   );
   const subtotal = totals.subtotal;
   const discount = totals.promoDiscount;
 
   // Which specific cart line(s) an offer made free, so the UI can show a
   // "FREE" badge on the exact item instead of only an aggregate savings line.
-  // Offer inputs list ordinary lines first, so the first `items.length`
-  // entries line up with `items`; a free unit that lands on a stackable
-  // bundle child is still counted in the discount, just not badged.
-  const freeQuantities = useMemo(
-    () => computeFreeItemQuantities(offerInputs.cartItems, appliedOffers).slice(0, items.length),
-    [offerInputs, appliedOffers, items.length],
-  );
+  // Offer inputs list the (non-owned) ordinary lines first and say which cart
+  // line each came from; a free unit that lands on a stackable bundle child is
+  // still counted in the discount, just not badged.
+  const freeQuantities = useMemo(() => {
+    const free = computeFreeItemQuantities(offerInputs.cartItems, appliedOffers);
+    const byLine = new Array(items.length).fill(0) as number[];
+    offerInputs.regularLineIndexes.forEach((lineIndex, k) => {
+      if (lineIndex < byLine.length) byLine[lineIndex] = free[k] ?? 0;
+    });
+    return byLine;
+  }, [offerInputs, appliedOffers, items.length]);
 
   useEffect(() => {
     if (bundlesHydrated) localStorage.setItem(BUNDLES_STORAGE_KEY, JSON.stringify(bundles));
@@ -337,77 +408,86 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+  }, [items]);
 
-    // Re-check the applied promo code against the new cart. Editing the cart
-    // can invalidate a code (dropping below its minimum, or removing the only
-    // eligible product), and it's far better to surface that here than to let
-    // checkout fail. Only failures act, so this can't loop.
-    const offerVisible = buildOfferInputs(
-      items.map((item) => ({ id: item.id, name: item.name, quantity: item.quantity, price: item.price })),
-      bundles.map((b) => ({
-        instanceId: b.instanceId,
-        offerStacking: b.offerStacking,
-        regularTotal: b.regularTotal,
-        bundleTotal: b.bundlePrice,
-        items: b.items.map((i) => ({ productId: i.productId, name: i.name, quantity: i.quantity, unitPrice: i.unitPrice })),
-      })),
-    );
-    if (promoCode && offerVisible.cartItems.length > 0) {
-      const promoCartItems = offerVisible.cartItems.map((item) => ({
-        id: item.id,
-        quantity: item.quantity,
-        price: item.price,
-      }));
-      const promoSubtotal = offerVisible.subtotal;
-      trpc.promoCode.validate
-        .query({
-          code: promoCode.code,
-          cartItems: promoCartItems,
-          subtotal: promoSubtotal,
-        })
-        .then((result) => {
-          if (!result.success || !result.result) {
-            const reason = promoErrorMessage(result);
-            setPromoCode(null);
-            setPromoCodeNotice(
-              reason
-                ? `Your promo code "${promoCode.code}" was removed: ${reason}`
-                : `Your promo code "${promoCode.code}" no longer applies to your cart and has been removed.`,
-            );
-          }
-        })
-        .catch(() => {
-          /* Network hiccup — leave the code applied; checkout re-validates. */
-        });
-    }
+  // Re-check the applied promo code against the new cart. Editing the cart
+  // can invalidate a code (dropping below its minimum, removing the only
+  // eligible product, or leaving a set code's exact quantity — PICK6 with 5 or
+  // 7 eligible pieces), and it's far better to surface that here than to let
+  // checkout fail. A success refreshes which cart products the code counts,
+  // in separate state, so this can't loop.
+  const promoCodeKey = promoCode?.code ?? null;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed by the code and the cart contents, not the object identity
+  useEffect(() => {
+    if (!promoCode || promoValidationItems.length === 0) return;
+    const code = promoCode.code;
+    let cancelled = false;
+    trpc.promoCode.validate
+      .query({
+        code,
+        cartItems: promoValidationItems,
+        subtotal: promoValidationSubtotal,
+      })
+      .then((result) => {
+        if (cancelled) return;
+        if (!result.success || !result.result) {
+          const reason = promoErrorMessage(result);
+          setPromoCode(null);
+          setPromoEligibility(null);
+          setPromoCodeNotice(
+            reason
+              ? `Your promo code "${code}" was removed: ${reason}`
+              : `Your promo code "${code}" no longer applies to your cart and has been removed.`,
+          );
+          return;
+        }
+        setPromoEligibility({ code, productIds: result.result.eligibleProductIds ?? [] });
+      })
+      .catch(() => {
+        /* Network hiccup — leave the code applied; checkout re-validates. */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [promoCodeKey, promoValidationItems, promoValidationSubtotal]);
 
-    // Re-evaluate automatic offers when cart changes
-    const cartItems = offerVisible.cartItems;
-    const currentSubtotal = offerVisible.subtotal;
-    if (cartItems.length > 0) {
-      trpc.offer.evaluate
-        .query({ cartItems, subtotal: currentSubtotal })
-        .then((result) => {
-          if (result.success && result.result) {
-            setAppliedOffers(result.result);
-            const totalOfferDiscount = result.result.reduce((s, o) => s + o.discountAmount, 0);
-            setOfferDiscount(totalOfferDiscount);
-            // `shipping` derives from `appliedOffers` above — no manual
-            // reset needed here, in either direction.
-          } else {
-            setAppliedOffers([]);
-            setOfferDiscount(0);
-          }
-        })
-        .catch(() => {
-          setAppliedOffers([]);
-          setOfferDiscount(0);
-        });
-    } else {
+  // Re-evaluate automatic offers whenever what they may see changes — the
+  // cart, or which lines a qualifying set code owns.
+  const offerInputsKey = JSON.stringify(offerInputs.cartItems);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed by value so an identical recomputation doesn't refetch
+  useEffect(() => {
+    const cartItems = offerInputs.cartItems;
+    const currentSubtotal = offerInputs.subtotal;
+    if (cartItems.length === 0) {
       setAppliedOffers([]);
       setOfferDiscount(0);
+      return;
     }
-  }, [items, bundles, promoCode]);
+    let cancelled = false;
+    trpc.offer.evaluate
+      .query({ cartItems, subtotal: currentSubtotal })
+      .then((result) => {
+        if (cancelled) return;
+        if (result.success && result.result) {
+          setAppliedOffers(result.result);
+          const totalOfferDiscount = result.result.reduce((s, o) => s + o.discountAmount, 0);
+          setOfferDiscount(totalOfferDiscount);
+          // `shipping` derives from `appliedOffers` above — no manual
+          // reset needed here, in either direction.
+        } else {
+          setAppliedOffers([]);
+          setOfferDiscount(0);
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAppliedOffers([]);
+        setOfferDiscount(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [offerInputsKey]);
 
   // Server-side cart capture — debounced, purely additive, mirrors the
   // localStorage cart into captured_cart so abandoned-cart emails have
@@ -640,20 +720,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       // The code is validated against what it may discount: ordinary lines
       // plus stackable bundle children (exclusive bundles are excluded).
-      const cartItems = offerInputs.cartItems.map((item) => ({
-        id: item.id,
-        quantity: item.quantity,
-        price: item.price,
-      }));
-
       // Use the client directly instead of hooks since we're not in a component context
       const result = await trpc.promoCode.validate.query({
         code,
-        cartItems,
-        subtotal: offerInputs.subtotal,
+        cartItems: promoValidationItems,
+        subtotal: promoValidationSubtotal,
       });
 
       if (result.success && result.result) {
+        setPromoEligibility({ code: result.result.code, productIds: result.result.eligibleProductIds ?? [] });
         setPromoCode(result.result);
         const label =
           result.result.discountLabel ??
@@ -686,6 +761,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const removePromoCode = () => {
     setPromoCode(null);
+    setPromoEligibility(null);
   };
 
   const clearPromoCodeNotice = () => setPromoCodeNotice(null);
@@ -722,6 +798,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         findItemInCart,
         appliedOffers,
         offerDiscount,
+        promoPlan,
+        promoFreeShipping,
         freeQuantities,
         bundles,
         addBundle,
