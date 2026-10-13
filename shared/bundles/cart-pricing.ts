@@ -21,8 +21,11 @@
  *       percentage → % of the eligible value, rounded once to the piaster
  *       fixed      → the amount, capped at the eligible value
  *     — promo codes follow the same offer_stacking policy as offers.
- *  6. shipping             = 0 if an applied offer, or a qualifying promo code
- *                            with free shipping, grants it; else the quoted fee.
+ *  6. shipping             = 0 if a free-shipping Pick Your Set instance, an
+ *                            applied offer, or a qualifying promo code with
+ *                            free shipping grants it; else the quoted fee. It
+ *                            is zeroed ONCE — several free-shipping sources
+ *                            never change the total twice.
  *                            Free shipping only ever zeroes an AVAILABLE quote —
  *                            an undeliverable destination is refused before
  *                            pricing (create-order) and never reaches here.
@@ -89,6 +92,12 @@ export interface PricingBundle {
   regularTotal: number;
   /** Fixed campaign charge for this instance — server-derived. */
   bundleTotal: number;
+  /**
+   * The (server-validated) campaign grants free shipping. Part of the
+   * bundle's own benefit — it applies whatever `offerStacking` says, and
+   * never discounts a single item.
+   */
+  freeShipping?: boolean;
   items: PricingBundleItem[];
 }
 
@@ -277,6 +286,8 @@ export interface CartTotalsInput {
   freeShipping: boolean;
 }
 
+export type FreeShippingSource = "bundle" | "offer" | "promo_code";
+
 export interface CartTotals {
   merchandiseSubtotal: number;
   bundleRegularValue: number;
@@ -292,8 +303,14 @@ export interface CartTotals {
   promoPlan: PromoPlan | null;
   /** A qualifying promo code granted free shipping. */
   promoFreeShipping: boolean;
-  /** Where a zero shipping charge came from, when one applied. */
-  freeShippingSource: "offer" | "promo_code" | null;
+  /** A free-shipping Pick Your Set instance is in the cart. */
+  bundleFreeShipping: boolean;
+  /**
+   * Where a zero shipping charge came from, when one applied. When several
+   * sources qualify the charge is still zeroed once; the bundle is reported
+   * first (the shopper chose it deliberately), then an offer, then a code.
+   */
+  freeShippingSource: FreeShippingSource | null;
   shipping: number;
   total: number;
 }
@@ -337,7 +354,14 @@ export function computeCartTotals(input: CartTotalsInput): CartTotals {
   }
 
   const promoFreeShipping = Boolean(input.promo?.freeShipping && plan?.qualifies);
-  const freeShippingSource = input.freeShipping ? "offer" : promoFreeShipping ? "promo_code" : null;
+  const bundleFreeShipping = input.bundles.some((b) => b.freeShipping === true);
+  const freeShippingSource: FreeShippingSource | null = bundleFreeShipping
+    ? "bundle"
+    : input.freeShipping
+      ? "offer"
+      : promoFreeShipping
+        ? "promo_code"
+        : null;
   const shippingMinor = freeShippingSource ? 0 : toMinorUnits(input.baseShippingFee);
   const goodsMinor = Math.max(0, merchandiseMinor + bundleChargedMinor - offerDiscountMinor - promoDiscountMinor);
 
@@ -352,6 +376,7 @@ export function computeCartTotals(input: CartTotalsInput): CartTotals {
     promoDiscount: fromMinorUnits(promoDiscountMinor),
     promoPlan: plan,
     promoFreeShipping,
+    bundleFreeShipping,
     freeShippingSource,
     shipping: fromMinorUnits(shippingMinor),
     total: fromMinorUnits(goodsMinor + shippingMinor),

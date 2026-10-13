@@ -147,6 +147,11 @@ export interface ValidatedBundle {
   pricingType: BundleCampaignRow["pricingType"];
   /** The matched tier's percentage for a percentage_discount campaign; null for fixed pricing. */
   discountPercent: number | null;
+  /**
+   * The LIVE campaign grants free shipping (Pick Your Set only). Read at
+   * validation time, never from the client, and snapshotted on the order.
+   */
+  freeShipping: boolean;
   requiredQuantity: number;
   offerStacking: BundleCampaignRow["offerStacking"];
   isRepeatable: boolean;
@@ -170,6 +175,8 @@ export interface PublicCampaignSummary {
   maxPerProduct: number | null;
   isRepeatable: boolean;
   offerStacking: BundleCampaignRow["offerStacking"];
+  /** Pick Your Set free shipping (always false for a Ready Set). */
+  freeShipping: boolean;
 }
 
 export type SelectionCheck =
@@ -289,6 +296,7 @@ function summarize(c: BundleCampaignRow, tiers: readonly BundleTier[]): PublicCa
     maxPerProduct: c.maxPerProduct,
     isRepeatable: c.isRepeatable,
     offerStacking: c.offerStacking,
+    freeShipping: c.type === "build_your_stack" && c.freeShipping,
   };
 }
 
@@ -451,6 +459,7 @@ export function validateBundleSelection(input: ValidateBundleSelectionInput): Se
       pricingType: campaign.pricingType,
       discountPercent:
         campaign.pricingType === "percentage_discount" && evaluation.tier ? tierDiscountPercent(evaluation.tier) : null,
+      freeShipping: campaign.type === "build_your_stack" && campaign.freeShipping,
       // The evaluated requirement (for curated stacks: the composition's unit
       // count), so an order snapshot never records a stale column value.
       requiredQuantity: evaluation.requiredQuantity,

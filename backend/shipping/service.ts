@@ -56,7 +56,7 @@ export function buildShippingSnapshot(input: {
   quote: Extract<ShippingQuote, { available: true }>;
   mode: ShippingMode;
   freeShippingApplied: boolean;
-  freeShippingSource?: "offer" | "promo_code" | null;
+  freeShippingSource?: "bundle" | "offer" | "promo_code" | null;
   chargedFee: number;
   rulesUpdatedAt: Date | null;
   now?: Date;

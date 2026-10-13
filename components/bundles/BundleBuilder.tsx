@@ -362,6 +362,7 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
         bundlePrice: check.bundle.bundleTotal,
         offerStacking: check.bundle.offerStacking,
         isRepeatable: check.bundle.isRepeatable,
+        freeShipping: check.bundle.freeShipping,
         items: check.bundle.items.map((item) => ({
           productId: item.productId,
           name: item.name,
@@ -541,6 +542,11 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
             <p className="mt-3 text-[17px] font-medium text-perce-ink" style={{ fontFamily: "var(--font-price)" }}>
               {headline}
             </p>
+            {campaign.freeShipping && (
+              <p className="mt-1 text-[13px] font-medium text-perce-success" data-testid="bundle-free-shipping">
+                {t("bundle.free_shipping")}
+              </p>
+            )}
             {/* ── Tier ladder ──────────────────────────────────────────────
                 The sizes and their prices, stated plainly before the shopper
                 starts choosing. Prices are printed exactly as configured — no
@@ -917,6 +923,9 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
                   <p data-testid="bundle-selected-subtotal">
                     {t("bundle.selected_subtotal")}: {money(regularTotal, currency)}
                   </p>
+                )}
+                {campaign.freeShipping && evaluation.qualifies && (
+                  <p className="font-medium text-perce-success">{t("bundle.free_shipping")}</p>
                 )}
                 {percentBreakdown && percentBreakdown.discount > 0 && (
                   <p className="font-medium text-perce-success" data-testid="bundle-percent-discount">

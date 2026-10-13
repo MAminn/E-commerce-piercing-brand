@@ -472,6 +472,131 @@ describeIfDb("promo set codes + percentage Pick Your Set (integration)", () => {
       ).toThrow(/Ready Set/);
     });
 
+    describe("campaign free shipping", () => {
+      it("OFF (PICK3-style, the default) → normal governorate shipping", async () => {
+        const campaign = await createPercentCampaign();
+        expect(campaign.freeShipping).toBe(false);
+        const created = await place({
+          bundles: [stack(campaign.id, [line(e[5]!), line(e[6]!), line(e[7]!)], 240)],
+          expectedShippingFee: 70,
+        });
+        const row = await loadOrder(created.id);
+        expect(Number(row.shipping)).toBe(70);
+        expect(Number(row.total)).toBe(240 + 70);
+        const [snapshot] = await db.select().from(schema.orderBundle).where(eq(schema.orderBundle.orderId, created.id));
+        expect(snapshot?.freeShipping).toBe(false);
+      });
+
+      it("ON (PICK6-style) → shipping 0 with no promo code, snapshotted and attributed to the set", async () => {
+        const campaign = await createPercentCampaign({ freeShipping: true });
+        expect(campaign.freeShipping).toBe(true);
+        const created = await place({ bundles: [stack(campaign.id, sixEligible(), 913.75)], expectedShippingFee: 0 });
+        const row = await loadOrder(created.id);
+        expect(Number(row.shipping)).toBe(0);
+        expect(Number(row.total)).toBe(913.75);
+        expect(row.shippingQuote).toMatchObject({
+          ruleFee: 70,
+          chargedFee: 0,
+          freeShippingApplied: true,
+          freeShippingSource: "bundle",
+        });
+        const [snapshot] = await db.select().from(schema.orderBundle).where(eq(schema.orderBundle.orderId, created.id));
+        expect(snapshot).toMatchObject({ freeShipping: true, pricingType: "percentage_discount", bundleTotal: "913.75" });
+
+        // Persisted totals equal the shared checkout computation.
+        const checkout = pricing.computeCartTotals({
+          regularLines: [],
+          bundles: [
+            {
+              instanceId: "x",
+              offerStacking: "exclusive",
+              regularTotal: 1075,
+              bundleTotal: 913.75,
+              freeShipping: true,
+              items: [],
+            },
+          ],
+          offerDiscount: 0,
+          promo: null,
+          baseShippingFee: 70,
+          freeShipping: false,
+        });
+        expect(checkout.total.toFixed(2)).toBe(row.total);
+        expect(checkout.shipping.toFixed(2)).toBe(row.shipping);
+        expect(checkout.subtotal.toFixed(2)).toBe(row.subtotal);
+      });
+
+      it("never makes an unavailable governorate deliverable", async () => {
+        const campaign = await createPercentCampaign({ freeShipping: true });
+        const message = await refuse({ bundles: [stack(campaign.id, sixEligible())], shippingGovernorateCode: "SSI" });
+        expect(message).toMatch(/don't deliver/i);
+      });
+
+      it("a set that no longer qualifies (5 of 6 pieces) is refused — no free shipping survives it", async () => {
+        const campaign = await createPercentCampaign({ freeShipping: true });
+        const five = [line(e[0]!), line(e[1]!), line(e[2]!), line(e[3]!), line(e[4]!)];
+        const message = await refuse({ bundles: [stack(campaign.id, five)], expectedShippingFee: 0 });
+        expect(message).toMatch(/isn't one of this set's sizes|not complete/);
+        // The same cart without the set pays the governorate fee.
+        const created = await place({ items: five, expectedShippingFee: 70 });
+        expect(Number((await loadOrder(created.id)).shipping)).toBe(70);
+      });
+
+      it("mixed cart: the whole order ships free, the unrelated ring keeps its full price", async () => {
+        const campaign = await createPercentCampaign({ freeShipping: true });
+        const created = await place({
+          bundles: [stack(campaign.id, sixEligible(), 913.75)],
+          items: [line(ring)],
+          expectedShippingFee: 0,
+        });
+        const row = await loadOrder(created.id);
+        expect(Number(row.subtotal)).toBe(1075 + 200);
+        expect(Number(row.discount)).toBe(161.25);
+        expect(Number(row.shipping)).toBe(0);
+        expect(Number(row.total)).toBe(913.75 + 200);
+      });
+
+      it("a second free-shipping source (code + offer) still zeroes shipping exactly once", async () => {
+        const campaign = await createPercentCampaign({ freeShipping: true });
+        const code = await PICK6();
+        await db.insert(schema.cartOffer).values({
+          name: `${TAG}free-ship-all`,
+          isActive: true,
+          condition: { type: "always" },
+          reward: { type: "free_shipping" },
+        });
+        const created = await place({
+          bundles: [stack(campaign.id, sixEligible(), 913.75)],
+          items: sixEligible(),
+          promoCodeId: code.id,
+          expectedShippingFee: 0,
+        });
+        const row = await loadOrder(created.id);
+        expect(Number(row.shipping)).toBe(0);
+        expect(Number(row.total)).toBe(913.75 + 913.75);
+        expect(row.shippingQuote).toMatchObject({ freeShippingSource: "bundle", chargedFee: 0 });
+      });
+
+      it("is stored off for a Ready Set", async () => {
+        const ready = await Effect.runPromise(
+          bundleService
+            .createBundleCampaign(
+              bundleService.createBundleCampaignSchema.parse({
+                internalName: `${TAG}ready-set`,
+                title: "Ready Set",
+                slug: `${TAG}ready-set`,
+                type: "curated_stack",
+                fixedBundlePrice: 250,
+                freeShipping: true,
+                composition: [{ productId: e[0]!, quantity: 3 }],
+              }),
+            )
+            .pipe(provideDatabase({ db: db as never })),
+        );
+        expect(ready.freeShipping).toBe(false);
+      });
+    });
+
     it("existing fixed-total campaigns keep pricing exactly as before", async () => {
       const fixed = await Effect.runPromise(
         bundleService
@@ -493,7 +618,13 @@ describeIfDb("promo set codes + percentage Pick Your Set (integration)", () => {
       const row = await loadOrder(created.id);
       expect(Number(row.total)).toBe(900 + 70);
       const [snapshot] = await db.select().from(schema.orderBundle).where(eq(schema.orderBundle.orderId, created.id));
-      expect(snapshot).toMatchObject({ pricingType: "fixed_total", discountPercent: null, bundleTotal: "900.00" });
+      expect(fixed.freeShipping).toBe(false);
+      expect(snapshot).toMatchObject({
+        pricingType: "fixed_total",
+        discountPercent: null,
+        bundleTotal: "900.00",
+        freeShipping: false,
+      });
     });
   });
 

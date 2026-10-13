@@ -435,6 +435,13 @@
       "when": 1791881125915,
       "tag": "0061_pick_set_percentage_promo_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1791884915724,
+      "tag": "0062_bundle_free_shipping",
+      "breakpoints": true
     }
   ]
 }

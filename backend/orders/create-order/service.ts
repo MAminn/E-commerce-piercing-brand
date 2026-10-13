@@ -713,6 +713,9 @@ export const createOrder = (
             offerStacking: b.offerStacking,
             regularTotal: b.regularTotal,
             bundleTotal: b.bundleTotal,
+            // From the live campaign the server just validated — a set that
+            // no longer qualifies was already rejected above.
+            freeShipping: b.freeShipping,
             items: b.items.map((item) => ({
               productId: item.productId,
               name: item.name,
@@ -1136,6 +1139,7 @@ export const createOrder = (
                 // between fixed and percentage pricing can't reword history.
                 pricingType: b.pricingType,
                 discountPercent: b.discountPercent === null ? null : b.discountPercent.toFixed(2),
+                freeShipping: b.freeShipping,
                 offerStacking: b.offerStacking,
               })
               .returning();

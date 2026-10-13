@@ -693,10 +693,12 @@ export function ProductPagePremium({
                 )}
               </div>
 
-              {/* Shipping transparency (display-only) */}
-              <p className='mb-3 sm:mb-5 text-[11px] sm:text-xs text-stone-400 tracking-wide'>
-                + EGP 45 standard shipping · Free above EGP 300
-              </p>
+              {/* No shipping teaser here. A hardcoded "+ EGP 45 standard
+                  shipping · Free above EGP 300" line used to sit under the
+                  price; neither figure was backed by anything — shipping is
+                  priced per governorate at checkout and there is no global
+                  free-shipping threshold. Shipping policy copy lives in the
+                  admin-authored Shipping & Returns content. */}
 
               {/* Availability */}
               <div className='mb-3 sm:mb-5 flex items-center gap-2'>

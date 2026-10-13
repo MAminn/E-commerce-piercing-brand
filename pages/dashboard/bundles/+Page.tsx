@@ -46,6 +46,11 @@ const money = (n: number) => formatMoney(n, { currency: STORE_CURRENCY, alwaysSh
  * and one price describe it.
  */
 function ruleSummary(c: BundleCampaign): string {
+  const base = ruleSummaryBase(c);
+  return c.freeShipping ? `${base} · free shipping` : base;
+}
+
+function ruleSummaryBase(c: BundleCampaign): string {
   const price = c.fixedBundlePrice === null ? "—" : money(c.fixedBundlePrice);
   if (c.pricingType === "percentage_discount" && c.type !== "curated_stack") {
     // "3 at 20% off · 6 at 15% off from 40" — the percentage IS the price.

@@ -117,6 +117,11 @@ function BundleHeading({ group }: { group: BundleGroup<AdminOrderItem> }) {
             {bundleTierLabel(bundle)}
           </Badge>
         )}
+        {bundle.freeShipping && (
+          <Badge variant='outline' className='text-[10px]'>
+            Free shipping
+          </Badge>
+        )}
         {bundle.offerStacking === "stackable" && (
           <Badge variant='outline' className='text-[10px]'>
             Stackable

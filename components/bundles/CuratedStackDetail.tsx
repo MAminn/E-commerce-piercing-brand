@@ -79,6 +79,7 @@ export function CuratedStackDetail({ campaign, reload }: CuratedStackDetailProps
         bundlePrice: check.bundle.bundleTotal,
         offerStacking: check.bundle.offerStacking,
         isRepeatable: check.bundle.isRepeatable,
+        freeShipping: check.bundle.freeShipping,
         items: check.bundle.items.map((item) => ({
           productId: item.productId,
           name: item.name,

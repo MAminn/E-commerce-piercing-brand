@@ -45,6 +45,12 @@ export interface CartBundleInstance {
   regularTotal: number;
   offerStacking: BundleOfferStacking;
   isRepeatable: boolean;
+  /**
+   * The campaign grants free shipping, as the server last reported it.
+   * Display only: CartContext refreshes it from the server, and create-order
+   * re-reads the live campaign. Absent on carts saved before this existed.
+   */
+  freeShipping?: boolean;
   items: CartBundleInstanceItem[];
   /** ISO timestamp — lets the cart show/sort stacks and helps debugging. */
   addedAt: string;
@@ -146,6 +152,9 @@ function parseInstance(raw: unknown): CartBundleInstance | null {
     regularTotal: isMoney(raw.regularTotal) ? raw.regularTotal : bundleRegularTotal(validItems),
     offerStacking,
     isRepeatable: raw.isRepeatable === true,
+    // Only carried when on, so an instance stored before this field existed
+    // round-trips unchanged; absent means off everywhere it is read.
+    ...(raw.freeShipping === true ? { freeShipping: true } : {}),
     items: validItems,
     addedAt: typeof raw.addedAt === "string" ? raw.addedAt : new Date(0).toISOString(),
   };

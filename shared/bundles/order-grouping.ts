@@ -55,6 +55,8 @@ export interface OrderBundleSnapshot {
   pricingType?: "fixed_total" | "percentage_discount";
   /** Snapshotted percentage of a percentage-priced tier (decimal string), else null. */
   discountPercent?: string | null;
+  /** Snapshot: this instance's campaign waived shipping. Absent/false on older orders. */
+  freeShipping?: boolean;
   offerStacking: "exclusive" | "stackable";
 }
 

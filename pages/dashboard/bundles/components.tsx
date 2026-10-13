@@ -441,6 +441,8 @@ export interface CampaignFormState {
   maxPerProduct: string;
   isRepeatable: boolean;
   offerStacking: "exclusive" | "stackable";
+  /** Pick Your Set only: a qualifying set waives the order's shipping. */
+  freeShipping: boolean;
   sortOrder: string;
   startsAt: string;
   endsAt: string;
@@ -481,6 +483,7 @@ export const emptyCampaignForm: CampaignFormState = {
   maxPerProduct: "",
   isRepeatable: false,
   offerStacking: "exclusive",
+  freeShipping: false,
   sortOrder: "0",
   startsAt: "",
   endsAt: "",
@@ -544,6 +547,7 @@ export function campaignToForm(c: BundleCampaign): CampaignFormState {
     maxPerProduct: c.maxPerProduct === null ? "" : String(c.maxPerProduct),
     isRepeatable: c.isRepeatable,
     offerStacking: c.offerStacking,
+    freeShipping: isCurated ? false : c.freeShipping,
     sortOrder: String(c.sortOrder),
     startsAt: toLocalInputValue(c.startsAt),
     endsAt: toLocalInputValue(c.endsAt),
@@ -575,6 +579,7 @@ export type CampaignPayload = {
   maxPerProduct: number | null;
   isRepeatable: boolean;
   offerStacking: "exclusive" | "stackable";
+  freeShipping: boolean;
   sortOrder: number;
   startsAt: Date | null;
   endsAt: Date | null;
@@ -742,6 +747,7 @@ export function buildCampaignPayload(form: CampaignFormState): { payload: Campai
       maxPerProduct,
       isRepeatable: form.isRepeatable,
       offerStacking: form.offerStacking,
+      freeShipping: isCurated ? false : form.freeShipping,
       sortOrder,
       startsAt,
       endsAt,
@@ -1616,6 +1622,17 @@ export function CampaignFormDialog({
                         : "Exclusive is the safe default."}
                     </p>
                   </div>
+                </div>
+                <div className="flex items-start justify-between gap-3 rounded-md border p-3">
+                  <div>
+                    <Label>Free shipping</Label>
+                    <p className="text-xs text-muted-foreground">
+                      A completed set makes the whole order ship free — only to governorates you already deliver to;
+                      it never makes an unavailable destination deliverable. Works with fixed and percentage pricing
+                      and needs no promo code. Off: normal governorate shipping.
+                    </p>
+                  </div>
+                  <Switch checked={form.freeShipping} onCheckedChange={(v) => update("freeShipping", v)} />
                 </div>
               </section>
 

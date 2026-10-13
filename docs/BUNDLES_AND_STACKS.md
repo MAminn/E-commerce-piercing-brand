@@ -1343,6 +1343,13 @@ a percentage set cannot be `stackable`. `order_bundle` snapshots
 percentage, the discount amount and the set total live. Full rules, including
 the stacking and sale-price rules: `docs/PROMOTIONS_PRICING_RULES.md`.
 
+Campaign free shipping (migration `0062_bundle_free_shipping`):
+`bundle_campaign.free_shipping` (default false; Pick Your Set only — Ready Sets
+are stored false). A validated instance carries the LIVE campaign's flag into
+`computeCartTotals`, which zeroes an available shipping quote once; the order
+snapshots it on `order_bundle.free_shipping` and as
+`shipping_quote.freeShippingSource = "bundle"`.
+
 ## Not built (genuinely post-Bundles work)
 
 - Behavioural/funnel analytics for bundles (bundle page views, builder started,

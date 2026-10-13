@@ -27,6 +27,7 @@ export type BundleCardCampaign = Pick<
   | "heroImageUrl"
   | "type"
   | "pricingType"
+  | "freeShipping"
   | "availability"
   | "requiredQuantity"
   | "unitCount"
@@ -147,6 +148,9 @@ export function BundleCampaignCard({ campaign, className, eager = false }: Bundl
           {separatelyLine && <> · {separatelyLine}</>}
         </p>
         {savingLine && <p className="mt-0.5 text-[12px] font-medium text-perce-success">{savingLine}</p>}
+        {!isCurated && campaign.freeShipping && (
+          <p className="mt-0.5 text-[12px] font-medium text-perce-success">{t("bundle.free_shipping")}</p>
+        )}
 
         {/* A sold-out stack still links through: seeing what is in it (and
             that it is sold out) is more useful than a dead control. No

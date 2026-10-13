@@ -32,11 +32,12 @@ export function deriveShippingLine(
   response: ShippingQuoteResponse | null | undefined,
   appliedOffers: readonly { freeShipping: boolean }[],
   /**
-   * A qualifying promo code with free shipping (e.g. PICK6). Like an offer it
-   * only ever zeroes an AVAILABLE quote: an unavailable destination stays
-   * unavailable, and a pending quote stays pending.
+   * A qualifying promo code with free shipping (e.g. PICK6), or a
+   * free-shipping Pick Your Set in the cart. Like an offer it only ever
+   * zeroes an AVAILABLE quote: an unavailable destination stays unavailable,
+   * and a pending quote stays pending.
    */
-  options: { promoFreeShipping?: boolean } = {},
+  options: { promoFreeShipping?: boolean; bundleFreeShipping?: boolean } = {},
 ): ShippingLine {
   if (!response) return { status: "pending", fee: 0, baseFee: 0 };
   const { quote } = response;
@@ -46,7 +47,11 @@ export function deriveShippingLine(
     }
     return { status: "pending", fee: 0, baseFee: 0 };
   }
-  const fee = options.promoFreeShipping ? 0 : deriveEffectiveShipping(quote.amount, appliedOffers);
+  // Zeroed once, whichever (and however many) free-shipping sources qualify.
+  const fee =
+    options.promoFreeShipping || options.bundleFreeShipping
+      ? 0
+      : deriveEffectiveShipping(quote.amount, appliedOffers);
   return {
     status: "quoted",
     baseFee: quote.amount,

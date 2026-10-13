@@ -249,6 +249,7 @@ export const viewOrders = (
                     bundleTotal: orderBundle.bundleTotal,
                     pricingType: orderBundle.pricingType,
                     discountPercent: orderBundle.discountPercent,
+                    freeShipping: orderBundle.freeShipping,
                     offerStacking: orderBundle.offerStacking,
                     createdAt: orderBundle.createdAt,
                   })

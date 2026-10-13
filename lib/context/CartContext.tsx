@@ -126,6 +126,8 @@ interface CartContextType {
   promoPlan: PromoPlan | null;
   /** A qualifying promo code is waiving the shipping charge. */
   promoFreeShipping: boolean;
+  /** A free-shipping Pick Your Set in the cart is waiving the shipping charge. */
+  bundleFreeShipping: boolean;
   /** Completed Build Your Stack instances — grouped units, never flattened into `items`. */
   bundles: CartBundleInstance[];
   addBundle: (bundle: NewCartBundle) => AddBundleResult;
@@ -307,10 +309,47 @@ export function CartProvider({ children }: { children: ReactNode }) {
         offerStacking: b.offerStacking,
         regularTotal: b.regularTotal,
         bundleTotal: b.bundlePrice,
+        freeShipping: b.freeShipping === true,
         items: b.items.map((i) => ({ productId: i.productId, name: i.name, quantity: i.quantity, unitPrice: i.unitPrice })),
       })),
     [bundles],
   );
+  const bundleFreeShipping = pricingBundles.some((b) => b.freeShipping === true);
+
+  // A set's free shipping is the LIVE campaign's, not whatever was saved
+  // when it entered the cart: re-check every instance with the server when
+  // the sets in the cart change (added, removed, restored on page load). A set
+  // that no longer validates loses the benefit here — checkout would refuse
+  // it anyway — and create-order re-reads the campaign regardless.
+  const bundleKey = bundles.map((b) => `${b.instanceId}:${b.campaignId}`).join("|");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed by the set of instances, not their (refreshed) flags
+  useEffect(() => {
+    if (!bundlesHydrated || bundles.length === 0) return;
+    let cancelled = false;
+    Promise.all(
+      bundles.map((b) =>
+        trpc.bundle.evaluateSelection
+          .query({
+            campaignId: b.campaignId,
+            items: b.items.map((i) => ({ productId: i.productId, quantity: i.quantity, selectedOptions: i.selectedOptions })),
+          })
+          .then((res) => [b.instanceId, res.success && res.result?.ok ? res.result.bundle.freeShipping : false] as const)
+          .catch(() => [b.instanceId, b.freeShipping === true] as const),
+      ),
+    ).then((answers) => {
+      if (cancelled) return;
+      const live = new Map(answers);
+      setBundles((prev) => {
+        const changed = prev.some((b) => live.has(b.instanceId) && live.get(b.instanceId) !== (b.freeShipping === true));
+        return changed
+          ? prev.map((b) => (live.has(b.instanceId) ? { ...b, freeShipping: live.get(b.instanceId) === true } : b))
+          : prev;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [bundleKey, bundlesHydrated]);
   // What promo validation may see: ordinary lines plus stackable bundle
   // children at bundle-share prices (flagged `bundled`, which a set code never
   // counts). Exclusive bundles are invisible here by design.
@@ -365,8 +404,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // usable the fee is 0 and `shippingLine.status` tells the UI to say
   // "calculated at checkout"; an unavailable destination stays unavailable.
   const shippingLine = useMemo(
-    () => deriveShippingLine(shippingResponse, appliedOffers, { promoFreeShipping }),
-    [shippingResponse, appliedOffers, promoFreeShipping],
+    () => deriveShippingLine(shippingResponse, appliedOffers, { promoFreeShipping, bundleFreeShipping }),
+    [shippingResponse, appliedOffers, promoFreeShipping, bundleFreeShipping],
   );
   const baseShippingFee = shippingLine.baseFee;
   const shipping = shippingLine.fee;
@@ -800,6 +839,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         offerDiscount,
         promoPlan,
         promoFreeShipping,
+        bundleFreeShipping,
         freeQuantities,
         bundles,
         addBundle,

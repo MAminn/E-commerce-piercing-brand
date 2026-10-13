@@ -126,8 +126,19 @@ six further loose pieces gets one discount on each group.
 * A qualifying code with **Free shipping** (`promo_code.free_shipping`)
   zeroes an *available* quote for the whole order. PICK3 without it pays the
   normal governorate fee.
+* A **Pick Your Set** campaign with **Free shipping**
+  (`bundle_campaign.free_shipping`, migration `0062`, default off) does the
+  same whenever a valid instance of it is in the cart — fixed or percentage
+  pricing, no code needed. It is part of the set's own benefit, so it applies
+  even though percentage sets are exclusive; it never discounts an item, and
+  unrelated items in the cart keep their price. Ready Sets are kept out of
+  scope (always stored off): a curated stack is a single fixed-price product
+  in the cart, and the requirement was the shopper-built set.
+* Several free-shipping sources (set, offer, code) zero the fee **once**; the
+  total never changes twice.
 * The order snapshot records who waived the fee:
-  `shipping_quote.freeShippingSource = "offer" | "promo_code"`.
+  `shipping_quote.freeShippingSource = "bundle" | "offer" | "promo_code"`
+  (bundle reported first), and `order_bundle.free_shipping` marks the set.
 * The checkout sends the fee it displayed (`expectedShippingFee`); a mismatch
   is a 409, so a cart that lost PICK6 can't silently be charged shipping it
   never saw (and vice versa).
@@ -138,7 +149,8 @@ six further loose pieces gets one discount on each group.
 | --- | --- |
 | Code applied | `promoCode.validate`: status, dates, limits, minimum, eligible units, quantity rule |
 | Cart quantity change / item removed / item added | `CartContext` re-validates the code (removed with a reason if PICK6 drops to 5 or rises to 7) and re-evaluates offers on the non-owned lines |
-| Governorate change | new quote; promo free shipping only zeroes an available one |
+| Governorate change | new quote; promo / set free shipping only zeroes an available one |
+| Set added / removed / cart restored | `CartContext` re-checks every set with `bundle.evaluateSelection` and takes its free-shipping flag from the live campaign |
 | Checkout start (page load) | saved code re-validated against the saved cart |
 | Order creation | everything above, again, from the database, inside the transaction; totals recomputed |
 
@@ -166,7 +178,8 @@ Nothing creates or activates these campaigns. When ready, in **Promo Codes**:
 | Applicability | the single-piece categories/products | same |
 | Excluded products | the fixed 3-piece sets | same |
 
-…or, for the browse-and-pick experience, a **Pick Your Set** campaign in
-*Percentage discount* mode with tiers 3 → 20% and 6 → 15% (pool without the
-3-piece sets). Note a set's free shipping is not a bundle feature — PICK6's
-free shipping comes from the code (or an automatic offer).
+…or, for the browse-and-pick experience, **Pick Your Set** campaigns in
+*Percentage discount* mode (pool without the 3-piece sets): a 3-piece / 20%
+campaign with Free shipping **off**, and a 6-piece / 15% campaign with Free
+shipping **on**. Free shipping is per campaign, so PICK3 and PICK6 are two
+campaigns if only one of them ships free.

@@ -137,6 +137,13 @@ export const createBundleCampaignSchema = z
     maxPerProduct: z.number().int().min(1).max(100).nullable().optional(),
     isRepeatable: z.boolean().default(false),
     offerStacking: z.enum(["exclusive", "stackable"]).default("exclusive"),
+    /**
+     * Pick Your Set only: a qualifying instance waives shipping for the
+     * order (deliverable destinations only). Ignored — stored false — for a
+     * Ready Set: a curated stack is one fixed price and the scope of this
+     * benefit is the shopper-built set.
+     */
+    freeShipping: z.boolean().default(false),
     sortOrder: z.number().int().min(0).default(0),
     startsAt: z.coerce.date().nullable().optional(),
     endsAt: z.coerce.date().nullable().optional(),
@@ -407,6 +414,8 @@ export interface BundleCampaignDto {
   maxPerProduct: number | null;
   isRepeatable: boolean;
   offerStacking: BundleCampaignRow["offerStacking"];
+  /** Pick Your Set: a qualifying instance waives the order's shipping (deliverable destinations only). Always false for a Ready Set. */
+  freeShipping: boolean;
   sortOrder: number;
   startsAt: Date | null;
   endsAt: Date | null;
@@ -627,6 +636,7 @@ function toDto(
     maxPerProduct: config.maxPerProduct,
     isRepeatable: c.isRepeatable,
     offerStacking: c.offerStacking,
+    freeShipping: c.type === "build_your_stack" && c.freeShipping,
     sortOrder: c.sortOrder,
     startsAt: c.startsAt,
     endsAt: c.endsAt,
@@ -1199,6 +1209,7 @@ export const createBundleCampaign = (input: CreateBundleCampaignInput) =>
                 maxPerProduct: !isCurated && input.allowDuplicates ? (input.maxPerProduct ?? null) : null,
                 isRepeatable: input.isRepeatable,
                 offerStacking: input.offerStacking,
+                freeShipping: isCurated ? false : input.freeShipping,
                 eligibilityMode,
                 eligibilityMinPrice:
                   eligibilityRules.minPrice === null ? null : eligibilityRules.minPrice.toFixed(2),
@@ -1372,6 +1383,7 @@ export const updateBundleCampaign = (input: UpdateBundleCampaignInput) =>
       maxPerProduct: isCurated ? null : patch.maxPerProduct !== undefined ? patch.maxPerProduct : existing.row.maxPerProduct,
       isRepeatable: patch.isRepeatable ?? existing.row.isRepeatable,
       offerStacking: patch.offerStacking ?? existing.row.offerStacking,
+      freeShipping: isCurated ? false : (patch.freeShipping ?? existing.row.freeShipping),
       sortOrder: patch.sortOrder ?? existing.row.sortOrder,
       startsAt: patch.startsAt !== undefined ? patch.startsAt : existing.row.startsAt,
       endsAt: patch.endsAt !== undefined ? patch.endsAt : existing.row.endsAt,

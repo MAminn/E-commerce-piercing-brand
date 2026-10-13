@@ -1856,6 +1856,16 @@ export const bundleCampaign = pgTable(
     isRepeatable: boolean("is_repeatable").notNull().default(false),
     offerStacking: bundleCampaignOfferStacking("offer_stacking").notNull().default("exclusive"),
     /**
+     * Pick Your Set (build_your_stack) only: a qualifying instance of this
+     * campaign waives the shipping charge of the WHOLE order — for a
+     * destination that is already deliverable; it never makes an unavailable
+     * governorate deliverable. Part of the bundle's own benefit, so it needs
+     * no offer or promo code (and works for exclusive/percentage sets).
+     * Default false: every existing campaign keeps normal shipping. Ready
+     * Sets are always stored false.
+     */
+    freeShipping: boolean("free_shipping").notNull().default(false),
+    /**
      * Build Your Stack only. Existing campaigns default to `manual`, which is
      * exactly their Phase 1-3 behaviour.
      */
@@ -2127,6 +2137,8 @@ export const orderBundle = pgTable(
     pricingType: bundleCampaignPricingType("pricing_type").notNull().default("fixed_total"),
     /** Snapshotted percentage of a percentage_discount tier; null for fixed-total bundles. */
     discountPercent: decimal("discount_percent", { precision: 5, scale: 2 }),
+    /** Snapshot: this instance's campaign granted free shipping at purchase. False on every older order. */
+    freeShipping: boolean("free_shipping").notNull().default(false),
     offerStacking: bundleCampaignOfferStacking("offer_stacking").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
       .defaultNow()

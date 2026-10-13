@@ -38,6 +38,7 @@ const campaign = (overrides: Partial<BundleCampaignRow> = {}): BundleCampaignRow
   maxPerProduct: null,
   isRepeatable: false,
   offerStacking: "exclusive",
+  freeShipping: false,
   eligibilityMode: "manual",
   eligibilityMinPrice: null,
   eligibilityMaxPrice: null,
