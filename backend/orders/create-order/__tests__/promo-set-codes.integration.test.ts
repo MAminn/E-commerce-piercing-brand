@@ -670,6 +670,156 @@ describeIfDb("promo set codes + percentage Pick Your Set (integration)", () => {
     });
   });
 
+  // ─── Final order path: attribution, usage, stock, rollback ──────────────
+
+  describe("final order path", () => {
+    const stockOf = async (ids: string[]) => {
+      const rows = await db
+        .select({ id: schema.product.id, stock: schema.product.stock })
+        .from(schema.product)
+        .where(inArray(schema.product.id, ids));
+      return Object.fromEntries(rows.map((r) => [r.id, r.stock]));
+    };
+    const usedCount = async (id: string) =>
+      (await db.select().from(schema.promoCode).where(eq(schema.promoCode.id, id)))[0]!.usedCount;
+
+    it("a qualifying PICK6 order: server totals, attribution, usage +1 exactly, stock −qty exactly", async () => {
+      const code = await PICK6();
+      const touched = [e[0]!, e[1]!, e[2]!, e[3]!, e[4]!, ring];
+      const before = await stockOf(touched);
+
+      // The client sends ids, quantities, the code id and the fee it showed —
+      // no prices, no discount, no totals.
+      const created = await place({
+        items: [...sixEligible(), line(ring)],
+        promoCodeId: code.id,
+        expectedShippingFee: 0,
+      });
+      const row = await loadOrder(created.id);
+
+      // Eligible subtotal 1,075 → 15% = 161.25; ring 200 untouched; Cairo 70 waived.
+      expect(row.subtotal).toBe("1275.00");
+      expect(row.discount).toBe("161.25");
+      expect(row.shipping).toBe("0.00");
+      expect(row.total).toBe("1113.75");
+      expect(row.promoCodeId).toBe(code.id);
+      expect(row.shippingQuote).toMatchObject({ ruleFee: 70, chargedFee: 0, freeShippingSource: "promo_code" });
+      expect(await usedCount(code.id)).toBe(1);
+
+      const after = await stockOf(touched);
+      expect(after[e[4]!]).toBe(before[e[4]!]! - 2);
+      for (const id of [e[0]!, e[1]!, e[2]!, e[3]!, ring]) expect(after[id]).toBe(before[id]! - 1);
+
+      // Order lines: one row per product line, regular prices snapshotted.
+      const lines = await db.select().from(schema.orderItem).where(eq(schema.orderItem.orderId, created.id));
+      expect(lines).toHaveLength(6);
+      expect(lines.reduce((s, l) => s + l.quantity, 0)).toBe(7);
+    });
+
+    it("an ineligible order (5 of 6) consumes no usage and no stock", async () => {
+      const code = await PICK6();
+      const five = [line(e[0]!), line(e[1]!), line(e[2]!), line(e[3]!), line(e[4]!)];
+      const before = await stockOf(e.slice(0, 5));
+      await refuse({ items: five, promoCodeId: code.id });
+      expect(await usedCount(code.id)).toBe(0);
+      expect(await stockOf(e.slice(0, 5))).toEqual(before);
+    });
+
+    it("a failure AFTER the code was accepted (shipping drift 409) rolls back usage and stock", async () => {
+      const code = await PICK6();
+      const before = await stockOf(e.slice(0, 5));
+      const message = await refuse({ items: sixEligible(), promoCodeId: code.id, expectedShippingFee: 70 });
+      expect(message).toMatch(/Shipping fee changed/);
+      expect(await usedCount(code.id)).toBe(0);
+      expect(await stockOf(e.slice(0, 5))).toEqual(before);
+      const orders = await db.select().from(schema.order).where(eq(schema.order.promoCodeId, code.id));
+      expect(orders).toHaveLength(0);
+    });
+
+    it("a set and a loose unit of the SAME product decrement its stock once each, never twice", async () => {
+      const campaign = await Effect.runPromise(
+        bundleService
+          .createBundleCampaign(
+            bundleService.createBundleCampaignSchema.parse({
+              internalName: `${TAG}stock-set`,
+              title: "Stock Set",
+              slug: `${TAG}stock-set`,
+              isActive: true,
+              pricingType: "percentage_discount",
+              allowDuplicates: true,
+              tiers: [{ quantity: 3, discountPercent: 20 }],
+              eligibleProductIds: e,
+            }),
+          )
+          .pipe(provideDatabase({ db: db as never })),
+      );
+      const before = await stockOf([e[5]!]);
+      await place({
+        bundles: [
+          {
+            instanceId: "inst-stock",
+            campaignId: campaign.id,
+            items: [line(e[5]!, 3)],
+          },
+        ],
+        items: [line(e[5]!, 1)],
+      });
+      expect((await stockOf([e[5]!]))[e[5]!]).toBe(before[e[5]!]! - 4);
+    });
+
+    it("dropping from qualifying to non-qualifying before ordering removes the benefit", async () => {
+      const code = await PICK6();
+      const fiveEligible = [line(e[0]!), line(e[1]!), line(e[2]!), line(e[3]!), line(e[4]!)];
+      // With the code still attached the server refuses rather than discounting.
+      expect(await refuse({ items: fiveEligible, promoCodeId: code.id })).toMatch(/exactly 6/);
+      // The same cart without the code is ordinary: full price + Cairo shipping.
+      const created = await place({ items: fiveEligible, expectedShippingFee: 70 });
+      const row = await loadOrder(created.id);
+      expect(row.discount).toBeNull();
+      expect(row.shipping).toBe("70.00");
+      expect(row.total).toBe((875 + 70).toFixed(2));
+      expect(await usedCount(code.id)).toBe(0);
+    });
+
+    it("a qualifying exclusive set + an unrelated loose-item promotion keep the existing stacking semantics", async () => {
+      const campaign = await Effect.runPromise(
+        bundleService
+          .createBundleCampaign(
+            bundleService.createBundleCampaignSchema.parse({
+              internalName: `${TAG}stacking-set`,
+              title: "Stacking Set",
+              slug: `${TAG}stacking-set`,
+              isActive: true,
+              pricingType: "percentage_discount",
+              allowDuplicates: true,
+              tiers: [{ quantity: 6, discountPercent: 15 }],
+              eligibleProductIds: e,
+            }),
+          )
+          .pipe(provideDatabase({ db: db as never })),
+      );
+      // An ordinary all-products 10% code and an always-on 10% offer: both may
+      // discount the loose ring; neither may touch the exclusive set.
+      const plain = await createSetCode("PLAIN10B", { percent: 10, exact: null, freeShipping: false, allProducts: true });
+      await db.insert(schema.cartOffer).values({
+        name: `${TAG}always-10`,
+        isActive: true,
+        condition: { type: "always" },
+        reward: { type: "percentage_off", percentOff: 10 },
+      });
+      const created = await place({
+        bundles: [{ instanceId: "inst-stack", campaignId: campaign.id, items: sixEligible(), expectedBundleTotal: 913.75 }],
+        items: [line(ring)],
+        promoCodeId: plain.id,
+      });
+      const row = await loadOrder(created.id);
+      // Set savings 161.25; offer 10% of 200 = 20; code 10% of (200 − 20) = 18.
+      expect(row.discount).toBe((161.25 + 20 + 18).toFixed(2));
+      expect(row.total).toBe((913.75 + 200 - 20 - 18 + 70).toFixed(2));
+      expect(await usedCount(plain.id)).toBe(1);
+    });
+  });
+
   // ─── Regressions ─────────────────────────────────────────────────────────
 
   it("an ordinary all-products percentage code still discounts the whole cart", async () => {

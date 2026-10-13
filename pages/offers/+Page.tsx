@@ -15,6 +15,7 @@ import type {
 } from "#root/shared/database/drizzle/schema";
 import { AuthContext } from "#root/context/AuthContext.js";
 import { formatMoney } from "#root/shared/pricing/format-money";
+import { OFFERS_PAGE_EMPTY_COPY, offersPageState } from "#root/components/offers/offersPageState";
 
 
 interface ActiveOffer {
@@ -128,6 +129,8 @@ export default function OffersPage() {
     };
   }, []);
 
+  const pageState = offersPageState({ offers: offers.length, promoCodes: promoCodes.length });
+
   const handleCopyCode = async (code: string) => {
     try {
       await navigator.clipboard.writeText(code);
@@ -189,11 +192,13 @@ export default function OffersPage() {
           <div className='flex items-center justify-center py-16'>
             <Loader2 className='w-6 h-6 animate-spin text-perce-ink-subtle' />
           </div>
-        ) : offers.length === 0 ? (
-          <p className='text-sm text-perce-ink-subtle py-8'>
-            {isAr ? "لا توجد عروض نشطة حالياً." : "No active offers right now."}
+        ) : pageState.showGlobalEmpty ? (
+          // Only when there is no promotion of ANY type on this page — never
+          // above a list of active promo codes.
+          <p className='text-sm text-perce-ink-subtle py-8' data-testid='offers-empty'>
+            {isAr ? OFFERS_PAGE_EMPTY_COPY.ar : OFFERS_PAGE_EMPTY_COPY.en}
           </p>
-        ) : (
+        ) : !pageState.showOffers ? null : (
           <div className='space-y-4 lg:space-y-5'>
             {offers.map((offer, idx) => {
               const isUnlocked = appliedOffers.some((a) => a.name === offer.name);
@@ -258,7 +263,7 @@ export default function OffersPage() {
         )}
 
         {/* Active promo codes */}
-        {promoCodes.length > 0 && (
+        {!isLoading && pageState.showPromoCodes && (
           <div className='mt-10 lg:mt-14 border border-perce-line rounded-lg bg-perce-surface p-4 sm:p-5 lg:p-8'>
             <div className='flex items-center gap-2 mb-1'>
               <Tag className='w-4 h-4 lg:w-5 lg:h-5 text-perce-ink-secondary' />

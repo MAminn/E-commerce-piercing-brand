@@ -153,7 +153,7 @@ export const MinimalOrderEmailTemplate = ({
                 Shipping
               </Column>
               <Column style={summaryValue}>
-                {fmt(shippingFees)}
+                {shippingFees === 0 ? "Free" : fmt(shippingFees)}
               </Column>
             </Row>
             <Row style={totalRow}>

@@ -8,6 +8,8 @@ import {
   computeOfferSavingsTotal,
 } from "./AppliedOffersSavings";
 import { formatMoney } from "#root/shared/pricing/format-money";
+import { useCouponFeedback } from "#root/components/template-system/useCouponFeedback";
+import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 
 /**
  * CartPageMinimalTemplate
@@ -33,10 +35,9 @@ export function CartPageMinimalTemplate({
 }: CartPageModernTemplateProps) {
   const [couponCode, setCouponCode] = React.useState("");
   const [isApplyingCoupon, setIsApplyingCoupon] = React.useState(false);
-  const [couponFeedback, setCouponFeedback] = React.useState<{
-    success: boolean;
-    message: string;
-  } | null>(null);
+  const { t } = useMinimalI18n();
+  // Cleared automatically when CartContext drops the code (see the hook).
+  const [couponFeedback, setCouponFeedback] = useCouponFeedback(appliedCoupon?.code, couponNotice);
 
   const handleApplyCoupon = async () => {
     const code = couponCode.trim();
@@ -495,11 +496,13 @@ export function CartPageMinimalTemplate({
                       <span>Shipping</span>
                       <span>Calculated at checkout</span>
                     </div>
-                  ) : totals.shipping != null && totals.shipping > 0 ? (
-                    <div className="flex justify-between text-[13px] text-perce-ink-secondary">
+                  ) : totals.shipping != null ? (
+                    <div className="flex justify-between text-[13px] text-perce-ink-secondary" data-testid="shipping-line">
                       <span>Shipping</span>
                       <span>
-                        {formatMoney(totals.shipping, { currency })}
+                        {/* 0 means a free-shipping benefit (or a zero-rate
+                            zone) — say so rather than dropping the row. */}
+                        {totals.shipping === 0 ? t("cart.free") || "Free" : formatMoney(totals.shipping, { currency })}
                       </span>
                     </div>
                   ) : null}

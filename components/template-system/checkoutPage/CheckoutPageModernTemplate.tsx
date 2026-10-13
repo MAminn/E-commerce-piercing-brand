@@ -26,6 +26,7 @@ import {
   AppliedOffersSavings,
 } from "#root/components/template-system/cartPage/AppliedOffersSavings";
 import { formatMoney } from "#root/shared/pricing/format-money";
+import { useCouponFeedback } from "#root/components/template-system/useCouponFeedback";
 
 /**
  * Customer information interface
@@ -224,10 +225,8 @@ export function CheckoutPageModernTemplate({
 
   const [couponCode, setCouponCode] = useState("");
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
-  const [couponFeedback, setCouponFeedback] = useState<{
-    success: boolean;
-    message: string;
-  } | null>(null);
+  // Cleared automatically when CartContext drops the code (see the hook).
+  const [couponFeedback, setCouponFeedback] = useCouponFeedback(appliedCoupon?.code, couponNotice);
 
   const handleApplyCoupon = async () => {
     const code = couponCode.trim();

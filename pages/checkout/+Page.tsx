@@ -24,6 +24,7 @@ import { useTracking } from "#root/frontend/contexts/TrackingContext";
 import { TrackingEventName } from "#root/shared/types/pixel-tracking";
 import { getCartSessionToken } from "#root/lib/cart-session";
 import { formatMoney } from "#root/shared/pricing/format-money";
+import { summaryShippingAmount } from "#root/shared/shipping/checkout-shipping";
 
 /** Parse a Zod validation error (JSON array) into a friendly message */
 function parseOrderError(error: unknown): string {
@@ -69,7 +70,6 @@ export default function CheckoutPage() {
     totalItems,
     subtotal,
     discount,
-    shipping,
     total,
     promoCode,
     clearCart,
@@ -244,10 +244,10 @@ export default function CheckoutPage() {
     return {
       subtotal: bundles.length > 0 ? merchandiseSubtotal + bundleChargedValue : subtotal,
       discount: discount > 0 ? discount : undefined,
-      // Unchanged rule: a numeric line only for a non-zero fee (a
-      // free-shipping offer is announced by AppliedOffersSavings instead).
-      // shippingStatus tells the templates when to render status text.
-      shipping: shipping > 0 ? shipping : undefined,
+      // A fee waived by a set, a promo code or an offer is 0 — rendered
+      // "Free" — never omitted (summaryShippingAmount). shippingStatus tells
+      // the templates when to render pending / unavailable text instead.
+      shipping: summaryShippingAmount(shippingLine, shippingMode),
       shippingStatus: shippingLine.status,
       shippingLoading: isShippingQuoteLoading,
       grandTotal: total,
@@ -259,8 +259,8 @@ export default function CheckoutPage() {
     bundleChargedValue,
     bundles.length,
     discount,
-    shipping,
     shippingLine,
+    shippingMode,
     isShippingQuoteLoading,
     total,
     appliedOffers,

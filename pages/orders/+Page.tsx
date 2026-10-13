@@ -270,7 +270,10 @@ export default function OrderHistoryPage() {
                         <div className='flex justify-between text-perce-ink-muted'>
                           <span>Shipping</span>
                           <span>
-                            {formatMoney(Number.parseFloat(order.shipping))}
+                            {/* A waived fee reads "Free", not "EGP 0.00". */}
+                            {Number.parseFloat(order.shipping) === 0
+                              ? "Free"
+                              : formatMoney(Number.parseFloat(order.shipping))}
                           </span>
                         </div>
                         <div className='flex justify-between font-semibold text-perce-ink pt-1'>

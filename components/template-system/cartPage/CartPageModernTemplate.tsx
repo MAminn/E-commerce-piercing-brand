@@ -17,6 +17,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
+import { useCouponFeedback } from "#root/components/template-system/useCouponFeedback";
 
 /**
  * Cart item interface
@@ -116,10 +117,8 @@ export function CartPageModernTemplate({
 }: CartPageModernTemplateProps) {
   const [couponCode, setCouponCode] = React.useState("");
   const [isApplyingCoupon, setIsApplyingCoupon] = React.useState(false);
-  const [couponFeedback, setCouponFeedback] = React.useState<{
-    success: boolean;
-    message: string;
-  } | null>(null);
+  // Cleared automatically when CartContext drops the code (see the hook).
+  const [couponFeedback, setCouponFeedback] = useCouponFeedback(appliedCoupon?.code, couponNotice);
   const { t } = useMinimalI18n();
 
   const handleApplyCoupon = async () => {

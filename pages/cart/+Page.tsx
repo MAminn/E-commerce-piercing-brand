@@ -13,6 +13,7 @@ import type {
 import type { CartPageBundleGroup } from "#root/components/template-system/cartPage/CartBundleGroup";
 import { navigate } from "vike/client/router";
 import { formatMoney } from "#root/shared/pricing/format-money";
+import { summaryShippingAmount } from "#root/shared/shipping/checkout-shipping";
 
 export default function CartPage() {
   const {
@@ -28,8 +29,8 @@ export default function CartPage() {
     removePromoCode,
     promoCodeNotice,
     clearPromoCodeNotice,
-    shipping,
     shippingLine,
+    shippingMode,
     appliedOffers,
     freeQuantities,
     bundles,
@@ -104,15 +105,16 @@ export default function CartPage() {
     return {
       subtotal,
       discount: discount > 0 ? discount : undefined,
-      shipping: shipping > 0 ? shipping : undefined,
-      // No destination is known on the cart page, so in zones mode the fee
-      // is "pending" and the templates say "Calculated at checkout".
+      // A waived fee is 0 here (rendered "Free"), never omitted — see
+      // summaryShippingAmount. No destination is known on the cart page, so
+      // in zones mode the fee is "pending" ("Calculated at checkout").
+      shipping: summaryShippingAmount(shippingLine, shippingMode),
       shippingStatus: shippingLine.status,
       grandTotal: total,
       appliedOffers: appliedOffers.length > 0 ? appliedOffers : undefined,
       bundleSavings: bundleSavings !== 0 ? bundleSavings : undefined,
     };
-  }, [subtotal, discount, shipping, shippingLine.status, total, appliedOffers, bundleSavings]);
+  }, [subtotal, discount, shippingLine, shippingMode, total, appliedOffers, bundleSavings]);
 
   // Handle quantity change
   const handleQuantityChange = (
