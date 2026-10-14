@@ -5,6 +5,7 @@ describe("offers page empty state", () => {
   it("no offers + no promo codes → the global empty state", () => {
     expect(offersPageState({ offers: 0, promoCodes: 0 })).toEqual({
       showGlobalEmpty: true,
+      showSets: false,
       showOffers: false,
       showPromoCodes: false,
     });
@@ -13,6 +14,7 @@ describe("offers page empty state", () => {
   it("no automatic offers + an active promo code → no misleading 'no offers' message", () => {
     expect(offersPageState({ offers: 0, promoCodes: 2 })).toEqual({
       showGlobalEmpty: false,
+      showSets: false,
       showOffers: false,
       showPromoCodes: true,
     });
@@ -21,6 +23,7 @@ describe("offers page empty state", () => {
   it("automatic offer only", () => {
     expect(offersPageState({ offers: 1, promoCodes: 0 })).toEqual({
       showGlobalEmpty: false,
+      showSets: false,
       showOffers: true,
       showPromoCodes: false,
     });
@@ -29,8 +32,18 @@ describe("offers page empty state", () => {
   it("both present", () => {
     expect(offersPageState({ offers: 3, promoCodes: 1 })).toEqual({
       showGlobalEmpty: false,
+      showSets: false,
       showOffers: true,
       showPromoCodes: true,
+    });
+  });
+
+  it("a live Pick Your Set alone is enough to fill the page", () => {
+    expect(offersPageState({ sets: 2, offers: 0, promoCodes: 0 })).toEqual({
+      showGlobalEmpty: false,
+      showSets: true,
+      showOffers: false,
+      showPromoCodes: false,
     });
   });
 

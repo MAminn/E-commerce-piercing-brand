@@ -1,8 +1,8 @@
 import { z } from "zod";
 import {
+  adminProcedure,
   publicProcedure,
   router,
-  protectedProcedure,
 } from "#root/shared/trpc/server";
 import { getHomepageContent } from "./get-homepage-content";
 import { updateHomepageContent } from "./update-homepage-content";
@@ -291,7 +291,10 @@ export const homepageRouter = router({
       };
     }),
 
-  updateContent: protectedProcedure
+  // Admin only. This was protectedProcedure with no role check, so any
+  // signed-in customer could overwrite the whole homepage CMS document
+  // (hero, legal pages, merchandising) through the tRPC endpoint.
+  updateContent: adminProcedure
     .input(
       z.object({
         merchantId: z.string().uuid(),
@@ -311,7 +314,7 @@ export const homepageRouter = router({
       };
     }),
 
-  uploadHeroImage: protectedProcedure
+  uploadHeroImage: adminProcedure
     .input(
       z.object({
         file: z.object({
@@ -356,7 +359,7 @@ export const homepageRouter = router({
       }
     }),
 
-  uploadMobileHeroImage: protectedProcedure
+  uploadMobileHeroImage: adminProcedure
     .input(
       z.object({
         file: z.object({

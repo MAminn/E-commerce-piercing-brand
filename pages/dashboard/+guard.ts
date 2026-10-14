@@ -1,22 +1,21 @@
 import { redirect } from "vike/abort";
-import { isSingleShopMode } from "#root/shared/config/app";
+import { isAdminRole } from "#root/shared/auth/roles";
 
+/**
+ * Every /dashboard page inherits this guard. Only admins and superadmins get
+ * in, whatever SINGLE_SHOP_MODE says: the multi-vendor branch that used to
+ * let any non-"user" role through (e.g. a "vendor") failed open if the env
+ * flag was ever missing. This store has no vendor dashboard.
+ *
+ * This is the page-level gate only — every admin tRPC procedure and REST
+ * route enforces the role again server-side.
+ */
 export async function guard(pageContext: Vike.PageContext) {
   if (!pageContext.clientSession) {
     throw redirect("/login");
   }
 
-  // In single-shop mode, only admins (and superadmins) can access dashboard
-  if (
-    isSingleShopMode() &&
-    pageContext.clientSession.role !== "admin" &&
-    pageContext.clientSession.role !== "superadmin"
-  ) {
-    throw redirect("/");
-  }
-
-  // In multi-vendor mode, redirect users with 'user' role to the homepage
-  if (!isSingleShopMode() && pageContext.clientSession.role === "user") {
+  if (!isAdminRole(pageContext.clientSession.role)) {
     throw redirect("/");
   }
 }

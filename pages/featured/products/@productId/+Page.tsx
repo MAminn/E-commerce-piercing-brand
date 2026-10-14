@@ -187,6 +187,9 @@ export default function ProductDetailPage() {
         imageUrl: product.images?.[0]?.url ?? undefined,
         images: product.images ?? [],
         categoryName: product.categoryName ?? null,
+        // Every category the product is in — the decision summary and the
+        // "No piercing needed" fact read these (never the title).
+        categories: product.categories ?? [],
         features: [],
         specifications: [],
         available: (product.stock || 0) > 0,
@@ -276,6 +279,7 @@ export default function ProductDetailPage() {
       onAddToCart={(
         product: ProductPageProduct,
         selectedOptions?: Record<string, string>,
+        quantity = 1,
       ) => {
         // The cart line's price is the chosen configuration's price — the
         // effective price plus the selected option modifiers — resolved with
@@ -300,7 +304,9 @@ export default function ProductDetailPage() {
             categoryName: product.categoryName ?? undefined,
             available: product.available,
           },
-          1, // quantity
+          // The template's quantity stepper. It used to be hardcoded to 1, so
+          // choosing 3 on the Premium page still added one piece.
+          Math.max(1, Math.floor(quantity)),
           resolved.ok ? resolved.selectedOptions : selectedOptions || {},
         );
 
@@ -308,13 +314,13 @@ export default function ProductDetailPage() {
           trackEvent(TrackingEventName.PRODUCT_ADDED_TO_CART, {
             ecommerce: {
               currency: STORE_CURRENCY,
-              value: linePrice,
+              value: linePrice * Math.max(1, Math.floor(quantity)),
               items: [
                 {
                   itemId: product.id,
                   itemName: product.name,
                   price: linePrice,
-                  quantity: 1,
+                  quantity: Math.max(1, Math.floor(quantity)),
                   category: product.categoryName ?? undefined,
                 },
               ],

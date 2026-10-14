@@ -44,6 +44,7 @@ function Page() {
   const [categories, setCategories] = useState<CategoryStripItem[]>([]);
   const [newArrivals, setNewArrivals] = useState<NewArrivalProduct[]>([]);
   const [bundleCampaigns, setBundleCampaigns] = useState<BundleCardCampaign[]>([]);
+  const [setCampaigns, setSetCampaigns] = useState<BundleCardCampaign[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [newArrivalsLoading, setNewArrivalsLoading] = useState(true);
@@ -177,8 +178,10 @@ function Page() {
     const fetchNewArrivals = async () => {
       setNewArrivalsLoading(true);
       try {
+        // 16, not 8: the template removes pieces already shown in Featured
+        // (distinctRails) and caps the rail at 8 afterwards.
         const searchParams: Record<string, any> = {
-          limit: 8,
+          limit: 16,
           sortBy: "newest" as const,
           includeOutOfStock: true,
         };
@@ -268,12 +271,35 @@ function Page() {
     homepageContent.bundles?.bestSellingPeriodDays,
   ]);
 
+  // Every live Pick Your Set campaign, for the selling block under the hero.
+  // Independent of the CMS rail selection below (which now carries Ready Sets
+  // only): a live public set offer is never hidden from the homepage.
+  useEffect(() => {
+    if (homepageContent.bundles?.enabled === false) {
+      setSetCampaigns([]);
+      return;
+    }
+    let cancelled = false;
+    trpc.bundle.listLive
+      .query({ type: "build_your_stack" })
+      .then((result) => {
+        if (!cancelled) setSetCampaigns(result.success && result.result ? result.result : []);
+      })
+      .catch((err) => {
+        console.error("Error loading Pick Your Set campaigns:", err);
+        if (!cancelled) setSetCampaigns([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [homepageContent.bundles?.enabled]);
+
   // Fetch discounted products (products with discountPrice < price)
   useEffect(() => {
     const fetchDiscounted = async () => {
       try {
         const searchParams: Record<string, any> = {
-          limit: 8,
+          limit: 16,
           discountedOnly: true,
           includeOutOfStock: false,
         };
@@ -340,6 +366,7 @@ function Page() {
     newArrivals,
     newArrivalsLoading,
     bundleCampaigns,
+    setCampaigns,
     onCtaClick: (link: string) => {
       window.location.href = link;
     },

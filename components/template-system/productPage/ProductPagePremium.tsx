@@ -9,7 +9,8 @@ import type {
 } from "./ProductPageModernSplit";
 import type { FeaturedProduct } from "../home/HomeFeaturedProducts";
 import {
-  ShoppingCart,
+  ShoppingBag,
+  Banknote,
   Heart,
   Star,
   StarHalf,
@@ -19,13 +20,17 @@ import {
   ChevronLeft,
   ChevronRight,
   Truck,
-  Shield,
-  RotateCcw,
   ChevronDown,
   ZoomIn,
 } from "lucide-react";
 import { showCartToast } from "#root/components/ui/cart-toast";
 import { trpc } from "#root/shared/trpc/client";
+import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
+import { useWishlist } from "#root/lib/hooks/useWishlist";
+import { formatMoney } from "#root/shared/pricing/format-money";
+import { fillTemplate } from "#root/components/bundles/bundle-ui";
+import { cn } from "#root/lib/utils";
+import { ProductDecisionSummary } from "./ProductDecisionSummary";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -37,6 +42,7 @@ export interface ProductPagePremiumProps {
   onAddToCart?: (
     product: ProductPageProduct,
     selectedOptions?: Record<string, string>,
+    quantity?: number,
   ) => void;
   onAddToWishlist?: (product: ProductPageProduct) => void;
   onImageClick?: (imageUrl: string, index: number) => void;
@@ -400,12 +406,13 @@ function MobileImageCarousel({
   images,
   onOpenLightbox,
   hasDiscount,
-  discountPct,
+  saveLabel,
 }: {
   images: ProductImage[];
   onOpenLightbox: (index: number) => void;
   hasDiscount: boolean;
   discountPct: number;
+  saveLabel: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [activeIdx, setActiveIdx] = useState(0);
@@ -423,9 +430,9 @@ function MobileImageCarousel({
     <div className='relative -mx-4 sm:hidden'>
       {/* Sale badge */}
       {hasDiscount && (
-        <div className='absolute left-4 top-3.5 z-10'>
+        <div className='absolute start-4 top-3.5 z-10'>
           <span className='inline-block bg-stone-800 px-2.5 py-1 text-[10px] font-medium tracking-widest text-white uppercase'>
-            Save {discountPct}%
+            {saveLabel}
           </span>
         </div>
       )}
@@ -443,7 +450,7 @@ function MobileImageCarousel({
             onClick={() => onOpenLightbox(i)}>
             <img
               src={img.url}
-              alt={`Product image ${i + 1}`}
+              alt=''
               className='w-full aspect-square object-cover'
               loading={i === 0 ? "eager" : "lazy"}
             />
@@ -477,6 +484,17 @@ function MobileImageCarousel({
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
+/**
+ * Purchase-first hierarchy: gallery → category → name → price → stock →
+ * decision summary → options → quantity + Add to bag → reassurance, and only
+ * then the long-form Description / Specifications / Shipping & Returns / Care
+ * Guide. The short description used to sit above the quantity and Add to Bag
+ * controls, pushing them below the first useful phone viewport; it now opens
+ * the Description section instead (shown once, never duplicated).
+ *
+ * Standalone purchase is always available here, whether or not the product
+ * also belongs to a Pick Your Set campaign.
+ */
 export function ProductPagePremium({
   product = DEFAULT_PRODUCT,
   relatedProducts,
@@ -487,6 +505,8 @@ export function ProductPagePremium({
   isLoading = false,
   className = "",
 }: ProductPagePremiumProps) {
+  const { t, locale } = useMinimalI18n();
+  const { toggle: toggleWishlist, isWishlisted } = useWishlist();
   // ── Image state
   const images: ProductImage[] = product.images?.length
     ? product.images
@@ -510,8 +530,13 @@ export function ProductPagePremium({
       .query()
       .then((res) => {
         if (cancelled || !res.success || !res.result) return;
-        setShippingText(res.result.shippingText?.trim() ?? "");
-        setReturnsText(res.result.returnsText?.trim() ?? "");
+        const isAr = locale === "ar";
+        setShippingText(
+          ((isAr && res.result.shippingTextAr) || res.result.shippingText)?.trim() ?? "",
+        );
+        setReturnsText(
+          ((isAr && res.result.returnsTextAr) || res.result.returnsText)?.trim() ?? "",
+        );
       })
       .catch(() => {
         // No policy copy available — the section simply stays hidden rather
@@ -520,7 +545,28 @@ export function ProductPagePremium({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [locale]);
+
+  // ── Sticky Add to bag (phones): only once the main button has scrolled out
+  // of view, so the page never shows two Add to bag buttons at once.
+  const addToBagRef = useRef<HTMLButtonElement>(null);
+  const [showSticky, setShowSticky] = useState(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-observe when the button remounts (skeleton → product, product → product)
+  useEffect(() => {
+    const btn = addToBagRef.current;
+    if (!btn || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        // Only once it has gone ABOVE the viewport — not while the shopper is
+        // still looking at the gallery and the button is below the fold.
+        if (entry) setShowSticky(!entry.isIntersecting && entry.boundingClientRect.top < 0);
+      },
+      { threshold: 0 },
+    );
+    observer.observe(btn);
+    return () => observer.disconnect();
+  }, [product.id, isLoading]);
 
   const currentImage = images[selectedIdx] || images[0];
 
@@ -539,6 +585,7 @@ export function ProductPagePremium({
   const displayPrice = hasDiscount
     ? Number(product.discountPrice)
     : product.price;
+  const money = (amount: number) => formatMoney(amount, { locale: locale === "ar" ? "ar" : "en" });
 
   const [selectedVariants, setSelectedVariants] = useState<
     Record<string, string>
@@ -548,22 +595,32 @@ export function ProductPagePremium({
     !product.variants?.length ||
     product.variants.every((v) => selectedVariants[v.name]);
 
+  const inStock = product.available && product.stock > 0;
+  const canAdd = inStock && allVariantsSelected;
+  const wishlisted = isWishlisted(product.id);
+
   // ── Handlers
   const handleAddToCart = () => {
+    if (!canAdd) return;
     // IMPORTANT: invoke parent first so the Meta Pixel `AddToCart` event
-    // fires upstream BEFORE the visual toast is shown.
-    onAddToCart?.(product, selectedVariants);
+    // fires upstream BEFORE the visual toast is shown. The chosen quantity
+    // travels with it — it used to be dropped, so the stepper did nothing.
+    onAddToCart?.(product, selectedVariants, quantity);
     showCartToast({
       name: product.name,
-      price: hasDiscount
-        ? Number(product.discountPrice)
-        : Number(product.price),
+      price: displayPrice,
       imageUrl: product.imageUrl || product.images?.[0]?.url || "",
     });
   };
-  const handleWishlist = () => onAddToWishlist?.(product);
+  const handleWishlist = () => {
+    toggleWishlist(product.id);
+    onAddToWishlist?.(product);
+  };
 
   if (isLoading) return <Skeleton />;
+
+  const longCopy = product.longDescription?.trim();
+  const shortCopy = product.description?.trim();
 
   return (
     <div className={`product-page-premium bg-white ${className}`}>
@@ -573,13 +630,13 @@ export function ProductPagePremium({
           <a
             href='/'
             className='shrink-0 transition-colors hover:text-stone-600'>
-            Home
+            {t("product.home")}
           </a>
           <span className='text-stone-300'>/</span>
           <a
             href='/shop'
             className='shrink-0 transition-colors hover:text-stone-600'>
-            Collection
+            {t("product.shop")}
           </a>
           {product.categoryName && (
             <>
@@ -605,9 +662,11 @@ export function ProductPagePremium({
                   onOpenLightbox={(idx) => {
                     setSelectedIdx(idx);
                     setLightboxOpen(true);
+                    onImageClick?.(images[idx]?.url ?? "", idx);
                   }}
                   hasDiscount={hasDiscount}
                   discountPct={discountPct}
+                  saveLabel={fillTemplate(t("product.save_pct"), { percent: discountPct })}
                 />
               )}
 
@@ -618,9 +677,9 @@ export function ProductPagePremium({
                   <div className='relative'>
                     {/* Sale badge */}
                     {hasDiscount && (
-                      <div className='absolute left-3.5 top-3.5 z-10'>
+                      <div className='absolute start-3.5 top-3.5 z-10'>
                         <span className='inline-block bg-stone-800 px-2.5 py-1 text-[10px] font-medium tracking-widest text-white uppercase'>
-                          Save {discountPct}%
+                          {fillTemplate(t("product.save_pct"), { percent: discountPct })}
                         </span>
                       </div>
                     )}
@@ -640,6 +699,7 @@ export function ProductPagePremium({
                         key={i}
                         type='button'
                         onClick={() => setSelectedIdx(i)}
+                        aria-label={`${product.name} ${i + 1}`}
                         className={`relative aspect-square w-17 shrink-0 overflow-hidden transition-all duration-200 ${
                           selectedIdx === i
                             ? "ring-1 ring-stone-800 ring-offset-1"
@@ -647,7 +707,7 @@ export function ProductPagePremium({
                         }`}>
                         <img
                           src={img.url}
-                          alt={`Thumbnail ${i + 1}`}
+                          alt=''
                           className='absolute inset-0 h-full w-full object-cover'
                         />
                       </button>
@@ -658,22 +718,22 @@ export function ProductPagePremium({
             </div>
 
             {/* ── RIGHT: Product Info Column (5/12) ── */}
-            <div className='lg:sticky lg:top-8 lg:col-span-5 flex flex-col pt-0 lg:pt-0'>
+            <div className='lg:sticky lg:top-8 lg:col-span-5 flex flex-col'>
               {/* Category */}
               {product.categoryName && (
-                <span className='mb-2.5 text-[11px] font-normal uppercase tracking-[0.18em] text-stone-400'>
+                <span className='mb-2 text-[11px] font-normal uppercase tracking-[0.18em] text-stone-500'>
                   {product.categoryName}
                 </span>
               )}
 
               {/* Title */}
-              <h1 className='mb-2 sm:mb-3 text-[1.3rem] font-light leading-[1.3] tracking-wide text-stone-900 sm:text-[1.75rem] lg:text-[1.85rem]'>
+              <h1 className='mb-2 text-[1.35rem] font-light leading-[1.3] tracking-wide text-stone-900 sm:text-[1.75rem] lg:text-[1.85rem]'>
                 {product.name}
               </h1>
 
               {/* Rating */}
               {product.rating !== undefined && product.rating > 0 && (
-                <div className='mb-4'>
+                <div className='mb-3'>
                   <StarRating
                     rating={product.rating}
                     count={product.reviewCount}
@@ -682,13 +742,13 @@ export function ProductPagePremium({
               )}
 
               {/* Price */}
-              <div className='mb-1 flex items-baseline gap-2.5'>
-                <span className='text-base sm:text-lg font-light tracking-wide text-stone-900'>
-                  EGP {Number(displayPrice).toFixed(2)}
+              <div className='mb-1.5 flex items-baseline gap-2.5'>
+                <span className='text-lg sm:text-xl font-normal tracking-wide text-stone-900'>
+                  {money(displayPrice)}
                 </span>
                 {hasDiscount && (
-                  <span className='text-[12px] sm:text-[13px] text-stone-400 line-through'>
-                    EGP {Number(product.price).toFixed(2)}
+                  <span className='text-[13px] text-stone-400 line-through'>
+                    {money(product.price)}
                   </span>
                 )}
               </div>
@@ -701,33 +761,15 @@ export function ProductPagePremium({
                   admin-authored Shipping & Returns content. */}
 
               {/* Availability */}
-              <div className='mb-3 sm:mb-5 flex items-center gap-2'>
-                {product.available && product.stock > 0 ? (
-                  <>
-                    <span className='h-1.5 w-1.5 rounded-full bg-emerald-500' />
-                    <span className='text-[12px] tracking-wide text-stone-500'>
-                      In Stock
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span className='h-1.5 w-1.5 rounded-full bg-stone-300' />
-                    <span className='text-[12px] tracking-wide text-stone-400'>
-                      Out of Stock
-                    </span>
-                  </>
-                )}
+              <div className='mb-4 flex items-center gap-2'>
+                <span className={cn("h-1.5 w-1.5 rounded-full", inStock ? "bg-emerald-500" : "bg-stone-300")} />
+                <span className={cn("text-[12px] tracking-wide", inStock ? "text-stone-600" : "text-stone-400")}>
+                  {inStock ? t("in_stock") : t("out_of_stock")}
+                </span>
               </div>
 
-              {/* Divider */}
-              <div className='mb-3 sm:mb-5 h-px bg-stone-200' />
-
-              {/* Short Description */}
-              {product.description && (
-                <p className='mb-4 sm:mb-6 text-[13px] sm:text-[14px] leading-[1.75] sm:leading-[1.85] text-stone-500'>
-                  {product.description}
-                </p>
-              )}
+              {/* Decision summary — short, real product facts only */}
+              <ProductDecisionSummary product={product} className='mb-4 border-y border-stone-200 py-3' />
 
               {/* Variant Selector */}
               {product.variants && product.variants.length > 0 && (
@@ -742,17 +784,18 @@ export function ProductPagePremium({
               )}
 
               {/* Quantity + Add to Bag row */}
-              <div className='mb-4 flex flex-col gap-2.5 sm:flex-row sm:items-center'>
+              <div className='mb-3 flex items-stretch gap-2'>
                 {/* Quantity */}
-                <div className='flex h-12 items-center rounded-lg border border-stone-200/80'>
+                <div className='flex h-12 shrink-0 items-center border border-stone-300'>
                   <button
                     type='button'
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    disabled={quantity <= 1}
-                    className='flex h-full w-10 items-center justify-center rounded-l-lg text-stone-400 transition-colors hover:bg-stone-50 hover:text-stone-600 disabled:opacity-25'>
-                    <Minus size={13} />
+                    disabled={quantity <= 1 || !inStock}
+                    aria-label={t("product.decrease")}
+                    className='flex h-full w-10 items-center justify-center text-stone-600 transition-colors hover:bg-stone-50 disabled:opacity-30'>
+                    <Minus size={14} />
                   </button>
-                  <span className='flex h-full w-10 items-center justify-center border-x border-stone-200/80 text-[13px] font-light text-stone-700'>
+                  <span className='flex h-full w-9 items-center justify-center text-[14px] tabular-nums text-stone-800' aria-live='polite'>
                     {quantity}
                   </span>
                   <button
@@ -760,75 +803,84 @@ export function ProductPagePremium({
                     onClick={() =>
                       setQuantity(Math.min(product.stock, quantity + 1))
                     }
-                    disabled={quantity >= product.stock}
-                    className='flex h-full w-10 items-center justify-center rounded-r-lg text-stone-400 transition-colors hover:bg-stone-50 hover:text-stone-600 disabled:opacity-25'>
-                    <Plus size={13} />
+                    disabled={quantity >= product.stock || !inStock}
+                    aria-label={t("product.increase")}
+                    className='flex h-full w-10 items-center justify-center text-stone-600 transition-colors hover:bg-stone-50 disabled:opacity-30'>
+                    <Plus size={14} />
                   </button>
                 </div>
 
                 {/* Add to Bag */}
                 <button
+                  ref={addToBagRef}
                   type='button'
                   onClick={handleAddToCart}
-                  disabled={
-                    !product.available ||
-                    product.stock === 0 ||
-                    !allVariantsSelected
-                  }
-                  className='flex h-12 p-4 flex-1 items-center justify-center gap-2.5 rounded-lg bg-stone-800 text-[11.5px] font-normal uppercase tracking-[0.18em] text-stone-100 transition-colors duration-200 hover:bg-stone-700 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400'>
-                  <ShoppingCart size={14} strokeWidth={1.5} />
-                  Add to Bag
+                  disabled={!canAdd}
+                  data-add-to-cart='true'
+                  className='flex h-12 min-w-0 flex-1 items-center justify-center gap-2 bg-stone-900 px-4 text-[13px] font-medium tracking-wide text-white transition-colors duration-200 hover:bg-stone-700 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400'>
+                  <ShoppingBag size={16} strokeWidth={1.75} />
+                  {inStock ? t("product.add_to_bag") : t("out_of_stock")}
                 </button>
 
-                {/* Wishlist */}
+                {/* Wishlist — secondary */}
                 {showWishlist && (
                   <button
                     type='button'
                     onClick={handleWishlist}
-                    className='flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-stone-200/80 text-stone-350 transition-colors duration-200 hover:border-stone-300 hover:text-stone-500'>
-                    <Heart size={15} strokeWidth={1.5} />
+                    aria-pressed={wishlisted}
+                    aria-label={t("product.wishlist")}
+                    className={cn(
+                      "flex h-12 w-12 shrink-0 items-center justify-center border transition-colors duration-200",
+                      wishlisted
+                        ? "border-stone-800 text-stone-900"
+                        : "border-stone-300 text-stone-500 hover:border-stone-500 hover:text-stone-700",
+                    )}>
+                    <Heart size={16} strokeWidth={1.5} className={cn(wishlisted && "fill-current")} />
                   </button>
                 )}
               </div>
 
-              {/* Trust indicators — only claims this store can actually
-                  stand behind. The row previously also promised "Free
-                  Shipping" and "30-Day Returns"; neither is an established
-                  policy here, and both were inherited template copy. Add
-                  shipping/returns wording from Dashboard > Settings and it
-                  appears in the accordion below instead. */}
-              <div className='mb-5 sm:mb-7 flex flex-wrap items-center gap-3 sm:gap-5 border-t border-stone-100 pt-4 sm:pt-5'>
-                <div className='flex items-center gap-1.5'>
-                  <Shield size={13} className='text-stone-400' />
-                  <span className='text-[10px] sm:text-[11px] tracking-wide text-stone-400'>
-                    Secure Checkout
-                  </span>
-                </div>
-              </div>
+              {/* Purchase reassurance — store facts only: cash on delivery is
+                  always offered (shared/config/payment.ts) and every shipping
+                  destination is an Egyptian governorate. No invented free
+                  shipping or return windows. */}
+              <ul className='mb-6 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[12px] text-stone-500' data-testid='purchase-reassurance'>
+                <li className='flex items-center gap-1.5'>
+                  <Banknote size={14} className='text-stone-400' aria-hidden />
+                  {t("product.reassure_cod")}
+                </li>
+                <li className='flex items-center gap-1.5'>
+                  <Truck size={14} className='text-stone-400' aria-hidden />
+                  {t("product.reassure_delivery")}
+                </li>
+              </ul>
 
               {/* SKU */}
               {product.sku && (
-                <p className='mb-7 text-[11px] tracking-wide text-stone-300'>
+                <p className='mb-5 text-[11px] tracking-wide text-stone-400'>
                   SKU: {product.sku}
                 </p>
               )}
 
-              {/* ── Accordion Information Sections ── */}
-              <div className='border-t border-stone-200'>
-                <AccordionSection title='Description' defaultOpen>
-                  <div className='whitespace-pre-line'>
-                    {product.longDescription || product.description || "—"}
-                  </div>
-                </AccordionSection>
+              {/* ── Long-form information, after the purchase decision ── */}
+              <div className='border-t border-stone-200' data-testid='product-details'>
+                {(shortCopy || longCopy) && (
+                  <AccordionSection title={t("product.description")} defaultOpen>
+                    <div className='space-y-3 whitespace-pre-line'>
+                      {shortCopy && <p>{shortCopy}</p>}
+                      {longCopy && longCopy !== shortCopy && <p>{longCopy}</p>}
+                    </div>
+                  </AccordionSection>
+                )}
 
                 {product.specifications &&
                   product.specifications.length > 0 && (
-                    <AccordionSection title='Materials & Details'>
+                    <AccordionSection title={t("product.specifications")}>
                       <div className='space-y-2'>
                         {product.specifications.map((spec, i) => (
                           <div
                             key={i}
-                            className='flex justify-between text-[13px]'>
+                            className='flex justify-between gap-4 text-[13px]'>
                             <span className='text-stone-400'>{spec.label}</span>
                             <span className='text-stone-600'>{spec.value}</span>
                           </div>
@@ -844,7 +896,7 @@ export function ProductPagePremium({
                     what an admin wrote in Dashboard > Settings > Product page
                     content, and disappears completely when that is empty. */}
                 {(shippingText || returnsText) && (
-                  <AccordionSection title='Shipping & Returns'>
+                  <AccordionSection title={t("product.shipping_returns")}>
                     <div className='space-y-3 whitespace-pre-line'>
                       {shippingText && <p>{shippingText}</p>}
                       {returnsText && <p>{returnsText}</p>}
@@ -854,16 +906,10 @@ export function ProductPagePremium({
 
                 {/* Care Guide — generic handling advice that makes no claim
                     about this store's products, materials or durability. */}
-                <AccordionSection title='Care Guide'>
+                <AccordionSection title={t("product.care_guide")}>
                   <div className='space-y-3'>
-                    <p>
-                      Store in a cool, dry place away from direct sunlight.
-                      Clean gently with a soft, lint-free cloth.
-                    </p>
-                    <p>
-                      Avoid contact with perfumes, lotions, and chemicals.
-                      Remove before swimming or exercising.
-                    </p>
+                    <p>{t("product.care_1")}</p>
+                    <p>{t("product.care_2")}</p>
                   </div>
                 </AccordionSection>
               </div>
@@ -875,14 +921,11 @@ export function ProductPagePremium({
       {/* ────────────────── Related Products ────────────────── */}
       {relatedProducts && relatedProducts.length > 0 && (
         <section className='border-t border-stone-100 bg-stone-50/50 py-14 lg:py-20'>
-          <div className='mx-auto max-w-7xl px-6 lg:px-10'>
-            <div className='mb-10 text-center'>
-              <h2 className='text-[1.55rem] font-light tracking-wide text-stone-800 sm:text-[1.75rem]'>
-                You May Also Love
+          <div className='mx-auto max-w-7xl px-4 sm:px-6 lg:px-10'>
+            <div className='mb-8 text-center'>
+              <h2 className='text-[1.4rem] font-light tracking-wide text-stone-800 sm:text-[1.75rem]'>
+                {t("product.related")}
               </h2>
-              <p className='mt-2 text-[13px] text-stone-400'>
-                Curated pieces to complement your collection
-              </p>
             </div>
             <HomeFeaturedProducts
               title=''
@@ -904,34 +947,41 @@ export function ProductPagePremium({
         />
       )}
 
-      {/* ── Mobile Sticky Add-to-Cart Bar ── */}
-      <div className='fixed bottom-0 left-0 right-0 z-40 border-t border-stone-200 bg-white/95 backdrop-blur-sm px-4 py-3 sm:hidden'>
-        <div className='flex items-center gap-3'>
-          <div className='flex-1 min-w-0'>
-            <p className='text-[12px] font-light text-stone-500 truncate'>
-              {product.name}
-            </p>
-            <p className='text-[14px] font-medium text-stone-900'>
-              EGP {Number(displayPrice).toFixed(2)}
-              {hasDiscount && (
-                <span className='ml-1.5 text-[11px] text-stone-400 line-through font-light'>
-                  EGP {Number(product.price).toFixed(2)}
-                </span>
-              )}
-            </p>
+      {/* ── Mobile sticky Add to bag ──
+          Appears only after the main button has scrolled away, and sits ABOVE
+          the fixed mobile bottom nav (h-16 + safe area) instead of under it. */}
+      {inStock && (
+        <div
+          style={{
+            bottom: "calc(4rem + env(safe-area-inset-bottom))",
+            zIndex: "var(--perce-z-sticky)",
+          }}
+          aria-hidden={!showSticky}
+          data-testid='sticky-add-to-bag'
+          className={cn(
+            "fixed inset-x-0 border-t border-stone-200 bg-white/95 px-4 py-2.5 backdrop-blur-sm transition-transform duration-300 sm:hidden",
+            showSticky ? "translate-y-0" : "pointer-events-none translate-y-[200%]",
+          )}>
+          <div className='flex items-center gap-3'>
+            <div className='min-w-0 flex-1'>
+              <p className='truncate text-[12px] text-stone-500'>{product.name}</p>
+              <p className='text-[14px] font-medium text-stone-900'>
+                {money(displayPrice)}
+                {quantity > 1 && <span className='ms-1.5 text-[12px] font-normal text-stone-500'>× {quantity}</span>}
+              </p>
+            </div>
+            <button
+              type='button'
+              onClick={handleAddToCart}
+              disabled={!canAdd}
+              tabIndex={showSticky ? 0 : -1}
+              className='flex h-11 shrink-0 items-center justify-center gap-2 bg-stone-900 px-5 text-[13px] font-medium text-white transition-colors hover:bg-stone-700 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400'>
+              <ShoppingBag size={15} strokeWidth={1.75} />
+              {t("product.add_to_bag")}
+            </button>
           </div>
-          <button
-            type='button'
-            onClick={handleAddToCart}
-            disabled={
-              !product.available || product.stock === 0 || !allVariantsSelected
-            }
-            className='flex h-11 items-center justify-center gap-2 rounded-lg bg-stone-800 px-6 text-[11px] font-normal uppercase tracking-[0.15em] text-stone-100 transition-colors hover:bg-stone-700 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400'>
-            <ShoppingCart size={14} strokeWidth={1.5} />
-            Add to Bag
-          </button>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -64,6 +64,11 @@ export interface LandingTemplateModernProps {
   bundleCampaigns?: BundleCardCampaign[];
 
   /**
+   * Live Pick Your Set campaigns for the block under the hero (minimal template)
+   */
+  setCampaigns?: BundleCardCampaign[];
+
+  /**
    * Additional CSS classes
    */
   className?: string;

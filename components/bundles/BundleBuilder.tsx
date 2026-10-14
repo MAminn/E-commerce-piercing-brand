@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, Layers, Minus, Plus, ShoppingBag, X } from "lucide-react";
+import { Check, Minus, Plus, Search, ShoppingBag, X } from "lucide-react";
 import { trpc } from "#root/shared/trpc/client";
 import { STORE_CURRENCY } from "#root/shared/config/branding";
 import type { PublicBundleCampaignDto } from "#root/backend/bundles/service";
@@ -25,12 +25,14 @@ import { TrackingEventName } from "#root/shared/types/pixel-tracking";
 import { showCartToast, flyToCart } from "#root/components/ui/cart-toast";
 import { Link } from "#root/components/utils/Link";
 import { cn } from "#root/lib/utils";
+import { needsNoPiercing } from "#root/shared/products/no-piercing";
 import {
   fillTemplate as fill,
   formatBundlePercent,
   formatMoney as money,
   resolveBundleImage as imageSrc,
 } from "./bundle-ui";
+import { builderFilterCategories, filterBuilderPool } from "./builder-filters";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -103,6 +105,9 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
   const [notice, setNotice] = useState<{ tone: "error" | "success" | "info"; text: string } | null>(null);
   const [addedInstanceId, setAddedInstanceId] = useState<string | null>(null);
   const ctaRef = useRef<HTMLButtonElement>(null);
+  /** Browse helpers only — they never change what is selected or how it is priced. */
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
 
   // A different campaign (client-side navigation between slugs) starts clean.
   useEffect(() => {
@@ -110,12 +115,20 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
     setPending(new Map());
     setNotice(null);
     setAddedInstanceId(null);
+    setSearch("");
+    setCategoryFilter(null);
   }, [campaign.id]);
 
   // Only what a shopper can actually buy: the public DTO already drops hidden
   // and deleted products; out-of-stock stays visible but disabled.
   const pool = useMemo(() => campaign.eligibleProducts, [campaign]);
   const poolById = useMemo(() => new Map(pool.map((p) => [p.productId, p])), [pool]);
+  /** Category chips: only categories the pool's products really carry. */
+  const filterCategories = useMemo(() => builderFilterCategories(pool), [pool]);
+  const visiblePool = useMemo(
+    () => filterBuilderPool(pool, { search, categoryId: categoryFilter }),
+    [pool, search, categoryFilter],
+  );
 
   const config = useMemo<BundleCampaignConfig | null>(
     () => ({
@@ -466,6 +479,29 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
           discount: evaluation.discountAmount,
         }
       : null;
+  /**
+   * What reaching a tier unlocks, in the shopper's words: "15% off + free
+   * shipping" / "6 pieces for EGP 480". Free shipping is the campaign's own
+   * benefit, earned by any qualifying size.
+   */
+  const benefitOf = (tier: { quantity: number; price: number | null; discountPercent: number | null }) =>
+    (tierPercent(tier) !== null
+      ? fill(t("bundle.benefit_pct"), { percent: tierPercent(tier) ?? "" })
+      : fill(t("bundle.benefit_price"), { size: tier.quantity, price: money(tier.price ?? 0, currency) })) +
+    (campaign.freeShipping ? t("bundle.benefit_free_shipping") : "");
+  /** What the shopper saves on a qualifying set — from the evaluator, never re-derived. */
+  const youSave =
+    !evaluation.qualifies || price === null
+      ? null
+      : isPercentage
+        ? (evaluation.discountAmount ?? null)
+        : savings;
+  /** Slots in the selection tray: the size being built toward (or matched). */
+  const slotCount = Math.min(12, Math.max(required, selectedCount));
+  /** One tray thumbnail per selected unit, in pick order. */
+  const trayUnits = selection.flatMap((line) =>
+    Array.from({ length: line.quantity }, (_, i) => ({ line, key: `${line.key}#${i}` })),
+  );
   /** "6 pieces · 480.00 EGP" / "6 pieces · 15% off" for one rung of the ladder. */
   const tierHint = (tier: { quantity: number; price: number | null; discountPercent: number | null }) =>
     tierPercent(tier) !== null
@@ -486,18 +522,13 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
       return fill(t("bundle.too_many"), { count: evaluation.excessUnits });
     }
     if (evaluation.qualifies) return t("bundle.complete");
-    if (selectedCount === 0 && nextTier) {
-      return fill(t("bundle.start_tier"), { count: nextTier.quantity });
-    }
+    // Before the exact count is reached, say what the shopper WILL unlock —
+    // never imply the discount (or free shipping) is already earned.
     if (nextTier && tierReachable(nextTier.quantity)) {
-      const percent = tierPercent(nextTierDto);
-      return percent !== null
-        ? fill(t("bundle.next_tier_pct"), { count: nextTier.quantity - selectedCount, size: nextTier.quantity, percent })
-        : fill(t("bundle.next_tier"), {
-            count: nextTier.quantity - selectedCount,
-            size: nextTier.quantity,
-            price: money(nextTier.price ?? 0, currency),
-          });
+      return fill(t(selectedCount === 0 ? "bundle.unlock_start" : "bundle.unlock_more"), {
+        count: nextTier.quantity - selectedCount,
+        benefit: benefitOf(nextTierDto ?? { quantity: nextTier.quantity, price: nextTier.price ?? null, discountPercent: null }),
+      });
     }
     if (evaluation.reason === "no_matching_tier") return t("bundle.between_tiers");
     return fill(t("bundle.choose_more"), { count: remaining });
@@ -520,7 +551,7 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
       : null;
 
   return (
-    <div className="perce-header-offset min-h-screen bg-perce-bg pb-40 sm:pb-16">
+    <div className="perce-header-offset min-h-screen bg-perce-bg pb-44 lg:pb-28">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         {/* ── Campaign header ────────────────────────────────────────────── */}
         <section className="grid gap-6 py-6 sm:py-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-center">
@@ -602,39 +633,112 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
           </div>
         </section>
 
-        {/* ── Sticky progress ────────────────────────────────────────────── */}
-        <div
-          className="sticky z-[5] -mx-4 border-y border-perce-border bg-perce-bg/95 px-4 py-3 backdrop-blur sm:mx-0 sm:px-0"
-          style={{ top: "var(--perce-header-offset)" }}>
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[13px] font-medium text-perce-ink">
-                {fill(t("bundle.selected"), { selected: selectedCount, required })}
-              </p>
-              <p className={cn("text-[12px]", evaluation.qualifies ? "text-perce-success" : "text-perce-ink-muted")}>
-                {progressLabel}
-              </p>
+        {/* ── Selection panel ───────────────────────────────────────────────
+            Progress, the chosen pieces and the live price breakdown, side by
+            side from md up. Every figure is the shared evaluator's — the same
+            pure rules (and rounding) the server re-runs before anything
+            reaches the bag. */}
+        <section
+          className="grid gap-px overflow-hidden border border-perce-border bg-perce-border md:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]"
+          aria-label={t("bundle.your_pieces")}
+          data-testid="bundle-selection-panel">
+          <div className="bg-perce-bg p-4 sm:p-5">
+            <p className="text-[15px] font-medium text-perce-ink" data-testid="bundle-progress-count">
+              {fill(t("bundle.selected"), { selected: selectedCount, required })}
+            </p>
+            <div className="mt-2 h-1.5 w-full bg-perce-surface" aria-hidden>
+              <div
+                className={cn("h-1.5 transition-[width]", evaluation.qualifies ? "bg-perce-success" : "bg-perce-ink")}
+                style={{ width: `${Math.min(100, (selectedCount / Math.max(1, required)) * 100)}%` }}
+              />
             </div>
-            <div className="flex items-center gap-1" aria-hidden>
-              {Array.from({ length: Math.min(required, 12) }, (_, i) => (
-                <span
-                  key={i}
-                  className={cn(
-                    "h-2 w-2 rounded-full transition-colors",
-                    i < Math.min(selectedCount, 12) ? "bg-perce-ink" : "bg-perce-border-strong",
-                  )}
-                />
-              ))}
-              {required > 12 && <span className="text-[11px] text-perce-ink-muted">+{required - 12}</span>}
+
+            {/* The chosen pieces as thumbnails, with an empty slot for each one
+                still to pick. × removes one unit of that line. */}
+            <ul
+              className="mt-3 grid max-w-md gap-2"
+              // One row up to six slots, sized to the width (a 6-piece set fits a
+              // 390px phone); larger sets wrap onto more rows.
+              style={{ gridTemplateColumns: `repeat(${Math.min(slotCount, 6)}, minmax(0, 1fr))` }}
+              data-testid="bundle-tray">
+              {Array.from({ length: slotCount }, (_, i) => {
+                const unit = trayUnits[i];
+                const product = unit ? poolById.get(unit.line.productId) : undefined;
+                if (!unit || !product) {
+                  return (
+                    <li
+                      key={`slot-${i}`}
+                      className="flex aspect-square max-w-16 items-center justify-center border border-dashed border-perce-border-strong text-perce-ink-muted"
+                      aria-label={t("bundle.empty_slot")}>
+                      <Plus className="h-4 w-4" aria-hidden />
+                    </li>
+                  );
+                }
+                const options = formatSelectedOptionValues(unit.line.selectedOptions);
+                return (
+                  <li key={unit.key} className="relative aspect-square max-w-16 bg-perce-surface">
+                    <img src={imageSrc(product.imageUrl)} alt={options ? `${product.name} (${options})` : product.name} className="h-full w-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => decrement(product, unit.line.selectedOptions)}
+                      aria-label={`${t("bundle.remove")}: ${product.name}`}
+                      className="absolute -end-2.5 -top-2.5 flex h-7 w-7 items-center justify-center rounded-full border border-perce-border bg-perce-bg text-perce-ink shadow-sm hover:bg-perce-surface">
+                      <X className="h-3 w-3" aria-hidden />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            <p
+              className={cn("mt-3 text-[13px]", evaluation.qualifies ? "text-perce-success" : "text-perce-ink-secondary")}
+              data-testid="bundle-progress-label">
+              {progressLabel}
+            </p>
+            {upsellLabel && <p className="mt-1 text-[12px] text-perce-ink-muted">{upsellLabel}</p>}
+          </div>
+
+          {/* Live price breakdown. Before the set qualifies there is no
+              discount row and no saving: nothing is shown as earned until the
+              exact piece count is reached. */}
+          <dl className="space-y-1.5 bg-perce-surface p-4 text-[13px] sm:p-5" data-testid="bundle-breakdown">
+            <div className="flex justify-between gap-3">
+              <dt className="text-perce-ink-secondary">{t("bundle.selected_subtotal")}</dt>
+              <dd className="text-perce-ink" data-testid="bundle-selected-subtotal">
+                <span className={cn(!isPercentage && evaluation.qualifies && "line-through text-perce-ink-muted")}>
+                  {money(regularTotal, currency)}
+                </span>
+              </dd>
             </div>
-          </div>
-          <div className="mt-2 h-1 w-full bg-perce-surface">
-            <div
-              className="h-1 bg-perce-ink transition-[width]"
-              style={{ width: `${Math.min(100, (selectedCount / Math.max(1, required)) * 100)}%` }}
-            />
-          </div>
-        </div>
+            {percentBreakdown && percentBreakdown.discount > 0 && (
+              <div className="flex justify-between gap-3 font-medium text-perce-success" data-testid="bundle-percent-discount">
+                <dt>{fill(t("bundle.discount_pct"), { percent: percentBreakdown.percent ?? "" })}</dt>
+                <dd>−{money(percentBreakdown.discount, currency)}</dd>
+              </div>
+            )}
+            <div className="flex justify-between gap-3">
+              <dt className="text-perce-ink-secondary">{t("bundle.shipping")}</dt>
+              <dd
+                className={cn(campaign.freeShipping && evaluation.qualifies ? "font-medium text-perce-success" : "text-perce-ink-muted")}
+                data-testid="bundle-shipping">
+                {campaign.freeShipping && evaluation.qualifies ? t("bundle.shipping_free") : t("bundle.shipping_at_checkout")}
+              </dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-3 border-t border-perce-border pt-2">
+              <dt className="font-medium text-perce-ink">{t(isPercentage ? "bundle.final_total" : "bundle.stack_price")}</dt>
+              {/* Between tiers there is no price, so none is shown. Falling
+                  back to the tier below would quote a total the shopper
+                  cannot actually be charged. */}
+              <dd className="text-[17px] font-semibold text-perce-ink" style={{ fontFamily: "var(--font-price)" }} data-testid="bundle-final-total">
+                {price === null ? "—" : money(price, currency)}
+              </dd>
+            </div>
+            {youSave !== null && youSave > 0 && (
+              <p className="mt-2 bg-perce-bg px-3 py-2 text-center font-medium text-perce-success" data-testid="bundle-you-save">
+                {fill(t("bundle.you_save_amount"), { amount: money(youSave, currency) })}
+              </p>
+            )}
+          </dl>
+        </section>
 
         {/* ── Notices ───────────────────────────────────────────────────── */}
         {!poolCanComplete && (
@@ -664,10 +768,79 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
 
         {/* ── Product grid ───────────────────────────────────────────────── */}
         <section className="mt-6">
-          <h2 className="perce-eyebrow">{t("bundle.eligible_products")}</h2>
-          {pool.length === 0 ? null : (
-            <ul className="mt-4 grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-4">
-              {pool.map((p) => {
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="perce-eyebrow">{t("bundle.eligible_products")}</h2>
+            {pool.length > 0 && (
+              <p className="text-[12px] text-perce-ink-muted" aria-live="polite">
+                {fill(t("bundle.showing"), { count: visiblePool.length })}
+              </p>
+            )}
+          </div>
+
+          {/* Browse helpers. Search matches the product name; the chips are the
+              categories the pool's products actually carry (no metal or
+              placement is inferred from titles). Neither touches the
+              selection — a picked piece stays picked when filtered out. */}
+          {pool.length > 1 && (
+            <div className="mt-3 space-y-3">
+              <label className="relative block">
+                <span className="sr-only">{t("bundle.search_label")}</span>
+                <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-perce-ink-muted" aria-hidden />
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={t("bundle.search_placeholder")}
+                  className="h-11 w-full border border-perce-border bg-perce-bg ps-10 pe-3 text-[14px] text-perce-ink outline-none placeholder:text-perce-ink-muted focus:border-perce-ink"
+                  data-testid="bundle-search"
+                />
+              </label>
+              {filterCategories.length > 1 && (
+                <fieldset className="m-0 min-w-0 border-0 p-0" data-testid="bundle-filters">
+                  <legend className="sr-only">{t("bundle.filters_label")}</legend>
+                  <div className="scrollbar-hide -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
+                  {[{ id: null as string | null, name: t("bundle.filter_all") }, ...filterCategories].map((c) => {
+                    const active = categoryFilter === c.id;
+                    return (
+                      <button
+                        key={c.id ?? "all"}
+                        type="button"
+                        onClick={() => setCategoryFilter(c.id)}
+                        aria-pressed={active}
+                        className={cn(
+                          "inline-flex min-h-10 shrink-0 items-center whitespace-nowrap rounded-full border px-4 text-[13px] transition-colors",
+                          active
+                            ? "border-perce-ink bg-perce-ink text-perce-ink-inverse"
+                            : "border-perce-border text-perce-ink hover:border-perce-ink",
+                        )}>
+                        {c.name}
+                      </button>
+                    );
+                  })}
+                  </div>
+                </fieldset>
+              )}
+            </div>
+          )}
+
+          {pool.length > 0 && visiblePool.length === 0 && (
+            <div className="mt-6 border border-perce-border bg-perce-surface px-4 py-6 text-center text-[13px] text-perce-ink-secondary" data-testid="bundle-no-matches">
+              <p>{t("bundle.no_matches")}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  setCategoryFilter(null);
+                }}
+                className="mt-3 inline-flex min-h-10 items-center border border-perce-ink px-4 text-xs font-medium text-perce-ink">
+                {t("bundle.clear_filters")}
+              </button>
+            </div>
+          )}
+
+          {visiblePool.length === 0 ? null : (
+            <ul className="mt-4 grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-4" data-testid="bundle-grid">
+              {visiblePool.map((p) => {
                 const qty = quantityOfProduct(p.productId);
                 // Product-level stock, and — Phase 7 — a product whose options
                 // leave nothing sellable reads as sold out too.
@@ -719,6 +892,11 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
                         decoding="async"
                         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                       />
+                      {needsNoPiercing(p) && !soldOut && (
+                        <span className="absolute start-2 top-2 bg-perce-bg/95 px-2 py-0.5 text-[11px] font-medium text-perce-ink">
+                          {t("product.no_piercing_needed")}
+                        </span>
+                      )}
                       {isSelected && (
                         <span className="absolute end-2 top-2 flex h-7 min-w-7 items-center justify-center rounded-full bg-perce-ink px-1.5 text-[11px] font-semibold text-perce-ink-inverse">
                           {campaign.allowDuplicates ? qty : <Check className="h-4 w-4" />}
@@ -735,12 +913,12 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
 
                     <div className="mt-2 min-w-0">
                       <p
-                        className="truncate text-[13px] font-medium text-perce-ink"
+                        className="line-clamp-2 min-h-[2.5em] text-[13px] font-medium leading-snug text-perce-ink"
                         style={{ fontFamily: "var(--font-product-title)" }}>
                         {p.name}
                       </p>
-                      <p className="mt-0.5 flex items-baseline gap-1.5 text-[12px]" style={{ fontFamily: "var(--font-price)" }}>
-                        <span className={hasDiscount ? "text-perce-sale font-medium" : "text-perce-ink-secondary"}>
+                      <p className="mt-1 flex items-baseline gap-1.5 text-[14px]" style={{ fontFamily: "var(--font-price)" }}>
+                        <span className={hasDiscount ? "text-perce-sale font-semibold" : "font-semibold text-perce-ink"}>
                           {money(unit, currency)}
                         </span>
                         {hasDiscount && (
@@ -887,7 +1065,9 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
                           ) : stackFull ? (
                             t("bundle.stack_full")
                           ) : (
-                            t("bundle.add")
+                            <>
+                              <Plus className="h-3.5 w-3.5" aria-hidden /> {t("bundle.add")}
+                            </>
                           )}
                         </button>
                       )}
@@ -903,91 +1083,52 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
         </section>
       </div>
 
-      {/* ── Summary + CTA (sticky bottom on mobile, inline on desktop) ─────── */}
+      {/* ── Sticky action bar ──────────────────────────────────────────────
+          Always in reach: above the mobile bottom nav below lg, at the bottom
+          of the window from lg. X of Y, the saving once earned (or what is
+          still needed), and the CTA — disabled until the campaign's own rule
+          (exact tier count, stock, duplicates) is met. */}
       <div
-        className="fixed inset-x-0 border-t border-perce-border bg-perce-bg shadow-[0_-4px_16px_rgba(36,29,25,0.08)] sm:static sm:mt-10 sm:border-0 sm:bg-transparent sm:shadow-none"
-        style={{ bottom: "calc(4rem + env(safe-area-inset-bottom))", zIndex: "var(--perce-z-sticky)" }}>
-        <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6 sm:py-0 lg:px-8">
-          <div className="sm:ms-auto sm:max-w-md sm:border sm:border-perce-border sm:bg-perce-surface sm:p-6">
-            <div className="flex items-end justify-between gap-3">
-              <div className="min-w-0 space-y-0.5 text-[12px] text-perce-ink-secondary">
-                <div className="flex items-center gap-2">
-                  <Layers className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  <span className="truncate">{fill(t("bundle.selected"), { selected: selectedCount, required })}</span>
-                </div>
-                {/* Percentage pricing: the live breakdown — selected subtotal,
-                    the tier's percentage and its amount — computed by the same
-                    shared evaluator (and rounding) the server prices with.
-                    The server re-checks it before anything reaches the bag. */}
-                {isPercentage && selectedCount > 0 && (
-                  <p data-testid="bundle-selected-subtotal">
-                    {t("bundle.selected_subtotal")}: {money(regularTotal, currency)}
-                  </p>
-                )}
-                {campaign.freeShipping && evaluation.qualifies && (
-                  <p className="font-medium text-perce-success">{t("bundle.free_shipping")}</p>
-                )}
-                {percentBreakdown && percentBreakdown.discount > 0 && (
-                  <p className="font-medium text-perce-success" data-testid="bundle-percent-discount">
-                    {fill(t("bundle.discount_pct"), { percent: percentBreakdown.percent ?? "" })}: −
-                    {money(percentBreakdown.discount, currency)}
-                  </p>
-                )}
-                {!isPercentage && selectedCount > 0 && (
-                  <p>
-                    {t("bundle.bought_separately")}:{" "}
-                    <span className={cn(evaluation.qualifies && "line-through")}>{money(regularTotal, currency)}</span>
-                  </p>
-                )}
-                {/* Only ever shown when the bundle genuinely costs less than the
-                    selected products do separately. A zero or negative
-                    difference is simply not announced — it is never relabelled
-                    as a saving. */}
-                {!isPercentage && evaluation.qualifies && savings !== null && savings > 0 && (
-                  <p className="font-medium text-perce-success">
-                    {t("bundle.you_save")} {money(savings, currency)}
-                  </p>
-                )}
-              </div>
-              <div className="text-end">
-                <p className="text-xs text-perce-ink-muted">{t(isPercentage ? "bundle.final_total" : "bundle.stack_price")}</p>
-                {/* Between tiers there is no price, so none is shown. Falling
-                    back to the tier below would quote a total the shopper
-                    cannot actually be charged. */}
-                <p className="text-[18px] font-semibold text-perce-ink" style={{ fontFamily: "var(--font-price)" }}>
-                  {price === null ? "—" : money(price, currency)}
-                </p>
-                {price === null && nextTierDto && tierReachable(nextTierDto.quantity) && (
-                  <p className="text-[11px] text-perce-ink-muted">{tierHint(nextTierDto)}</p>
-                )}
-              </div>
-            </div>
-            <button
-              ref={ctaRef}
-              type="button"
-              onClick={handleAddToBag}
-              disabled={!canAdd}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-md bg-perce-cta py-3.5 text-sm font-medium text-perce-ink-inverse transition-colors hover:bg-perce-cta-hover disabled:cursor-not-allowed disabled:opacity-50">
-              <ShoppingBag className="h-4 w-4" />
-              {submitting ? t("bundle.adding") : evaluation.qualifies ? t("bundle.add_to_bag") : progressLabel}
-            </button>
-            {/* A matched stack that can still be upgraded. Suppressed when the
-                pool cannot currently fill the next tier, so the builder never
-                dangles a size the shopper could not complete. */}
-            {upsellLabel && <p className="mt-2 text-center text-[11px] text-perce-ink-secondary">{upsellLabel}</p>}
-            {addedInstanceId && (
-              <button
-                type="button"
-                onClick={() => {
-                  setAddedInstanceId(null);
-                  setNotice(null);
-                }}
-                className="mt-2 w-full py-2 text-xs text-perce-ink-muted hover:text-perce-ink">
-                {t("bundle.build_another")}
-              </button>
-            )}
+        className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] border-t border-perce-border bg-perce-bg/95 shadow-[0_-4px_16px_rgba(36,29,25,0.08)] backdrop-blur lg:bottom-0"
+        style={{ zIndex: "var(--perce-z-sticky)" }}
+        data-testid="bundle-action-bar">
+        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
+          <div className="min-w-0 flex-1">
+            <p className="text-[14px] font-medium text-perce-ink">
+              {fill(t("bundle.selected"), { selected: selectedCount, required })}
+            </p>
+            <p className={cn("truncate text-[12px]", youSave ? "font-medium text-perce-success" : "text-perce-ink-muted")}>
+              {youSave
+                ? fill(t("bundle.you_save_amount"), { amount: money(youSave, currency) })
+                : evaluation.qualifies && price !== null
+                  ? money(price, currency)
+                  : progressLabel}
+            </p>
           </div>
+          <button
+            ref={ctaRef}
+            type="button"
+            onClick={handleAddToBag}
+            disabled={!canAdd}
+            data-testid="bundle-add-to-bag"
+            className="flex min-h-12 shrink-0 items-center justify-center gap-2 bg-perce-cta px-5 text-sm font-medium text-perce-ink-inverse transition-colors hover:bg-perce-cta-hover disabled:cursor-not-allowed disabled:opacity-45 sm:px-8">
+            <ShoppingBag className="h-4 w-4" aria-hidden />
+            {submitting ? t("bundle.adding") : t("bundle.add_to_bag")}
+          </button>
         </div>
+        {addedInstanceId && (
+          <div className="mx-auto max-w-6xl px-4 pb-2 text-center sm:px-6 lg:px-8">
+            <button
+              type="button"
+              onClick={() => {
+                setAddedInstanceId(null);
+                setNotice(null);
+              }}
+              className="py-1 text-xs text-perce-ink-muted hover:text-perce-ink">
+              {t("bundle.build_another")}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

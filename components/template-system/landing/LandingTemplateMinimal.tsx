@@ -6,7 +6,10 @@ import { PerceEditorialBlock } from "#root/components/template-system/minimal/Pe
 import type { HeroSlide } from "#root/components/ui/hero-carousel";
 import { MinimalProductCarousel } from "#root/components/template-system/minimal/MinimalProductCarousel";
 import { MinimalBundleSection } from "#root/components/bundles/MinimalBundleSection";
+import { PickYourSetSection } from "#root/components/bundles/PickYourSetSection";
 import type { BundleCardCampaign } from "#root/components/bundles/BundleCampaignCard";
+import { TrustStrip } from "#root/components/template-system/minimal/TrustStrip";
+import { distinctRails } from "./distinct-rails";
 import { QuickViewDialog } from "#root/components/template-system/minimal/QuickViewDialog";
 import { TestimonialsSection } from "#root/components/template-system/shared/TestimonialsSection";
 import type { MinimalProduct } from "#root/components/template-system/minimal/MinimalProductCard";
@@ -40,6 +43,8 @@ export interface LandingTemplateMinimalProps {
   })[];
   newArrivalsLoading?: boolean;
   bundleCampaigns?: BundleCardCampaign[];
+  /** Every live Pick Your Set campaign — the selling block under the hero. */
+  setCampaigns?: BundleCardCampaign[];
   className?: string;
   onCtaClick?: (link: string) => void;
 }
@@ -165,14 +170,14 @@ function CategoryCarousel({ categories }: { categories: CategoryStripItem[] }) {
 /**
  * Minimal Landing Page — Commerce-First
  *
- * Inspired by matchperfumes.com. Image-heavy, clean, designed to sell:
- * - Scrolling marquee announcement bar
- * - Full-width hero image carousel
- * - Visual category grid with images
- * - Horizontal product carousels (Featured + New Arrivals)
- * - Full-width promotional banner
- * - Value propositions strip
- * - Newsletter + closing CTA
+ * Selling flow, mobile-first:
+ * 1. Hero
+ * 2. Pick Your Set — live set offers, the primary selling mechanic
+ * 3. Shop by placement (categories)
+ * 4. Featured products (merchant picks, e.g. "Trending now")
+ * 5. Trust strip
+ * 6. Ready Sets, New in, editorial, On sale — each product in one rail only
+ * 7. Shop the look, testimonials
  */
 export function LandingTemplateMinimal({
   content,
@@ -183,6 +188,7 @@ export function LandingTemplateMinimal({
   newArrivals = [],
   newArrivalsLoading = false,
   bundleCampaigns = [],
+  setCampaigns = [],
   className = "",
   onCtaClick,
 }: LandingTemplateMinimalProps) {
@@ -282,6 +288,17 @@ export function LandingTemplateMinimal({
     categories: p.categories,
   }));
 
+  // Each product appears in ONE rail: Featured (the merchant's own picks)
+  // first, then New in, then On sale — see distinctRails. A rail the CMS has
+  // switched off claims nothing, so it never empties a visible one.
+  const [featuredRail = [], newInRail = [], saleRail = []] = distinctRails([
+    content.featuredProducts.enabled ? featuredMinimal : [],
+    content.newArrivals?.enabled !== false ? newArrivalProducts : [],
+    content.discountedProducts?.enabled !== false ? discountedMinimal : [],
+  ]);
+  // Curated stacks only: Pick Your Set campaigns are the block under the hero.
+  const readySets = bundleCampaigns.filter((c) => c.type === "curated_stack");
+
   return (
     <div className={`landing-template-minimal overflow-x-hidden bg-perce-bg ${className}`}>
       <ScrollToProductsButton targetId='home-products' />
@@ -299,6 +316,17 @@ export function LandingTemplateMinimal({
         video={heroVideo}
         onCtaClick={onCtaClick}
       />
+
+      {/* ═══════════════════════════════════════════════
+          PICK YOUR SET — the first selling block after the hero
+          ═══════════════════════════════════════════════
+          Every live Pick Your Set campaign as a large offer card (discount,
+          free shipping, exact piece rule, CTA into the builder). Open to
+          everyone — no sign-in. Hidden with the rest of the bundle
+          merchandising when the CMS Bundles section is switched off. */}
+      {content.bundles?.enabled !== false && (
+        <PickYourSetSection campaigns={setCampaigns} className='bg-perce-bg' />
+      )}
 
       {/* ═══════════════════════════════════════════════
           3. CATEGORY GRID — Clean image + title (matchperfumes style)
@@ -344,37 +372,42 @@ export function LandingTemplateMinimal({
       )}
 
       {/* ═══════════════════════════════════════════════
-          7. NEW ARRIVALS — Minimal card carousel
+          5. FEATURED PRODUCTS — Minimal card carousel
           ═══════════════════════════════════════════════ */}
-      {content.newArrivals?.enabled !== false &&
-        newArrivalProducts.length > 0 && (
-          <MinimalProductCarousel
-            products={newArrivalProducts}
-            title={
-              locale === "ar" && content.newArrivals?.titleAr
-                ? content.newArrivals.titleAr
-                : content.newArrivals?.title || t("new_arrivals")
-            }
-            viewAllHref={`${content.newArrivals?.viewAllLink || "/shop"}${(content.newArrivals?.viewAllLink || "/shop").includes("?") ? "&" : "?"}section=newarrivals`}
-            viewAllText={
-              locale === "ar" && content.newArrivals?.viewAllTextAr
-                ? content.newArrivals.viewAllTextAr
-                : content.newArrivals?.viewAllText || t("view_all")
-            }
-            className='bg-perce-surface'
-            onQuickView={setQuickViewProduct}
-          />
-        )}
+      {content.featuredProducts.enabled && featuredRail.length > 0 && (
+        <MinimalProductCarousel
+          products={featuredRail}
+          title={
+            locale === "ar" && content.featuredProducts.titleAr
+              ? content.featuredProducts.titleAr
+              : content.featuredProducts.title
+          }
+          viewAllHref={`${content.featuredProducts.viewAllLink || "/shop"}${(content.featuredProducts.viewAllLink || "/shop").includes("?") ? "&" : "?"}section=featured`}
+          viewAllText={
+            locale === "ar" && content.featuredProducts.viewAllTextAr
+              ? content.featuredProducts.viewAllTextAr
+              : content.featuredProducts.viewAllText
+          }
+          className='bg-perce-bg'
+          onQuickView={setQuickViewProduct}
+        />
+      )}
 
       {/* ═══════════════════════════════════════════════
-          7b. BUNDLES & STACKS — campaign rail (CMS: content.bundles)
+          TRUST STRIP — store facts only (see TrustStrip)
+          ═══════════════════════════════════════════════ */}
+      <TrustStrip valueProps={content.valueProps} className='bg-perce-bg' />
+
+      {/* ═══════════════════════════════════════════════
+          READY SETS — curated-stack rail (CMS: content.bundles). Pick Your Set
+          campaigns have their own block under the hero, so only Ready Sets here.
           Not a product carousel: these are sets with their own purchase
           model, so they get wider cards and no quick view.
           ═══════════════════════════════════════════════ */}
-      {content.bundles?.enabled !== false && bundleCampaigns.length > 0 && (
+      {content.bundles?.enabled !== false && readySets.length > 0 && (
         <MinimalBundleSection
           id='bundles'
-          campaigns={bundleCampaigns}
+          campaigns={readySets}
           title={
             locale === "ar" && content.bundles?.titleAr
               ? content.bundles.titleAr
@@ -401,26 +434,27 @@ export function LandingTemplateMinimal({
       )}
 
       {/* ═══════════════════════════════════════════════
-          5. FEATURED PRODUCTS — Minimal card carousel
+          7. NEW ARRIVALS — Minimal card carousel
           ═══════════════════════════════════════════════ */}
-      {content.featuredProducts.enabled && featuredMinimal.length > 0 && (
-        <MinimalProductCarousel
-          products={featuredMinimal}
-          title={
-            locale === "ar" && content.featuredProducts.titleAr
-              ? content.featuredProducts.titleAr
-              : content.featuredProducts.title
-          }
-          viewAllHref={`${content.featuredProducts.viewAllLink || "/shop"}${(content.featuredProducts.viewAllLink || "/shop").includes("?") ? "&" : "?"}section=featured`}
-          viewAllText={
-            locale === "ar" && content.featuredProducts.viewAllTextAr
-              ? content.featuredProducts.viewAllTextAr
-              : content.featuredProducts.viewAllText
-          }
-          className='bg-perce-bg'
-          onQuickView={setQuickViewProduct}
-        />
-      )}
+      {content.newArrivals?.enabled !== false &&
+        newInRail.length > 0 && (
+          <MinimalProductCarousel
+            products={newInRail}
+            title={
+              locale === "ar" && content.newArrivals?.titleAr
+                ? content.newArrivals.titleAr
+                : content.newArrivals?.title || t("new_arrivals")
+            }
+            viewAllHref={`${content.newArrivals?.viewAllLink || "/shop"}${(content.newArrivals?.viewAllLink || "/shop").includes("?") ? "&" : "?"}section=newarrivals`}
+            viewAllText={
+              locale === "ar" && content.newArrivals?.viewAllTextAr
+                ? content.newArrivals.viewAllTextAr
+                : content.newArrivals?.viewAllText || t("view_all")
+            }
+            className='bg-perce-surface'
+            onQuickView={setQuickViewProduct}
+          />
+        )}
 
       {/* ═══════════════════════════════════════════════
           6. BRAND / EDITORIAL CAMPAIGN BLOCK
@@ -445,9 +479,9 @@ export function LandingTemplateMinimal({
           ═══════════════════════════════════════════════ */}
       <div id='home-products' className='scroll-mt-24' />
       {content.discountedProducts?.enabled !== false &&
-        discountedMinimal.length > 0 && (
+        saleRail.length > 0 && (
           <MinimalProductCarousel
-            products={discountedMinimal}
+            products={saleRail}
             title={
               locale === "ar" && content.discountedProducts?.titleAr
                 ? content.discountedProducts.titleAr

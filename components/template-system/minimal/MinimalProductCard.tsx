@@ -10,6 +10,7 @@ import { getProductUrl } from "#root/lib/utils/route-helpers";
 import { cn } from "#root/lib/utils";
 import { showCartToast, flyToCart } from "#root/components/ui/cart-toast";
 import { formatMoney } from "#root/shared/pricing/format-money";
+import { needsNoPiercing } from "#root/shared/products/no-piercing";
 
 interface ProductImage {
   url: string;
@@ -124,8 +125,11 @@ export function MinimalProductCard({
     [product, displayPrice, displayImageUrl, addItem, trackEvent, hasDiscount],
   );
 
-  // Determine tag text
-  const tagText = product.tag || (product.isNew ? t("new") : hasDiscount ? t("sale") : null);
+  // One short badge, from real data only: an explicit tag, then "No piercing
+  // needed" (the product's category says so), then New / Sale.
+  const tagText =
+    product.tag ||
+    (needsNoPiercing(product) ? t("product.no_piercing_needed") : product.isNew ? t("new") : hasDiscount ? t("sale") : null);
 
   const wishlisted = isWishlisted(product.id);
   const productUrl = getProductUrl(product);
@@ -170,39 +174,40 @@ export function MinimalProductCard({
           </div>
         )}
 
-        {/* Action icons (bottom-center, appear on hover) */}
-        <div className='absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300'>
+        {/* Wishlist — secondary, always reachable in the corner. */}
+        <button
+          type='button'
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggle(product.id);
+          }}
+          className={cn(
+            "absolute end-1.5 top-1.5 flex h-10 w-10 items-center justify-center rounded-full transition-colors",
+            wishlisted ? "text-perce-sale" : "text-perce-ink-secondary hover:text-perce-ink",
+          )}
+          aria-pressed={wishlisted}
+          aria-label={`${t("nav.wishlist")}: ${product.name}`}>
+          <span className='flex h-8 w-8 items-center justify-center rounded-full bg-perce-bg/90 shadow-sm'>
+            <Heart className={cn("w-4 h-4", wishlisted && "fill-current")} />
+          </span>
+        </button>
+
+        {/* Quick view — a desktop hover affordance; on touch the card itself
+            opens the product page. */}
+        {onQuickView && (
           <button
             type='button'
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              onQuickView?.(product);
+              onQuickView(product);
             }}
-            className='w-11 h-11 md:w-9 md:h-9 flex items-center justify-center bg-white rounded-full shadow-md hover:bg-perce-surface transition-colors'
+            className='absolute bottom-3 left-1/2 hidden h-9 w-9 -translate-x-1/2 items-center justify-center rounded-full bg-white opacity-0 shadow-md transition-opacity duration-300 hover:bg-perce-surface md:flex md:group-hover:opacity-100 md:focus-visible:opacity-100'
             aria-label={`${t("quick_view")}: ${product.name}`}>
             <Eye className='w-4 h-4 text-stone-700' />
           </button>
-          <button
-            type='button'
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              toggle(product.id);
-            }}
-            className={cn(
-              "w-11 h-11 md:w-9 md:h-9 flex items-center justify-center rounded-full shadow-md transition-colors",
-              wishlisted
-                ? "bg-red-50 text-red-500 hover:bg-red-100"
-                : "bg-white text-perce-ink-secondary hover:bg-perce-surface",
-            )}
-            aria-pressed={wishlisted}
-            aria-label={`${t("nav.wishlist")}: ${product.name}`}>
-            <Heart
-              className={cn("w-4 h-4", wishlisted && "fill-current")}
-            />
-          </button>
-        </div>
+        )}
       </div>
 
       {/* Product info */}
@@ -210,7 +215,7 @@ export function MinimalProductCard({
         <Link href={productUrl}>
           <h3
             style={{ fontFamily: "var(--font-product-title)" }}
-            className='line-clamp-1 text-[0.8125rem] font-normal text-perce-ink transition-colors hover:text-perce-ink-muted'>
+            className='line-clamp-2 min-h-[2.5em] text-[0.875rem] font-normal leading-snug text-perce-ink transition-colors hover:text-perce-ink-muted'>
             {product.name}
           </h3>
         </Link>
@@ -225,7 +230,7 @@ export function MinimalProductCard({
           <span
             style={{ fontFamily: "var(--font-price)" }}
             className={cn(
-              "text-sm font-medium",
+              "text-[0.9375rem] font-semibold",
               hasDiscount ? "text-perce-sale" : "text-perce-ink",
             )}>
             {formatMoney(displayPrice, { locale })}
@@ -241,11 +246,16 @@ export function MinimalProductCard({
           onClick={handleAddToCart}
           disabled={!product.available || isAdding}
           data-add-to-cart='true'
-          className='perce-underline-hover mt-2 inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap text-xs font-medium text-perce-ink-muted transition-colors hover:text-perce-ink disabled:cursor-not-allowed disabled:opacity-40 sm:text-[11px]'>
+          className={cn(
+            "mt-2 inline-flex min-h-10 w-full items-center justify-center gap-1.5 whitespace-nowrap px-2 text-[13px] font-medium transition-colors disabled:cursor-not-allowed",
+            product.available
+              ? "bg-perce-cta text-perce-ink-inverse hover:bg-perce-cta-hover"
+              : "border border-perce-line text-perce-ink-muted",
+          )}>
+          {product.available && <ShoppingBag className='h-3.5 w-3.5 shrink-0' aria-hidden />}
           <span className='truncate'>
-            {product.available ? t("add_to_cart") : t("out_of_stock")}
+            {product.available ? t("product.add_to_bag") : t("out_of_stock")}
           </span>
-          {product.available && <ShoppingBag className='w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0' />}
         </button>
       </div>
     </div>

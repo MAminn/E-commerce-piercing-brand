@@ -2,7 +2,7 @@ import {
   runBackendEffect,
   serializeBackendEffectResult,
 } from "#root/shared/backend/effect";
-import { provideDatabase, protectedProcedure } from "#root/shared/trpc/server";
+import { adminProcedure, provideDatabase } from "#root/shared/trpc/server";
 import { z } from "zod";
 import { createFile } from "./createFile";
 import { createWriteStream } from "node:fs";
@@ -22,7 +22,7 @@ setTimeout(() => {
 }, 5000); // Slight delay to ensure server is fully started
 
 // Create a file upload procedure
-export const uploadFileProcedure = protectedProcedure
+export const uploadFileProcedure = adminProcedure
   .input(
     z.object({
       // This will be populated from FormData

@@ -8,6 +8,7 @@ import {
   category,
   file,
   product,
+  productCategory,
   type BundleCampaignRow,
 } from "#root/shared/database/drizzle/schema";
 import { ServerError } from "#root/shared/error/server";
@@ -284,6 +285,8 @@ export const listLiveBundleCampaignsSchema = z.object({
   categoryId: z.string().uuid().optional(),
   /** Explicit picks (e.g. the homepage section); result keeps this order. */
   ids: z.array(z.string().uuid()).max(50).optional(),
+  /** Only one campaign type, e.g. the Pick Your Set block on the homepage and /offers. */
+  type: z.enum(["build_your_stack", "curated_stack"]).optional(),
   limit: z.number().int().min(1).max(50).optional(),
   /** Include the full pool/composition. Cards don't need it; detail pages do. */
   includeProducts: z.boolean().optional(),
@@ -335,6 +338,12 @@ export interface BundleCampaignProductSummary {
   /** Curated composition lines only: the configuration the merchant fixed. Null otherwise. */
   selectedOptions: SelectedOptions | null;
   /**
+   * The product's live categories (primary + additional), for the builder's
+   * filter chips. Only the public Pick Your Set detail read fills it; every
+   * other read leaves it undefined rather than paying for the query.
+   */
+  categories?: PoolProductCategory[];
+  /**
    * The line's regular unit price: effective price plus, for a curated line,
    * its fixed options' modifiers. For a BYS pool row (no options chosen yet)
    * this is the effective price and the builder adds the shopper's choice.
@@ -347,6 +356,12 @@ export interface BundleCampaignProductSummary {
    * THE flag every capacity/availability calculation reads.
    */
   purchasable: boolean;
+}
+
+export interface PoolProductCategory {
+  id: string;
+  name: string;
+  slug: string;
 }
 
 /**
@@ -1595,6 +1610,7 @@ export const listLiveBundleCampaigns = (options: ListLiveBundleCampaignsInput = 
               liveCampaignWhere(new Date()),
               placementIds !== null ? inArray(bundleCampaign.id, placementIds) : undefined,
               options.ids && options.ids.length > 0 ? inArray(bundleCampaign.id, options.ids) : undefined,
+              options.type ? eq(bundleCampaign.type, options.type) : undefined,
             ),
           )
           .orderBy(asc(bundleCampaign.sortOrder), asc(bundleCampaign.createdAt));
@@ -1654,12 +1670,44 @@ export const getLiveBundleCampaignBySlug = (slug: string) =>
           .where(and(eq(bundleCampaign.slug, slug), liveCampaignWhere(new Date())))
           .limit(1);
         const [hydrated] = await hydrate(db, rows);
-        return hydrated ? toPublic(shopperVisiblePool(hydrated)) : null;
+        if (!hydrated) return null;
+        const visible = shopperVisiblePool(hydrated);
+        if (visible.type === "build_your_stack") await attachPoolCategories(db, visible.eligibleProducts);
+        return toPublic(visible);
       }),
     );
     if (!dto) return yield* $(Effect.fail(notFound()));
     return dto;
   });
+
+/**
+ * Fills `categories` on Pick Your Set pool rows: the primary category plus
+ * every additional one, live (not deleted) categories only, in one query.
+ * The same two relations the shop's category filter matches on.
+ */
+async function attachPoolCategories(db: Db, pool: BundleCampaignProductSummary[]): Promise<void> {
+  if (pool.length === 0) return;
+  const ids = pool.map((p) => p.productId);
+  const [primary, additional] = await Promise.all([
+    db
+      .select({ productId: product.id, id: category.id, name: category.name, slug: category.slug })
+      .from(product)
+      .innerJoin(category, eq(product.categoryId, category.id))
+      .where(and(inArray(product.id, ids), eq(category.deleted, false))),
+    db
+      .select({ productId: productCategory.productId, id: category.id, name: category.name, slug: category.slug })
+      .from(productCategory)
+      .innerJoin(category, eq(productCategory.categoryId, category.id))
+      .where(and(inArray(productCategory.productId, ids), eq(category.deleted, false))),
+  ]);
+  const byProduct = new Map<string, Map<string, PoolProductCategory>>();
+  for (const row of [...primary, ...additional]) {
+    const list = byProduct.get(row.productId) ?? new Map<string, PoolProductCategory>();
+    list.set(row.id, { id: row.id, name: row.name, slug: row.slug });
+    byProduct.set(row.productId, list);
+  }
+  for (const p of pool) p.categories = [...(byProduct.get(p.productId)?.values() ?? [])];
+}
 
 /** Admin helper: is this slug free? Lets the form warn before submit. */
 export const isBundleSlugAvailable = (slug: string, excludeId?: string) =>

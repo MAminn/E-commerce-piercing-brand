@@ -32,7 +32,10 @@ import {
   Check,
   X,
   Eye,
+  Banknote,
+  Truck,
 } from "lucide-react";
+import { ProductDecisionSummary } from "./ProductDecisionSummary";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { useCart } from "#root/lib/context/CartContext";
 import { useTracking } from "#root/frontend/contexts/TrackingContext";
@@ -480,11 +483,8 @@ export function ProductPageMinimal({
             {/* Main large image */}
             <div className='flex-1'>
               <div className='overflow-hidden bg-perce-surface relative'>
-                {product.available && (
-                  <span className='absolute top-3 start-3 z-10 bg-perce-cta text-perce-ink-inverse text-xs font-medium px-3 py-1'>
-                    {t("new") || "New"}
-                  </span>
-                )}
+                {/* No badge here: a "New" label used to sit on EVERY in-stock
+                    product, which is a claim, not data. */}
                 <img
                   ref={mainImageRef}
                   src={images[selectedImage]?.url || product.imageUrl}
@@ -645,6 +645,9 @@ export function ProductPageMinimal({
               </p>
             )}
 
+            {/* Decision summary — short, real product facts only */}
+            <ProductDecisionSummary product={product} className='border-t border-perce-line pt-3' />
+
             {/* ── Promo text line (CMS-driven) ── */}
             {/* {(() => {
               const promoText =
@@ -717,6 +720,19 @@ export function ProductPageMinimal({
                   {t("buy_now")}
                 </Button>
               )}
+
+              {/* Purchase reassurance — store facts only (cash on delivery is
+                  always offered; every destination is an Egyptian governorate). */}
+              <ul className='flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-perce-ink-muted' data-testid='purchase-reassurance'>
+                <li className='flex items-center gap-1.5'>
+                  <Banknote className='h-3.5 w-3.5' aria-hidden />
+                  {t("product.reassure_cod")}
+                </li>
+                <li className='flex items-center gap-1.5'>
+                  <Truck className='h-3.5 w-3.5' aria-hidden />
+                  {t("product.reassure_delivery")}
+                </li>
+              </ul>
             </div>
 
             {/* ── Product info accordion: About / Shipping / Returns / FAQs / Details / Style It With ── */}
