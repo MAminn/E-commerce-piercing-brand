@@ -13,6 +13,7 @@ import { Badge } from "#root/components/ui/badge";
 import { Heart, ShoppingCart, Eye, Star } from "lucide-react";
 import { useToast } from "#root/components/ui/use-toast";
 import { useCart } from "#root/lib/context/CartContext";
+import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import type { ProductCardTemplateData } from "../../templateRegistry";
 
 interface ModernProductCardTemplateProps {
@@ -26,6 +27,7 @@ const ModernProductCardTemplate: React.FC<ModernProductCardTemplateProps> = ({
 }) => {
   const { toast } = useToast();
   const { addItem } = useCart();
+  const { t } = useMinimalI18n();
   const [isHovered, setIsHovered] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
@@ -65,8 +67,8 @@ const ModernProductCardTemplate: React.FC<ModernProductCardTemplateProps> = ({
     );
 
     toast({
-      title: "Added to cart",
-      description: `${product.name} has been added to your cart.`,
+      title: t("product.added_to_cart"),
+      description: t("product.added_to_cart_body").replace("{name}", product.name),
     });
   };
 
@@ -196,8 +198,8 @@ const ModernProductCardTemplate: React.FC<ModernProductCardTemplateProps> = ({
               size='sm'
               className='bg-gray-900 text-white hover:bg-gray-800 rounded-none px-4 border border-gray-900'
               onClick={handleAddToCart}>
-              <ShoppingCart className='h-4 w-4 mr-2' />
-              Add to Cart
+              <ShoppingCart className='h-4 w-4 me-2' />
+              {t("add_to_cart")}
             </Button>
           )}
 

@@ -3,6 +3,7 @@ import { ProductCard } from "#root/components/shop/ProductCard";
 import { Button } from "#root/components/ui/button";
 import { Link } from "#root/components/utils/Link";
 import { ShoppingBag } from "lucide-react";
+import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 
 export interface FeaturedProduct {
   id: string;
@@ -41,6 +42,7 @@ export function HomeFeaturedProducts({
   viewAllHref = "/shop",
   maxProducts = 8,
 }: HomeFeaturedProductsProps) {
+  const { t } = useMinimalI18n();
   // Limit the number of products displayed
   const displayedProducts = products.slice(0, maxProducts);
 
@@ -94,14 +96,14 @@ export function HomeFeaturedProducts({
           <div className='max-w-md mx-auto text-center py-12 bg-white rounded-lg border border-gray-200'>
             <ShoppingBag className='h-16 w-16 mx-auto text-gray-400 mb-4' />
             <h3 className='text-xl lg:text-2xl font-normal text-stone-900 leading-snug mb-2'>
-              No Featured Products Yet
+              {t("home.no_products_title")}
             </h3>
             <p className='text-sm text-stone-600 font-light leading-relaxed mb-6'>
-              Check back soon for exciting new products!
+              {t("home.no_products_body")}
             </p>
             {showViewAllButton && (
               <Button variant='secondary' size='md' asChild>
-                <Link href={viewAllHref}>Browse All Products</Link>
+                <Link href={viewAllHref}>{t("home.view_all_products")}</Link>
               </Button>
             )}
           </div>
@@ -144,8 +146,8 @@ export function HomeFeaturedProducts({
           <div className='text-center'>
             <Button variant='secondary' size='lg' asChild>
               <Link href={viewAllHref}>
-                View All Products
-                <ShoppingBag className='ml-2 h-5 w-5' />
+                {t("home.view_all_products")}
+                <ShoppingBag className='ms-2 h-5 w-5' />
               </Link>
             </Button>
           </div>

@@ -12,7 +12,7 @@ import { deriveShippingLine, type ShippingLine } from "#root/shared/shipping/che
 import {
   addBundleInstance,
   bundleRegularTotal,
-  bundleUnitCount,
+  cartUnitCount,
   newBundleInstanceId,
   parseStoredBundleInstances,
   removeBundleInstance,
@@ -805,9 +805,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clearPromoCodeNotice = () => setPromoCodeNotice(null);
 
-  const totalItems =
-    items.reduce((total, item) => total + item.quantity, 0) +
-    bundles.reduce((total, b) => total + bundleUnitCount(b), 0);
+  const totalItems = cartUnitCount(items, bundles);
 
   const total = totals.total;
 

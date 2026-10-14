@@ -305,3 +305,42 @@ describe("Pick Your Set builder", () => {
     expect(text("bundle-progress-label")).toBe("اختاري 5 قطع إضافية لتحصلي على خصم 15% + شحن مجاني");
   });
 });
+
+describe("Pick Your Set builder — Arabic core UI", () => {
+  /** The visible text with product names, the campaign title and money removed. */
+  const systemText = () => {
+    let all = document.body.textContent ?? "";
+    for (const name of [...pool.map((p) => p.name), "Pick Your 6", "Flat Back", "Nose", "Fake Piercings"]) {
+      all = all.split(name).join(" ");
+    }
+    return all.replace(/EGP|ج\.م\.?/g, " ");
+  };
+
+  it("intro, filters, search, progress, pricing breakdown, saving and the sticky CTA are all Arabic", async () => {
+    const user = userEvent.setup();
+    renderBuilder("ar");
+    expect(screen.getByText("كوّني طقمك")).toBeTruthy();
+    expect(screen.getByTestId("bundle-search").getAttribute("placeholder")).toBe("ابحثي عن قطعة");
+    expect(screen.getByRole("button", { name: "الكل" })).toBeTruthy();
+    expect(text("bundle-progress-count")).toBe("تم اختيار 0 من 6");
+
+    for (const name of SIX) await user.click(within(tile(name)).getAllByRole("button")[1]!);
+
+    const expected = shared(SIX);
+    const breakdown = text("bundle-breakdown");
+    expect(breakdown).toContain("إجمالي القطع المختارة");
+    expect(text("bundle-percent-discount")).toContain("الخصم (15%)");
+    expect(breakdown).toContain("الشحن");
+    expect(text("bundle-shipping")).toBe("مجاني");
+    expect(breakdown).toContain("إجمالي الطقم");
+    expect(text("bundle-final-total")).toBe(formatMoney(expected.bundleTotal!));
+    expect(text("bundle-you-save")).toBe(`وفّرتِ ${formatMoney(expected.discountAmount!)}`);
+    expect(text("bundle-progress-count")).toBe("تم اختيار 6 من 6");
+    expect(within(screen.getByTestId("bundle-action-bar")).getByTestId("bundle-add-to-bag").textContent).toBe(
+      "أضيفي الطقم إلى الحقيبة",
+    );
+
+    // Nothing of the interface is left in English — only catalogue content.
+    expect(systemText()).not.toMatch(/[A-Za-z]{2,}/);
+  });
+});

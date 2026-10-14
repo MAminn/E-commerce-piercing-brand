@@ -10,6 +10,8 @@ import {
 import { formatMoney } from "#root/shared/pricing/format-money";
 import { useCouponFeedback } from "#root/components/template-system/useCouponFeedback";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
+import { formatItemCount } from "#root/lib/i18n/item-count";
+import { cartUnitCount } from "#root/shared/bundles/cart-instance";
 
 /**
  * CartPageMinimalTemplate
@@ -35,7 +37,7 @@ export function CartPageMinimalTemplate({
 }: CartPageModernTemplateProps) {
   const [couponCode, setCouponCode] = React.useState("");
   const [isApplyingCoupon, setIsApplyingCoupon] = React.useState(false);
-  const { t } = useMinimalI18n();
+  const { t, locale } = useMinimalI18n();
   // Cleared automatically when CartContext drops the code (see the hook).
   const [couponFeedback, setCouponFeedback] = useCouponFeedback(appliedCoupon?.code, couponNotice);
 
@@ -111,7 +113,10 @@ export function CartPageMinimalTemplate({
 
           {/* Page title */}
           <h1 className="text-[22px] sm:text-[28px] font-medium text-perce-ink mb-4 sm:mb-6">
-            Cart <span className="text-perce-ink-muted font-normal text-[16px] sm:text-[18px]">({lineCount} {lineCount === 1 ? "item" : "items"})</span>
+            {t("cart.heading")}{" "}
+            <span className="text-perce-ink-muted font-normal text-[16px] sm:text-[18px]" data-testid="cart-item-count">
+              ({formatItemCount(cartUnitCount(items, bundles), locale, t)})
+            </span>
           </h1>
 
           {/* Offer progress banner */}
@@ -492,13 +497,13 @@ export function CartPageMinimalTemplate({
                       appears only once a fee is configured, exactly as
                       before. */}
                   {totals.shippingStatus === "pending" ? (
-                    <div className="flex justify-between text-[13px] text-perce-ink-secondary">
-                      <span>Shipping</span>
-                      <span>Calculated at checkout</span>
+                    <div className="flex justify-between text-[13px] text-perce-ink-secondary" data-testid="shipping-line">
+                      <span>{t("cart.shipping")}</span>
+                      <span>{t("cart.shipping_calculated_at_checkout")}</span>
                     </div>
                   ) : totals.shipping != null ? (
                     <div className="flex justify-between text-[13px] text-perce-ink-secondary" data-testid="shipping-line">
-                      <span>Shipping</span>
+                      <span>{t("cart.shipping")}</span>
                       <span>
                         {/* 0 means a free-shipping benefit (or a zero-rate
                             zone) — say so rather than dropping the row. */}
@@ -507,7 +512,7 @@ export function CartPageMinimalTemplate({
                     </div>
                   ) : null}
                   <div className="pt-3 border-t border-perce-line flex justify-between text-[15px] font-semibold text-perce-ink">
-                    <span>Total</span>
+                    <span>{t("cart.total")}</span>
                     <span>{formatMoney(totals.grandTotal, { currency })}</span>
                   </div>
                 </div>

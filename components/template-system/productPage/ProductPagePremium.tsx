@@ -312,6 +312,7 @@ function MainImage({
   alt: string;
   onOpenLightbox: () => void;
 }) {
+  const { t } = useMinimalI18n();
   return (
     <div
       className='group relative w-full cursor-pointer overflow-hidden'
@@ -321,7 +322,7 @@ function MainImage({
       <div className='pointer-events-none absolute inset-0 flex items-end justify-center pb-5 opacity-0 transition-opacity duration-300 group-hover:opacity-100'>
         <span className='flex items-center gap-1.5 rounded-full bg-black/40 px-3.5 py-1.5 text-[11px] tracking-wider text-white/90 backdrop-blur-sm'>
           <ZoomIn size={13} />
-          Click to expand
+          {t("product.click_to_expand")}
         </span>
       </div>
     </div>

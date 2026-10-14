@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTracking } from "#root/frontend/contexts/TrackingContext";
-import { TrackingEventName } from "#root/shared/types/pixel-tracking";
-import { STORE_CURRENCY } from "#root/shared/config/branding";
+import { trackPurchaseOnce } from "#root/frontend/tracking/purchase-event";
 import { useCart } from "#root/lib/context/CartContext";
 import { trpc } from "#root/shared/trpc/client";
 import { OrderConfirmationCard } from "./OrderConfirmationCard";
@@ -84,7 +83,8 @@ export default function OrderConfirmationPage() {
           return;
         }
 
-        setLookup({ status: "found", order: { paymentStatus } });
+        const total = typeof result.result?.total === "string" ? result.result.total : null;
+        setLookup({ status: "found", order: { paymentStatus, total } });
         if (paymentStatus !== "pending" && paymentStatus !== "processing") {
           stopPolling();
         }
@@ -123,6 +123,8 @@ export default function OrderConfirmationPage() {
   const { trackEvent } = useTracking();
   const { clearCart } = useCart();
   const hasTrackedCompletion = useRef<string | null>(null);
+  const verifiedTotal =
+    lookup.status === "found" ? (lookup.order.total ?? null) : null;
 
   // ─── Clear cart once the order is known to exist ───────────────────────
   // For online payments, clearCart is NOT called before redirect (so pressing
@@ -142,61 +144,33 @@ export default function OrderConfirmationPage() {
     }
   }, [orderId, view.kind, clearCart]);
 
-  // ─── Fire checkout_completed once per order ────────────────────────────
-  // Only for a verified, placed order — a direct visit must not emit a
-  // Purchase event. Uses sessionStorage keyed by orderId to survive refresh;
-  // the ref guards React strict-mode double-effects within one mount.
+  // ─── Purchase: once per order, only for a verified placed order ────────
+  // `placed` means payment.verify returned the persisted order and it is COD
+  // or paid — a direct visit, an unknown id, a pending or failed payment
+  // never get here. The value is the order's stored total from that same
+  // response, not the `?total=` in the URL. Dedupe (refresh, re-render,
+  // reopened link) is per order id — see frontend/tracking/purchase-event.ts;
+  // the ref only short-circuits strict-mode double effects.
   useEffect(() => {
-    if (!orderId || view.kind !== "placed") return;
+    if (!orderId || view.kind !== "placed" || verifiedTotal === null) return;
     if (hasTrackedCompletion.current === orderId) return;
-
-    const storageKey = `tracked_checkout_completed:${orderId}`;
-    try {
-      if (sessionStorage.getItem(storageKey)) return;
-    } catch {
-      /* SSR or private browsing — fall through to ref guard */
-    }
-
     hasTrackedCompletion.current = orderId;
 
-    try {
-      sessionStorage.setItem(storageKey, "1");
-    } catch {
-      /* best-effort */
-    }
-
-    const totalValue = orderTotal ? Number.parseFloat(orderTotal) : undefined;
-
-    // Retrieve cart items saved by checkout page for richer Purchase events
-    let purchaseItems:
-      | {
-          itemId: string;
-          itemName: string;
-          price?: number;
-          quantity?: number;
-          category?: string;
-        }[]
-      | undefined;
-    try {
-      const raw = sessionStorage.getItem(`checkout_items:${orderId}`);
-      if (raw) {
-        purchaseItems = JSON.parse(raw);
-        // Clean up after reading
-        sessionStorage.removeItem(`checkout_items:${orderId}`);
+    const storage = (name: "localStorage" | "sessionStorage") => {
+      try {
+        return window[name];
+      } catch {
+        return null;
       }
-    } catch {
-      /* best-effort */
-    }
-
-    trackEvent(TrackingEventName.CHECKOUT_COMPLETED, {
-      ecommerce: {
-        currency: STORE_CURRENCY,
-        value: totalValue,
-        transactionId: orderId,
-        items: purchaseItems,
-      },
+    };
+    trackPurchaseOnce({
+      orderId,
+      total: verifiedTotal,
+      trackEvent,
+      local: storage("localStorage"),
+      session: storage("sessionStorage"),
     });
-  }, [orderId, orderTotal, view.kind, trackEvent]);
+  }, [orderId, view.kind, verifiedTotal, trackEvent]);
 
   // Order number, total and email are shown only alongside a verified order,
   // so a crafted `?total=` on a direct visit renders nothing.
@@ -209,7 +183,7 @@ export default function OrderConfirmationPage() {
     <OrderConfirmationCard
       view={view}
       shortId={shortId}
-      orderTotal={orderTotal}
+      orderTotal={verifiedTotal ?? orderTotal}
       customerEmail={customerEmail}
     />
   );

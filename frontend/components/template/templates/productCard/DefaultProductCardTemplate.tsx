@@ -15,6 +15,7 @@ import { Heart, ShoppingCart, Eye } from "lucide-react";
 import { useToast } from "#root/components/ui/use-toast";
 import type { ProductCardTemplateData } from "../../templateRegistry";
 import { useCart } from "#root/lib/context/CartContext";
+import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 
 interface DefaultProductCardTemplateProps {
   data?: ProductCardTemplateData;
@@ -27,6 +28,7 @@ const DefaultProductCardTemplate: React.FC<DefaultProductCardTemplateProps> = ({
 }) => {
   const { toast } = useToast();
   const { addItem } = useCart();
+  const { t } = useMinimalI18n();
   const [isHovered, setIsHovered] = useState(false);
 
   // Use provided data or default values
@@ -65,8 +67,8 @@ const DefaultProductCardTemplate: React.FC<DefaultProductCardTemplateProps> = ({
     );
 
     toast({
-      title: "Added to cart",
-      description: `${product.name} has been added to your cart.`,
+      title: t("product.added_to_cart"),
+      description: t("product.added_to_cart_body").replace("{name}", product.name),
     });
   };
 
@@ -143,8 +145,8 @@ const DefaultProductCardTemplate: React.FC<DefaultProductCardTemplateProps> = ({
               variant='outline'
               className='flex-1 h-9'
               onClick={handleAddToCart}>
-              <ShoppingCart className='h-4 w-4 mr-2' />
-              Add
+              <ShoppingCart className='h-4 w-4 me-2' />
+              {t("product.add")}
             </Button>
           )}
 

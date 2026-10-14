@@ -2,6 +2,7 @@ import React, {
   createContext,
   useContext,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   useMemo,
@@ -59,6 +60,8 @@ interface TrackingContextValue {
     data?: {
       ecommerce?: EcommerceEventData;
       customProperties?: Record<string, unknown>;
+      /** A deterministic id (e.g. one per order) so platforms can dedupe. Random when omitted. */
+      eventId?: string;
     },
   ) => void;
   sessionId: string;
@@ -67,6 +70,11 @@ interface TrackingContextValue {
 const TrackingContext = createContext<TrackingContextValue | undefined>(
   undefined,
 );
+
+// Layout effects run before every passive effect in the tree, children's
+// included; the server has no effects at all.
+const useIsomorphicLayoutEffect =
+  typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 // ─── Provider ───────────────────────────────────────────────────────────────
 
@@ -83,12 +91,21 @@ export function TrackingProvider({ children }: { children: ReactNode }) {
   // ── Pixel Adapter Wiring ────────────────────────────────────────────────
   const registryRef = useRef<PixelAdapterRegistry | null>(null);
   const hasFiredInitialPageView = useRef(false);
+  // Client pixels are only registered once their configs have been fetched.
+  // An event emitted before that (a page that tracks on mount right after a
+  // full page load — e.g. /order-confirmation's Purchase on the return from
+  // a payment gateway) used to reach an empty registry and was lost for
+  // every pixel, while the page had already marked it as sent. Such events
+  // wait here and are delivered once the adapters are registered.
+  const adaptersReadyRef = useRef(false);
+  const pendingAdapterEventsRef = useRef<TrackingEvent[]>([]);
   const trackEventRef = useRef<
     (
       eventName: TrackingEventName | string,
       data?: {
         ecommerce?: EcommerceEventData;
         customProperties?: Record<string, unknown>;
+        eventId?: string;
       },
     ) => void
   >(() => {});
@@ -190,10 +207,11 @@ export function TrackingProvider({ children }: { children: ReactNode }) {
       data?: {
         ecommerce?: EcommerceEventData;
         customProperties?: Record<string, unknown>;
+        eventId?: string;
       },
     ) => {
       const event: TrackingEvent = {
-        eventId: v7(),
+        eventId: data?.eventId ?? v7(),
         eventName,
         timestamp: Date.now(),
         pageUrl: typeof window !== "undefined" ? window.location.href : "",
@@ -223,7 +241,10 @@ export function TrackingProvider({ children }: { children: ReactNode }) {
   );
   trackEventRef.current = trackEvent;
 
-  useEffect(() => {
+  // A layout effect, so the bus subscription below exists before any page's
+  // own mount effects run (React runs a child's effects before its parent's):
+  // an event a page emits on mount is queued, not lost.
+  useIsomorphicLayoutEffect(() => {
     // Only run client-side
     if (typeof window === "undefined") return;
 
@@ -235,6 +256,15 @@ export function TrackingProvider({ children }: { children: ReactNode }) {
       if (hasFiredInitialPageView.current) return;
       hasFiredInitialPageView.current = true;
       trackEventRef.current(TrackingEventName.PAGE_VIEWED);
+    };
+
+    // PageView first, then whatever the page emitted while configs loaded.
+    const markAdaptersReady = () => {
+      adaptersReadyRef.current = true;
+      fireInitialPageView();
+      const pending = pendingAdapterEventsRef.current;
+      pendingAdapterEventsRef.current = [];
+      for (const event of pending) registry.broadcastEvent(event);
     };
 
     // Fetch enabled client-side configs and bootstrap adapters
@@ -254,7 +284,7 @@ export function TrackingProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        fireInitialPageView();
+        markAdaptersReady();
       })
       .catch(() => {
         // Pixel config fetch failed — gracefully degrade, no pixels fire
@@ -265,17 +295,23 @@ export function TrackingProvider({ children }: { children: ReactNode }) {
           console.debug("[Tracking] Failed to fetch pixel configs");
         }
         if (!cancelled) {
-          fireInitialPageView();
+          markAdaptersReady();
         }
       });
 
     // Subscribe registry.broadcastEvent to the event bus
     const unsubscribe = trackingEventBus.subscribe((event) => {
+      if (!adaptersReadyRef.current) {
+        pendingAdapterEventsRef.current.push(event);
+        return;
+      }
       registry.broadcastEvent(event);
     });
 
     return () => {
       cancelled = true;
+      adaptersReadyRef.current = false;
+      pendingAdapterEventsRef.current = [];
       unsubscribe();
       registry.destroyAll();
       registryRef.current = null;

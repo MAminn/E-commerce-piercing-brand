@@ -681,7 +681,7 @@ export function ProductPageMinimal({
                       onClick={decrementQty}
                       disabled={quantity <= 1}
                       className='w-9 h-11 flex items-center justify-center hover:bg-perce-surface disabled:opacity-30 transition-colors'
-                      aria-label='Decrease quantity'>
+                      aria-label={t("product.decrease")}>
                       <Minus className='w-3.5 h-3.5' />
                     </button>
                     <span className='w-8 h-11 flex items-center justify-center text-sm font-medium tabular-nums'>
@@ -691,7 +691,7 @@ export function ProductPageMinimal({
                       onClick={incrementQty}
                       disabled={quantity >= maxQty}
                       className='w-9 h-11 flex items-center justify-center hover:bg-perce-surface disabled:opacity-30 transition-colors'
-                      aria-label='Increase quantity'>
+                      aria-label={t("product.increase")}>
                       <Plus className='w-3.5 h-3.5' />
                     </button>
                   </div>

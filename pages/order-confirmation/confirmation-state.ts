@@ -31,6 +31,8 @@ export type OrderPaymentStatus =
 /** The subset of the verified order this page renders from. */
 export interface VerifiedOrder {
   paymentStatus: OrderPaymentStatus;
+  /** The persisted `order.total` — what the Purchase event reports. */
+  total?: string | null;
 }
 
 /**

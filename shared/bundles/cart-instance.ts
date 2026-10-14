@@ -60,6 +60,23 @@ export function bundleUnitCount(bundle: Pick<CartBundleInstance, "items">): numb
   return bundle.items.reduce((sum, item) => sum + item.quantity, 0);
 }
 
+/**
+ * The cart's item count: product UNITS, loose and inside sets alike — a PICK6
+ * alone is 6, plus two loose pieces is 8. Every count the shopper sees (header
+ * and bottom-nav badges, cart title, sticky bar) comes from here, so they
+ * cannot disagree. Lines are not units: counting `items.length` is how a
+ * cart holding only a set used to read "0 items".
+ */
+export function cartUnitCount(
+  items: readonly { quantity: number }[],
+  bundles: readonly { items: readonly { quantity: number }[] }[],
+): number {
+  return (
+    items.reduce((sum, item) => sum + item.quantity, 0) +
+    bundles.reduce((sum, bundle) => sum + bundle.items.reduce((s, item) => s + item.quantity, 0), 0)
+  );
+}
+
 export function bundleRegularTotal(items: readonly Pick<CartBundleInstanceItem, "unitPrice" | "quantity">[]): number {
   // Minor-unit sum so 6 × 79.99 doesn't drift.
   const minor = items.reduce((sum, item) => sum + Math.round(item.unitPrice * 100) * item.quantity, 0);

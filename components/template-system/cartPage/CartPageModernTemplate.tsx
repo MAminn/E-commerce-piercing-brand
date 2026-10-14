@@ -1,5 +1,5 @@
 import React from "react";
-import type { ShippingLineStatus } from "#root/shared/shipping/checkout-shipping";
+import type { CartShippingStatus } from "#root/shared/shipping/checkout-shipping";
 import { OfferProgressBanner } from "./OfferProgressBanner";
 import { CartBundleGroup, type CartPageBundleGroup } from "./CartBundleGroup";
 import {
@@ -17,6 +17,8 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
+import { formatItemCount } from "#root/lib/i18n/item-count";
+import { cartUnitCount } from "#root/shared/bundles/cart-instance";
 import { useCouponFeedback } from "#root/components/template-system/useCouponFeedback";
 
 /**
@@ -49,9 +51,11 @@ export interface CartPageTotals {
    * "pending" — the fee depends on a governorate the shopper has not chosen
    * yet (zone shipping); the line reads "Calculated at checkout" and
    * `grandTotal` is the goods total. "quoted" — `shipping` is exact.
+   * "waived" — no quote yet, but a free-shipping set / code / offer already
+   * in the cart waives every destination: `shipping` is 0 ("Free").
    * Absent = legacy caller; treated as "quoted".
    */
-  shippingStatus?: ShippingLineStatus;
+  shippingStatus?: CartShippingStatus;
   grandTotal: number;
   /** Σ (regular value − fixed price) over the bundle instances in the cart. */
   bundleSavings?: number;
@@ -119,7 +123,7 @@ export function CartPageModernTemplate({
   const [isApplyingCoupon, setIsApplyingCoupon] = React.useState(false);
   // Cleared automatically when CartContext drops the code (see the hook).
   const [couponFeedback, setCouponFeedback] = useCouponFeedback(appliedCoupon?.code, couponNotice);
-  const { t } = useMinimalI18n();
+  const { t, locale } = useMinimalI18n();
 
   const handleApplyCoupon = async () => {
     const code = couponCode.trim();
@@ -189,7 +193,7 @@ export function CartPageModernTemplate({
         <h1 className='text-2xl sm:text-3xl font-extrabold uppercase tracking-tight mb-6'>
           {t("cart.title") || "Shopping Cart"}
           <span className='ms-3 text-sm font-semibold tracking-widest text-muted-foreground uppercase'>
-            ({items.length} {items.length === 1 ? "item" : "items"})
+            ({formatItemCount(cartUnitCount(items, bundles), locale, t)})
           </span>
         </h1>
 
@@ -608,7 +612,7 @@ export function CartPageModernTemplate({
 
                 {/* Shipping */}
                 {totals.shippingStatus === "pending" ? (
-                  <div className='flex justify-between'>
+                  <div className='flex justify-between' data-testid='shipping-line'>
                     <span className='text-muted-foreground'>
                       {t("cart.shipping") || "Shipping"}
                     </span>
@@ -617,7 +621,7 @@ export function CartPageModernTemplate({
                     </span>
                   </div>
                 ) : totals.shipping !== undefined ? (
-                  <div className='flex justify-between'>
+                  <div className='flex justify-between' data-testid='shipping-line'>
                     <span className='text-muted-foreground'>
                       {t("cart.shipping") || "Shipping"}
                     </span>

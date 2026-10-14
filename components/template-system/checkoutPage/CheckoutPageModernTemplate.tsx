@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { cn } from "#root/lib/utils";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
+import { formatItemCount } from "#root/lib/i18n/item-count";
 import { OfferProgressBanner } from "#root/components/template-system/cartPage/OfferProgressBanner";
 import {
   AppliedOffersSavings,
@@ -103,6 +104,12 @@ export interface CheckoutPageModernTemplateProps {
   shippingAddress?: CheckoutAddress;
   billingAddress?: CheckoutAddress;
   items: CheckoutOrderSummaryItem[];
+  /**
+   * Product units in the cart (useCart().totalItems — loose pieces plus every
+   * piece inside a set). A set is ONE summary line, so counting `items`
+   * would show a PICK6 as "1 item".
+   */
+  itemCount?: number;
   totals: CheckoutTotals;
   isSubmitting?: boolean;
   errorMessage?: string | null;
@@ -186,6 +193,7 @@ export function CheckoutPageModernTemplate({
   shippingAddress,
   billingAddress,
   items = [],
+  itemCount,
   totals,
   isSubmitting = false,
   errorMessage = null,
@@ -1027,7 +1035,7 @@ export function CheckoutPageModernTemplate({
                     {t("cart.total") || "Total"}
                   </p>
                   <p className='text-xs text-muted-foreground'>
-                    {cartQuantity} {cartQuantity === 1 ? "item" : "items"}
+                    {formatItemCount(itemCount ?? cartQuantity, locale, t)}
                   </p>
                 </div>
                 <div className='text-right shrink-0'>

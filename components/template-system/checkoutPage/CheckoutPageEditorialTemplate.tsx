@@ -18,6 +18,8 @@ import { EditorialChrome } from "../editorial/EditorialChrome";
 import { Reveal } from "../motion/Reveal";
 import { StaggerContainer, StaggerItem } from "../motion/Stagger";
 import { useCouponFeedback } from "#root/components/template-system/useCouponFeedback";
+import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
+import { formatItemCount } from "#root/lib/i18n/item-count";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                             */
@@ -28,6 +30,12 @@ export interface CheckoutPageEditorialTemplateProps {
   shippingAddress?: CheckoutAddress;
   billingAddress?: CheckoutAddress;
   items: CheckoutOrderSummaryItem[];
+  /**
+   * Product units in the cart (useCart().totalItems — loose pieces plus every
+   * piece inside a set). A set is ONE summary line, so counting `items`
+   * would show a PICK6 as "1 item".
+   */
+  itemCount?: number;
   totals: CheckoutTotals;
   isSubmitting?: boolean;
   errorMessage?: string | null;
@@ -64,6 +72,7 @@ export function CheckoutPageEditorialTemplate({
   customer,
   shippingAddress,
   items = [],
+  itemCount,
   totals,
   isSubmitting = false,
   errorMessage,
@@ -81,6 +90,7 @@ export function CheckoutPageEditorialTemplate({
   onGovernorateChange,
   governorateRequired = false,
 }: CheckoutPageEditorialTemplateProps) {
+  const { t, locale } = useMinimalI18n();
   /* Internal form state — field names match the Modern template so
      pages/checkout/+Page.tsx's submit handler works for either template. */
   const [formValues, setFormValues] = useState<Record<string, string>>({
@@ -661,7 +671,7 @@ export function CheckoutPageEditorialTemplate({
                         Total
                       </p>
                       <p className='text-xs text-stone-500'>
-                        {cartQuantity} {cartQuantity === 1 ? "item" : "items"}
+                        {formatItemCount(itemCount ?? cartQuantity, locale, t)}
                       </p>
                     </div>
                     <div className='text-right shrink-0'>

@@ -17,6 +17,9 @@ import type {
 } from "./CartPageModernTemplate";
 import { EditorialChrome } from "../editorial/EditorialChrome";
 import { CartBundleGroup, type CartPageBundleGroup } from "./CartBundleGroup";
+import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
+import { formatItemCount } from "#root/lib/i18n/item-count";
+import { cartUnitCount } from "#root/shared/bundles/cart-instance";
 import { Reveal } from "../motion/Reveal";
 import { StaggerContainer, StaggerItem } from "../motion/Stagger";
 
@@ -64,6 +67,7 @@ export function CartPageEditorialTemplate({
   onProceedToCheckout,
 }: CartPageEditorialTemplateProps) {
   const [couponCode, setCouponCode] = useState("");
+  const { t, locale } = useMinimalI18n();
 
   const handleApplyCoupon = () => {
     if (couponCode.trim() && onApplyCoupon) {
@@ -138,7 +142,7 @@ export function CartPageEditorialTemplate({
             Your Bag
           </h1>
           <p className="mt-1 text-sm text-stone-500">
-            {items.length} {items.length === 1 ? "item" : "items"}
+            {formatItemCount(cartUnitCount(items, bundles), locale, t)}
           </p>
         </div>
         </Reveal>
@@ -300,15 +304,15 @@ export function CartPageEditorialTemplate({
                 ))}
                 {totals.shippingStatus === "pending" ? (
                   <div className="flex justify-between text-stone-600">
-                    <span>Shipping</span>
-                    <span>Calculated at checkout</span>
+                    <span>{t("cart.shipping")}</span>
+                    <span>{t("cart.shipping_calculated_at_checkout")}</span>
                   </div>
                 ) : totals.shipping != null ? (
                   <div className="flex justify-between text-stone-600">
-                    <span>Shipping</span>
+                    <span>{t("cart.shipping")}</span>
                     <span>
                       {totals.shipping === 0
-                        ? "Free"
+                        ? t("cart.free")
                         : formatPrice(totals.shipping, currency)}
                     </span>
                   </div>

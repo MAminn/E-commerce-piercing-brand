@@ -27,6 +27,7 @@ import type {
   HomepageContent,
 } from "#root/shared/types/homepage-content";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
+import { localizeCmsLabel } from "#root/lib/i18n/cms-copy";
 import { VALUE_PROP_ICON_MAP as ICON_MAP } from "#root/components/template-system/shared/value-prop-icons";
 
 /**
@@ -193,6 +194,9 @@ export function LandingTemplateMinimal({
   onCtaClick,
 }: LandingTemplateMinimalProps) {
   const { t, locale } = useMinimalI18n();
+  // CMS section labels in the active language — see lib/i18n/cms-copy.ts.
+  const label = (en: string | null | undefined, ar?: string | null, fallbackKey?: string) =>
+    localizeCmsLabel(locale, t, { en, ar }, fallbackKey);
   const [quickViewProduct, setQuickViewProduct] =
     useState<MinimalProduct | null>(null);
 
@@ -311,7 +315,7 @@ export function LandingTemplateMinimal({
           strip. PerceHero composes image and copy, uses a portrait crop on
           phones, and still degrades to image-only or text-only. */}
       <PerceHero
-        hero={content.hero}
+        hero={{ ...content.hero, ctaText: label(content.hero.ctaText) }}
         slides={heroSlides}
         video={heroVideo}
         onCtaClick={onCtaClick}
@@ -344,9 +348,7 @@ export function LandingTemplateMinimal({
                 photography carry the section. */}
             <div className='mb-8 sm:mb-10'>
               <h2 className='perce-section-title'>
-                {locale === "ar" && content.categories.titleAr
-                  ? content.categories.titleAr
-                  : content.categories.title}
+                {label(content.categories.title, content.categories.titleAr)}
               </h2>
               {content.categories.subtitle?.trim() && (
                 <p className='mt-2 max-w-prose text-sm text-perce-ink-muted'>
@@ -377,17 +379,9 @@ export function LandingTemplateMinimal({
       {content.featuredProducts.enabled && featuredRail.length > 0 && (
         <MinimalProductCarousel
           products={featuredRail}
-          title={
-            locale === "ar" && content.featuredProducts.titleAr
-              ? content.featuredProducts.titleAr
-              : content.featuredProducts.title
-          }
+          title={label(content.featuredProducts.title, content.featuredProducts.titleAr)}
           viewAllHref={`${content.featuredProducts.viewAllLink || "/shop"}${(content.featuredProducts.viewAllLink || "/shop").includes("?") ? "&" : "?"}section=featured`}
-          viewAllText={
-            locale === "ar" && content.featuredProducts.viewAllTextAr
-              ? content.featuredProducts.viewAllTextAr
-              : content.featuredProducts.viewAllText
-          }
+          viewAllText={label(content.featuredProducts.viewAllText, content.featuredProducts.viewAllTextAr)}
           className='bg-perce-bg'
           onQuickView={setQuickViewProduct}
         />
@@ -408,27 +402,18 @@ export function LandingTemplateMinimal({
         <MinimalBundleSection
           id='bundles'
           campaigns={readySets}
-          title={
-            locale === "ar" && content.bundles?.titleAr
-              ? content.bundles.titleAr
-              : content.bundles?.title ||
-                t(
-                  content.bundles?.source === "best_selling"
-                    ? "bundles.best_selling_title"
-                    : "bundles.section_default_title",
-                )
-          }
+          title={label(
+            content.bundles?.title,
+            content.bundles?.titleAr,
+            content.bundles?.source === "best_selling" ? "bundles.best_selling_title" : "bundles.section_default_title",
+          )}
           subtitle={
             locale === "ar" && content.bundles?.subtitleAr
               ? content.bundles.subtitleAr
               : content.bundles?.subtitle
           }
           viewAllHref={content.bundles?.viewAllLink || "/bundles"}
-          viewAllText={
-            locale === "ar" && content.bundles?.viewAllTextAr
-              ? content.bundles.viewAllTextAr
-              : content.bundles?.viewAllText || t("bundles.view_all")
-          }
+          viewAllText={label(content.bundles?.viewAllText, content.bundles?.viewAllTextAr, "bundles.view_all")}
           className='bg-perce-bg'
         />
       )}
@@ -440,17 +425,9 @@ export function LandingTemplateMinimal({
         newInRail.length > 0 && (
           <MinimalProductCarousel
             products={newInRail}
-            title={
-              locale === "ar" && content.newArrivals?.titleAr
-                ? content.newArrivals.titleAr
-                : content.newArrivals?.title || t("new_arrivals")
-            }
+            title={label(content.newArrivals?.title, content.newArrivals?.titleAr, "new_arrivals")}
             viewAllHref={`${content.newArrivals?.viewAllLink || "/shop"}${(content.newArrivals?.viewAllLink || "/shop").includes("?") ? "&" : "?"}section=newarrivals`}
-            viewAllText={
-              locale === "ar" && content.newArrivals?.viewAllTextAr
-                ? content.newArrivals.viewAllTextAr
-                : content.newArrivals?.viewAllText || t("view_all")
-            }
+            viewAllText={label(content.newArrivals?.viewAllText, content.newArrivals?.viewAllTextAr, "view_all")}
             className='bg-perce-surface'
             onQuickView={setQuickViewProduct}
           />
@@ -482,17 +459,9 @@ export function LandingTemplateMinimal({
         saleRail.length > 0 && (
           <MinimalProductCarousel
             products={saleRail}
-            title={
-              locale === "ar" && content.discountedProducts?.titleAr
-                ? content.discountedProducts.titleAr
-                : content.discountedProducts?.title || t("on_sale")
-            }
+            title={label(content.discountedProducts?.title, content.discountedProducts?.titleAr, "on_sale")}
             viewAllHref={`${content.discountedProducts?.viewAllLink || "/shop"}${(content.discountedProducts?.viewAllLink || "/shop").includes("?") ? "&" : "?"}section=offers`}
-            viewAllText={
-              locale === "ar" && content.discountedProducts?.viewAllTextAr
-                ? content.discountedProducts.viewAllTextAr
-                : content.discountedProducts?.viewAllText || t("view_all")
-            }
+            viewAllText={label(content.discountedProducts?.viewAllText, content.discountedProducts?.viewAllTextAr, "view_all")}
             className='bg-perce-bg'
             onQuickView={setQuickViewProduct}
           />

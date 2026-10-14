@@ -22,6 +22,7 @@ import { STORE_CURRENCY } from "#root/shared/config/branding";
 import { navigate } from "vike/client/router";
 import { useTracking } from "#root/frontend/contexts/TrackingContext";
 import { TrackingEventName } from "#root/shared/types/pixel-tracking";
+import { savePurchaseItems } from "#root/frontend/tracking/purchase-event";
 import { getCartSessionToken } from "#root/lib/cart-session";
 import { formatMoney } from "#root/shared/pricing/format-money";
 import { summaryShippingAmount } from "#root/shared/shipping/checkout-shipping";
@@ -355,31 +356,23 @@ export default function CheckoutPage() {
           .catch(() => {});
       }
 
-      // Persist cart items for the Purchase tracking event on confirmation page
-      try {
-        sessionStorage.setItem(
-          `checkout_items:${orderId}`,
-          JSON.stringify([
-            ...items.map((item) => ({
-              itemId: item.id,
-              itemName: item.name,
-              price: item.price,
-              quantity: item.quantity,
-              category: item.categoryName ?? undefined,
-            })),
-            ...bundles.flatMap((b) =>
-              b.items.map((item) => ({
-                itemId: item.productId,
-                itemName: item.name,
-                price: item.unitPrice,
-                quantity: item.quantity,
-                category: item.categoryName ?? undefined,
-              })),
-            ),
-          ]),
-        );
-      } catch {
-        /* best-effort — tracking still works with value/transactionId */
+      // The persisted order lines, for the Purchase event the confirmation
+      // page fires once the order verifies (frontend/tracking/purchase-event).
+      if (orderId) {
+        try {
+          savePurchaseItems(
+            sessionStorage,
+            orderId,
+            result.result?.items ?? [
+              ...items.map((item) => ({ productId: item.id, name: item.name, quantity: item.quantity, price: item.price })),
+              ...bundles.flatMap((b) =>
+                b.items.map((item) => ({ productId: item.productId, name: item.name, quantity: item.quantity, price: item.unitPrice })),
+              ),
+            ],
+          );
+        } catch {
+          /* best-effort — the Purchase still carries value and order id */
+        }
       }
 
       // ─── Online payment: create payment session & redirect ──────────
@@ -466,6 +459,7 @@ export default function CheckoutPage() {
 
   const templateProps: CheckoutPageModernTemplateProps = {
     items: orderItems,
+    itemCount: totalItems,
     totals,
     isSubmitting,
     errorMessage,

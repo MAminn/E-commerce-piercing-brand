@@ -13,7 +13,7 @@ import type {
 import type { CartPageBundleGroup } from "#root/components/template-system/cartPage/CartBundleGroup";
 import { navigate } from "vike/client/router";
 import { formatMoney } from "#root/shared/pricing/format-money";
-import { summaryShippingAmount } from "#root/shared/shipping/checkout-shipping";
+import { cartSummaryShipping, isShippingWaived } from "#root/shared/shipping/checkout-shipping";
 
 export default function CartPage() {
   const {
@@ -36,6 +36,8 @@ export default function CartPage() {
     bundles,
     removeBundle,
     bundleSavings,
+    promoFreeShipping,
+    bundleFreeShipping,
   } = useCart();
   const { getTemplateId } = useTemplate();
   const [isLoading, setIsLoading] = useState(false);
@@ -102,19 +104,35 @@ export default function CartPage() {
 
   // Build totals object
   const totals: CartPageTotals = useMemo(() => {
+    // A waived fee is 0 here (rendered "Free"), never omitted. No
+    // destination is known on the cart page, so in zones mode the fee is
+    // "pending" ("Calculated at checkout") — unless a valid free-shipping set,
+    // code or offer already waives it for every destination (cartSummaryShipping).
+    const shippingRow = cartSummaryShipping(
+      shippingLine,
+      shippingMode,
+      isShippingWaived(appliedOffers, { promoFreeShipping, bundleFreeShipping }),
+    );
     return {
       subtotal,
       discount: discount > 0 ? discount : undefined,
-      // A waived fee is 0 here (rendered "Free"), never omitted — see
-      // summaryShippingAmount. No destination is known on the cart page, so
-      // in zones mode the fee is "pending" ("Calculated at checkout").
-      shipping: summaryShippingAmount(shippingLine, shippingMode),
-      shippingStatus: shippingLine.status,
+      shipping: shippingRow.shipping,
+      shippingStatus: shippingRow.shippingStatus,
       grandTotal: total,
       appliedOffers: appliedOffers.length > 0 ? appliedOffers : undefined,
       bundleSavings: bundleSavings !== 0 ? bundleSavings : undefined,
     };
-  }, [subtotal, discount, shippingLine, shippingMode, total, appliedOffers, bundleSavings]);
+  }, [
+    subtotal,
+    discount,
+    shippingLine,
+    shippingMode,
+    total,
+    appliedOffers,
+    bundleSavings,
+    promoFreeShipping,
+    bundleFreeShipping,
+  ]);
 
   // Handle quantity change
   const handleQuantityChange = (

@@ -86,6 +86,10 @@ export const translations: Record<Locale, Record<string, string>> = {
     "cart.free_shipping": "Free shipping",
     "cart.shipping_calculated_at_checkout": "Calculated at checkout",
     "cart.shipping_unavailable": "Not available for this destination",
+    "cart.heading": "Cart",
+    // Item counts by plural category (see lib/i18n/item-count.ts).
+    "cart.item_count_one": "{count} item",
+    "cart.item_count_other": "{count} items",
 
     // Checkout page
     "checkout.title": "Checkout",
@@ -327,6 +331,17 @@ export const translations: Record<Locale, Record<string, string>> = {
     "curated.add_to_bag": "Add set to bag",
     "curated.sold_out_body": "One or more pieces of this set are out of stock right now.",
     "curated.unit_x": "×{count}",
+    // Homepage section / CTA labels that the CMS stores in English only
+    // (see lib/i18n/cms-copy.ts).
+    "home.shop_all": "Shop all",
+    "home.shop_all_pieces": "Shop all pieces",
+    "home.shop_by_placement": "Shop by placement",
+    "home.view_all_products": "View all products",
+    "home.no_products_title": "No products yet",
+    "home.no_products_body": "New pieces are on the way.",
+    "product.click_to_expand": "Click to expand",
+    "product.add": "Add",
+    "product.added_to_cart_body": "{name} has been added to your cart.",
   },
   ar: {
     // Navbar
@@ -404,6 +419,13 @@ export const translations: Record<Locale, Record<string, string>> = {
     "cart.free_shipping": "شحن مجاني",
     "cart.shipping_calculated_at_checkout": "يُحسب عند إتمام الطلب",
     "cart.shipping_unavailable": "غير متاح لهذه الوجهة",
+    "cart.heading": "السلة",
+    "cart.item_count_zero": "{count} قطعة",
+    "cart.item_count_one": "قطعة واحدة",
+    "cart.item_count_two": "قطعتان",
+    "cart.item_count_few": "{count} قطع",
+    "cart.item_count_many": "{count} قطعة",
+    "cart.item_count_other": "{count} قطعة",
 
     // Checkout page
     "checkout.title": "إتمام الطلب",
@@ -634,5 +656,14 @@ export const translations: Record<Locale, Record<string, string>> = {
     "curated.add_to_bag": "أضيفي الطقم إلى الحقيبة",
     "curated.sold_out_body": "قطعة أو أكثر من هذا الطقم غير متوفرة حاليًا.",
     "curated.unit_x": "×{count}",
+    "home.shop_all": "تسوّقي الكل",
+    "home.shop_all_pieces": "تسوّقي كل القطع",
+    "home.shop_by_placement": "تسوّقي حسب مكان الثقب",
+    "home.view_all_products": "عرض كل المنتجات",
+    "home.no_products_title": "لا توجد منتجات بعد",
+    "home.no_products_body": "قطع جديدة في الطريق.",
+    "product.click_to_expand": "اضغطي للتكبير",
+    "product.add": "أضيفي",
+    "product.added_to_cart_body": "تمت إضافة {name} إلى سلتك.",
   },
 };

@@ -28,6 +28,27 @@ export type ShippingLine =
 
 export type ShippingLineStatus = ShippingLine["status"];
 
+export interface ShippingWaivers {
+  /** A qualifying free-shipping promo code (e.g. PICK6). */
+  promoFreeShipping?: boolean;
+  /** A valid free-shipping Pick Your Set in the cart (e.g. a complete PICK6). */
+  bundleFreeShipping?: boolean;
+}
+
+/**
+ * Whether a free-shipping benefit the cart already qualifies for waives the
+ * fee. Each source is destination-independent — it zeroes the quote of EVERY
+ * deliverable governorate — which is what lets the cart say "Free" before a
+ * governorate is chosen. It never makes an undeliverable destination
+ * deliverable (see deriveShippingLine).
+ */
+export function isShippingWaived(
+  appliedOffers: readonly { freeShipping: boolean }[],
+  waivers: ShippingWaivers = {},
+): boolean {
+  return Boolean(waivers.promoFreeShipping || waivers.bundleFreeShipping || appliedOffers.some((o) => o.freeShipping));
+}
+
 export function deriveShippingLine(
   response: ShippingQuoteResponse | null | undefined,
   appliedOffers: readonly { freeShipping: boolean }[],
@@ -37,7 +58,7 @@ export function deriveShippingLine(
    * zeroes an AVAILABLE quote: an unavailable destination stays unavailable,
    * and a pending quote stays pending.
    */
-  options: { promoFreeShipping?: boolean; bundleFreeShipping?: boolean } = {},
+  options: ShippingWaivers = {},
 ): ShippingLine {
   if (!response) return { status: "pending", fee: 0, baseFee: 0 };
   const { quote } = response;
@@ -81,6 +102,27 @@ export function summaryShippingAmount(line: ShippingLine, mode: "flat" | "zones"
   if (line.fee > 0) return line.fee;
   if (line.freeShipping || mode === "zones") return 0;
   return undefined;
+}
+
+/**
+ * The CART page's shipping row. The cart knows no governorate, so in zones
+ * mode the quote is pending ("Calculated at checkout") — unless the cart
+ * already holds a free-shipping benefit (a valid PICK6, a qualifying
+ * free-shipping code or offer). Those waive every deliverable destination, so
+ * the row says "Free" (`waived`, amount 0) instead of promising a fee that
+ * will not be charged. A cart that loses the benefit (a piece removed, the
+ * code no longer qualifying) is back to pending on the next render; an
+ * unavailable destination stays unavailable.
+ */
+export type CartShippingStatus = ShippingLineStatus | "waived";
+
+export function cartSummaryShipping(
+  line: ShippingLine,
+  mode: "flat" | "zones",
+  waived: boolean,
+): { shipping: number | undefined; shippingStatus: CartShippingStatus } {
+  if (line.status === "pending" && waived) return { shipping: 0, shippingStatus: "waived" };
+  return { shipping: summaryShippingAmount(line, mode), shippingStatus: line.status };
 }
 
 /** Whether "Place order" may be pressed as far as shipping is concerned. */
