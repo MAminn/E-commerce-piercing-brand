@@ -58,6 +58,43 @@ function buildMetaParams(event: TrackingEvent): Record<string, unknown> {
   return params;
 }
 
+// ─── Purchase: an explicit, validated payload ───────────────────────────────
+
+/**
+ * Meta drops a Purchase whose `currency` is not an exact ISO 4217 code
+ * ("Parameter 'currency' is invalid for event 'Purchase'") or whose `value`
+ * is not a number. The store charges every order in Egyptian pounds, so the
+ * Purchase currency is fixed here rather than trusted from the event, which
+ * could carry a build-time env value, a display label or a localized symbol.
+ */
+export const META_PURCHASE_CURRENCY = "EGP";
+
+/** A plain number of pounds (2 dp), or null for anything that is not one. */
+export function toMetaValue(raw: unknown): number | null {
+  const value =
+    typeof raw === "number" ? raw : typeof raw === "string" && /^\s*-?\d+(\.\d+)?\s*$/.test(raw) ? Number(raw) : Number.NaN;
+  if (!Number.isFinite(value) || value < 0) return null;
+  return Math.round(value * 100) / 100;
+}
+
+/**
+ * The literal Purchase parameters: the shared ecommerce fields (content ids,
+ * contents with quantities, num_items) plus a numeric `value`, currency
+ * "EGP" and the order id. Null when there is no usable value — Meta would
+ * reject that Purchase anyway.
+ */
+export function buildMetaPurchaseParams(event: TrackingEvent): Record<string, unknown> | null {
+  const value = toMetaValue(event.ecommerce?.value);
+  if (value === null) return null;
+  const params: Record<string, unknown> = {
+    ...buildMetaParams(event),
+    value,
+    currency: META_PURCHASE_CURRENCY,
+  };
+  if (event.ecommerce?.transactionId) params.order_id = event.ecommerce.transactionId;
+  return params;
+}
+
 // ─── Meta Pixel Adapter ─────────────────────────────────────────────────────
 
 const META_EVENT_MAP = PLATFORM_EVENT_MAP[PixelPlatform.META];
@@ -99,11 +136,22 @@ export class MetaPixelAdapter implements PixelAdapter {
     if (typeof window === "undefined" || typeof window.fbq !== "function") return;
 
     const metaEventName = META_EVENT_MAP[event.eventName as TrackingEventName];
-    const params = buildMetaParams(event);
 
     // Attach eventId for server-side deduplication (Conversions API Phase 3)
     const options: Record<string, unknown> = { eventID: event.eventId };
 
+    if (metaEventName === "Purchase") {
+      const purchase = buildMetaPurchaseParams(event);
+      if (purchase) window.fbq("track", "Purchase", purchase, options);
+      return;
+    }
+
+    // The order's one Purchase comes from checkout_completed above. A custom
+    // event that happens to be named "Purchase" would reach Meta as a second,
+    // unvalidated Purchase with no value or currency — never send it.
+    if (!metaEventName && event.eventName.trim().toLowerCase() === "purchase") return;
+
+    const params = buildMetaParams(event);
     if (metaEventName) {
       // Standard Meta event
       window.fbq("track", metaEventName, params, options);

@@ -3,7 +3,6 @@ import {
   type EcommerceEventData,
   type TrackingProductItem,
 } from "#root/shared/types/pixel-tracking";
-import { STORE_CURRENCY } from "#root/shared/config/branding";
 
 /**
  * The Purchase (`checkout_completed` → Meta `Purchase`) event.
@@ -15,7 +14,7 @@ import { STORE_CURRENCY } from "#root/shared/config/branding";
  * click or on a failed / rejected checkout (the page is never reached).
  *
  * WHAT IT CARRIES: the order's persisted `total` as returned by
- * `payment.verify` (never the `?total=` in the URL), the store currency, the
+ * `payment.verify` (never the `?total=` in the URL), currency "EGP", the
  * order id as `transactionId`, and the persisted order lines `order.create`
  * returned — one Purchase per order, with bundle children listed as the
  * products they are inside that single event.
@@ -28,6 +27,15 @@ import { STORE_CURRENCY } from "#root/shared/config/branding";
  */
 
 export const purchaseEventId = (orderId: string) => `purchase-${orderId}`;
+
+/**
+ * The ISO 4217 code every order is charged in. A literal, deliberately: the
+ * Purchase currency used to be STORE_CURRENCY, which is read from
+ * VITE_CURRENCY / CURRENCY at BUILD time (documented as a "currency label")
+ * and was passed to Meta verbatim — Meta rejects a Purchase whose currency is
+ * not an exact code. Display formatting never feeds this.
+ */
+export const PURCHASE_CURRENCY = "EGP";
 
 /** Written by checkout from the `order.create` response, read here once. */
 export const purchaseItemsKey = (orderId: string) => `checkout_items:${orderId}`;
@@ -78,7 +86,7 @@ export function buildPurchaseEcommerce(input: {
   // as 0 and still burn the order's one event.
   if (!Number.isFinite(value) || value < 0) return null;
   return {
-    currency: STORE_CURRENCY,
+    currency: PURCHASE_CURRENCY,
     value,
     transactionId: input.orderId,
     ...(input.items && input.items.length > 0 ? { items: input.items } : {}),

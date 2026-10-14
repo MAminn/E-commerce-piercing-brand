@@ -27,6 +27,7 @@ describeIfDb("Purchase tracking from persisted orders (integration)", () => {
   let EmailService: typeof import("#root/shared/email/service").EmailService;
   let purchase: typeof import("#root/frontend/tracking/purchase-event");
   let confirmation: typeof import("#root/pages/order-confirmation/confirmation-state");
+  let MetaPixelAdapter: typeof import("#root/frontend/pixel-adapters/meta-pixel-adapter").MetaPixelAdapter;
 
   const TAG = "purchase-it-";
   let fileId: string;
@@ -54,6 +55,7 @@ describeIfDb("Purchase tracking from persisted orders (integration)", () => {
     ({ EmailService } = await import("#root/shared/email/service"));
     purchase = await import("#root/frontend/tracking/purchase-event");
     confirmation = await import("#root/pages/order-confirmation/confirmation-state");
+    ({ MetaPixelAdapter } = await import("#root/frontend/pixel-adapters/meta-pixel-adapter"));
 
     const storeOwner = (await import("#root/shared/config/store")).getStoreOwnerId();
     await db.insert(schema.vendor).values({ id: storeOwner, name: `${TAG}store`, status: "active" }).onConflictDoNothing();
@@ -170,7 +172,24 @@ describeIfDb("Purchase tracking from persisted orders (integration)", () => {
   const browser = () => {
     const local = memoryStorage();
     const session = memoryStorage();
-    const trackEvent = vi.fn();
+    // The real Meta Pixel adapter in front of a stubbed fbq: every tracked
+    // event goes through it exactly as the browser's would.
+    const fbq = vi.fn();
+    (globalThis as unknown as Record<string, unknown>).window = globalThis;
+    (globalThis as unknown as Record<string, unknown>).fbq = fbq;
+    const meta = new MetaPixelAdapter();
+    meta.initialize({ pixelId: "1234567890", enabled: true } as never);
+    fbq.mockClear();
+    const trackEvent = vi.fn<import("#root/frontend/tracking/purchase-event").PurchaseTrackFn>((eventName, data) =>
+      meta.trackEvent({
+        eventId: data?.eventId ?? "random",
+        eventName,
+        timestamp: Date.now(),
+        pageUrl: "https://shop.test/order-confirmation",
+        sessionId: "s",
+        ecommerce: data?.ecommerce,
+      }),
+    );
     const guest = appRouter.createCaller({
       db,
       clientSession: null,
@@ -181,6 +200,7 @@ describeIfDb("Purchase tracking from persisted orders (integration)", () => {
 
     return {
       trackEvent,
+      fbq,
       afterCheckout: (created: { id: string; items: import("#root/frontend/tracking/purchase-event").PersistedOrderLine[] }) =>
         purchase.savePurchaseItems(session, created.id, created.items),
       /** A visit to /order-confirmation?id=… (also: every refresh). */
@@ -216,7 +236,8 @@ describeIfDb("Purchase tracking from persisted orders (integration)", () => {
     expected: { units: number; productIds: string[] },
   ) => {
     expect(b.trackEvent).toHaveBeenCalledTimes(1);
-    const [name, data] = b.trackEvent.mock.calls[0]!;
+    const [name, maybeData] = b.trackEvent.mock.calls[0]!;
+    const data = maybeData as { eventId: string; ecommerce: import("#root/shared/types/pixel-tracking").EcommerceEventData };
     expect(name).toBe("checkout_completed");
     const row = await loadOrder(orderId);
     expect(data.eventId).toBe(`purchase-${orderId}`);
@@ -226,6 +247,18 @@ describeIfDb("Purchase tracking from persisted orders (integration)", () => {
     const items = data.ecommerce.items as { itemId: string; quantity: number }[];
     expect(items.map((i) => i.itemId).sort()).toEqual([...expected.productIds].sort());
     expect(items.reduce((s, i) => s + i.quantity, 0)).toBe(expected.units);
+
+    // …and the literal Meta Pixel call it produced.
+    expect(b.fbq).toHaveBeenCalledTimes(1);
+    const [cmd, eventName, params, options] = b.fbq.mock.calls[0]!;
+    expect([cmd, eventName]).toEqual(["track", "Purchase"]);
+    expect(params.value).toBe(Number(row.total));
+    expect(typeof params.value).toBe("number");
+    expect(params.currency).toBe("EGP");
+    expect(params.order_id).toBe(orderId);
+    expect([...params.content_ids].sort()).toEqual([...expected.productIds].sort());
+    expect(params.num_items).toBe(expected.units);
+    expect(options).toEqual({ eventID: `purchase-${orderId}` });
     return row;
   };
 
@@ -300,6 +333,7 @@ describeIfDb("Purchase tracking from persisted orders (integration)", () => {
     // Whatever id the browser might hold, the server knows no such order.
     expect(await b.openConfirmation("0f1e2d3c-4b5a-4968-8778-6a5b4c3d2e1f")).toBe("not-found");
     expect(b.trackEvent).not.toHaveBeenCalled();
+    expect(b.fbq).not.toHaveBeenCalled();
   });
 
   it("an unpaid online order emits nothing until it is paid", async () => {
@@ -312,5 +346,6 @@ describeIfDb("Purchase tracking from persisted orders (integration)", () => {
     await db.update(schema.order).set({ paymentStatus: "failed" }).where(eq(schema.order.id, created.id));
     expect(await b.openConfirmation(created.id)).toBe("failed");
     expect(b.trackEvent).not.toHaveBeenCalled();
+    expect(b.fbq).not.toHaveBeenCalled();
   });
 });

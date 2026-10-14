@@ -88,7 +88,7 @@ Once at least one pixel is connected, these events fire **with zero configuratio
 | `product_removed_from_cart` | Customer removes an item from their cart |
 | `cart_viewed` | Customer views their cart |
 | `checkout_started` | Customer begins the checkout flow |
-| `checkout_completed` | Meta `Purchase`. Fires once per order on `/order-confirmation`, only after `payment.verify` returns the persisted order as placed (COD, or online and paid) — never on the Place order click or a failed checkout. Value = the stored order total, currency = store currency (EGP), event id `purchase-<orderId>`; refreshes and reopened links do not re-send it. See `frontend/tracking/purchase-event.ts`. |
+| `checkout_completed` | Meta `Purchase`. Fires once per order on `/order-confirmation`, only after `payment.verify` returns the persisted order as placed (COD, or online and paid) — never on the Place order click or a failed checkout. Literal call: fbq("track", "Purchase", { value: <stored order total, a number>, currency: "EGP" (fixed — never the VITE_CURRENCY label), content_ids, contents, num_items, order_id }, { eventID: "purchase-<orderId>" }), event id `purchase-<orderId>`; refreshes and reopened links do not re-send it. See `frontend/tracking/purchase-event.ts`. |
 | `search_submitted` | Customer searches for something |
 | `registration_completed` | New customer creates an account |
 | `login_completed` | Customer logs in |

@@ -97,7 +97,7 @@ describe("MetaPixelAdapter", () => {
     );
   });
 
-  it("should track Purchase event with ecommerce data", () => {
+  it("should track Purchase event with ecommerce data (currency is always EGP)", () => {
     adapter.initialize(makeConfig());
     mockFbq.mockClear();
 
@@ -106,6 +106,7 @@ describe("MetaPixelAdapter", () => {
         eventName: TrackingEventName.CHECKOUT_COMPLETED,
         ecommerce: {
           value: 99.99,
+          // Whatever the event carries, the store charges in EGP.
           currency: "USD",
           items: [
             { itemId: "prod-1", itemName: "Widget", price: 49.99, quantity: 2, category: "Gadgets" },
@@ -119,7 +120,7 @@ describe("MetaPixelAdapter", () => {
       "Purchase",
       {
         value: 99.99,
-        currency: "USD",
+        currency: "EGP",
         content_ids: ["prod-1"],
         contents: [{ id: "prod-1", quantity: 2 }],
         content_type: "product",

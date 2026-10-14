@@ -94,7 +94,8 @@ describe("Purchase reaches the Meta pixel", () => {
     await waitFor(() => expect(fbqTracks("Purchase")).toHaveLength(1));
 
     const [, , params, options] = fbqTracks("Purchase")[0]!;
-    expect(params).toMatchObject({
+    // The literal payload Meta receives.
+    expect(params).toEqual({
       value: 913.75,
       currency: "EGP",
       content_ids: ["p1", "p2"],
@@ -103,7 +104,9 @@ describe("Purchase reaches the Meta pixel", () => {
         { id: "p2", quantity: 4 },
       ],
       content_type: "product",
+      content_name: "A",
       num_items: 6,
+      order_id: ORDER,
     });
     expect(options).toEqual({ eventID: `purchase-${ORDER}` });
 
