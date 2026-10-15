@@ -6,7 +6,7 @@ import { MinimalMobileBottomNav } from "#root/components/template-system/minimal
 import { MinimalComingSoonPage } from "#root/components/template-system/minimal/MinimalComingSoonPage";
 import { MinimalI18nProvider } from "#root/lib/i18n/MinimalI18nContext";
 import { Footer } from "#root/components/globals/Footer";
-import { useContext, useEffect, useRef, useState, memo } from "react";
+import { useContext, useEffect, useMemo, useRef, useState, memo } from "react";
 import "./style.css";
 import { toast, Toaster } from "sonner";
 import { CartToastContainer } from "#root/components/ui/cart-toast";
@@ -30,6 +30,7 @@ import { LayoutSettingsContext } from "#root/frontend/contexts/LayoutSettingsCon
 import type { LayoutSettings } from "#root/shared/types/layout-settings";
 import { DEFAULT_LAYOUT_SETTINGS } from "#root/shared/types/layout-settings";
 import { getStoreOwnerId } from "#root/shared/config/store";
+import { withSetsLinksHidden } from "#root/shared/config/sets-visibility";
 import { trpc } from "#root/shared/trpc/client.js";
 import { authClient } from "#root/lib/auth-client.js";
 
@@ -201,8 +202,14 @@ function LayoutShell({
     | undefined;
 
   // Initialise from SSR data if available — prevents flicker
-  const [layoutSettings, setLayoutSettings] = useState<LayoutSettings>(
+  const [storedLayoutSettings, setLayoutSettings] = useState<LayoutSettings>(
     ssrLayoutSettings ?? DEFAULT_LAYOUT_SETTINGS,
+  );
+  // The storefront's view: CMS links to /bundles drop out while Sets are
+  // temporarily hidden from shoppers (shared/config/sets-visibility).
+  const layoutSettings = useMemo(
+    () => withSetsLinksHidden(storedLayoutSettings),
+    [storedLayoutSettings],
   );
 
   // Fetch CMS layout settings (template-scoped) — only if SSR didn't provide them
