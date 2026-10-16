@@ -9,14 +9,20 @@ import type { SortingPageProduct } from "#root/components/template-system/sortin
 import {
   MinimalCategoryPage,
   PRODUCTS_PER_PAGE,
+  categoryNavProps,
   type MinimalCategoryProduct,
 } from "#root/components/template-system/minimal/MinimalCategoryPage";
+import { useStorefrontCategories } from "#root/hooks/useStorefrontCategories";
+import { storefrontCategoryNav } from "#root/shared/categories/tree";
 
 /**
  * /categories/@slug – Generic dynamic category page.
  *
- * Resolves a category by its slug, fetches products belonging to that category,
- * and renders the active sorting template.
+ * Resolves a category by its slug (or id), fetches its products and renders
+ * the active sorting template. A main category lists its own products plus
+ * every subcategory's, with tabs to narrow to one subcategory; a subcategory
+ * lists its own. Hidden categories resolve to "not found" — see
+ * storefrontCategoryNav in shared/categories/tree.ts.
  * When the store uses the minimal navbar, renders the dedicated MinimalCategoryPage
  * with paginated grid (3 rows × 4 cols) and translated breadcrumbs / controls.
  */
@@ -30,55 +36,22 @@ export default function CategoryPage() {
 
   const [products, setProducts] = useState<SortingPageProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [categoryName, setCategoryName] = useState<string | undefined>(
-    undefined,
+  const { categories, failed } = useStorefrontCategories();
+  const nav = useMemo(
+    () => (categories ? storefrontCategoryNav(categories, slug) : undefined),
+    [categories, slug],
   );
-  const [categoryId, setCategoryId] = useState<string | undefined>(undefined);
-  const [notFound, setNotFound] = useState(false);
+  const notFound = failed || (categories !== null && !nav);
+  const categoryId = nav?.current.id;
+  const categoryName = nav?.current.name;
+  // Stable key so the product fetch re-runs only when the set really changes.
+  const listingKey = nav?.listingIds.join(",");
 
   // Minimal-specific state
   const [currentPage, setCurrentPage] = useState(1);
   const [currentSort, setCurrentSort] = useState("featured");
   const [searchQuery, setSearchQuery] = useState("");
   const [totalProducts, setTotalProducts] = useState(0);
-
-  // Resolve category slug → id + name
-  useEffect(() => {
-    if (!slug) return;
-
-    let cancelled = false;
-
-    const resolve = async () => {
-      try {
-        const result = await trpc.category.view.query();
-        if (cancelled) return;
-
-        if (result.success && result.result) {
-          const match = result.result.find(
-            (cat: { slug?: string; id: string; name: string }) =>
-              cat.slug === slug,
-          );
-          if (match) {
-            setCategoryId(match.id);
-            setCategoryName(match.name);
-            setNotFound(false);
-          } else {
-            setNotFound(true);
-            setIsLoading(false);
-          }
-        }
-      } catch (err) {
-        console.error("Error resolving category:", err);
-        setNotFound(true);
-        setIsLoading(false);
-      }
-    };
-
-    resolve();
-    return () => {
-      cancelled = true;
-    };
-  }, [slug]);
 
   // Map sort value → server-side sortBy param
   const serverSort = useMemo(() => {
@@ -88,9 +61,15 @@ export default function CategoryPage() {
     return undefined;
   }, [currentSort]);
 
+  // A different category starts from page one.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset on navigation only
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [slug]);
+
   // Fetch products for resolved category
   useEffect(() => {
-    if (!categoryId) return;
+    if (!listingKey) return;
 
     let cancelled = false;
 
@@ -98,7 +77,7 @@ export default function CategoryPage() {
       setIsLoading(true);
       try {
         const result = await trpc.product.search.query({
-          categoryIds: [categoryId],
+          categoryIds: listingKey.split(","),
           limit: isMinimal ? PRODUCTS_PER_PAGE : 100,
           offset: isMinimal ? (currentPage - 1) * PRODUCTS_PER_PAGE : 0,
           includeOutOfStock: true,
@@ -135,7 +114,7 @@ export default function CategoryPage() {
     return () => {
       cancelled = true;
     };
-  }, [categoryId, isMinimal, currentPage, serverSort, searchQuery]);
+  }, [listingKey, isMinimal, currentPage, serverSort, searchQuery]);
 
   // Debounced search for minimal template
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -182,6 +161,7 @@ export default function CategoryPage() {
       <MinimalCategoryPage
         products={products as MinimalCategoryProduct[]}
         categoryName={categoryName}
+        {...categoryNavProps(nav)}
         categoryId={categoryId}
         isLoading={isLoading}
         totalProducts={totalProducts}
@@ -224,6 +204,16 @@ export default function CategoryPage() {
               All Products
             </a>
             <span aria-hidden>/</span>
+            {nav && nav.current.id !== nav.main.id && (
+              <>
+                <a
+                  href={`/categories/${encodeURIComponent(nav.main.slug)}`}
+                  className='perce-underline-hover transition-colors hover:text-perce-ink'>
+                  {nav.main.name}
+                </a>
+                <span aria-hidden>/</span>
+              </>
+            )}
             <span aria-current='page' className='truncate text-perce-ink'>
               {categoryName}
             </span>

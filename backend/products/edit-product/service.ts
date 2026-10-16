@@ -9,6 +9,7 @@ import {
 import { ServerError } from "#root/shared/error/server";
 import { and, eq, inArray, not } from "drizzle-orm";
 import { Effect } from "effect";
+import { normalizeProductCategoryIds } from "#root/backend/categories/hierarchy";
 import { z } from "zod";
 import { validateProductRules, fragranceInfoSchema } from "../shared";
 import {
@@ -182,9 +183,15 @@ export const editProduct = (
               .delete(productCategory)
               .where(eq(productCategory.productId, data.id));
 
-            // Then add the new relationships
-            for (let i = 0; i < data.categoryIds.length; i++) {
-              const categoryId = data.categoryIds[i];
+            // Then add the new relationships — normalized so a chosen
+            // subcategory always brings its main category with it.
+            const categoryIds = await normalizeProductCategoryIds(
+              tx,
+              data.categoryId,
+              data.categoryIds,
+            );
+            for (let i = 0; i < categoryIds.length; i++) {
+              const categoryId = categoryIds[i];
               const isPrimary = categoryId === data.categoryId;
 
               await tx.insert(productCategory).values({

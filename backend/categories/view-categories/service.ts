@@ -3,6 +3,7 @@ import { query } from "#root/shared/database/drizzle/db";
 import { category, file, product } from "#root/shared/database/drizzle/schema";
 import { eq, sql } from "drizzle-orm";
 import { storefrontVisibleInCategory } from "../category-products";
+import { buildCategoryTree } from "#root/shared/categories/tree";
 
 import { Effect } from "effect";
 
@@ -50,6 +51,11 @@ export const viewCategories = () =>
             filename: file.diskname,
             type: category.type,
             showOnLanding: category.showOnLanding,
+            parentId: category.parentId,
+            sortOrder: category.sortOrder,
+            hidden: category.hidden,
+            description: category.description,
+            createdAt: category.createdAt,
             // Correlated against `category.id` on the row being selected.
             productCount: sql<number>`(select count(*)::int from ${product} where ${storefrontVisibleInCategory(category.id)})`,
           })
@@ -57,8 +63,16 @@ export const viewCategories = () =>
           .leftJoin(file, eq(category.imageId, file.id))
           .where(eq(category.deleted, false));
 
+        // Tree order — each main category followed by its subcategories,
+        // as the admin arranged them — so every consumer lists categories
+        // the same way. `hidden` rows are included (admin screens need
+        // them); shopper-facing callers filter with shared/categories/tree.
+        const ordered = buildCategoryTree(results).flatMap(
+          ({ children, ...main }) => [main, ...children],
+        );
+
         // Format the category names
-        return results.map((result) => ({
+        return ordered.map((result) => ({
           ...result,
           name: result.name,
           displayName: formatCategoryName(result.name), // Add formatted name without prefix

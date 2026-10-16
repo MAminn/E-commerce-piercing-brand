@@ -442,6 +442,13 @@
       "when": 1791884915724,
       "tag": "0062_bundle_free_shipping",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1792142147609,
+      "tag": "0063_category_hierarchy",
+      "breakpoints": true
     }
   ]
 }

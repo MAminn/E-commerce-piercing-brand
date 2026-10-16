@@ -14,14 +14,38 @@ import {
 } from "#root/lib/i18n/minimal-category-translations";
 import { cn } from "#root/lib/utils";
 import { MinimalTestimonialsSection } from "#root/components/template-system/minimal/MinimalTestimonials";
+import type {
+  CategoryNodeLike,
+  StorefrontCategoryNav,
+} from "#root/shared/categories/tree";
 
 /* ── Types ──────────────────────────────────────────────────────────── */
 
 export interface MinimalCategoryProduct extends MinimalProduct {}
 
+export interface SubcategoryNavItem {
+  id: string;
+  name: string;
+  href: string;
+}
+
+export interface SubcategoryNav {
+  /** Link back to the whole main category ("All"). */
+  allHref: string;
+  /** The subcategory being viewed; omitted on the main category itself. */
+  activeId?: string;
+  items: SubcategoryNavItem[];
+}
+
 export interface MinimalCategoryPageProps {
   products: MinimalCategoryProduct[];
   categoryName?: string;
+  /** Optional line under the heading (the category's admin description). */
+  categoryDescription?: string | null;
+  /** The main category, when the page shows one of its subcategories. */
+  parentCategory?: { name: string; href: string };
+  /** Subcategory tabs. Nothing renders unless there is at least one item. */
+  subcategoryNav?: SubcategoryNav;
   /** When known, live bundle campaigns placed on this category render below the grid. */
   categoryId?: string;
   isLoading?: boolean;
@@ -79,8 +103,10 @@ function useSortOptions() {
 
 function CategoryBreadcrumbs({
   categoryName,
+  parentCategory,
 }: {
   categoryName?: string;
+  parentCategory?: { name: string; href: string };
 }) {
   const ct = useCategoryT();
   const { locale } = useMinimalI18n();
@@ -105,6 +131,19 @@ function CategoryBreadcrumbs({
             className="perce-underline-hover transition-colors hover:text-perce-ink">
             {ct("breadcrumb.shop")}
           </Link>
+          {parentCategory && (
+            <>
+              <ChevronRight
+                aria-hidden
+                className={cn("w-3.5 h-3.5 shrink-0", locale === "ar" && "rotate-180")}
+              />
+              <Link
+                href={parentCategory.href}
+                className="perce-underline-hover truncate transition-colors hover:text-perce-ink">
+                {parentCategory.name}
+              </Link>
+            </>
+          )}
           {categoryName && (
             <>
               <ChevronRight
@@ -119,6 +158,54 @@ function CategoryBreadcrumbs({
         </nav>
       </div>
     </div>
+  );
+}
+
+/* ── Subcategory tabs ────────────────────────────────────────────────── */
+
+/**
+ * "All · Lobe · Helix · Daith" — a quiet text tab row under the heading.
+ * Real links (shareable, crawlable, back-button friendly), not filter state.
+ * Scrolls sideways on a phone instead of wrapping into a block of pills; the
+ * active tab carries the 1px ink rule the rest of the site uses for links.
+ */
+function SubcategoryTabs({ nav }: { nav: SubcategoryNav }) {
+  const ct = useCategoryT();
+  if (nav.items.length === 0) return null;
+
+  const tabs = [
+    { id: "__all", name: ct("subnav.all"), href: nav.allHref, active: !nav.activeId },
+    ...nav.items.map((item) => ({ ...item, active: item.id === nav.activeId })),
+  ];
+
+  return (
+    <nav
+      aria-label={ct("subnav.label")}
+      // The hairline is an inset shadow, not a border: the row scrolls
+      // (overflow-x), which would clip a tab border overlapping a real one,
+      // and children paint over an inset shadow — so the active tab's rule
+      // sits exactly on the hairline.
+      className="-mx-[var(--perce-gutter)] mb-6 overflow-x-auto scrollbar-hide shadow-[inset_0_-1px_0_var(--perce-border)] sm:mx-0 sm:mb-8">
+      <ul className="flex w-max gap-6 px-[var(--perce-gutter)] sm:gap-8 sm:px-0">
+        {tabs.map((tab) => (
+          <li key={tab.id}>
+            {/* A plain <a>: the shared Link component drops aria-current, and
+                Vike routes plain links client-side anyway. */}
+            <a
+              href={tab.href}
+              aria-current={tab.active ? "page" : undefined}
+              className={cn(
+                "inline-flex min-h-11 items-center whitespace-nowrap border-b text-[length:var(--perce-text-small)] font-medium transition-colors",
+                tab.active
+                  ? "border-perce-ink text-perce-ink"
+                  : "border-transparent text-perce-ink-muted hover:text-perce-ink",
+              )}>
+              {tab.name}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
   );
 }
 
@@ -245,6 +332,9 @@ function GridSkeleton() {
 export function MinimalCategoryPage({
   products,
   categoryName,
+  categoryDescription,
+  parentCategory,
+  subcategoryNav,
   categoryId,
   isLoading,
   totalProducts,
@@ -279,7 +369,10 @@ export function MinimalCategoryPage({
   return (
     <div className="perce-header-offset min-h-screen bg-perce-bg">
       {/* Breadcrumbs */}
-      <CategoryBreadcrumbs categoryName={categoryName} />
+      <CategoryBreadcrumbs
+        categoryName={categoryName}
+        parentCategory={parentCategory}
+      />
 
       <div className="bg-perce-bg">
         <div className="perce-container py-6">
@@ -294,6 +387,11 @@ export function MinimalCategoryPage({
             {/* Result count is read from the API's own total, never estimated.
                 Hidden while loading so the number never counts up from a
                 stale page. */}
+            {categoryDescription?.trim() && (
+              <p className="mt-2 max-w-prose text-[length:var(--perce-text-body)] text-perce-ink-muted">
+                {categoryDescription}
+              </p>
+            )}
             {!isLoading && totalProducts > 0 && (
               <p
                 aria-live="polite"
@@ -302,6 +400,8 @@ export function MinimalCategoryPage({
               </p>
             )}
           </div>
+
+          {subcategoryNav && <SubcategoryTabs nav={subcategoryNav} />}
 
           {/* Toolbar: search + sort */}
           {/* Toolbar. Search and sort only — both are backed by real
@@ -418,6 +518,28 @@ export function MinimalCategoryPage({
       />
     </div>
   );
+}
+
+/**
+ * Heading, breadcrumb and tab props for a resolved category (see
+ * storefrontCategoryNav). Tabs always link to /categories/<slug>, whichever
+ * route the shopper arrived on.
+ */
+export function categoryNavProps(
+  nav: StorefrontCategoryNav<CategoryNodeLike & { description?: string | null }> | undefined,
+): Pick<MinimalCategoryPageProps, "categoryDescription" | "parentCategory" | "subcategoryNav"> {
+  if (!nav) return {};
+  const href = (slug: string) => `/categories/${encodeURIComponent(slug)}`;
+  const isSub = nav.current.id !== nav.main.id;
+  return {
+    categoryDescription: nav.current.description,
+    parentCategory: isSub ? { name: nav.main.name, href: href(nav.main.slug) } : undefined,
+    subcategoryNav: {
+      allHref: href(nav.main.slug),
+      activeId: isSub ? nav.current.id : undefined,
+      items: nav.tabs.map((t) => ({ id: t.id, name: t.name, href: href(t.slug) })),
+    },
+  };
 }
 
 export { PRODUCTS_PER_PAGE };

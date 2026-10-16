@@ -37,6 +37,7 @@ import { Label } from "#root/components/ui/label";
 import { Badge } from "#root/components/ui/badge";
 import { Switch } from "#root/components/ui/switch";
 import { trpc } from "#root/shared/trpc/client";
+import { CategoryPicker, type CategoryOption } from "./CategoryPicker";
 
 // Define the interface to match our component
 export interface FileMetadata {
@@ -196,7 +197,7 @@ export function ProductForm({
     /** Merchant-only unit cost in EGP. `null` = not entered yet. */
     costPrice?: number | string | null;
   }>;
-  categories: { id: string; name: string }[];
+  categories: CategoryOption[];
   vendors?: { id: string; name: string }[];
   onSuccess?: () => void;
   isLoading?: boolean;
@@ -768,94 +769,11 @@ export function ProductForm({
             name='categoryIds'
             render={({ field }) => (
               <FormItem className='flex flex-col'>
-                <FormLabel>Categories (select multiple)</FormLabel>
-                <div className='flex flex-wrap gap-2 mb-2'>
-                  {field.value.map((categoryId) => {
-                    const category = categories.find(
-                      (c) => c.id === categoryId,
-                    );
-                    return category ? (
-                      <Badge key={categoryId} className='p-2'>
-                        {category.name}
-                        <button
-                          type='button'
-                          className='ml-1'
-                          onClick={() => {
-                            const newCategoryIds = field.value.filter(
-                              (id) => id !== categoryId,
-                            );
-                            field.onChange(newCategoryIds);
-                          }}>
-                          ×
-                        </button>
-                      </Badge>
-                    ) : null;
-                  })}
-                </div>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button
-                        type='button'
-                        variant='outline'
-                        className={cn(
-                          "w-full justify-between",
-                          field.value.length === 0 && "text-muted-foreground",
-                        )}>
-                        {field.value.length === 0
-                          ? "Select categories"
-                          : `${field.value.length} ${
-                              field.value.length === 1
-                                ? "category"
-                                : "categories"
-                            } selected`}
-                        <ChevronsUpDown className='ml-2 h-4 w-4 shrink-0 opacity-50' />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className='w-full p-0'>
-                    <Command>
-                      <CommandInput placeholder='Search categories...' />
-                      <CommandList>
-                        <CommandEmpty>No categories found.</CommandEmpty>
-                        <CommandGroup>
-                          {categories.map((c) => (
-                            <CommandItem
-                              key={c.id}
-                              onSelect={() => {
-                                const isSelected = field.value.includes(c.id);
-                                let newCategoryIds = [...field.value];
-
-                                if (isSelected) {
-                                  // Remove if already selected
-                                  newCategoryIds = newCategoryIds.filter(
-                                    (id) => id !== c.id,
-                                  );
-                                } else {
-                                  // Add if not selected
-                                  newCategoryIds.push(c.id);
-                                }
-
-                                field.onChange(newCategoryIds);
-                              }}>
-                              <div className='flex items-center'>
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    field.value.includes(c.id)
-                                      ? "opacity-100"
-                                      : "opacity-0",
-                                  )}
-                                />
-                                {c.name}
-                              </div>
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                <CategoryPicker
+                  categories={categories}
+                  value={field.value}
+                  onChange={field.onChange}
+                />
                 <FormMessage />
               </FormItem>
             )}

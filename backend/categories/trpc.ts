@@ -12,6 +12,17 @@ import {
   deleteMainCategoryProcedure,
   toggleCategoryLandingProcedure,
 } from "./main-category-crud/trpc";
+import {
+  reorderCategoriesProcedure,
+  setCategoryVisibilityProcedure,
+  viewCategoryAdminTreeProcedure,
+} from "./category-admin/trpc";
+import {
+  assignProductsProcedure,
+  listCategoryProductsProcedure,
+  moveProductsProcedure,
+  removeProductsProcedure,
+} from "./subcategory-products/trpc";
 
 export const categoriesRouter = t.router({
   create: createCategoryProcedure,
@@ -26,4 +37,12 @@ export const categoriesRouter = t.router({
   renameMain: renameMainCategoryProcedure,
   deleteMain: deleteMainCategoryProcedure,
   toggleLanding: toggleCategoryLandingProcedure,
+  // Hierarchy management + bulk product assignment (admin-only)
+  adminTree: viewCategoryAdminTreeProcedure,
+  reorder: reorderCategoriesProcedure,
+  setVisibility: setCategoryVisibilityProcedure,
+  products: listCategoryProductsProcedure,
+  assignProducts: assignProductsProcedure,
+  removeProducts: removeProductsProcedure,
+  moveProducts: moveProductsProcedure,
 });

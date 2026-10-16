@@ -8,6 +8,7 @@ import {
 } from "#root/shared/database/drizzle/schema";
 import { ServerError } from "#root/shared/error/server";
 import { Effect } from "effect";
+import { normalizeProductCategoryIds } from "#root/backend/categories/hierarchy";
 import { z } from "zod";
 import { validateProductRules, fragranceInfoSchema } from "../shared";
 import {
@@ -149,10 +150,16 @@ export const createProduct = (
             .where(eq(product.id, newProduct.id));
           newProduct.slug = newSlug;
 
-          // Create product-category relationships
+          // Create product-category relationships. Normalized so a chosen
+          // subcategory always brings its main category with it.
           if (data.categoryIds && data.categoryIds.length > 0) {
+            const categoryIds = await normalizeProductCategoryIds(
+              tx,
+              data.categoryId,
+              data.categoryIds,
+            );
             await Promise.all(
-              data.categoryIds.map(async (categoryId) => {
+              categoryIds.map(async (categoryId) => {
                 if (categoryId) {
                   const isPrimary = categoryId === data.categoryId;
 

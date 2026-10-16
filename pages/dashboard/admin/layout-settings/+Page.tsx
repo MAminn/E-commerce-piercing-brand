@@ -101,7 +101,15 @@ export default function LayoutSettingsPage() {
   useEffect(() => {
     trpc.category.view.query().then((res) => {
       if (res.success && res.result) {
-        setCategories(res.result.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })));
+        // Subcategories read "Ear Piercings › Helix" so same-named ones
+        // under different categories can be told apart.
+        const names = new Map(res.result.map((c) => [c.id, c.name]));
+        setCategories(
+          res.result.map((c) => ({
+            id: c.id,
+            name: c.parentId && names.has(c.parentId) ? `${names.get(c.parentId)} › ${c.name}` : c.name,
+          })),
+        );
       }
     }).catch(() => {});
   }, []);

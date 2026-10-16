@@ -36,7 +36,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "#root/components/ui/alert-dialog";
-import { Plus, MoreVertical, Pencil, Trash2, Eye, EyeOff } from "lucide-react";
+import {
+  Plus,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  ArrowUp,
+  ArrowDown,
+  AlertCircle,
+} from "lucide-react";
 import { useData } from "vike-react/useData";
 import { navigate } from "vike/client/router";
 import type { Data } from "./+data";
@@ -64,11 +72,23 @@ export default function Categories() {
     return <ErrorSection error={fetchData.error} />;
   }
 
-  const mainCategories = fetchData.mainCategories;
-  const subCategories = fetchData.subcategories;
+  const mainCategories = fetchData.tree;
 
-  const getSubcategories = (type: string) => {
-    return subCategories.filter((s) => s.type === type);
+  const handleMove = async (index: number, direction: -1 | 1) => {
+    const ids = mainCategories.map((c) => c.id);
+    const target = index + direction;
+    if (target < 0 || target >= ids.length) return;
+    [ids[index], ids[target]] = [ids[target] as string, ids[index] as string];
+    const result = await trpc.category.reorder.mutate({ parentId: null, orderedIds: ids });
+    if (result.success) {
+      navigate("/dashboard/categories");
+    } else {
+      toast({
+        title: "Could not reorder",
+        description: result.error || "Refresh the page and try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleCreateCategory = async () => {
@@ -203,7 +223,8 @@ export default function Categories() {
             <DialogHeader>
               <DialogTitle>Create New Category</DialogTitle>
               <DialogDescription>
-                Add a new main category for organizing products
+                A main category such as “Ear Piercings”. You can add
+                subcategories (e.g. Helix, Lobe) inside it afterwards.
               </DialogDescription>
             </DialogHeader>
             <div className='grid gap-4 py-4'>
@@ -211,7 +232,7 @@ export default function Categories() {
                 <Label htmlFor='name'>Category Name</Label>
                 <Input
                   id='name'
-                  placeholder='e.g., Electronics, Clothing'
+                  placeholder='e.g. Ear Piercings'
                   value={newCategoryName}
                   onChange={(e) => setNewCategoryName(e.target.value)}
                   onKeyDown={(e) => {
@@ -246,9 +267,24 @@ export default function Categories() {
         </Dialog>
       </div>
 
+      {mainCategories.length === 0 && (
+        <Card className='py-12 text-center'>
+          <CardContent>
+            <p className='mb-4 text-slate-500'>
+              No categories yet. Start with a main category such as “Ear
+              Piercings”, then add subcategories inside it.
+            </p>
+            <Button onClick={() => setCreateDialogOpen(true)}>
+              <Plus className='h-4 w-4 mr-2' />
+              Add your first category
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
-        {mainCategories.map((category) => {
-          const subcategories = getSubcategories(category.type);
+        {mainCategories.map((category, index) => {
+          const subcategories = category.children;
 
           return (
             <Card key={category.id} className='relative group'>
@@ -293,6 +329,18 @@ export default function Categories() {
                           Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem
+                          disabled={index === 0}
+                          onClick={() => handleMove(index, -1)}>
+                          <ArrowUp className='h-4 w-4 mr-2' />
+                          Move up
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={index === mainCategories.length - 1}
+                          onClick={() => handleMove(index, 1)}>
+                          <ArrowDown className='h-4 w-4 mr-2' />
+                          Move down
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
                           className='text-red-600'
                           onClick={() => {
                             setSelectedCategory({
@@ -308,8 +356,17 @@ export default function Categories() {
                     </DropdownMenu>
                   </div>
                   <CardDescription>
-                    {subcategories.length} subcategories
+                    {category.productCount} product
+                    {category.productCount === 1 ? "" : "s"} ·{" "}
+                    {subcategories.length} subcategor
+                    {subcategories.length === 1 ? "y" : "ies"}
                   </CardDescription>
+                  {category.unclassifiedCount > 0 && (
+                    <p className='mt-2 flex items-center gap-1.5 text-xs text-amber-700'>
+                      <AlertCircle className='h-3.5 w-3.5 shrink-0' />
+                      {category.unclassifiedCount} not in a subcategory yet
+                    </p>
+                  )}
                   <div className='flex items-center gap-2 mt-2'>
                     <Switch
                       checked={category.showOnLanding !== false}
@@ -322,21 +379,29 @@ export default function Categories() {
                     />
                     <span className='text-xs text-muted-foreground'>
                       {category.showOnLanding !== false
-                        ? "Shown on landing"
-                        : "Hidden from landing"}
+                        ? "Shown on homepage"
+                        : "Not on homepage"}
                     </span>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <ul className='space-y-1'>
-                    {subcategories.slice(0, 3).map((subcategory) => (
-                      <li key={subcategory.id} className='text-sm'>
-                        {subcategory.name} ({subcategory.productCount} products)
+                    {subcategories.slice(0, 4).map((subcategory) => (
+                      <li
+                        key={subcategory.id}
+                        className='flex justify-between gap-2 text-sm'>
+                        <span className={subcategory.hidden ? "text-slate-400" : ""}>
+                          {subcategory.name}
+                          {subcategory.hidden && " (hidden)"}
+                        </span>
+                        <span className='text-slate-500'>
+                          {subcategory.productCount}
+                        </span>
                       </li>
                     ))}
-                    {subcategories.length > 3 && (
+                    {subcategories.length > 4 && (
                       <li className='text-sm text-slate-500'>
-                        +{subcategories.length - 3} more...
+                        +{subcategories.length - 4} more...
                       </li>
                     )}
                     {subcategories.length === 0 && (
@@ -348,7 +413,7 @@ export default function Categories() {
                 </CardContent>
                 <CardFooter>
                   <Button variant='outline' className='w-full' asChild>
-                    <Link href={`/dashboard/categories/${category.type}`}>
+                    <Link href={`/dashboard/categories/${category.id}`}>
                       Manage Subcategories
                     </Link>
                   </Button>

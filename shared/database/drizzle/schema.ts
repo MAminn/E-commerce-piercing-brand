@@ -10,6 +10,7 @@ import {
   timestamp,
   uuid,
   uniqueIndex,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { v7 } from "uuid";
@@ -246,8 +247,36 @@ export const category = pgTable("category", {
   }),
   type: text("type").notNull().default("general"), // Changed from enum to text for dynamic categories
   deleted: boolean("deleted").notNull().default(false),
+  /** Featured in the homepage "Shop by placement" strip. */
   showOnLanding: boolean("show_on_landing").notNull().default(true),
-});
+  /**
+   * The main category this row is a subcategory of; NULL for a main category.
+   *
+   * Before this column the hierarchy was implicit: the oldest live row of a
+   * given `type` was the "main" category and every other row of that type was
+   * its subcategory — so the main row also showed up in its own subcategory
+   * list, and renaming a main category (which rewrote its `type`) silently
+   * detached all of its subcategories. Migration 0063 backfilled this column
+   * with exactly that implicit rule, so existing groupings are unchanged.
+   * `type` is still kept equal to the parent's for older readers.
+   */
+  parentId: uuid("parent_id").references((): AnyPgColumn => category.id, {
+    onDelete: "restrict",
+    onUpdate: "cascade",
+  }),
+  /** Position among siblings (lower first); ties fall back to creation order. */
+  sortOrder: integer("sort_order").notNull().default(0),
+  /**
+   * Hidden from shopper navigation (category tabs, homepage, search). Products
+   * keep their memberships and stay listed under the parent category — this
+   * is navigation-only, never a product-visibility switch.
+   */
+  hidden: boolean("hidden").notNull().default(false),
+  /** Optional short description shown under the category heading. */
+  description: text("description"),
+}, (table) => ({
+  parentIdx: index("category_parent_idx").on(table.parentId),
+}));
 
 export const categoryLogAction = pgEnum("category_log_action", [
   "created",

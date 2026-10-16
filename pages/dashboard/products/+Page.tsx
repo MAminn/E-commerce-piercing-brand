@@ -427,11 +427,20 @@ export default function Products() {
                     : Number(selectedProductData.product.costPrice),
                 imageId: selectedProductData.file?.id ?? "",
                 productImages: productImages,
-                categoryIds: selectedProductCategories,
-                categoryId:
-                  selectedProductCategories.length > 0
-                    ? selectedProductCategories[0]
-                    : selectedProductData.product.categoryId || "",
+                // The form treats the first id as the primary category, so
+                // the product's real primary (`product.category_id`) goes
+                // first. The junction list arrives non-primary-first, which
+                // used to re-point the primary on every save, and a product
+                // filed only through the column loaded with no categories.
+                categoryIds: [
+                  ...new Set(
+                    [
+                      selectedProductData.product.categoryId,
+                      ...selectedProductCategories,
+                    ].filter(Boolean),
+                  ),
+                ],
+                categoryId: selectedProductData.product.categoryId || "",
                 variants: selectedProductData.variants.map((v) => ({
                   name: v.name,
                   values: v.values,

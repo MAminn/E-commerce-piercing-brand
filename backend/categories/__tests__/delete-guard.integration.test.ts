@@ -81,7 +81,11 @@ describeIfDb("category delete guards (integration)", () => {
     which: "main" | "sub",
     id: string,
   ): Promise<{ refused: boolean; message: string }> => {
-    const effect =
+    const effect: Effect.Effect<
+      unknown,
+      unknown,
+      import("#root/shared/database/drizzle/db").DatabaseClientService
+    > =
       which === "main"
         ? deleteMainCategory({ id }, session)
         : deleteCategory({ id }, session);

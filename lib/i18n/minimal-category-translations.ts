@@ -43,6 +43,10 @@ export const minimalCategoryT = {
 
     // Product grid
     "products.no_products": "No products found",
+
+    // Subcategory tabs ("All · Lobe · Helix …")
+    "subnav.label": "Shop by type",
+    "subnav.all": "All",
   },
 
   ar: {
@@ -78,6 +82,10 @@ export const minimalCategoryT = {
 
     // Product grid
     "products.no_products": "لا توجد منتجات",
+
+    // Subcategory tabs
+    "subnav.label": "تسوق حسب النوع",
+    "subnav.all": "الكل",
   },
 } as const;
 

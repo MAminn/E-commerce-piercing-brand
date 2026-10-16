@@ -26,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "#root/components/ui/dropdown-menu";
 import { formatMoney } from "#root/shared/pricing/format-money";
+import { visibleToShoppers } from "#root/shared/categories/tree";
 
 /**
  * Percé navbar — the dark brand frame.
@@ -70,7 +71,7 @@ export function MinimalNavbar() {
   useEffect(() => {
     trpc.category.view.query().then((res) => {
       if (res.success && res.result) {
-        setCategories(res.result.map((c: { id: string; name: string; slug?: string }) => ({ id: c.id, name: c.name, slug: c.slug })));
+        setCategories(visibleToShoppers(res.result).map((c: { id: string; name: string; slug?: string }) => ({ id: c.id, name: c.name, slug: c.slug })));
       }
     }).catch(() => {});
   }, []);

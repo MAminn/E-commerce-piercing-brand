@@ -9,17 +9,25 @@ import {
 import { ServerError } from "#root/shared/error/server";
 import { Effect } from "effect";
 import { z } from "zod";
-import slug from "slug";
-import { eq, and, count, sql } from "drizzle-orm";
+import { eq, and, count, isNull } from "drizzle-orm";
 import { attachedToCategory } from "../category-products";
+import {
+  assertImageFree,
+  assertSiblingNameFree,
+  badRequest,
+  nextSortOrder,
+  offerReferences,
+  resolveSlug,
+} from "../hierarchy";
 
 /**
  * Create Main Category
  * Creates a top-level category that can have subcategories
  */
 export const createMainCategorySchema = z.object({
-  name: z.string().nonempty().max(255).min(1, "Category name is required"),
+  name: z.string().trim().max(255).min(1, "Category name is required"),
   imageId: z.string().uuid().optional().nullable(),
+  description: z.string().trim().max(300).optional().nullable(),
 });
 
 export const createMainCategory = (
@@ -42,30 +50,34 @@ export const createMainCategory = (
     return yield* $(
       query(async (db) => {
         return await db.transaction(async (tx) => {
-          // Check if category with same name already exists
-          const existing = await tx
-            .select({ id: category.id })
-            .from(category)
-            .where(
-              and(eq(category.name, input.name), eq(category.deleted, false)),
-            )
-            .then((data) => data[0]);
+          // Only other MAIN categories clash: a subcategory called "Nose"
+          // somewhere else does not block a main category "Nose".
+          await assertSiblingNameFree(tx, input.name, null);
+          await assertImageFree(tx, input.imageId);
 
-          if (existing) {
-            throw new ServerError({
-              tag: "BadRequest",
-              statusCode: 400,
-              clientMessage: `Category "${input.name}" already exists`,
-            });
+          // `type` is the legacy grouping key (still read by product.search's
+          // `categoryType`). Keep it unique per main category so an old type
+          // string never merges two groups.
+          const takenTypes = new Set(
+            (await tx.select({ type: category.type }).from(category)).map(
+              (r) => r.type,
+            ),
+          );
+          let type = input.name.toLowerCase();
+          for (let n = 2; takenTypes.has(type); n++) {
+            type = `${input.name.toLowerCase()}-${n}`;
           }
 
           const newCategory = await tx
             .insert(category)
             .values({
               name: input.name,
-              slug: slug(input.name),
-              type: input.name.toLowerCase() as any, // Dynamic type
+              slug: await resolveSlug(tx, { name: input.name }),
+              type,
+              parentId: null,
               imageId: input.imageId || null,
+              description: input.description || null,
+              sortOrder: await nextSortOrder(tx, null),
             })
             .returning()
             .then((data) => data[0]);
@@ -96,12 +108,13 @@ export const createMainCategory = (
 
 /**
  * Rename Main Category
- * Updates the name and slug of a main category
+ * Updates the name, image and description of a main category (the slug stays)
  */
 export const renameMainCategorySchema = z.object({
   id: z.string().uuid(),
-  name: z.string().nonempty().max(255).min(1, "Category name is required"),
+  name: z.string().trim().max(255).min(1, "Category name is required"),
   imageId: z.string().uuid().optional().nullable(),
+  description: z.string().trim().max(300).optional().nullable(),
 });
 
 export const renameMainCategory = (
@@ -128,7 +141,13 @@ export const renameMainCategory = (
           const existing = await tx
             .select({ id: category.id, name: category.name })
             .from(category)
-            .where(and(eq(category.id, input.id), eq(category.deleted, false)))
+            .where(
+              and(
+                eq(category.id, input.id),
+                eq(category.deleted, false),
+                isNull(category.parentId),
+              ),
+            )
             .then((data) => data[0]);
 
           if (!existing) {
@@ -139,34 +158,23 @@ export const renameMainCategory = (
             });
           }
 
-          // Check if new name conflicts with another category
-          const nameConflict = await tx
-            .select({ id: category.id })
-            .from(category)
-            .where(
-              and(
-                eq(category.name, input.name),
-                eq(category.deleted, false),
-                sql`${category.id} != ${input.id}`,
-              ),
-            )
-            .then((data) => data[0]);
-
-          if (nameConflict) {
-            throw new ServerError({
-              tag: "BadRequest",
-              statusCode: 400,
-              clientMessage: `Category "${input.name}" already exists`,
-            });
+          await assertSiblingNameFree(tx, input.name, null, input.id);
+          if (input.imageId !== undefined) {
+            await assertImageFree(tx, input.imageId, input.id);
           }
 
+          // The slug and `type` are deliberately left alone. Rewriting the
+          // slug broke every link to the category on each rename; rewriting
+          // `type` detached all of its subcategories, because they used to be
+          // grouped by that string (they are linked by parent_id now).
           const updatedCategory = await tx
             .update(category)
             .set({
               name: input.name,
-              slug: slug(input.name),
-              type: input.name.toLowerCase() as any,
               ...(input.imageId !== undefined && { imageId: input.imageId }),
+              ...(input.description !== undefined && {
+                description: input.description || null,
+              }),
               updatedAt: new Date(),
             })
             .where(eq(category.id, input.id))
@@ -246,16 +254,12 @@ export const deleteMainCategory = (
             });
           }
 
-          // Check for subcategories (categories with same type but different ID)
+          // Check for subcategories
           const subcategoryCount = await tx
             .select({ count: count() })
             .from(category)
             .where(
-              and(
-                eq(category.type, targetCategory.type),
-                eq(category.deleted, false),
-                sql`${category.id} != ${input.id}`,
-              ),
+              and(eq(category.parentId, input.id), eq(category.deleted, false)),
             )
             .then((data) => data[0]?.count || 0);
 
@@ -292,6 +296,13 @@ export const deleteMainCategory = (
               statusCode: 400,
               clientMessage: `Cannot delete "${targetCategory.name}". It has ${productCount} products. Please reassign or delete all products first.`,
             });
+          }
+
+          const refs = await offerReferences(tx, input.id);
+          if (refs.promoCodes > 0 || refs.bundles > 0) {
+            throw badRequest(
+              `Cannot delete "${targetCategory.name}": it is used by promo codes or bundles. Remove it there first.`,
+            );
           }
 
           // Safe to delete - soft delete

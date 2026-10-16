@@ -1,4 +1,4 @@
-import { and, eq, or, sql, type SQL } from "drizzle-orm";
+import { and, eq, inArray, or, sql, type SQL } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import { product, productCategory } from "#root/shared/database/drizzle/schema";
 
@@ -41,6 +41,21 @@ export function productBelongsToCategory(
     eq(product.categoryId, categoryRef),
     // 2. Junction table. EXISTS, never a join — see the note above.
     sql`exists (select 1 from ${productCategory} where ${productCategory.productId} = ${product.id} and ${productCategory.categoryId} = ${categoryRef})`,
+  ) as SQL;
+}
+
+/**
+ * `productBelongsToCategory` for a SET of categories — e.g. a main category
+ * and all of its subcategories. Same shape (a predicate, EXISTS not a join),
+ * so a product in several of them still counts once. An empty set matches
+ * nothing.
+ */
+export function productBelongsToAnyCategory(categoryIds: readonly string[]): SQL {
+  if (categoryIds.length === 0) return sql`false`;
+  const ids = [...categoryIds];
+  return or(
+    inArray(product.categoryId, ids),
+    sql`exists (select 1 from ${productCategory} where ${productCategory.productId} = ${product.id} and ${inArray(productCategory.categoryId, ids)})`,
   ) as SQL;
 }
 

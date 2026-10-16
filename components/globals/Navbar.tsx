@@ -47,6 +47,7 @@ import { useNavbarMode } from "./NavbarContext";
 import { useLayoutSettings } from "#root/frontend/contexts/LayoutSettingsContext";
 import { navigate } from "vike/client/router";
 import { HeaderLogo } from "#root/components/globals/HeaderLogo";
+import { visibleToShoppers } from "#root/shared/categories/tree";
 
 interface NavbarProps {
   lang: string;
@@ -83,7 +84,7 @@ const Navbar: React.FC<NavbarProps> = ({
         return;
       }
 
-      setSubcategories(res.result as any);
+      setSubcategories(visibleToShoppers(res.result) as any);
     });
   }, []);
 

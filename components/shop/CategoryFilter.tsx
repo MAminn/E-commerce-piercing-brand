@@ -11,6 +11,7 @@ import { trpc } from "#root/shared/trpc/client";
 import { Checkbox } from "#root/components/ui/checkbox";
 import { Label } from "#root/components/ui/label";
 import { Loader2 } from "lucide-react";
+import { visibleToShoppers } from "#root/shared/categories/tree";
 
 interface Category {
   id: string;
@@ -34,7 +35,7 @@ export default function CategoryFilter({
       try {
         const result = await trpc.category.view.query();
         if (result.success && result.result) {
-          setCategories(result.result);
+          setCategories(visibleToShoppers(result.result));
         }
       } catch (error) {
         console.error("Error fetching categories:", error);

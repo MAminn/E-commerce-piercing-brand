@@ -35,6 +35,7 @@ import { EASE_OUT } from "../motion/motionPresets";
 import { useLayoutSettings } from "#root/frontend/contexts/LayoutSettingsContext";
 import { useNavbarMode } from "#root/components/globals/NavbarContext";
 import { HeaderLogo } from "#root/components/globals/HeaderLogo";
+import { visibleToShoppers } from "#root/shared/categories/tree";
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                         */
@@ -84,7 +85,7 @@ export function EditorialNavbar() {
       .then((res) => {
         if (res.success && Array.isArray(res.result)) {
           setCategories(
-            (res.result as { id: string; name: string; slug: string }[]).map(
+            visibleToShoppers(res.result as { id: string; name: string; slug: string }[]).map(
               (c) => ({ id: c.id, name: c.name, slug: c.slug }),
             ),
           );

@@ -10,6 +10,7 @@ import type { CategoryStripItem } from "#root/components/shop/CategoryStrip";
 import type { NewArrivalProduct } from "#root/components/shop/NewArrivals";
 import { useData } from "vike-react/useData";
 import { DEFAULT_LANDING_TEMPLATE_ID } from "#root/shared/config/storefront";
+import { landingCategories } from "#root/shared/categories/tree";
 import type { Data } from "./+data";
 
 export { Page };
@@ -150,10 +151,13 @@ function Page() {
         const categoriesResult = await trpc.category.view.query();
 
         if (categoriesResult.success && categoriesResult.result) {
-          const mappedCategories: CategoryStripItem[] = categoriesResult.result
-            .filter((cat: any) => !cat.deleted && cat.showOnLanding !== false)
-            .slice(0, 8) // Limit to 8 categories for the strip
-            .map((cat: any) => ({
+          // Featured categories ("Show on homepage") in the admin's order:
+          // each main category, then any of its subcategories the admin
+          // featured. Hidden categories and empty subcategories are skipped.
+          const mappedCategories: CategoryStripItem[] = landingCategories(
+            categoriesResult.result,
+            8, // Limit to 8 categories for the strip
+          ).map((cat) => ({
               id: cat.id,
               name: cat.name,
               slug: cat.slug,

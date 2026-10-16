@@ -9,9 +9,12 @@ import { useSearchParams } from "#root/hooks/useSearchParams";
 import {
   MinimalCategoryPage,
   PRODUCTS_PER_PAGE,
+  categoryNavProps,
   type MinimalCategoryProduct,
 } from "#root/components/template-system/minimal/MinimalCategoryPage";
 import { getStoreOwnerId } from "#root/shared/config/store";
+import { useStorefrontCategories } from "#root/hooks/useStorefrontCategories";
+import { storefrontCategoryNav } from "#root/shared/categories/tree";
 import type { HomepageContent } from "#root/shared/types/homepage-content";
 
 /**
@@ -35,10 +38,23 @@ export default function ShopPage() {
   // Optional category filter from query string
   const categoryParam = searchParams.get("category");
   const sectionParam = searchParams.get("section"); // offers | featured | newarrivals
-  const [categoryId, setCategoryId] = useState<string | undefined>(undefined);
-  const [categoryName, setCategoryName] = useState<string | undefined>(
-    undefined,
+  // Same resolution as /categories/[slug]: a main category includes its
+  // subcategories' products. An unknown or hidden category falls back to
+  // the unfiltered shop — it used to leave the grid on a skeleton forever,
+  // because the fetch waited for an id that would never resolve.
+  const { categories, failed: categoriesFailed } = useStorefrontCategories();
+  const nav = useMemo(
+    () =>
+      categoryParam && categories
+        ? storefrontCategoryNav(categories, categoryParam)
+        : undefined,
+    [categories, categoryParam],
   );
+  const categoryResolving =
+    !!categoryParam && categories === null && !categoriesFailed;
+  const categoryId = nav?.current.id;
+  const categoryName = nav?.current.name;
+  const listingKey = nav?.listingIds.join(",");
 
   // Section-specific filter data from homepage CMS content
   const [sectionProductIds, setSectionProductIds] = useState<
@@ -58,45 +74,10 @@ export default function ShopPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [totalProducts, setTotalProducts] = useState(0);
 
-  // Resolve category slug/id when present
+  // A different category starts from page one.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset on navigation only
   useEffect(() => {
-    if (!categoryParam) {
-      setCategoryId(undefined);
-      setCategoryName(undefined);
-      return;
-    }
-
-    // Reset to prevent stale categoryId from blocking the fetch guard
-    // until the new categoryParam resolves
-    setCategoryId(undefined);
-    setCategoryName(undefined);
     setCurrentPage(1);
-
-    let cancelled = false;
-
-    const resolve = async () => {
-      try {
-        const result = await trpc.category.view.query();
-        if (cancelled) return;
-        if (result.success && result.result) {
-          const match = result.result.find(
-            (cat: { slug?: string; id: string; name: string }) =>
-              cat.slug === categoryParam || cat.id === categoryParam,
-          );
-          if (match) {
-            setCategoryId(match.id);
-            setCategoryName(match.name);
-          }
-        }
-      } catch (err) {
-        console.error("Error resolving category:", err);
-      }
-    };
-
-    resolve();
-    return () => {
-      cancelled = true;
-    };
   }, [categoryParam]);
 
   // Resolve section filter from homepage CMS content
@@ -165,7 +146,7 @@ export default function ShopPage() {
   // Fetch products (all or filtered by category / section)
   useEffect(() => {
     // Wait for category resolution if param is present
-    if (categoryParam && !categoryId) return;
+    if (categoryResolving) return;
     // Wait for section resolution if param is present
     if (sectionParam && !sectionReady) return;
 
@@ -181,7 +162,7 @@ export default function ShopPage() {
           limit: isMinimal ? PRODUCTS_PER_PAGE : 100,
           offset: isMinimal ? (currentPage - 1) * PRODUCTS_PER_PAGE : 0,
           includeOutOfStock: true,
-          categoryIds: categoryId ? [categoryId] : undefined,
+          categoryIds: listingKey ? listingKey.split(",") : undefined,
           search: isMinimal && searchQuery ? searchQuery : undefined,
           sortBy: isMinimal ? effectiveSort : undefined,
           productIds:
@@ -221,8 +202,8 @@ export default function ShopPage() {
       cancelled = true;
     };
   }, [
-    categoryParam,
-    categoryId,
+    categoryResolving,
+    listingKey,
     isMinimal,
     currentPage,
     serverSort,
@@ -261,6 +242,7 @@ export default function ShopPage() {
       <MinimalCategoryPage
         products={products as MinimalCategoryProduct[]}
         categoryName={categoryName}
+        {...categoryNavProps(nav)}
         categoryId={categoryId}
         isLoading={isLoading}
         totalProducts={totalProducts}
