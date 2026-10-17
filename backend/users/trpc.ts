@@ -399,6 +399,7 @@ export const usersRouter = router({
       const orders = await db
         .select({
           id: order.id,
+          orderNumber: order.orderNumber,
           total: order.total,
           status: order.status,
           createdAt: order.createdAt,

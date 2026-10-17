@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useContext } from "react";
 import { trpc } from "#root/shared/trpc/client";
+import { formatOrderNumber } from "#root/shared/orders/order-number";
 import { AuthContext } from "#root/context/AuthContext";
 import { Link } from "#root/components/utils/Link";
 import { navigate } from "vike/client/router";
@@ -30,6 +31,8 @@ interface OrderItem {
 
 interface Order {
   id: string;
+  /** Customer-facing order number (order.order_number). */
+  orderNumber?: number | null;
   customerName: string;
   customerEmail: string | null;
   customerPhone: string;
@@ -188,7 +191,7 @@ export default function OrderHistoryPage() {
                       </div>
                       <div className='min-w-0'>
                         <p className='text-sm font-medium text-perce-ink'>
-                          Order #{order.id.substring(0, 8).toUpperCase()}
+                          Order {formatOrderNumber(order.orderNumber)}
                         </p>
                         <p className='text-xs text-perce-ink-subtle mt-0.5'>
                           {new Date(order.createdAt).toLocaleDateString(

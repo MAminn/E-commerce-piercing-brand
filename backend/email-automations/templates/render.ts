@@ -78,7 +78,9 @@ async function renderGeneric(
   stepKey: string,
 ): Promise<RenderedScheduledEmail> {
   const [template, branding] = await Promise.all([
-    getEffectiveTemplate(row.automationType, stepKey),
+    // Only ever registered for marketing types (registerSingleStep below);
+    // transactional order emails have their own renderers.
+    getEffectiveTemplate(row.automationType as EmailAutomationType, stepKey),
     getEmailBranding(),
   ]);
 

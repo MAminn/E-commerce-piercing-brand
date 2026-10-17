@@ -6,6 +6,7 @@ import { trackPurchaseOnce } from "#root/frontend/tracking/purchase-event";
 import { useCart } from "#root/lib/context/CartContext";
 import { trpc } from "#root/shared/trpc/client";
 import { OrderConfirmationCard } from "./OrderConfirmationCard";
+import { formatOrderNumber } from "#root/shared/orders/order-number";
 import {
   deriveConfirmationView,
   isOrderReference,
@@ -84,7 +85,9 @@ export default function OrderConfirmationPage() {
         }
 
         const total = typeof result.result?.total === "string" ? result.result.total : null;
-        setLookup({ status: "found", order: { paymentStatus, total } });
+        const orderNumber =
+          typeof result.result?.orderNumber === "number" ? result.result.orderNumber : null;
+        setLookup({ status: "found", order: { paymentStatus, total, orderNumber } });
         if (paymentStatus !== "pending" && paymentStatus !== "processing") {
           stopPolling();
         }
@@ -173,16 +176,15 @@ export default function OrderConfirmationPage() {
   }, [orderId, view.kind, verifiedTotal, trackEvent]);
 
   // Order number, total and email are shown only alongside a verified order,
-  // so a crafted `?total=` on a direct visit renders nothing.
-  const shortId =
-    lookup.status === "found" && orderId
-      ? orderId.substring(0, 8).toUpperCase()
-      : "";
+  // so a crafted `?total=` on a direct visit renders nothing. The number is
+  // the server's `order_number` — the same one the confirmation email shows.
+  const orderNumber =
+    lookup.status === "found" ? formatOrderNumber(lookup.order.orderNumber) : "";
 
   return (
     <OrderConfirmationCard
       view={view}
-      shortId={shortId}
+      orderNumber={orderNumber}
       orderTotal={verifiedTotal ?? orderTotal}
       customerEmail={customerEmail}
     />

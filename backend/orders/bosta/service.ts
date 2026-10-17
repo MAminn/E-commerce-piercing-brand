@@ -1,5 +1,7 @@
 import { resolveBostaDropOffAddress } from "./districts";
 import { resolveBostaPickupAddress } from "./pickup";
+import { formatOrderNumber } from "#root/shared/orders/order-number";
+import { STORE_NAME } from "#root/shared/config/branding";
 
 /**
  * Bosta Delivery API service
@@ -45,6 +47,8 @@ export interface BostaReceiver {
 export interface BostaCreateDeliveryInput {
   /** Our internal order ID — stored in businessReference so webhook can find it */
   orderId: string;
+  /** Customer-facing order number (#10001) — printed in the parcel description so the courier and customer share one reference. */
+  orderNumber?: number | null;
   receiver: BostaReceiver;
   dropOffAddress: BostaReceiverAddress;
   /** COD amount — the total to collect. 0 for pre-paid orders */
@@ -143,17 +147,24 @@ export async function createBostaDelivery(
     console.log("[Bosta] Resolved dropOffAddress:", dropOffAddress);
     console.log("[Bosta] Resolved pickupAddress:", pickupAddress);
 
+    const orderRef = formatOrderNumber(input.orderNumber);
     const body = {
       type: 10, // 10 = SEND (standard delivery)
       cod: Math.round(input.cod),
-      notes: input.notes ?? "",
+      notes: [orderRef ? `Order ${orderRef}` : "", input.notes?.trim() ?? ""]
+        .filter(Boolean)
+        .join(" — "),
+      // Stays the UUID: the Bosta webhook resolves the order from it.
       businessReference: input.orderId,
       specs: {
         packageType: "Parcel",
         size: "SMALL",
         packageDetails: {
           itemsCount: Math.max(1, input.itemsCount ?? 1),
-          description: input.notes?.trim() || "Online store order",
+          description:
+            [orderRef ? `${STORE_NAME} order ${orderRef}` : "", input.notes?.trim() ?? ""]
+              .filter(Boolean)
+              .join(" — ") || "Online store order",
         },
       },
       receiver: {

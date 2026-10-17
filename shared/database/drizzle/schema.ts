@@ -468,6 +468,15 @@ export const order = pgTable("order", {
   id: uuid("id")
     .primaryKey()
     .$defaultFn(() => v7()),
+  /**
+   * Customer-facing order number (#10001, #10002, …) — see
+   * shared/orders/order-number.ts. Assigned by Postgres on insert; never set
+   * by application code. Unique; older orders were backfilled in placement
+   * order by migration 0064.
+   */
+  orderNumber: integer("order_number")
+    .notNull()
+    .generatedByDefaultAsIdentity({ startWith: 10001 }),
   userId: text("user_id").references(() => user.id, {
     onDelete: "restrict",
     onUpdate: "cascade",
@@ -587,6 +596,7 @@ export const order = pgTable("order", {
      * passes), so the date alone is the useful key.
      */
     createdAtIdx: index("order_created_at_idx").on(table.createdAt),
+    orderNumberIdx: uniqueIndex("order_order_number_idx").on(table.orderNumber),
   };
 });
 
@@ -1171,6 +1181,9 @@ export const orderLogAction = pgEnum("order_log_action", [
   "bosta_skipped",
   "bosta_cancelled",
   "bosta_status_updated",
+  // Customer order-confirmation email outcomes (backend/orders/order-emails).
+  "confirmation_email_sent",
+  "confirmation_email_failed",
 ]);
 
 export const orderLog = pgTable("order_log", {
@@ -2199,6 +2212,10 @@ export const emailAutomationType = pgEnum("email_automation_type", [
   "new_drops",
   "flash_offer",
   "retention",
+  // Transactional order emails ride the same queue for retry + dedupe, but
+  // are never gated by the marketing toggles (see worker.ts).
+  "order_confirmation",
+  "order_admin_notification",
 ]);
 
 export const scheduledEmailStatus = pgEnum("scheduled_email_status", [

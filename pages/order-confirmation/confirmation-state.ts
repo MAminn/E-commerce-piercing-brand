@@ -33,6 +33,8 @@ export interface VerifiedOrder {
   paymentStatus: OrderPaymentStatus;
   /** The persisted `order.total` — what the Purchase event reports. */
   total?: string | null;
+  /** The customer-facing order number (`order.order_number`). */
+  orderNumber?: number | null;
 }
 
 /**

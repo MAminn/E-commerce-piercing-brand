@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "#
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "#root/components/ui/alert-dialog";
 import { Users, Search, Loader2, CheckCircle, XCircle, Plus, Pencil, Trash2, KeyRound, ShieldCheck, ShieldOff, Eye, RotateCcw, Activity, ShoppingCart, CreditCard, TrendingUp, Package, DollarSign, BarChart2, MousePointerClick } from "lucide-react";
 import { trpc } from "#root/shared/trpc/client";
+import { formatOrderNumber } from "#root/shared/orders/order-number";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -19,13 +20,13 @@ import { Label } from "#root/components/ui/label";
 import { formatMoney } from "#root/shared/pricing/format-money";
 
 interface UserRow { id: string; name: string; email: string; phone: string | null; role: string; emailVerified: boolean; createdAt: Date | string | null; }
-interface OrderRow { id: string; customerName: string; customerEmail: string; total: string; status: string; createdAt: Date | string | null; items: { id: string; name: string; quantity: number; price: string; }[]; }
+interface OrderRow { id: string; orderNumber?: number | null; customerName: string; customerEmail: string; total: string; status: string; createdAt: Date | string | null; items: { id: string; name: string; quantity: number; price: string; }[]; }
 interface UserDetail extends UserRow { orders: OrderRow[]; }
 
 interface CartProduct { productId: string; productName: string; count: number; }
 interface ViewedProduct { productId: string; productName: string; count: number; }
 interface TopPurchased { productId: string; productName: string; timesBought: number; totalSpent: number; }
-interface ActivityOrder { id: string; total: number; status: string; createdAt: Date | null; paymentMethod: string; }
+interface ActivityOrder { id: string; orderNumber?: number | null; total: number; status: string; createdAt: Date | null; paymentMethod: string; }
 interface UserActivityData {
   pageViews: number; productViews: number; cartAdds: number; checkoutStarts: number; purchasesTracked: number;
   cartProducts: CartProduct[]; viewedProducts: ViewedProduct[]; topPurchased: TopPurchased[];
@@ -489,7 +490,7 @@ export default function UsersPage() {
                     {selectedUser.orders.map((o) => (
                       <div key={o.id} className="border rounded-md p-3 text-sm">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="font-medium font-mono text-xs">{o.id.slice(0, 8)}...</span>
+                          <span className="font-medium font-mono text-xs">{formatOrderNumber(o.orderNumber) || o.id}</span>
                           <div className="flex items-center gap-2">
                             <Badge variant="outline" className="capitalize text-xs">{o.status}</Badge>
                             <span className="text-muted-foreground text-xs">{formatDate(o.createdAt)}</span>
@@ -649,7 +650,7 @@ export default function UsersPage() {
                     {activityData.recentOrders.map((o) => (
                       <div key={o.id} className="flex items-center justify-between px-3 py-2.5">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs text-muted-foreground">{o.id.slice(0, 8)}…</span>
+                          <span className="font-mono text-xs text-muted-foreground">{formatOrderNumber(o.orderNumber) || o.id}</span>
                           <Badge
                             variant="outline"
                             className={`capitalize text-xs ${

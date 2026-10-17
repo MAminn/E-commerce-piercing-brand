@@ -9,6 +9,8 @@ import {
   DEFAULT_PRIVACY_PAGE,
   DEFAULT_TERMS_PAGE,
 } from "#root/shared/legal/default-legal-pages";
+import { RETURNS_POLICY_POINTS } from "#root/shared/legal/returns-policy";
+import { SUPPORT_EMAIL } from "#root/shared/config/branding";
 
 /**
  * Meta information for SEO and page head
@@ -555,67 +557,26 @@ export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
     imageUrl: "",
   },
   returnPolicy: {
-    // Ships DISABLED. Every term below is placeholder scaffolding for the
-    // admin to fill in — the return window, refund timing and exclusions are
-    // business facts this store has not established, so /return-policy shows
-    // "not available yet" until an admin publishes real terms.
-    enabled: false,
-    title: "Returns & exchange",
-    titleAr: "الاستبدال والإرجاع",
-    intro:
-      "Our return policy has not been published yet. Set it from Dashboard > Homepage > Return Policy before enabling this page.",
-    introAr:
-      "لم يتم نشر سياسة الإرجاع بعد. يرجى ضبطها من لوحة التحكم قبل تفعيل هذه الصفحة.",
-    steps: [
-      {
-        icon: ValuePropIconType.PACKAGE,
-        title: "1. Return Window",
-        titleAr: "1. فترة الإرجاع",
-        description: "Describe your return window here.",
-        descriptionAr: "اكتب هنا فترة الإرجاع المسموح بها.",
-      },
-      {
-        icon: ValuePropIconType.BOTTLE,
-        title: "2. Eligible Items",
-        titleAr: "2. المنتجات المؤهلة",
-        description: "Describe which items can be returned.",
-        descriptionAr: "اكتب هنا المنتجات المؤهلة للإرجاع.",
-      },
-      {
-        icon: ValuePropIconType.RECEIPT,
-        title: "3. How to Return",
-        titleAr: "3. كيفية الإرجاع",
-        description: "Describe how a customer starts a return.",
-        descriptionAr: "اكتب هنا طريقة بدء عملية الإرجاع.",
-      },
-      {
-        icon: ValuePropIconType.PAYMENT,
-        title: "4. Refunds",
-        titleAr: "4. المبالغ المستردة",
-        description: "Describe how and when refunds are issued.",
-        descriptionAr: "اكتب هنا طريقة وموعد استرداد المبالغ.",
-      },
-    ],
-    detailSections: [
-      {
-        title: "Non-Returnable Items",
-        titleAr: "منتجات غير قابلة للإرجاع",
-        body: "List any items that cannot be returned.",
-        bodyAr: "اكتب هنا المنتجات غير القابلة للإرجاع.",
-      },
-      {
-        title: "Damaged or Wrong Items",
-        titleAr: "منتجات تالفة أو خاطئة",
-        body: "Describe what a customer should do if an order arrives damaged or incorrect.",
-        bodyAr: "اكتب هنا ما يجب فعله عند وصول طلب تالف أو غير صحيح.",
-      },
-    ],
-    footerPrefix:
-      "Need help? We're just an email away. Reach out to us at",
-    footerPrefixAr: "تحتاج مساعدة؟ نحن على بعد بريد إلكتروني. تواصل معنا على",
-    // Empty on purpose — filled from Dashboard > Homepage, or leave blank.
-    // Never inherit a previous brand's inbox here.
-    supportEmail: "",
+    // The owner-approved policy (shared/legal/returns-policy.ts), published by
+    // default. Edited from Dashboard > Homepage > Return Policy; the
+    // order-confirmation email renders whatever is published here. No
+    // exclusions or refund timings are listed — none have been approved.
+    enabled: true,
+    title: "Returns",
+    titleAr: "الإرجاع",
+    intro: "",
+    introAr: "",
+    steps: RETURNS_POLICY_POINTS.map((point, index) => ({
+      icon: index === 0 ? ValuePropIconType.PACKAGE : ValuePropIconType.RECEIPT,
+      title: point.title,
+      titleAr: point.titleAr,
+      description: point.text,
+      descriptionAr: point.textAr,
+    })),
+    detailSections: [],
+    footerPrefix: "Need help with a return? Reach out to us at",
+    footerPrefixAr: "تحتاج مساعدة في الإرجاع؟ تواصل معنا على",
+    supportEmail: SUPPORT_EMAIL,
     footerMiddle: "or via our",
     footerMiddleAr: "أو عبر",
     contactLinkLabel: "Contact Us page",

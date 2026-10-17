@@ -12,6 +12,7 @@ import { Effect } from "effect";
 import { query, DatabaseClientService } from "#root/shared/database/drizzle/db";
 import { order } from "#root/shared/database/drizzle/schema";
 import { eq } from "drizzle-orm";
+import { queueOrderPlacedEmails } from "#root/backend/orders/order-emails/service";
 
 export async function stripeWebhookPlugin(fastify: FastifyInstance) {
   // Only register if Stripe is configured
@@ -71,6 +72,24 @@ export async function stripeWebhookPlugin(fastify: FastifyInstance) {
             fastify.log.info(
               `[Stripe] Payment completed for order ${orderId}`,
             );
+
+            // Payment confirmed — the customer confirmation and the store
+            // notification are queued now (deduped per order, never throws).
+            const [paidOrder] = await Effect.runPromise(
+              query(async (db) =>
+                db
+                  .select({
+                    customerEmail: order.customerEmail,
+                    orderNumber: order.orderNumber,
+                  })
+                  .from(order)
+                  .where(eq(order.id, orderId))
+                  .limit(1),
+              ).pipe(provideDb),
+            );
+            if (paidOrder) {
+              await queueOrderPlacedEmails({ orderId, ...paidOrder });
+            }
           }
           break;
         }

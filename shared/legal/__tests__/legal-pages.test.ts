@@ -80,7 +80,11 @@ describe("shipped drafts", () => {
   it("are the defaults every store loads", () => {
     expect(DEFAULT_HOMEPAGE_CONTENT.terms).toBe(DEFAULT_TERMS_PAGE);
     expect(DEFAULT_HOMEPAGE_CONTENT.privacy).toBe(DEFAULT_PRIVACY_PAGE);
-    expect(getPublishedLegalPages(DEFAULT_HOMEPAGE_CONTENT)).toEqual([]);
+    // Terms and privacy stay unpublished drafts; the owner-approved returns
+    // policy (shared/legal/returns-policy.ts) is the one page live by default.
+    expect(getPublishedLegalPages(DEFAULT_HOMEPAGE_CONTENT).map((p) => p.key)).toEqual([
+      "returnPolicy",
+    ]);
   });
 
   it("do not invent business facts outside a placeholder", () => {
@@ -171,7 +175,7 @@ describe("getPublishedLegalPages", () => {
       }),
     );
     expect(published).toEqual([
-      { key: "returnPolicy", href: "/return-policy", title: "Returns & exchange", titleAr: "الاستبدال والإرجاع" },
+      { key: "returnPolicy", href: "/return-policy", title: "Returns", titleAr: "الإرجاع" },
       { key: "terms", href: "/terms", title: "Terms & conditions", titleAr: "الشروط والأحكام" },
       { key: "privacy", href: "/privacy", title: "Privacy policy", titleAr: "سياسة الخصوصية" },
     ]);
@@ -188,7 +192,8 @@ describe("getPublishedLegalPages", () => {
     const published = getPublishedLegalPages(
       content({ privacy: { ...DEFAULT_PRIVACY_PAGE, enabled: true } }),
     );
-    expect(published).toEqual([]);
+    // (The published-by-default returns page is unaffected.)
+    expect(published.map((p) => p.key)).not.toContain("privacy");
   });
 });
 

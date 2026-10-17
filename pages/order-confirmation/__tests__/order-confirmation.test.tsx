@@ -196,7 +196,7 @@ describe("OrderConfirmationCard rendering", () => {
   it("hides the order number, total and email on a not-found state", () => {
     const html = render(
       { kind: "not-found" },
-      { shortId: "", orderTotal: "4321", customerEmail: "spoof@example.com" },
+      { orderNumber: "", orderTotal: "4321", customerEmail: "spoof@example.com" },
     );
     expect(html).not.toContain("Order number");
     expect(html).not.toContain("Total");
@@ -214,12 +214,12 @@ describe("OrderConfirmationCard rendering", () => {
   it("renders a COD placement without claiming a payment was taken", () => {
     const html = render(
       { kind: "placed", paid: false },
-      { shortId: "0F1E2D3C", orderTotal: "250", customerEmail: "a@b.com" },
+      { orderNumber: "#10001", orderTotal: "250", customerEmail: "a@b.com" },
     );
     expect(html).toContain("Order placed");
     expect(html).toContain("Your order has been received");
     expect(html).not.toContain("Payment received");
-    expect(html).toContain("0F1E2D3C");
+    expect(html).toContain("#10001");
     expect(html).toContain("a@b.com");
   });
 
@@ -230,7 +230,7 @@ describe("OrderConfirmationCard rendering", () => {
   });
 
   it("renders the pending state", () => {
-    const html = render({ kind: "pending" }, { shortId: "0F1E2D3C" });
+    const html = render({ kind: "pending" }, { orderNumber: "#10001" });
     expect(html).toContain("Payment pending");
     expect(html).toContain("Awaiting payment");
     expect(html).not.toContain("Order placed");

@@ -18,8 +18,8 @@ import type { ConfirmationView } from "./confirmation-state";
 
 export interface OrderConfirmationCardProps {
   view: ConfirmationView;
-  /** Short display id, derived from a *verified* order id only. */
-  shortId?: string;
+  /** Customer-facing order number ("#10001"), from a *verified* order only. */
+  orderNumber?: string;
   /** Raw `?total=` value. Shown only once the order is known to exist. */
   orderTotal?: string;
   /** Raw `?email=` value. Shown only once the order is known to exist. */
@@ -37,7 +37,7 @@ export interface OrderConfirmationCardProps {
  */
 export function OrderConfirmationCard({
   view,
-  shortId,
+  orderNumber,
   orderTotal,
   customerEmail,
 }: OrderConfirmationCardProps) {
@@ -121,11 +121,11 @@ export function OrderConfirmationCard({
         {/* Order Details Card — only for an order the server confirmed. */}
         {showDetails && (
           <div className='mt-8 mb-8 space-y-3 overflow-x-auto bg-perce-surface p-6 text-start'>
-            {shortId && (
+            {orderNumber && (
               <div className='flex justify-between items-center flex-wrap gap-2'>
                 <span className='text-sm text-perce-ink-muted'>Order number</span>
                 <span className='font-mono text-sm font-medium text-perce-ink'>
-                  #{shortId}
+                  {orderNumber}
                 </span>
               </div>
             )}

@@ -73,6 +73,7 @@ import {
 } from "lucide-react";
 import { usePageContext } from "vike-react/usePageContext";
 import { trpc } from "#root/shared/trpc/client";
+import { formatOrderNumber, matchesOrderNumber } from "#root/shared/orders/order-number";
 import { useToast } from "#root/components/ui/use-toast";
 import { Pagination } from "#root/components/utils/Pagination";
 import { OrderEditPanel } from "./OrderEditPanel";
@@ -106,6 +107,8 @@ interface OrderItem {
 
 interface Order {
   id: string;
+  /** Customer-facing order number (order.order_number). */
+  orderNumber?: number | null;
   customerName: string;
   customerEmail: string;
   customerPhone: string;
@@ -425,7 +428,7 @@ export default function Orders() {
       if (result.success) {
         toast({
           title: "Order Deleted",
-          description: `Order ${orderToDeleteId.substring(0, 8)}... was deleted.`,
+          description: `Order ${orderLabel(orderToDeleteId)} was deleted.`,
         });
         fetchOrders();
         setOrderToDeleteId(null);
@@ -449,11 +452,16 @@ export default function Orders() {
     }
   };
 
+  /** "#10001" for an order on this page; the full id only if it has no number. */
+  const orderLabel = (id: string) =>
+    formatOrderNumber(orders.find((o) => o.id === id)?.orderNumber) || id;
+
   const filteredOrders = orders.filter((order) => {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return (
         order.id.toLowerCase().includes(query) ||
+        matchesOrderNumber(query, order.orderNumber) ||
         order.customerName.toLowerCase().includes(query) ||
         order.customerEmail.toLowerCase().includes(query) ||
         order.items?.some((item) => item.name.toLowerCase().includes(query))
@@ -808,7 +816,7 @@ export default function Orders() {
                                   aria-label='Sent to Bosta without confirmed payment'
                                 />
                               )}
-                              {order.id.slice(0, 8)}
+                              {formatOrderNumber(order.orderNumber) || order.id}
                             </div>
                           </TableCell>
                           <TableCell className='py-2'>
@@ -896,7 +904,7 @@ export default function Orders() {
                               aria-label='Sent to Bosta without confirmed payment'
                             />
                           )}
-                          #{order.id.slice(0, 8)}
+                          {formatOrderNumber(order.orderNumber) || order.id}
                         </span>
                         <span className='text-xs text-muted-foreground'>
                           {formatRelativeDate(order.createdAt)}
@@ -1640,7 +1648,7 @@ export default function Orders() {
               order
               <span className='font-mono font-semibold'>
                 {" "}
-                {orderToDeleteId?.substring(0, 8)}...
+                {orderToDeleteId ? orderLabel(orderToDeleteId) : ""}
               </span>
             </AlertDialogDescription>
           </AlertDialogHeader>

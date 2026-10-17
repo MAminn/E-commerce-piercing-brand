@@ -157,8 +157,10 @@ describeIfDb("customer order isolation (integration)", () => {
     };
     expect(res.success).toBe(true);
     const keys = Object.keys(res.result).sort();
+    // orderNumber is the order's own display reference (#10001) — shown on the
+    // confirmation page that calls this endpoint — not customer data.
     expect(keys).toEqual(
-      ["id", "paymentMethod", "paymentSessionId", "paymentStatus", "paymentTransactionId", "status", "total"].sort(),
+      ["id", "orderNumber", "paymentMethod", "paymentSessionId", "paymentStatus", "paymentTransactionId", "status", "total"].sort(),
     );
     const serialized = JSON.stringify(res.result);
     expect(serialized).not.toContain(bob.email);

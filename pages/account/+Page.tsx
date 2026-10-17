@@ -2,6 +2,7 @@ import { useContext, useState, useEffect } from "react";
 import type React from "react";
 import { AuthContext } from "#root/context/AuthContext";
 import { trpc } from "#root/shared/trpc/client";
+import { formatOrderNumber } from "#root/shared/orders/order-number";
 import { toast } from "sonner";
 import { navigate } from "vike/client/router";
 import { useForm } from "react-hook-form";
@@ -71,6 +72,8 @@ interface OrderItem {
 
 interface Order {
   id: string;
+  /** Customer-facing order number (order.order_number). */
+  orderNumber?: number | null;
   customerName: string;
   customerEmail: string | null;
   customerPhone: string;
@@ -325,7 +328,7 @@ function OrdersTab() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[13px] font-medium text-perce-ink">#{order.id.substring(0, 8).toUpperCase()}</span>
+                  <span className="text-[13px] font-medium text-perce-ink">{formatOrderNumber(order.orderNumber)}</span>
                   <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${cfg.bg} ${cfg.color}`}>{cfg.label}</span>
                 </div>
                 <div className="flex items-center gap-2 mt-0.5 text-[12px] text-perce-ink-subtle">

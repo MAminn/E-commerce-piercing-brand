@@ -52,9 +52,10 @@ vi.mock("#root/shared/config/branding", async (importOriginal) => {
 });
 
 const { getEmailBranding } = await import("#root/backend/emails/branding");
-const { MinimalOrderEmailTemplate } = await import(
+const { OrderConfirmationEmail } = await import(
   "#root/backend/emails/minimal/order-confirmation"
 );
+const { buildOrderEmailModel } = await import("#root/backend/orders/order-emails/model");
 const { MinimalPasswordResetTemplate } = await import(
   "#root/backend/emails/minimal/password-reset"
 );
@@ -62,7 +63,8 @@ const { MinimalEmailVerificationTemplate } = await import(
   "#root/backend/emails/minimal/email-verification"
 );
 
-const PREVIOUS_BRANDS = /lebsy|lebsey|synt|zeli|perce-eg\.com/i;
+// perce-eg.com is the CURRENT production domain — not a previous brand.
+const PREVIOUS_BRANDS = /lebsy|lebsey|synt|zeli/i;
 
 beforeEach(() => {
   env.storeName = "Percé";
@@ -110,7 +112,6 @@ describe("getEmailBranding", () => {
     "support@lebsy.com",
     "cs@Lebsey.com",
     "syntperfumes@gmail.com",
-    "hello@perce-eg.com",
     "orders@syntperfumes.com",
     "info@mail.lebsy.com",
   ])("never emails a previous brand's inbox (%s)", async (address) => {
@@ -129,6 +130,26 @@ describe("getEmailBranding", () => {
   ])("keeps a current-brand address whose local part holds an old word (%s)", async (address) => {
     layout.header.contactEmail = address;
     expect((await getEmailBranding()).contactEmail).toBe(address);
+  });
+
+  it("treats perce-eg.com as the current production domain", async () => {
+    layout.header.contactEmail = "hello@perce-eg.com";
+    expect((await getEmailBranding()).contactEmail).toBe("hello@perce-eg.com");
+
+    layout.header.contactEmail = "";
+    env.supportEmail = "orders@perce-eg.com";
+    expect((await getEmailBranding()).contactEmail).toBe("orders@perce-eg.com");
+
+    layout.siteTitle = "Percé · perce-eg.com";
+    expect((await getEmailBranding()).storeName).toBe("Percé · perce-eg.com");
+  });
+
+  it("carries the website and WhatsApp contact for every email", async () => {
+    const branding = await getEmailBranding();
+    expect(branding.whatsappDisplay).toBe("+20 103 579 0911");
+    expect(branding.whatsappUrl).toBe("https://wa.me/201035790911");
+    expect(branding.websiteUrl).toMatch(/^https?:\/\//);
+    expect(branding.websiteLabel).not.toMatch(/^https?:/);
   });
 
   it("falls back to SUPPORT_EMAIL, and to no contact line without one", async () => {
@@ -164,24 +185,50 @@ describe("customer emails rendered from a pre-rebrand settings row", () => {
 
   it("order confirmation", async () => {
     const b = await getEmailBranding();
+    const order = buildOrderEmailModel({
+      orderId: "00000000-0000-7000-8000-000000000001",
+      orderNumber: 10001,
+      createdAt: new Date("2026-10-17T10:00:00Z"),
+      customerName: "Nour",
+      customerEmail: "nour@example.com",
+      customerPhone: "01000000000",
+      shippingAddress: "12 Street",
+      shippingCity: "Nasr City",
+      shippingState: "Cairo",
+      shippingGovernorateCode: "CAI",
+      shippingCountry: "Egypt",
+      subtotal: "450.00",
+      shipping: "60.00",
+      discount: null,
+      total: "510.00",
+      paymentMethod: "cod",
+      paymentStatus: "not_required",
+      promoCode: null,
+      notes: null,
+      items: [
+        {
+          id: "i1",
+          name: "Star labret",
+          quantity: 1,
+          price: "450.00",
+          discountPrice: null,
+          selectedOptions: null,
+          orderBundleId: null,
+        },
+      ],
+      bundles: [],
+    });
     const html = await render(
-      MinimalOrderEmailTemplate({
+      OrderConfirmationEmail({
+        order,
         storeName: b.storeName,
         logoUrl: b.logoUrl,
-        contactEmail: b.contactEmail,
-        currency: b.currency,
-        items: [{ name: "Titanium labret", quantity: 1, price: 450 }],
-        shippingFees: 60,
-        subTotal: 450,
-        total: 510,
-        address: "12 Street",
-        city: "Cairo",
-        state: "",
-        postalCode: "",
-        country: "Egypt",
-        customerName: "Nour",
-        customerEmail: "nour@example.com",
-        customerPhone: "01000000000",
+        supportEmail: b.contactEmail,
+        whatsappDisplay: b.whatsappDisplay,
+        whatsappUrl: b.whatsappUrl,
+        websiteUrl: b.websiteUrl,
+        websiteLabel: b.websiteLabel,
+        returns: { lines: [] },
       }),
     );
     expect(html).toContain("Percé");

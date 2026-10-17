@@ -33,7 +33,8 @@ That is deliberate — see `docs/CURRENT_PROJECT.md`.
 | Logo | Dashboard → Layout Settings → Header logo (uploaded file) | none — the header falls back to the store name as text | OPTIONAL FOR FIRST SALE |
 | Email logo | Dashboard → Marketing Emails → Automation Settings; falls back to the header logo | none | OPTIONAL FOR FIRST SALE |
 | Favicon | `assets/favicon.svg` (committed file) | a placeholder mark is committed | OPTIONAL FOR FIRST SALE |
-| Support email | `VITE_SUPPORT_EMAIL` → `SUPPORT_EMAIL` | **none, deliberately** — every contact line is hidden when unset | **REQUIRED FOR FIRST SALE** — a customer whose COD order goes wrong currently has no address to write to. |
+| Support email | `VITE_SUPPORT_EMAIL` → `SUPPORT_EMAIL` | `piercingperce@gmail.com` (owner-confirmed, October 2026). Also the Reply-To of every email. | DONE — override only if the inbox changes. |
+| Support WhatsApp | `VITE_SUPPORT_WHATSAPP` → `SUPPORT_WHATSAPP_E164` | `+201035790911` (owner-confirmed) — shown as +20 103 579 0911 in the order email | DONE |
 | Social URLs (Instagram / Facebook / TikTok / YouTube / WhatsApp) | `VITE_SOCIAL_INSTAGRAM`, `VITE_SOCIAL_FACEBOOK`, `VITE_SOCIAL_TIKTOK`, `VITE_SOCIAL_YOUTUBE`, `VITE_SOCIAL_WHATSAPP` | **none** — footer, `/links` and email icons render nothing | OPTIONAL FOR FIRST SALE. The previous brand's accounts must not be reused. |
 
 ---
@@ -42,7 +43,8 @@ That is deliberate — see `docs/CURRENT_PROJECT.md`.
 
 | Item | Where it is read | Default if unset | Status |
 |---|---|---|---|
-| Production origin | `PUBLIC_ORIGIN`, falling back to `BASE_URL` (`shared/config/site-url.ts`) | none | **REQUIRED FOR FIRST SALE** — `toAbsoluteUrl()` builds every email image URL and every password-reset / verification link from it. Unset means broken images and dead links in transactional email. |
+| Production domain | owner-confirmed: **https://perce-eg.com** (`PRODUCTION_STORE_URL` in `shared/config/branding.ts`) | — | DONE |
+| Production origin | `PUBLIC_ORIGIN`, falling back to `BASE_URL` (`shared/config/site-url.ts`) | none | **REQUIRED FOR FIRST SALE** — set to `https://perce-eg.com`. `toAbsoluteUrl()` builds every email image URL and every password-reset / verification link from it. Unset means broken images and dead links in transactional email. |
 | Canonical store URL | `VITE_STORE_URL`, falling back to `PUBLIC_ORIGIN` / `BASE_URL` | falls back as above | OPTIONAL FOR FIRST SALE (SEO/social preview only) |
 | Trusted origins (auth CORS) | `TRUSTED_ORIGINS` | derived from the origin above | **REQUIRED FOR FIRST SALE** if the storefront is served from more than one hostname. |
 | DNS / TLS | Hosting (Coolify), not the app | — | **REQUIRED FOR FIRST SALE** |
@@ -60,10 +62,12 @@ to the customer.**
 
 | Item | Where it is read | Default if unset | Status |
 |---|---|---|---|
-| `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_PORT` | `shared/email/service.ts` | none → outbound email silently disabled | **REQUIRED FOR FIRST SALE** |
+| `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_PORT` | `shared/email/service.ts` | none → outbound email silently disabled | **REQUIRED FOR FIRST SALE**. Port 465 → implicit TLS; 587 → STARTTLS (required). `SMTP_SECURE=true\|false` overrides. Boot logs `[Email] SMTP connection verified` or `SMTP verification FAILED` (never the credentials). |
 | `EMAIL_FROM_ADDRESS` | send options | falls back to `SMTP_USER` | OPTIONAL FOR FIRST SALE |
-| `EMAIL_FROM_NAME` | send options | falls back to the SMTP account name | OPTIONAL FOR FIRST SALE |
-| Order-confirmation template branding | `backend/emails/branding.ts` → CMS Layout Settings + `shared/config/branding.ts` | store name and logo resolve automatically | already wired (Phase 0) — no action |
+| `EMAIL_FROM_NAME` | send options | falls back to the store name (`Percé`) | Recommended: `Percé` |
+| `EMAIL_REPLY_TO` | send options | falls back to the support email | OPTIONAL |
+| Order confirmation | `backend/orders/order-emails/service.ts` via the email queue (`scheduled_email`, key `order_confirmation:<orderId>`) | COD: queued after the order commits; online payment: queued when payment is confirmed paid | DONE — bilingual EN/AR, retried up to 5 times, outcome on the order's activity log (`confirmation_email_sent` / `confirmation_email_failed`). Not affected by the marketing on/off or test-mode switches. |
+| New-order notification to admins | same queue, key `order_admin_notification:<orderId>:<email>` | every `role = admin` user | DONE — separate operational template |
 | Password reset / email verification | `backend/auth/*` via the same email service | — | **REQUIRED FOR FIRST SALE** if customer accounts are offered at all (guest checkout works without it) |
 
 > The order-confirmation page no longer claims an email was sent. It only
@@ -160,7 +164,7 @@ Everything here lives in the database and is entered through the dashboard.
 | Homepage hero + editorial imagery | Dashboard → Homepage | none | **REQUIRED FOR FIRST SALE** — the homepage is the entry point |
 | Shipping copy (product page accordion) | Dashboard → Settings → product page content | empty → section hidden | **REQUIRED FOR FIRST SALE** once a delivery policy exists |
 | Returns copy (product page accordion) | same | empty → section hidden | **REQUIRED FOR FIRST SALE** once a returns policy exists |
-| Return-policy page | Dashboard → Homepage → Return Policy (`enabled` + body) | disabled → `/return-policy` shows "not available yet" | **REQUIRED FOR FIRST SALE** |
+| Return-policy page | Dashboard → Homepage → Return Policy (`enabled` + steps) | **published by default** with the owner-approved policy (`shared/legal/returns-policy.ts`): 14-day returns for eligible orders; colour-change returns outside the 14-day window. The order-confirmation email renders whatever is published here. | DONE — no exclusions or refund timings have been approved, so none are listed. |
 | Terms & conditions | Dashboard → Homepage → Terms & Conditions Page (`/terms`) | ships as a **disabled draft**: verified store behaviour plus `[Owner input required: …]` placeholders; `/terms` shows "not available yet" and is not linked | **REQUIRED FOR FIRST SALE** as a business decision — seller identity, delivery times, cancellations, returns summary, governing law, contact. The page goes live only once switched on **and** every placeholder is replaced or its section deleted. Checkout does not link to it. |
 | Privacy policy | Dashboard → Homepage → Privacy Policy Page (`/privacy`) | ships as a **disabled draft** describing what the code actually collects, plus placeholders | **REQUIRED FOR FIRST SALE** — responsible business, analytics/advertising services in use, service providers, retention periods, how to request a copy or deletion. Same publish rule as Terms. |
 | FAQs | Dashboard → Settings | empty → FAQ section renders nothing | OPTIONAL FOR FIRST SALE |
@@ -191,9 +195,9 @@ Strictly what blocks the **first real customer order**:
 1. Products and categories in the database, with images.
 2. A shipping fee (or an explicit decision that delivery is free).
 3. `SMTP_*` — otherwise no order confirmation reaches the customer.
-4. `VITE_SUPPORT_EMAIL` — otherwise the customer has nowhere to turn.
-5. `PUBLIC_ORIGIN` and a live domain.
-6. A returns policy (published to `/return-policy`) and delivery terms.
+4. ~~`VITE_SUPPORT_EMAIL`~~ — done: piercingperce@gmail.com.
+5. `PUBLIC_ORIGIN=https://perce-eg.com`.
+6. ~~A returns policy~~ — done; delivery terms still open.
 7. A decision on `coming_soon_mode` until 1–6 are done.
 
 Everything else — Paymob, Stripe, Bosta, Fincart, Meta Pixel, social accounts,

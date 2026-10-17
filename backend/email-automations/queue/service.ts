@@ -13,10 +13,34 @@ export type EmailAutomationType =
   | "flash_offer"
   | "retention";
 
+/**
+ * Order emails that ride the same queue for its retry, dedupe and
+ * claim-locking, but are NOT marketing: they are never gated by the
+ * automation on/off switch or test mode, never checked against marketing
+ * unsubscribes, and never carry an unsubscribe link (see worker.ts).
+ */
+export type TransactionalEmailType =
+  | "order_confirmation"
+  | "order_admin_notification";
+
+/** Every value of the `email_automation_type` column. */
+export type ScheduledEmailType = EmailAutomationType | TransactionalEmailType;
+
+export const TRANSACTIONAL_EMAIL_TYPES: readonly TransactionalEmailType[] = [
+  "order_confirmation",
+  "order_admin_notification",
+];
+
+export function isTransactionalEmailType(
+  type: string,
+): type is TransactionalEmailType {
+  return (TRANSACTIONAL_EMAIL_TYPES as readonly string[]).includes(type);
+}
+
 export type ScheduledEmailLocale = "en" | "ar";
 
 export interface EnqueueScheduledEmailParams {
-  automationType: EmailAutomationType;
+  automationType: ScheduledEmailType;
   recipientEmail: string;
   locale?: ScheduledEmailLocale;
   /** Arbitrary data the template needs to render (order items, product, discount code, campaign id, ...). */
@@ -32,18 +56,25 @@ export interface EnqueueScheduledEmailParams {
 }
 
 /**
- * Schedules a marketing-automation email. Never throws — a queueing failure
- * must not break the checkout/signup/order flow that triggered it. Callers
- * fire-and-forget this, matching backend/orders/order-log.ts's convention.
+ * Schedules an email. Never throws — a queueing failure must not break the
+ * checkout/signup/order flow that triggered it, matching
+ * backend/orders/order-log.ts's convention. Resolves to whether the row is
+ * now queued (true also when the dedupeKey already existed) so a caller that
+ * must record a failure — the order-confirmation flow — can; everyone else
+ * can keep ignoring it.
  */
 export async function enqueueScheduledEmail(
   params: EnqueueScheduledEmailParams,
-): Promise<void> {
+): Promise<boolean> {
   try {
     // Ensure a subscription row (and unsubscribe token) exists as soon as
     // something is queued — not deferred to send time — so the row is
     // visible/manageable immediately and never racing the worker for it.
-    await getOrCreateSubscriptionToken(params.recipientEmail);
+    // Transactional order emails are not marketing and create no
+    // subscription row.
+    if (!isTransactionalEmailType(params.automationType)) {
+      await getOrCreateSubscriptionToken(params.recipientEmail);
+    }
 
     await db()
       .insert(scheduledEmail)
@@ -69,11 +100,13 @@ export async function enqueueScheduledEmail(
         // abandoned cart) must not resurrect or resend a completed send.
         setWhere: eq(scheduledEmail.status, "pending"),
       });
+    return true;
   } catch (err) {
     console.error(
       `[EmailQueue] Failed to enqueue "${params.automationType}" for ${params.recipientEmail} (${params.dedupeKey}):`,
       err,
     );
+    return false;
   }
 }
 
@@ -111,7 +144,7 @@ export async function cancelScheduledEmailsByPrefix(
 // intentionally throw on failure so the worker's own try/catch can log and
 // back off, instead of silently swallowing a real DB problem.
 
-const MAX_ATTEMPTS = 5;
+export const MAX_ATTEMPTS = 5;
 
 /**
  * Atomically claims up to `limit` due rows and marks them "sending".
@@ -120,6 +153,8 @@ const MAX_ATTEMPTS = 5;
  */
 export async function claimDueScheduledEmails(
   limit: number,
+  /** Restrict the claim to these types — the worker passes the transactional types while marketing sends are switched off. */
+  onlyTypes?: readonly ScheduledEmailType[],
 ): Promise<Array<typeof scheduledEmail.$inferSelect>> {
   return db().transaction(async (tx) => {
     const due = await tx
@@ -129,6 +164,9 @@ export async function claimDueScheduledEmails(
         and(
           eq(scheduledEmail.status, "pending"),
           lte(scheduledEmail.scheduledFor, new Date()),
+          onlyTypes
+            ? inArray(scheduledEmail.automationType, [...onlyTypes])
+            : undefined,
         ),
       )
       .orderBy(scheduledEmail.scheduledFor)
@@ -146,6 +184,31 @@ export async function claimDueScheduledEmails(
   });
 }
 
+/**
+ * Puts rows of the given types that have sat in "sending" for longer than
+ * `olderThanMs` back to "pending". A row only stays "sending" when the
+ * process died mid-send; for transactional order emails a possible duplicate
+ * is better than a confirmation that silently never goes out. Marketing rows
+ * are never passed here.
+ */
+export async function requeueStaleSendingEmails(
+  types: readonly ScheduledEmailType[],
+  olderThanMs: number,
+): Promise<number> {
+  const rows = await db()
+    .update(scheduledEmail)
+    .set({ status: "pending", updatedAt: new Date() })
+    .where(
+      and(
+        eq(scheduledEmail.status, "sending"),
+        inArray(scheduledEmail.automationType, [...types]),
+        lte(scheduledEmail.updatedAt, new Date(Date.now() - olderThanMs)),
+      ),
+    )
+    .returning({ id: scheduledEmail.id });
+  return rows.length;
+}
+
 export async function markScheduledEmailSent(id: string): Promise<void> {
   await db()
     .update(scheduledEmail)
@@ -161,17 +224,19 @@ export async function markScheduledEmailFailed(
   id: string,
   attempts: number,
   error: string,
-): Promise<void> {
+): Promise<{ attempts: number; willRetry: boolean }> {
   const nextAttempts = attempts + 1;
+  const willRetry = nextAttempts < MAX_ATTEMPTS;
   await db()
     .update(scheduledEmail)
     .set({
-      status: nextAttempts >= MAX_ATTEMPTS ? "failed" : "pending",
+      status: willRetry ? "pending" : "failed",
       attempts: nextAttempts,
       lastError: error,
       updatedAt: new Date(),
     })
     .where(eq(scheduledEmail.id, id));
+  return { attempts: nextAttempts, willRetry };
 }
 
 /**

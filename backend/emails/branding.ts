@@ -9,6 +9,9 @@ import {
   STORE_CURRENCY,
   SUPPORT_EMAIL,
   STORE_SOCIAL_LINKS,
+  STORE_URL,
+  SUPPORT_WHATSAPP_DISPLAY,
+  SUPPORT_WHATSAPP_URL,
   isUsableUrl,
 } from "#root/shared/config/branding";
 import { toAbsoluteUrl } from "#root/shared/config/site-url";
@@ -20,6 +23,31 @@ export interface EmailBranding {
   contactEmail: string | undefined;
   currency: string;
   socialLinks: Array<{ platform: string; url: string }>;
+  /** Absolute storefront URL, e.g. "https://perce-eg.com". */
+  websiteUrl: string;
+  /** The host shown as link text, e.g. "perce-eg.com". */
+  websiteLabel: string;
+  /** Customer-service WhatsApp: "+20 103 579 0911" and its wa.me link. */
+  whatsappDisplay: string;
+  whatsappUrl: string;
+}
+
+/** Fields that never depend on the CMS row. */
+function staticBranding() {
+  return {
+    websiteUrl: STORE_URL,
+    websiteLabel: websiteLabelFor(STORE_URL),
+    whatsappDisplay: SUPPORT_WHATSAPP_DISPLAY,
+    whatsappUrl: SUPPORT_WHATSAPP_URL,
+  };
+}
+
+function websiteLabelFor(url: string): string {
+  try {
+    return new URL(url).host.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
 }
 
 /**
@@ -76,6 +104,7 @@ export async function getEmailBranding(): Promise<EmailBranding> {
       // link. Falls back to the env-configured profiles, which are empty
       // until the new brand's accounts exist.
       socialLinks: resolveSocialLinks(settings.footer.socialLinks),
+      ...staticBranding(),
     };
   } catch {
     return {
@@ -84,6 +113,7 @@ export async function getEmailBranding(): Promise<EmailBranding> {
       contactEmail: resolveContactEmail(undefined),
       currency: STORE_CURRENCY,
       socialLinks: resolveSocialLinks(undefined),
+      ...staticBranding(),
     };
   }
 }
@@ -94,11 +124,14 @@ export async function getEmailBranding(): Promise<EmailBranding> {
  * settings rows can predate the rebrand, so a stored site title or contact
  * address may still carry one of them; nothing matching is ever emailed to a
  * customer. Kept server-side only so it never reaches the client bundle.
+ *
+ * perce-eg.com is NOT on these lists: it is Percé's current production
+ * domain (owner-confirmed), so its addresses and name are valid.
  */
 
 /** Previous brand names, matched as whole words in a store name. */
 const PREVIOUS_BRAND_NAME_PATTERN =
-  /\b(lebsy|lebsey|synt|zeli)\b|syntperfumes|perce-eg\.com/i;
+  /\b(lebsy|lebsey|synt|zeli)\b|syntperfumes/i;
 
 /**
  * Retired inboxes and domains. Addresses are matched exactly and domains by
@@ -111,7 +144,6 @@ const RETIRED_EMAIL_ADDRESSES = [
   "syntperfumes@gmail.com",
 ];
 const RETIRED_EMAIL_DOMAINS = [
-  "perce-eg.com",
   "syntperfumes.com",
   "lebsy.com",
   "lebsey.com",

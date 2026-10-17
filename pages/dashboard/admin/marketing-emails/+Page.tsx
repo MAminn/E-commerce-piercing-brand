@@ -101,9 +101,12 @@ interface EmailAutomationSettings {
   emailLogoUrl: string;
 }
 
+/** Queue rows also include the transactional order emails, which are not marketing automations. */
+type QueueEmailType = AutomationType | "order_confirmation" | "order_admin_notification";
+
 interface ScheduledEmailRow {
   id: string;
-  automationType: AutomationType;
+  automationType: QueueEmailType;
   recipientEmail: string;
   status: "pending" | "sending" | "sent" | "failed" | "cancelled";
   scheduledFor: Date;
@@ -122,6 +125,12 @@ const AUTOMATION_LABELS: Record<AutomationType, string> = {
   new_drops: "New Drops",
   flash_offer: "Flash Offer",
   retention: "Retention",
+};
+
+const QUEUE_TYPE_LABELS: Record<QueueEmailType, string> = {
+  ...AUTOMATION_LABELS,
+  order_confirmation: "Order confirmation",
+  order_admin_notification: "New order (admin)",
 };
 
 const AUTOMATION_ORDER: AutomationType[] = [
@@ -509,7 +518,7 @@ function RecentQueueActivity({
                     <tr key={row.id} className='border-b last:border-0 align-top'>
                       <td className='py-2 pe-3 whitespace-nowrap'>{row.recipientEmail}</td>
                       <td className='py-2 px-3 whitespace-nowrap'>
-                        {AUTOMATION_LABELS[row.automationType] ?? row.automationType}
+                        {QUEUE_TYPE_LABELS[row.automationType] ?? row.automationType}
                       </td>
                       <td className='py-2 px-3'>
                         <Badge variant={QUEUE_STATUS_VARIANT[row.status]}>{row.status}</Badge>

@@ -135,6 +135,7 @@ export const bostaRouter = t.router({
             Effect.promise(() =>
               createBostaDelivery({
                 orderId: orderRow.id,
+                orderNumber: orderRow.orderNumber,
                 receiver: {
                   firstName,
                   lastName,

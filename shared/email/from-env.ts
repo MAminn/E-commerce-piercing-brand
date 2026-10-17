@@ -1,10 +1,12 @@
 import { Redacted } from "effect";
+import { STORE_NAME, SUPPORT_EMAIL } from "../config/branding";
 import { z } from "zod";
 import { runBackendEffect } from "../backend/effect";
 import {
   type EmailServiceInterface,
   makeEmailService,
   createDummyEmailService,
+  resolveSmtpTransportSecurity,
 } from "./service";
 
 /**
@@ -45,6 +47,14 @@ type MakeEmailServiceResult =
  * Fastify request middleware and the standalone automation worker so the
  * two never drift out of sync with each other.
  */
+/** SMTP_SECURE=true|false forces the TLS mode; anything else derives it from the port. */
+function parseSmtpSecure(raw: string | undefined): boolean | undefined {
+  const v = raw?.trim().toLowerCase();
+  if (v === "true" || v === "1") return true;
+  if (v === "false" || v === "0") return false;
+  return undefined;
+}
+
 export async function createEmailServiceFromEnv(
   logger: EmailEnvLogger,
 ): Promise<EmailServiceInterface> {
@@ -76,18 +86,27 @@ export async function createEmailServiceFromEnv(
       return createDummyEmailService(logger);
     }
 
+    // Host/port/TLS mode only — the login and password are never logged.
     logger.info({
       msg: "Setting up email service with configuration",
       host: validationResult.data.smtpHost,
       port: validationResult.data.smtpPort,
-      user: validationResult.data.smtpUser,
+      secure: resolveSmtpTransportSecurity(
+        validationResult.data.smtpPort,
+        parseSmtpSecure(process.env.SMTP_SECURE),
+      ).secure,
     });
 
     const data = {
       ...validationResult.data,
       smtpPassword: Redacted.make(validationResult.data.smtpPassword),
       fromAddress: process.env.EMAIL_FROM_ADDRESS || undefined,
-      fromName: process.env.EMAIL_FROM_NAME || undefined,
+      // "Percé" unless EMAIL_FROM_NAME says otherwise.
+      fromName: process.env.EMAIL_FROM_NAME || STORE_NAME,
+      // Replies reach the support inbox, not the SMTP login.
+      replyTo: process.env.EMAIL_REPLY_TO || SUPPORT_EMAIL,
+      secure: parseSmtpSecure(process.env.SMTP_SECURE),
+      verifyOnStart: true,
     };
 
     const timeoutPromise = new Promise<TimeoutResult>((resolve) => {

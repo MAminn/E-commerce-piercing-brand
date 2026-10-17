@@ -231,6 +231,7 @@ const verifyPaymentProcedure = publicProcedure
           const [o] = await db
             .select({
               id: order.id,
+              orderNumber: order.orderNumber,
               paymentMethod: order.paymentMethod,
               paymentStatus: order.paymentStatus,
               paymentSessionId: order.paymentSessionId,

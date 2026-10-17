@@ -136,6 +136,7 @@ export const viewOrders = (
           const orders = await tx
             .select({
               id: order.id,
+              orderNumber: order.orderNumber,
               customerName: order.customerName,
               customerEmail: order.customerEmail,
               customerPhone: order.customerPhone,

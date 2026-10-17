@@ -14,10 +14,8 @@ import { Effect } from "effect";
 import { z } from "zod";
 import type { ClientSession } from "#root/backend/auth/shared/entities";
 import { ServerError } from "#root/shared/error/server";
-import { EmailService, renderEmailTemplate } from "#root/shared/email/service";
-import { STORE_NAME } from "#root/shared/config/branding";
-import { MinimalOrderEmailTemplate } from "#root/backend/emails/minimal/order-confirmation";
-import { getEmailBranding } from "#root/backend/emails/branding";
+import { queueOrderPlacedEmails } from "#root/backend/orders/order-emails/service";
+import { formatOrderNumber } from "#root/shared/orders/order-number";
 import axios from "axios";
 import { validatePromoCode } from "#root/backend/promo-codes/validate-promo-code/validate-promo-code";
 import { applyOffersToCart } from "#root/backend/offers/service";
@@ -207,6 +205,7 @@ type OrderInsertData = {
 // Function to send order data to Fincart
 interface FincartOrderData {
   id: string;
+  orderNumber?: number | null;
   customerName: string;
   customerPhone: string;
   customerEmail: string;
@@ -280,7 +279,7 @@ const sendOrderToFincart = async (
       ref_id: orderData.id.substring(0, 24), // Limit length to match their format
       pickup_id: FINCART_PICKUP_ID || "67115a8c16713e3eaec19384",
       id_default: true,
-      desc: `Order #${orderData.id.substring(0, 8)} from ${orderData.customerName}`,
+      desc: `Order ${formatOrderNumber(orderData.orderNumber) || orderData.id} from ${orderData.customerName}`,
       no_items: orderData.items.reduce(
         (total, item) => total + item.quantity,
         0,
@@ -388,6 +387,7 @@ const sendOrderToFincart = async (
 
 interface CreatedOrder {
   id: string;
+  orderNumber?: number | null;
   customerName: string;
   customerPhone: string;
   shippingAddress: string;
@@ -430,6 +430,7 @@ async function autoSendOrderToBosta(orderData: CreatedOrder): Promise<void> {
 
   const outcome = await createBostaDelivery({
     orderId: orderData.id,
+    orderNumber: orderData.orderNumber,
     receiver: { firstName, lastName, phone: orderData.customerPhone },
     dropOffAddress: {
       firstLine: orderData.shippingAddress,
@@ -1230,85 +1231,24 @@ export const createOrder = (
       ),
     );
 
-    const emailService = yield* $(EmailService);
-
-    const branding = yield* $(Effect.promise(() => getEmailBranding()));
-
-    const orderItems = result.items.map((i) => ({
-      name: i.name ?? "-",
-      quantity: i.quantity ?? 0,
-      price: i.price ? Number.parseFloat(i.price) : 0,
-      discountPrice: i.discountPrice
-        ? Number.parseFloat(i.discountPrice)
-        : undefined,
-      vendorName: i.vendorName ?? undefined,
-    }));
-
-    const emailTemplate = yield* $(
-      renderEmailTemplate(
-        MinimalOrderEmailTemplate({
-          storeName: branding.storeName,
-          logoUrl: branding.logoUrl,
-          contactEmail: branding.contactEmail,
-          currency: branding.currency,
-          items: orderItems,
-          shippingFees: Number.parseFloat(result.shipping),
-          subTotal: Number.parseFloat(result.subtotal),
-          total: Number.parseFloat(result.total),
-          address: result.shippingAddress,
-          city: result.shippingCity,
-          state: result.shippingState,
-          country: result.shippingCountry,
-          postalCode: result.shippingPostalCode,
-          customerName: result.customerName,
-          customerEmail: result.customerEmail,
-          customerPhone: result.customerPhone,
-        }),
-      ),
-    );
-
-    const admins = yield* $(
-      query(
-        async (db) =>
-          await db.select().from(user).where(eq(user.role, "admin")),
-      ),
-    );
-
-    // Send emails, but don't let failures block the order creation
-    // Single-shop mode: Only send customer notification, no vendor emails
-    try {
+    // ── Order emails ───────────────────────────────────────────────────────
+    // The order is committed. Emails are QUEUED, never sent inline: the
+    // customer confirmation and the store notification go through the email
+    // queue (retries, `order_confirmation:<orderId>` dedupe, outcome on the
+    // order activity log). queueOrderPlacedEmails never rejects, so no email
+    // problem — render, SMTP, admin lookup — can turn this committed order
+    // into a reported failure. Online-payment orders are queued only once
+    // their payment is confirmed (backend/payments/*).
+    if (result.paymentMethod === "cod") {
       yield* $(
-        emailService.sendEmail(
-          input.customerEmail,
-          `${branding.storeName} Order Confirmation`,
-          emailTemplate,
+        Effect.promise(() =>
+          queueOrderPlacedEmails({
+            orderId: result.id,
+            customerEmail: result.customerEmail,
+            orderNumber: result.orderNumber,
+          }),
         ),
       );
-    } catch (error) {
-      console.error(
-        `Failed to send confirmation email to customer ${input.customerEmail}:`,
-        error,
-      );
-      // Continue with order creation even if email fails
-    }
-
-    // Send admin notifications
-    for (const admin of admins) {
-      try {
-        yield* $(
-          emailService.sendEmail(
-            admin.email,
-            "New Order Received",
-            emailTemplate,
-          ),
-        );
-      } catch (error) {
-        console.error(
-          `Failed to send notification email to admin ${admin.email}:`,
-          error,
-        );
-        // Continue with order creation even if email fails
-      }
     }
 
     // Single-shop mode: No vendor notifications needed

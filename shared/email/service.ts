@@ -48,6 +48,46 @@ export class EmailService extends Context.Tag("EmailService")<
   EmailServiceInterface
 >() {}
 
+/**
+ * TLS mode for an SMTP port, instead of the old hard-coded `secure: true`
+ * (which only works on 465 — a 587 relay failed every send):
+ *
+ *   465        → implicit TLS from the first byte (`secure: true`)
+ *   587 / 25 / 2525 / anything else
+ *              → plain connect upgraded with STARTTLS, and the upgrade is
+ *                REQUIRED (`requireTLS`) so credentials never travel in clear
+ *
+ * `override` (SMTP_SECURE=true|false) wins for a relay with unusual ports.
+ */
+export function resolveSmtpTransportSecurity(
+  port: number,
+  override?: boolean,
+): { secure: boolean; requireTLS: boolean } {
+  const secure = override ?? port === 465;
+  return { secure, requireTLS: !secure };
+}
+
+/** Logs whether the SMTP login works — once per process, never blocking start-up, never printing credentials. */
+let smtpVerificationStarted = false;
+function verifyTransportInBackground(
+  transport: { verify: () => Promise<unknown> },
+  details: { host: string; port: number; secure: boolean },
+): void {
+  if (smtpVerificationStarted) return;
+  smtpVerificationStarted = true;
+  const where = `${details.host}:${details.port} (${details.secure ? "TLS" : "STARTTLS"})`;
+  transport
+    .verify()
+    .then(() => console.info(`[Email] SMTP connection verified — ${where}`))
+    .catch((err: unknown) => {
+      const code =
+        err && typeof err === "object" && "code" in err ? ` [${String(err.code)}]` : "";
+      console.error(
+        `[Email] SMTP verification FAILED for ${where}${code}: ${err instanceof Error ? err.message : String(err)}. Order confirmations will be retried by the queue but cannot be delivered until this is fixed.`,
+      );
+    });
+}
+
 export const makeEmailService = (input: {
   smtpHost: string;
   smtpUser: string;
@@ -57,6 +97,12 @@ export const makeEmailService = (input: {
   fromAddress?: string;
   /** Default From display name for all sends. */
   fromName?: string;
+  /** Default Reply-To for all sends (the support inbox). Per-call options override it. */
+  replyTo?: string;
+  /** SMTP_SECURE override; otherwise derived from the port. */
+  secure?: boolean;
+  /** Check the login in the background and log the outcome. */
+  verifyOnStart?: boolean;
 }) =>
   Effect.gen(function* ($) {
     // Validate SMTP host - remove any http:// or https:// prefixes
@@ -104,7 +150,7 @@ export const makeEmailService = (input: {
             return createTransport({
               host: cleanedHost,
               port: input.smtpPort,
-              secure: true,
+              ...resolveSmtpTransportSecurity(input.smtpPort, input.secure),
               auth: {
                 user: input.smtpUser,
                 pass: Redacted.value(input.smtpPassword),
@@ -129,6 +175,15 @@ export const makeEmailService = (input: {
 
       const defaultFromAddress = input.fromAddress || input.smtpUser;
       const defaultFromName = input.fromName;
+      const defaultReplyTo = input.replyTo;
+
+      if (input.verifyOnStart) {
+        verifyTransportInBackground(transport, {
+          host: cleanedHost,
+          port: input.smtpPort,
+          secure: resolveSmtpTransportSecurity(input.smtpPort, input.secure).secure,
+        });
+      }
 
       // Don't even attempt to verify if we know authentication will fail
       // Instead, just check if the transport exists and return the proper service
@@ -192,7 +247,7 @@ export const makeEmailService = (input: {
                   to,
                   subject,
                   html: processedBody,
-                  replyTo: options?.replyTo,
+                  replyTo: options?.replyTo ?? defaultReplyTo,
                   headers: options?.headers,
                   attachments:
                     inlineAttachments.length > 0

@@ -8,6 +8,7 @@ import { order, orderItem } from "#root/shared/database/drizzle/schema";
 import { createBostaDelivery, isBostaEnabled } from "#root/backend/orders/bosta/service";
 import { persistBostaSyncStatus } from "#root/backend/orders/bosta/sync-status";
 import { logOrderEvent } from "#root/backend/orders/order-log";
+import { queueOrderPlacedEmails } from "#root/backend/orders/order-emails/service";
 
 type PaymentStatus = "paid" | "failed" | "processing";
 
@@ -63,6 +64,7 @@ async function triggerBostaForPaidOrder(
 
   const outcome = await createBostaDelivery({
     orderId: orderRow.id,
+    orderNumber: orderRow.orderNumber,
     receiver: {
       firstName,
       lastName,
@@ -166,6 +168,17 @@ export async function applyOnlinePaymentUpdate(
         }`,
       });
     }
+  }
+
+  // Online-payment orders get their confirmation only here, once the
+  // payment is confirmed paid — never at checkout. Dedupe on
+  // `order_confirmation:<orderId>` makes a repeated webhook a no-op.
+  if (update.paymentStatus === "paid" && !wasAlreadyPaid) {
+    await queueOrderPlacedEmails({
+      orderId: orderRow.id,
+      customerEmail: orderRow.customerEmail,
+      orderNumber: orderRow.orderNumber,
+    });
   }
 
   if (update.paymentStatus === "paid" && !wasAlreadyPaid) {

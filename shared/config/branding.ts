@@ -101,25 +101,58 @@ export const STORE_DESCRIPTION =
 export const STORE_CURRENCY = readEnv("VITE_CURRENCY", "CURRENCY") ?? "EGP";
 
 /**
- * Customer-facing support address.
- *
- * Intentionally has NO default — there is no support inbox for the new brand
- * yet, and inventing one (or inheriting a previous brand's) would send real
- * customers to an address nobody reads. Callers must handle `undefined` by
- * omitting the contact line entirely. Set VITE_SUPPORT_EMAIL to enable it.
+ * Customer-facing support address — the owner-confirmed Percé inbox.
+ * Override per environment with VITE_SUPPORT_EMAIL. Also the Reply-To of
+ * every outgoing email (see shared/email/from-env.ts).
  */
-export const SUPPORT_EMAIL = readEnv("VITE_SUPPORT_EMAIL", "SUPPORT_EMAIL");
+export const DEFAULT_SUPPORT_EMAIL = "piercingperce@gmail.com";
+export const SUPPORT_EMAIL =
+  readEnv("VITE_SUPPORT_EMAIL", "SUPPORT_EMAIL") ?? DEFAULT_SUPPORT_EMAIL;
+
+/**
+ * Customer-service WhatsApp number (owner-confirmed), in E.164 form.
+ * Override with VITE_SUPPORT_WHATSAPP. The display form and the wa.me link
+ * are both derived from it, so there is one number, never two that drift.
+ */
+export const SUPPORT_WHATSAPP_E164 =
+  readEnv("VITE_SUPPORT_WHATSAPP", "SUPPORT_WHATSAPP") ?? "+201035790911";
+
+/** "+201035790911" → "+20 103 579 0911" (Egyptian mobile grouping). */
+export function formatWhatsAppNumber(e164: string): string {
+  const digits = e164.replace(/\D/g, "");
+  const match = /^20(\d{3})(\d{3})(\d{4})$/.exec(digits);
+  return match ? `+20 ${match[1]} ${match[2]} ${match[3]}` : `+${digits}`;
+}
+
+export const SUPPORT_WHATSAPP_DISPLAY = formatWhatsAppNumber(SUPPORT_WHATSAPP_E164);
+export const SUPPORT_WHATSAPP_URL = `https://wa.me/${SUPPORT_WHATSAPP_E164.replace(/\D/g, "")}`;
+
+/**
+ * The live production storefront (owner-confirmed). Used whenever no
+ * environment says otherwise, so customer emails always link to the real
+ * shop. Staging/dev environments set PUBLIC_ORIGIN and link to themselves.
+ */
+export const PRODUCTION_STORE_URL = "https://perce-eg.com";
 
 /**
  * Canonical public URL of the storefront. Falls back to PUBLIC_ORIGIN/BASE_URL
  * (the same values `shared/config/site-url.ts` uses) so there is one origin,
- * not two that can drift.
+ * not two that can drift, and finally to the production domain.
+ *
+ * Only absolute http(s) values count: under Vite `import.meta.env.BASE_URL`
+ * is the bundle's base PATH ("/"), which must never be taken for an origin.
  */
+function readAbsoluteUrl(...keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = readEnv(key);
+    if (value && /^https?:\/\//i.test(value)) return value.replace(/\/+$/, "");
+  }
+  return undefined;
+}
+
 export const STORE_URL =
-  readEnv("VITE_STORE_URL", "STORE_URL", "PUBLIC_ORIGIN", "BASE_URL")?.replace(
-    /\/$/,
-    "",
-  ) ?? undefined;
+  readAbsoluteUrl("VITE_STORE_URL", "STORE_URL", "PUBLIC_ORIGIN", "BASE_URL") ??
+  PRODUCTION_STORE_URL;
 
 // ─── Social profiles ────────────────────────────────────────────────────────
 

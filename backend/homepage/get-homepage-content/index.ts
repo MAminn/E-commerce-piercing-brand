@@ -3,6 +3,7 @@ import { homepageContent } from "#root/shared/database/drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import type { HomepageContent } from "#root/shared/types/homepage-content";
 import { DEFAULT_HOMEPAGE_CONTENT } from "#root/shared/types/homepage-content";
+import { resolveReturnPolicyContent } from "#root/shared/legal/return-policy-content";
 
 /**
  * Fetches homepage content for a specific merchant and template
@@ -143,8 +144,9 @@ function mergeWithDefaults(
       clean.bottomCarousel ?? DEFAULT_HOMEPAGE_CONTENT.bottomCarousel,
     aboutUs:
       clean.aboutUs ?? DEFAULT_HOMEPAGE_CONTENT.aboutUs,
-    returnPolicy:
-      clean.returnPolicy ?? DEFAULT_HOMEPAGE_CONTENT.returnPolicy,
+    // An untouched pre-approval placeholder row is upgraded to the
+    // owner-approved policy (shared/legal/return-policy-content.ts).
+    returnPolicy: resolveReturnPolicyContent(clean.returnPolicy),
     terms: clean.terms ?? DEFAULT_HOMEPAGE_CONTENT.terms,
     privacy: clean.privacy ?? DEFAULT_HOMEPAGE_CONTENT.privacy,
     productCarouselTitle:

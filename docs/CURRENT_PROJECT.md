@@ -84,12 +84,17 @@ storefront**, **Lebsy / Lebsey**, **SYNT** — are previous projects.
   simply **hidden** everywhere (footer, `/links`, emails, JSON-LD) rather than
   filled with a placeholder or a guessed handle. See `STORE_SOCIAL_LINKS` in
   `shared/config/branding.ts`.
-- Old domains (`perce-eg.com`, `syntperfumes.com`) and old support inboxes
+- Old domains (`syntperfumes.com`) and old support inboxes
   (`support@lebsy.com`, `syntperfumes@gmail.com`, `cs@Lebsey.com`) must never
-  be reintroduced into runtime code, defaults, or configuration. The Percé
-  domain, support inbox and WhatsApp number are configuration
-  (`VITE_STORE_URL`, `VITE_SUPPORT_EMAIL`, `VITE_SOCIAL_WHATSAPP`), not
-  assumptions.
+  be reintroduced into runtime code, defaults, or configuration.
+- **`perce-eg.com` is Percé's current production domain** (owner-confirmed,
+  October 2026). It was previously listed here as an old domain; that was
+  wrong and has been removed from the retired lists in
+  `backend/emails/branding.ts`. Owner-confirmed defaults in
+  `shared/config/branding.ts`: production URL `https://perce-eg.com`, support
+  inbox `piercingperce@gmail.com`, WhatsApp `+20 103 579 0911`. Each stays
+  overridable per environment (`VITE_STORE_URL`, `VITE_SUPPORT_EMAIL`,
+  `VITE_SUPPORT_WHATSAPP`).
 - The misspelling of the brand with a trailing "e" is never correct. A repo-wide search for it must return nothing.
 
 ## What is reused vs. what is new
@@ -115,9 +120,12 @@ notes below for what is deliberately left outstanding.
 1. Never hardcode a brand name, support email, domain, phone number, or social
    URL in runtime code. Read it from `shared/config/branding.ts`, from the CMS
    (Layout Settings / Homepage Content), or omit it.
-2. Never invent business facts. Delivery times, return windows, refund
-   timelines, warranties, materials, and hypoallergenic or medical/safety
-   claims are **not established**. A default that would have to assert one
+2. Never invent business facts. Delivery times, refund timelines,
+   warranties, materials, and hypoallergenic or medical/safety claims are
+   **not established**. The one approved returns policy (14-day returns for
+   eligible orders; colour-change returns outside that window) lives in
+   `shared/legal/returns-policy.ts` — a return remedy, never a material or
+   "won't tarnish" claim. A default that would have to assert one
    should instead be blank or disabled, and the admin fills it in.
 3. Never reintroduce a previous brand's name, assets, domains, inboxes, phone
    numbers, or social accounts — including "temporarily".

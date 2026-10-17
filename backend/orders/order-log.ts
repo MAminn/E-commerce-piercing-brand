@@ -14,7 +14,9 @@ export type OrderLogAction =
   | "bosta_send_failed"
   | "bosta_skipped"
   | "bosta_cancelled"
-  | "bosta_status_updated";
+  | "bosta_status_updated"
+  | "confirmation_email_sent"
+  | "confirmation_email_failed";
 
 /**
  * Records one entry in the per-order audit trail (cart→checkout is
