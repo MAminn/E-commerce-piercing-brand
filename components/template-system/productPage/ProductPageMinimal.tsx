@@ -51,6 +51,7 @@ import { getStoreOwnerId } from "#root/shared/config/store";
 import type { HomepageContent } from "#root/shared/types/homepage-content";
 import { navigate } from "vike/client/router";
 import { formatMoney } from "#root/shared/pricing/format-money";
+import { useListingOrigin } from "#root/hooks/useListingOrigin";
 
 /* ═══════════════════════════════════════════════════════════════════
    Props
@@ -90,6 +91,7 @@ export function ProductPageMinimal({
   className = "",
 }: ProductPageMinimalProps) {
   const { toggle: toggleWishlist, isWishlisted } = useWishlist();
+  const { origin: listingOrigin, linkProps: originLinkProps } = useListingOrigin();
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [showShareMenu, setShowShareMenu] = useState(false);
@@ -433,18 +435,35 @@ export function ProductPageMinimal({
               {t("product.home")}
             </a>
             <span className='mx-2 text-perce-ink-subtle'>&gt;</span>
-            {product.categoryName && (
-              <>
-                <a href='/shop' className='hover:text-perce-ink'>
-                  {product.categoryName}
-                </a>
-                <span className='mx-2 text-perce-ink-subtle'>&gt;</span>
-              </>
-            )}
-            <a href='/shop' className='hover:text-perce-ink'>
+            {/* Shop › Category, in the same order as the listing's own
+                breadcrumb. When the shopper came from a listing, the crumb
+                for it returns to that exact state (page, sort, filters) —
+                see hooks/useListingOrigin. */}
+            <a
+              className='hover:text-perce-ink'
+              {...(listingOrigin && !listingOrigin.categoryName
+                ? originLinkProps(listingOrigin.url)
+                : { href: "/shop" })}>
               {t("product.shop")}
             </a>
             <span className='mx-2 text-perce-ink-subtle'>&gt;</span>
+            {listingOrigin?.categoryName ? (
+              <>
+                <a className='hover:text-perce-ink' {...originLinkProps(listingOrigin.url)}>
+                  {listingOrigin.categoryName}
+                </a>
+                <span className='mx-2 text-perce-ink-subtle'>&gt;</span>
+              </>
+            ) : (
+              product.categoryName && (
+                <>
+                  <a href='/shop' className='hover:text-perce-ink'>
+                    {product.categoryName}
+                  </a>
+                  <span className='mx-2 text-perce-ink-subtle'>&gt;</span>
+                </>
+              )
+            )}
             <span className='text-perce-ink'>{product.name}</span>
           </nav>
         </div>

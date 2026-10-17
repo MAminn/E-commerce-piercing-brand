@@ -7,23 +7,18 @@ import {
   productImage,
   productCategory,
 } from "#root/shared/database/drizzle/schema";
-import {
-  and,
-  desc,
-  asc,
-  eq,
-  ilike,
-  inArray,
-  or,
-  count,
-  gt,
-  exists,
-  sql,
-  isNotNull,
-  lt,
-} from "drizzle-orm";
+import { and, desc, asc, eq, inArray, count, exists, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import { z } from "zod";
+import {
+  effectivePrice,
+  inCategoriesCondition,
+  inStockCondition,
+  onSaleCondition,
+  priceRangeCondition,
+  searchCondition,
+  visibleProductCondition,
+} from "../listing-conditions";
 
 export const searchProductsSchema = z.object({
   categoryIds: z.array(z.string().uuid()).optional(),
@@ -35,6 +30,9 @@ export const searchProductsSchema = z.object({
   includeOutOfStock: z.boolean().optional().default(false),
   discountedOnly: z.boolean().optional(),
   productIds: z.array(z.string().uuid()).optional(),
+  /** Whole EGP bounds on the price the shopper pays (see effectivePrice). */
+  minPrice: z.number().min(0).max(1_000_000).optional(),
+  maxPrice: z.number().min(0).max(1_000_000).optional(),
 });
 
 export const searchProducts = (input: z.infer<typeof searchProductsSchema>) =>
@@ -44,22 +42,7 @@ export const searchProducts = (input: z.infer<typeof searchProductsSchema>) =>
         // Prepare category filter condition
         let categoryCondition = undefined;
         if (input.categoryIds && input.categoryIds.length > 0) {
-          categoryCondition = or(
-            // Match via junction table (productCategory)
-            exists(
-              db
-                .select({ productId: productCategory.productId })
-                .from(productCategory)
-                .where(
-                  and(
-                    eq(productCategory.productId, product.id),
-                    inArray(productCategory.categoryId, input.categoryIds),
-                  ),
-                ),
-            ),
-            // Match via direct FK (product.categoryId)
-            inArray(product.categoryId, input.categoryIds),
-          );
+          categoryCondition = inCategoriesCondition(db, input.categoryIds);
         } else if (input.categoryType) {
           // If categoryType is specified but no categoryIds, fetch categories of that type
           const categoryIds = await db
@@ -88,41 +71,26 @@ export const searchProducts = (input: z.infer<typeof searchProductsSchema>) =>
           }
         }
 
-        // Build count query first
+        // One WHERE clause for the count and the page, so `total` always
+        // describes exactly the rows being paged through.
+        const where = and(
+          visibleProductCondition(),
+          input.productIds && input.productIds.length > 0
+            ? inArray(product.id, input.productIds)
+            : undefined,
+          categoryCondition,
+          input.search ? searchCondition(input.search) : undefined,
+          !input.includeOutOfStock ? inStockCondition() : undefined,
+          input.discountedOnly ? onSaleCondition() : undefined,
+          priceRangeCondition(input.minPrice, input.maxPrice),
+        );
+
         const countQuery = db
           .select({
             count: count(product.id),
           })
           .from(product)
-          .where(
-            and(
-              // Exclude soft-deleted and hidden products
-              eq(product.deleted, false),
-              eq(product.hidden, false),
-              // Filter by specific product IDs
-              input.productIds && input.productIds.length > 0
-                ? inArray(product.id, input.productIds)
-                : undefined,
-              // Filter by categories (using junction table)
-              categoryCondition,
-              // Filter by search term if specified
-              input.search
-                ? or(
-                    ilike(product.name, `%${input.search}%`),
-                    ilike(product.description, `%${input.search}%`),
-                  )
-                : undefined,
-              // Include out of stock items if specified
-              !input.includeOutOfStock ? gt(product.stock, 0) : undefined,
-              // Only discounted products
-              input.discountedOnly
-                ? and(
-                    isNotNull(product.discountPrice),
-                    lt(product.discountPrice, product.price),
-                  )
-                : undefined,
-            ),
-          );
+          .where(where);
 
         // Build main query
         const productsQuery = db
@@ -142,51 +110,30 @@ export const searchProducts = (input: z.infer<typeof searchProductsSchema>) =>
           .from(product)
           .leftJoin(file, eq(product.imageId, file.id))
           .leftJoin(category, eq(product.categoryId, category.id))
-          .where(
-            and(
-              // Exclude soft-deleted and hidden products
-              eq(product.deleted, false),
-              eq(product.hidden, false),
-              // Filter by specific product IDs
-              input.productIds && input.productIds.length > 0
-                ? inArray(product.id, input.productIds)
-                : undefined,
-              // Filter by categories (using junction table)
-              categoryCondition,
-              // Filter by search term if specified
-              input.search
-                ? or(
-                    ilike(product.name, `%${input.search}%`),
-                    ilike(product.description, `%${input.search}%`),
-                  )
-                : undefined,
-              // Include out of stock items if specified
-              !input.includeOutOfStock ? gt(product.stock, 0) : undefined,
-              // Only discounted products
-              input.discountedOnly
-                ? and(
-                    isNotNull(product.discountPrice),
-                    lt(product.discountPrice, product.price),
-                  )
-                : undefined,
-            ),
-          )
+          .where(where)
           .limit(input.limit)
           .offset(input.offset);
 
-        // Apply sort order
+        // Apply sort order. Price sorts use the price the shopper pays (a
+        // discounted piece sorts by its sale price, as the card shows it).
+        // Every order ends on the id: many pieces share a price or a
+        // creation instant, and without a unique tie-breaker Postgres may
+        // order ties differently per query — so LIMIT/OFFSET pages could
+        // repeat or skip products, and "page 3" would not be the same page
+        // when a shopper comes back to it.
         if (input.sortBy === "newest") {
-          productsQuery.orderBy(desc(product.createdAt));
+          productsQuery.orderBy(desc(product.createdAt), desc(product.id));
         } else if (input.sortBy === "price-asc") {
-          productsQuery.orderBy(asc(product.price));
+          productsQuery.orderBy(asc(effectivePrice), asc(product.id));
         } else if (input.sortBy === "price-desc") {
-          productsQuery.orderBy(desc(product.price));
+          productsQuery.orderBy(desc(effectivePrice), asc(product.id));
         } else {
           // Default: sort by sortOrder (0 and null last), then newest first
           productsQuery.orderBy(
             sql`(${product.sortOrder} IS NULL OR ${product.sortOrder} = 0)`,
             asc(product.sortOrder),
             desc(product.createdAt),
+            desc(product.id),
           );
         }
 

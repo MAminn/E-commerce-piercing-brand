@@ -1,6 +1,5 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useMemo } from "react";
 import { usePageContext } from "vike-react/usePageContext";
-import { trpc } from "#root/shared/trpc/client";
 import { getTemplateComponent } from "#root/components/template-system/templateConfig";
 import { resolveTemplateId } from "#root/shared/config/storefront";
 import { useTemplate } from "#root/frontend/contexts/TemplateContext";
@@ -10,10 +9,10 @@ import {
   MinimalCategoryPage,
   PRODUCTS_PER_PAGE,
   categoryNavProps,
-  type MinimalCategoryProduct,
 } from "#root/components/template-system/minimal/MinimalCategoryPage";
 import { useStorefrontCategories } from "#root/hooks/useStorefrontCategories";
 import { storefrontCategoryNav } from "#root/shared/categories/tree";
+import { useCatalogueListing } from "#root/hooks/useCatalogueListing";
 
 /**
  * /categories/@slug – Generic dynamic category page.
@@ -23,8 +22,10 @@ import { storefrontCategoryNav } from "#root/shared/categories/tree";
  * every subcategory's, with tabs to narrow to one subcategory; a subcategory
  * lists its own. Hidden categories resolve to "not found" — see
  * storefrontCategoryNav in shared/categories/tree.ts.
- * When the store uses the minimal navbar, renders the dedicated MinimalCategoryPage
- * with paginated grid (3 rows × 4 cols) and translated breadcrumbs / controls.
+ *
+ * Runs on the same listing system as /shop (useCatalogueListing): page,
+ * sort, search and filters live in the URL, so Back from a product returns
+ * to the same page of the same filtered listing.
  */
 export default function CategoryPage() {
   const pageContext = usePageContext();
@@ -34,8 +35,6 @@ export default function CategoryPage() {
 
   const isMinimal = layoutSettings.header.navbarStyle === "minimal";
 
-  const [products, setProducts] = useState<SortingPageProduct[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const { categories, failed } = useStorefrontCategories();
   const nav = useMemo(
     () => (categories ? storefrontCategoryNav(categories, slug) : undefined),
@@ -44,97 +43,22 @@ export default function CategoryPage() {
   const notFound = failed || (categories !== null && !nav);
   const categoryId = nav?.current.id;
   const categoryName = nav?.current.name;
-  // Stable key so the product fetch re-runs only when the set really changes.
+  // Stable key so the scope (and the product fetch) changes only when the set really does.
   const listingKey = nav?.listingIds.join(",");
+  const scope = useMemo(
+    () => (listingKey ? { categoryIds: listingKey.split(",") } : null),
+    [listingKey],
+  );
 
-  // Minimal-specific state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [currentSort, setCurrentSort] = useState("featured");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [totalProducts, setTotalProducts] = useState(0);
-
-  // Map sort value → server-side sortBy param
-  const serverSort = useMemo(() => {
-    if (currentSort === "price-asc") return "price-asc" as const;
-    if (currentSort === "price-desc") return "price-desc" as const;
-    if (currentSort === "newest") return "newest" as const;
-    return undefined;
-  }, [currentSort]);
-
-  // A different category starts from page one.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reset on navigation only
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [slug]);
-
-  // Fetch products for resolved category
-  useEffect(() => {
-    if (!listingKey) return;
-
-    let cancelled = false;
-
-    const fetchProducts = async () => {
-      setIsLoading(true);
-      try {
-        const result = await trpc.product.search.query({
-          categoryIds: listingKey.split(","),
-          limit: isMinimal ? PRODUCTS_PER_PAGE : 100,
-          offset: isMinimal ? (currentPage - 1) * PRODUCTS_PER_PAGE : 0,
-          includeOutOfStock: true,
-          search: isMinimal && searchQuery ? searchQuery : undefined,
-          sortBy: isMinimal ? serverSort : undefined,
-        });
-
-        if (cancelled) return;
-
-        if (result.success && result.result) {
-          const mapped: SortingPageProduct[] = result.result.items.map((p) => ({
-            id: p.id,
-            slug: p.slug,
-            name: p.name,
-            price: Number(p.price),
-            discountPrice: p.discountPrice ? Number(p.discountPrice) : null,
-            stock: p.stock,
-            imageUrl: p.imageUrl ?? undefined,
-            images: p.images,
-            categoryName: p.categoryName || null,
-            available: p.stock > 0,
-          }));
-          setProducts(mapped);
-          setTotalProducts(result.result.total ?? mapped.length);
-        }
-      } catch (err) {
-        console.error("Error fetching category products:", err);
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    };
-
-    fetchProducts();
-    return () => {
-      cancelled = true;
-    };
-  }, [listingKey, isMinimal, currentPage, serverSort, searchQuery]);
-
-  // Debounced search for minimal template
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setSearchQuery(debouncedSearch);
-      setCurrentPage(1);
-    }, 350);
-    return () => clearTimeout(timer);
-  }, [debouncedSearch]);
-
-  const handleSortChange = useCallback((sort: string) => {
-    setCurrentSort(sort);
-    setCurrentPage(1);
-  }, []);
-
-  const handlePageChange = useCallback((page: number) => {
-    setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }, []);
+  const listing = useCatalogueListing({
+    scope,
+    categories,
+    categoriesFailed: failed,
+    allowCategories: false,
+    pageSize: isMinimal ? PRODUCTS_PER_PAGE : 100,
+    paged: isMinimal,
+    originName: categoryName,
+  });
 
   if (notFound) {
     return (
@@ -156,22 +80,36 @@ export default function CategoryPage() {
 
   /* ── Minimal template path ────────────────────────────────────────── */
   if (isMinimal) {
-    const totalPages = Math.ceil(totalProducts / PRODUCTS_PER_PAGE);
+    const navProps = categoryNavProps(nav);
+    // Moving between sibling subcategories keeps the shopper's sort, search
+    // and filters; only the page starts over.
+    const tabs = navProps.subcategoryNav;
+    const subcategoryNav = tabs && {
+      ...tabs,
+      allHref: listing.carryHref(tabs.allHref),
+      items: tabs.items.map((item) => ({ ...item, href: listing.carryHref(item.href) })),
+    };
     return (
       <MinimalCategoryPage
-        products={products as MinimalCategoryProduct[]}
+        products={listing.products}
         categoryName={categoryName}
-        {...categoryNavProps(nav)}
+        {...navProps}
+        subcategoryNav={subcategoryNav}
         categoryId={categoryId}
-        isLoading={isLoading}
-        totalProducts={totalProducts}
-        currentPage={currentPage}
-        totalPages={totalPages}
-        onPageChange={handlePageChange}
-        onSortChange={handleSortChange}
-        onSearchChange={setDebouncedSearch}
-        currentSort={currentSort}
-        currentSearch={debouncedSearch}
+        isLoading={listing.isLoading}
+        isRefreshing={listing.isRefreshing}
+        loadFailed={listing.failed}
+        onRetry={listing.retry}
+        totalProducts={listing.total}
+        currentPage={listing.listing.page}
+        totalPages={listing.totalPages}
+        pageHref={listing.pageHref}
+        onPageChange={listing.actions.setPage}
+        onSortChange={listing.actions.setSort}
+        onSearchChange={listing.actions.setSearch}
+        currentSort={listing.listing.sort}
+        currentSearch={listing.listing.q}
+        filters={listing.filterModel}
       />
     );
   }
@@ -221,8 +159,8 @@ export default function CategoryPage() {
         </nav>
       )}
       <Template
-        products={products}
-        isLoading={isLoading}
+        products={listing.products as SortingPageProduct[]}
+        isLoading={listing.isLoading}
         onSortChange={() => {}}
         onOpenFilters={() => {}}
         defaultSort='featured'

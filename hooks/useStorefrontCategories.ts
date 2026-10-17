@@ -17,13 +17,16 @@ export interface StorefrontCategory {
 }
 
 let pending: Promise<StorefrontCategory[]> | null = null;
+/** The list once it has arrived, so later mounts start with it. */
+let resolved: StorefrontCategory[] | null = null;
 
 function loadCategories(): Promise<StorefrontCategory[]> {
   pending ??= trpc.category.view
     .query()
     .then((res) => {
       if (!res.success || !res.result) throw new Error("categories unavailable");
-      return res.result as StorefrontCategory[];
+      resolved = res.result as StorefrontCategory[];
+      return resolved;
     })
     .catch((err) => {
       // Let the next caller retry instead of caching the failure.
@@ -39,13 +42,16 @@ function loadCategories(): Promise<StorefrontCategory[]> {
  * the pure helpers in shared/categories/tree.ts to resolve, nest or filter.
  *
  * `categories` is `null` while loading; `failed` is true if the request
- * failed, so pages can fall back instead of spinning forever.
+ * failed, so pages can fall back instead of spinning forever. A page mounted
+ * after the list arrived (e.g. Back from a product) gets it on its first
+ * render, so it never flashes a skeleton for data it already has.
  */
 export function useStorefrontCategories() {
-  const [categories, setCategories] = useState<StorefrontCategory[] | null>(null);
+  const [categories, setCategories] = useState<StorefrontCategory[] | null>(resolved);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
+    if (resolved) return;
     let cancelled = false;
     loadCategories()
       .then((rows) => {

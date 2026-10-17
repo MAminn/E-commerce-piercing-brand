@@ -10,6 +10,7 @@ import { productStatsProcedure } from "./get-product-stats/trpc";
 import { topSellingProcedure } from "./get-top-selling/trpc";
 import { totalRevenueProcedure } from "./get-total-revenue/trpc";
 import { searchProductsProcedure } from "./search-products/trpc";
+import { listingFacetsProcedure } from "./listing-facets/trpc";
 import { viewProductsProcedure } from "./view-products/trpc";
 import { viewReviewsProcedure, viewAllReviewsProcedure } from "./view-reviews/trpc";
 import { createReviewProcedure } from "./create-review/trpc";
@@ -28,6 +29,8 @@ export const productRouter = t.router({
   topSelling: topSellingProcedure,
   revenue: totalRevenueProcedure,
   search: searchProductsProcedure,
+  /** Filter counts and price bounds for a storefront listing (see listing-facets/compute.ts). */
+  facets: listingFacetsProcedure,
   getReviews: viewReviewsProcedure,
   getAllReviews: viewAllReviewsProcedure,
   createReview: createReviewProcedure,

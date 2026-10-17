@@ -1,258 +1,144 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { trpc } from "#root/shared/trpc/client";
 import { getTemplateComponent } from "#root/components/template-system/templateConfig";
 import { resolveTemplateId } from "#root/shared/config/storefront";
 import { useTemplate } from "#root/frontend/contexts/TemplateContext";
 import { useLayoutSettings } from "#root/frontend/contexts/LayoutSettingsContext";
 import type { SortingPageProduct } from "#root/components/template-system/sorting/SortingMinimalTemplate";
-import { useSearchParams } from "#root/hooks/useSearchParams";
 import {
   MinimalCategoryPage,
   PRODUCTS_PER_PAGE,
   categoryNavProps,
-  type MinimalCategoryProduct,
 } from "#root/components/template-system/minimal/MinimalCategoryPage";
 import { getStoreOwnerId } from "#root/shared/config/store";
 import { useStorefrontCategories } from "#root/hooks/useStorefrontCategories";
 import { storefrontCategoryNav } from "#root/shared/categories/tree";
 import type { HomepageContent } from "#root/shared/types/homepage-content";
+import { type ListingScope, useCatalogueListing } from "#root/hooks/useCatalogueListing";
+import { useLocationSearch } from "#root/hooks/useListingUrlState";
 
 /**
  * /shop – Canonical all-products collection page.
  *
- * Supports optional `?category=<slug|id>` filtering via URL query param
- * (used by CategoryStrip and breadcrumb links).
- * When the store uses the minimal navbar, renders the MinimalCategoryPage
- * with paginated grid, search, sort, and breadcrumbs (same UI as category pages).
+ * Every piece of browsing state is in the URL (see
+ * shared/products/listing-params.ts): `?category=` (one or more slugs — the
+ * CategoryStrip and breadcrumb links use it), price, stock, sale, search,
+ * sort and page. Opening a product and pressing Back returns to exactly this
+ * listing. `?section=offers|featured|newarrivals` narrows to a homepage
+ * section and is carried through every filter change.
  */
+
+const KNOWN_SECTIONS = new Set(["offers", "featured", "newarrivals"]);
+const NO_SCOPE: ListingScope = {};
+/** Resolved homepage sections, so a remount (Back) needs no second request. */
+const sectionScopes = new Map<string, ListingScope>();
+
+function sectionScope(sectionParam: string, content: HomepageContent): ListingScope {
+  if (sectionParam === "offers") {
+    const ids = content.discountedProducts?.productIds;
+    return ids && ids.length > 0 ? { productIds: ids } : { discountedOnly: true };
+  }
+  if (sectionParam === "featured") {
+    const ids = content.featuredProducts?.productIds;
+    // No special filter for featured without productIds — shows all
+    return ids && ids.length > 0 ? { productIds: ids } : NO_SCOPE;
+  }
+  const ids = content.newArrivals?.productIds;
+  return ids && ids.length > 0 ? { productIds: ids } : { defaultSort: "newest" };
+}
+
+/** The homepage section's scope; null while it resolves. */
+function useSectionScope(sectionParam: string | null, landingTemplateId: string): ListingScope | null {
+  const section = sectionParam && KNOWN_SECTIONS.has(sectionParam) ? sectionParam : null;
+  const [, setResolvedAt] = useState(0);
+
+  useEffect(() => {
+    if (!section || sectionScopes.has(section)) return;
+    let cancelled = false;
+    trpc.homepage.getContent
+      .query({ merchantId: getStoreOwnerId(), templateId: landingTemplateId })
+      .then((result) => {
+        sectionScopes.set(
+          section,
+          result.success && result.result
+            ? sectionScope(section, result.result as HomepageContent)
+            : NO_SCOPE,
+        );
+      })
+      .catch((err) => {
+        console.error("Error resolving section:", err);
+        sectionScopes.set(section, NO_SCOPE);
+      })
+      .finally(() => {
+        if (!cancelled) setResolvedAt(Date.now());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [section, landingTemplateId]);
+
+  if (!section) return NO_SCOPE;
+  return sectionScopes.get(section) ?? null;
+}
+
 export default function ShopPage() {
-  const [products, setProducts] = useState<SortingPageProduct[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [sortOption, setSortOption] = useState("featured");
   const { getTemplateId } = useTemplate();
   const layoutSettings = useLayoutSettings();
-  const searchParams = useSearchParams();
-
   const isMinimal = layoutSettings.header.navbarStyle === "minimal";
 
-  // Optional category filter from query string
-  const categoryParam = searchParams.get("category");
-  const sectionParam = searchParams.get("section"); // offers | featured | newarrivals
+  const { search } = useLocationSearch();
+  const sectionParam = useMemo(() => new URLSearchParams(search).get("section"), [search]);
+  const scope = useSectionScope(
+    sectionParam,
+    resolveTemplateId("landing", getTemplateId("landing")),
+  );
+
   // Same resolution as /categories/[slug]: a main category includes its
   // subcategories' products. An unknown or hidden category falls back to
-  // the unfiltered shop — it used to leave the grid on a skeleton forever,
-  // because the fetch waited for an id that would never resolve.
+  // the unfiltered shop instead of an endless skeleton.
   const { categories, failed: categoriesFailed } = useStorefrontCategories();
+  const listing = useCatalogueListing({
+    scope,
+    categories,
+    categoriesFailed,
+    allowCategories: true,
+    pageSize: isMinimal ? PRODUCTS_PER_PAGE : 100,
+    paged: isMinimal,
+  });
+
+  // One category picked (e.g. arriving from the homepage "Shop by placement"
+  // strip): the page is named after it. Several, or none: "Shop".
+  const single = listing.selectedCategories.length === 1 ? listing.selectedCategories[0] : undefined;
   const nav = useMemo(
-    () =>
-      categoryParam && categories
-        ? storefrontCategoryNav(categories, categoryParam)
-        : undefined,
-    [categories, categoryParam],
+    () => (single && categories ? storefrontCategoryNav(categories, single.ref) : undefined),
+    [single, categories],
   );
-  const categoryResolving =
-    !!categoryParam && categories === null && !categoriesFailed;
-  const categoryId = nav?.current.id;
   const categoryName = nav?.current.name;
-  const listingKey = nav?.listingIds.join(",");
-
-  // Section-specific filter data from homepage CMS content
-  const [sectionProductIds, setSectionProductIds] = useState<
-    string[] | undefined
-  >(undefined);
-  const [sectionDiscountedOnly, setSectionDiscountedOnly] = useState<
-    boolean | undefined
-  >(undefined);
-  const [sectionSortBy, setSectionSortBy] = useState<"newest" | undefined>(
-    undefined,
-  );
-  const [sectionReady, setSectionReady] = useState(!sectionParam); // true immediately if no section param
-
-  // Minimal-specific state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [currentSort, setCurrentSort] = useState("featured");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [totalProducts, setTotalProducts] = useState(0);
-
-  // A different category starts from page one.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reset on navigation only
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [categoryParam]);
-
-  // Resolve section filter from homepage CMS content
-  useEffect(() => {
-    if (!sectionParam) {
-      setSectionReady(true);
-      return;
-    }
-
-    let cancelled = false;
-
-    const resolveSection = async () => {
-      try {
-        const merchantId = getStoreOwnerId();
-        const result = await trpc.homepage.getContent.query({
-          merchantId,
-          templateId: resolveTemplateId("landing", getTemplateId("landing")),
-        });
-        if (cancelled) return;
-
-        if (result.success && result.result) {
-          const content = result.result as HomepageContent;
-          if (sectionParam === "offers") {
-            const ids = content.discountedProducts?.productIds;
-            if (ids && ids.length > 0) {
-              setSectionProductIds(ids);
-            } else {
-              setSectionDiscountedOnly(true);
-            }
-          } else if (sectionParam === "featured") {
-            const ids = content.featuredProducts?.productIds;
-            if (ids && ids.length > 0) {
-              setSectionProductIds(ids);
-            }
-            // No special filter for featured without productIds — shows all
-          } else if (sectionParam === "newarrivals") {
-            const ids = content.newArrivals?.productIds;
-            if (ids && ids.length > 0) {
-              setSectionProductIds(ids);
-            } else {
-              setSectionSortBy("newest");
-            }
-          }
-        }
-      } catch (err) {
-        console.error("Error resolving section:", err);
-      } finally {
-        if (!cancelled) setSectionReady(true);
-      }
-    };
-
-    resolveSection();
-    return () => {
-      cancelled = true;
-    };
-  }, [sectionParam]);
-
-  // Map sort value → server-side sortBy param
-  const serverSort = useMemo(() => {
-    if (currentSort === "price-asc") return "price-asc" as const;
-    if (currentSort === "price-desc") return "price-desc" as const;
-    if (currentSort === "newest") return "newest" as const;
-    return undefined;
-  }, [currentSort]);
-
-  // Fetch products (all or filtered by category / section)
-  useEffect(() => {
-    // Wait for category resolution if param is present
-    if (categoryResolving) return;
-    // Wait for section resolution if param is present
-    if (sectionParam && !sectionReady) return;
-
-    let cancelled = false;
-
-    const fetchProducts = async () => {
-      setIsLoading(true);
-      try {
-        // Determine effective sort: user-selected sort overrides section default
-        const effectiveSort = serverSort ?? sectionSortBy ?? undefined;
-
-        const result = await trpc.product.search.query({
-          limit: isMinimal ? PRODUCTS_PER_PAGE : 100,
-          offset: isMinimal ? (currentPage - 1) * PRODUCTS_PER_PAGE : 0,
-          includeOutOfStock: true,
-          categoryIds: listingKey ? listingKey.split(",") : undefined,
-          search: isMinimal && searchQuery ? searchQuery : undefined,
-          sortBy: isMinimal ? effectiveSort : undefined,
-          productIds:
-            sectionProductIds && sectionProductIds.length > 0
-              ? sectionProductIds
-              : undefined,
-          discountedOnly: sectionDiscountedOnly || undefined,
-        });
-
-        if (cancelled) return;
-
-        if (result.success && result.result) {
-          const mapped: SortingPageProduct[] = result.result.items.map((p) => ({
-            id: p.id,
-            slug: p.slug,
-            name: p.name,
-            price: Number(p.price),
-            discountPrice: p.discountPrice ? Number(p.discountPrice) : null,
-            stock: p.stock,
-            imageUrl: p.imageUrl ?? undefined,
-            images: p.images,
-            categoryName: p.categoryName || null,
-            available: p.stock > 0,
-          }));
-          setProducts(mapped);
-          setTotalProducts(result.result.total ?? mapped.length);
-        }
-      } catch (err) {
-        console.error("Error fetching products:", err);
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    };
-
-    fetchProducts();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    categoryResolving,
-    listingKey,
-    isMinimal,
-    currentPage,
-    serverSort,
-    searchQuery,
-    sectionParam,
-    sectionReady,
-    sectionProductIds,
-    sectionDiscountedOnly,
-    sectionSortBy,
-  ]);
-
-  // Debounced search for minimal template
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setSearchQuery(debouncedSearch);
-      setCurrentPage(1);
-    }, 350);
-    return () => clearTimeout(timer);
-  }, [debouncedSearch]);
-
-  const handleSortChange = useCallback((sort: string) => {
-    setCurrentSort(sort);
-    setCurrentPage(1);
-  }, []);
-
-  const handlePageChange = useCallback((page: number) => {
-    setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }, []);
 
   /* ── Minimal template path ────────────────────────────────────────── */
   if (isMinimal) {
-    const totalPages = Math.ceil(totalProducts / PRODUCTS_PER_PAGE);
+    // The Category filter replaces the subcategory tabs here.
+    const { subcategoryNav: _tabs, ...navProps } = categoryNavProps(nav);
     return (
       <MinimalCategoryPage
-        products={products as MinimalCategoryProduct[]}
+        products={listing.products}
         categoryName={categoryName}
-        {...categoryNavProps(nav)}
-        categoryId={categoryId}
-        isLoading={isLoading}
-        totalProducts={totalProducts}
-        currentPage={currentPage}
-        totalPages={totalPages}
-        onPageChange={handlePageChange}
-        onSortChange={handleSortChange}
-        onSearchChange={setDebouncedSearch}
-        currentSort={currentSort}
-        currentSearch={debouncedSearch}
+        {...navProps}
+        categoryId={nav?.current.id}
+        isLoading={listing.isLoading}
+        isRefreshing={listing.isRefreshing}
+        loadFailed={listing.failed}
+        onRetry={listing.retry}
+        totalProducts={listing.total}
+        currentPage={listing.listing.page}
+        totalPages={listing.totalPages}
+        pageHref={listing.pageHref}
+        onPageChange={listing.actions.setPage}
+        onSortChange={listing.actions.setSort}
+        onSearchChange={listing.actions.setSearch}
+        currentSort={listing.listing.sort}
+        currentSearch={listing.listing.q}
+        filters={listing.filterModel}
       />
     );
   }
@@ -292,11 +178,11 @@ export default function ShopPage() {
         </nav>
       )}
       <Template
-        products={products}
-        isLoading={isLoading}
-        onSortChange={setSortOption}
+        products={listing.products as SortingPageProduct[]}
+        isLoading={listing.isLoading}
+        onSortChange={() => {}}
         onOpenFilters={() => {}}
-        defaultSort={sortOption}
+        defaultSort='featured'
       />
     </div>
   );

@@ -1,4 +1,5 @@
 import type { PageContextClient } from "vike/types";
+import { isSamePageNavigation } from "./page-transition-guard";
 
 /**
  * Phase 3 — CSS-overlay page transition (start).
@@ -21,6 +22,8 @@ function prefersReducedMotion(): boolean {
 export async function onPageTransitionStart(
   pageContext: Partial<PageContextClient>,
 ): Promise<void> {
+  if (isSamePageNavigation(pageContext)) return;
+
   document.documentElement.dataset.pageTransition = "out";
 
   // Force a reflow so the CSS transition always triggers reliably

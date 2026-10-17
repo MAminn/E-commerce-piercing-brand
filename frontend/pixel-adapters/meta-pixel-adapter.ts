@@ -12,7 +12,14 @@ import type { PixelAdapter } from "./types";
 
 declare global {
   interface Window {
-    fbq: FbqFunction & { callMethod?: (...args: unknown[]) => void; queue: unknown[] };
+    fbq: FbqFunction & {
+      callMethod?: (...args: unknown[]) => void;
+      queue: unknown[];
+      /** Meta's switch for its automatic PageView on history changes. */
+      disablePushState?: boolean;
+      /** Lets a second explicit PageView in one page load through. */
+      allowDuplicatePageViews?: boolean;
+    };
     _fbq: Window["fbq"];
   }
 }
@@ -114,6 +121,18 @@ export class MetaPixelAdapter implements PixelAdapter {
 
     // Inject Meta's fbevents.js snippet
     this.injectSdk();
+
+    // PageViews are ours to send, one per real page, each with an eventID.
+    // Left to itself, fbevents.js fires its own PageView (no eventID, so
+    // never deduplicated with the server-side event) on every
+    // history.pushState / replaceState / popstate — and the shop listing
+    // writes page, sort, search and filters to the URL that way, so every
+    // filter click became a PageView. It also drops any explicit PageView
+    // after the first in a page load, so our SPA navigations never reached
+    // Meta with their eventID. Both switches are read from the fbq object
+    // by fbevents.js and must be set before `init`.
+    window.fbq.disablePushState = true;
+    window.fbq.allowDuplicatePageViews = true;
 
     // Init the pixel
     window.fbq("init", this.pixelId);

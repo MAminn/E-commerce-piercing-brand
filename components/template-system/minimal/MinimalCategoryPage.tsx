@@ -1,5 +1,13 @@
 import { CategoryBundlesSection } from "#root/components/bundles/CategoryBundlesSection";
-import { useState, useMemo, useCallback } from "react";
+import {
+  type MouseEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Search, ChevronRight, ChevronLeft } from "lucide-react";
 import { Link } from "#root/components/utils/Link";
 import {
@@ -8,11 +16,21 @@ import {
 } from "#root/components/template-system/minimal/MinimalProductCard";
 import { QuickViewDialog } from "#root/components/template-system/minimal/QuickViewDialog";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
-import {
-  minimalCategoryT,
-  type MinimalCategoryKey,
-} from "#root/lib/i18n/minimal-category-translations";
 import { cn } from "#root/lib/utils";
+import {
+  ActiveFilterChips,
+  DesktopFilterBar,
+  FilterButton,
+  type FilterModel,
+  MobileFilterDrawer,
+  hasFilterGroups,
+} from "#root/components/template-system/minimal/listing/ListingFilters";
+import { useCategoryT } from "#root/components/template-system/minimal/listing/useCategoryT";
+import {
+  type ListingSort,
+  activeFilterCount,
+  normalizeSearch,
+} from "#root/shared/products/listing-params";
 import { MinimalTestimonialsSection } from "#root/components/template-system/minimal/MinimalTestimonials";
 import type {
   CategoryNodeLike,
@@ -48,15 +66,26 @@ export interface MinimalCategoryPageProps {
   subcategoryNav?: SubcategoryNav;
   /** When known, live bundle campaigns placed on this category render below the grid. */
   categoryId?: string;
+  /** Nothing to show yet (first load of this listing). */
   isLoading?: boolean;
+  /** The previous results stay on screen, dimmed, while new ones load. */
+  isRefreshing?: boolean;
+  loadFailed?: boolean;
+  onRetry?: () => void;
   totalProducts: number;
   currentPage: number;
   totalPages: number;
+  /** Real hrefs for the pagination links (shareable, open-in-new-tab). */
+  pageHref?: (page: number) => string;
   onPageChange: (page: number) => void;
-  onSortChange: (sort: string) => void;
+  onSortChange: (sort: ListingSort) => void;
+  /** Called with the committed (debounced, trimmed) search term. */
   onSearchChange: (search: string) => void;
-  currentSort: string;
+  currentSort: ListingSort;
+  /** The committed search term (from the URL). */
   currentSearch: string;
+  /** Filter UI; omitted, the page shows search and sort only. */
+  filters?: FilterModel;
   onQuickView?: (product: MinimalProduct) => void;
 }
 
@@ -64,36 +93,16 @@ export interface MinimalCategoryPageProps {
 
 const PRODUCTS_PER_PAGE = 12; // 3 rows × 4 cols
 
-/* ── Helper: translate with locale ──────────────────────────────────── */
-
-function useCategoryT() {
-  const { locale } = useMinimalI18n();
-  const ct = useCallback(
-    (key: MinimalCategoryKey, replacements?: Record<string, string | number>) => {
-      const lang = locale === "ar" ? "ar" : "en";
-      let value: string = minimalCategoryT[lang][key] ?? key;
-      if (replacements) {
-        for (const [k, v] of Object.entries(replacements)) {
-          value = value.replace(`{${k}}`, String(v));
-        }
-      }
-      return value;
-    },
-    [locale],
-  );
-  return ct;
-}
-
 /* ── Sort options ───────────────────────────────────────────────────── */
 
 function useSortOptions() {
   const ct = useCategoryT();
   return useMemo(
     () => [
-      { value: "featured", label: ct("sort.featured") },
-      { value: "newest", label: ct("sort.newest") },
-      { value: "price-asc", label: ct("sort.price_asc") },
-      { value: "price-desc", label: ct("sort.price_desc") },
+      { value: "featured" as const, label: ct("sort.featured") },
+      { value: "newest" as const, label: ct("sort.newest") },
+      { value: "price-asc" as const, label: ct("sort.price_asc") },
+      { value: "price-desc" as const, label: ct("sort.price_desc") },
     ],
     [ct],
   );
@@ -211,14 +220,69 @@ function SubcategoryTabs({ nav }: { nav: SubcategoryNav }) {
 
 /* ── Pagination ──────────────────────────────────────────────────────── */
 
+const pagerButtonClass =
+  "inline-flex min-h-11 items-center gap-1.5 border border-perce-line-strong px-4 text-[length:var(--perce-text-small)] font-medium text-perce-ink-secondary transition-colors hover:border-perce-ink hover:text-perce-ink";
+
+/**
+ * A page control. With an href it is a real link — middle-click and "open in
+ * new tab" work, and crawlers see the pages — whose plain clicks are handled
+ * here (`data-vike="false"` keeps Vike's router out of it; see
+ * useListingUrlState for why a page turn is not a Vike navigation).
+ */
+function PageControl({
+  page,
+  href,
+  onNavigate,
+  disabled,
+  className,
+  children,
+  ...aria
+}: {
+  page: number;
+  href?: string;
+  onNavigate: (page: number) => void;
+  disabled?: boolean;
+  className: string;
+  children: ReactNode;
+  "aria-label"?: string;
+  "aria-current"?: "page";
+}) {
+  if (disabled) {
+    return (
+      <span aria-disabled="true" className={cn(className, "pointer-events-none opacity-30")} {...aria}>
+        {children}
+      </span>
+    );
+  }
+  if (!href) {
+    return (
+      <button type="button" onClick={() => onNavigate(page)} className={className} {...aria}>
+        {children}
+      </button>
+    );
+  }
+  const onClick = (e: MouseEvent<HTMLAnchorElement>) => {
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    onNavigate(page);
+  };
+  return (
+    <a href={href} data-vike="false" onClick={onClick} className={className} {...aria}>
+      {children}
+    </a>
+  );
+}
+
 function Pagination({
   currentPage,
   totalPages,
   onPageChange,
+  pageHref,
 }: {
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  pageHref?: (page: number) => string;
 }) {
   const ct = useCategoryT();
   const { locale } = useMinimalI18n();
@@ -244,15 +308,15 @@ function Pagination({
       aria-label="Pagination"
       className="flex items-center justify-center gap-2 pt-12 pb-4">
       {/* Previous */}
-      <button
-        type="button"
-        onClick={() => onPageChange(currentPage - 1)}
+      <PageControl
+        page={currentPage - 1}
+        href={pageHref?.(currentPage - 1)}
+        onNavigate={onPageChange}
         disabled={currentPage <= 1}
-        className="inline-flex min-h-11 items-center gap-1.5 border border-perce-line-strong px-4 text-[length:var(--perce-text-small)] font-medium text-perce-ink-secondary transition-colors hover:border-perce-ink hover:text-perce-ink disabled:cursor-not-allowed disabled:opacity-30"
-      >
+        className={pagerButtonClass}>
         <ChevronLeft aria-hidden className={cn("w-4 h-4", locale === "ar" && "rotate-180")} />
         {ct("pagination.previous")}
-      </button>
+      </PageControl>
 
       {/* Page numbers */}
       <div className="hidden sm:flex items-center gap-1">
@@ -265,10 +329,11 @@ function Pagination({
               …
             </span>
           ) : (
-            <button
+            <PageControl
               key={page}
-              type="button"
-              onClick={() => onPageChange(page)}
+              page={page}
+              href={pageHref?.(page)}
+              onNavigate={onPageChange}
               aria-current={page === currentPage ? "page" : undefined}
               aria-label={ct("pagination.page_of", {
                 current: page,
@@ -279,10 +344,9 @@ function Pagination({
                 page === currentPage
                   ? "bg-perce-cta text-perce-ink-inverse"
                   : "text-perce-ink-secondary hover:bg-perce-surface",
-              )}
-            >
+              )}>
               {page}
-            </button>
+            </PageControl>
           ),
         )}
       </div>
@@ -293,15 +357,15 @@ function Pagination({
       </span>
 
       {/* Next */}
-      <button
-        type="button"
-        onClick={() => onPageChange(currentPage + 1)}
+      <PageControl
+        page={currentPage + 1}
+        href={pageHref?.(currentPage + 1)}
+        onNavigate={onPageChange}
         disabled={currentPage >= totalPages}
-        className="inline-flex min-h-11 items-center gap-1.5 border border-perce-line-strong px-4 text-[length:var(--perce-text-small)] font-medium text-perce-ink-secondary transition-colors hover:border-perce-ink hover:text-perce-ink disabled:cursor-not-allowed disabled:opacity-30"
-      >
+        className={pagerButtonClass}>
         {ct("pagination.next")}
         <ChevronRight aria-hidden className={cn("w-4 h-4", locale === "ar" && "rotate-180")} />
-      </button>
+      </PageControl>
     </nav>
   );
 }
@@ -329,6 +393,12 @@ function GridSkeleton() {
 
 /* ── Main Component ──────────────────────────────────────────────────── */
 
+const SEARCH_DEBOUNCE_MS = 350;
+
+function scrollBehavior(): ScrollBehavior {
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ? "auto" : "smooth";
+}
+
 export function MinimalCategoryPage({
   products,
   categoryName,
@@ -337,20 +407,27 @@ export function MinimalCategoryPage({
   subcategoryNav,
   categoryId,
   isLoading,
+  isRefreshing,
+  loadFailed,
+  onRetry,
   totalProducts,
   currentPage,
   totalPages,
+  pageHref,
   onPageChange,
   onSortChange,
   onSearchChange,
   currentSort,
   currentSearch,
+  filters,
   onQuickView,
 }: MinimalCategoryPageProps) {
   const ct = useCategoryT();
-  const { locale } = useMinimalI18n();
   const sortOptions = useSortOptions();
   const [quickViewProduct, setQuickViewProduct] = useState<MinimalProduct | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  /** Top of the toolbar + grid: where a page turn or a new filter lands. */
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   const handleQuickView = useCallback((product: MinimalProduct) => {
     if (onQuickView) {
@@ -360,11 +437,73 @@ export function MinimalCategoryPage({
     }
   }, [onQuickView]);
 
-  // Two different empty states. A search that matched nothing is the
-  // shopper's problem to fix and gets a control to fix it; a collection with
+  // Search box: local text, committed to the URL after a pause, and re-synced
+  // when the URL's term changes on its own (Back/Forward, a chip, "Clear
+  // all"). Mounting commits nothing — the old debounce fired on mount and
+  // reset a restored page to 1.
+  const [searchText, setSearchText] = useState(currentSearch);
+  const committedSearch = useRef(currentSearch);
+  const onSearchChangeRef = useRef(onSearchChange);
+  onSearchChangeRef.current = onSearchChange;
+  useEffect(() => {
+    if (currentSearch === committedSearch.current) return;
+    committedSearch.current = currentSearch;
+    setSearchText(currentSearch);
+  }, [currentSearch]);
+  useEffect(() => {
+    const next = normalizeSearch(searchText);
+    if (next === committedSearch.current) return;
+    const timer = setTimeout(() => {
+      committedSearch.current = next;
+      onSearchChangeRef.current(next);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [searchText]);
+
+  /** After narrowing from far down the page, bring the first results into view. */
+  const revealResults = useCallback(() => {
+    const el = resultsRef.current;
+    if (el && el.getBoundingClientRect().top < 0) {
+      el.scrollIntoView({ block: "start", behavior: scrollBehavior() });
+    }
+  }, []);
+
+  const handlePageChange = useCallback(
+    (page: number) => {
+      onPageChange(page);
+      resultsRef.current?.scrollIntoView({ block: "start", behavior: scrollBehavior() });
+    },
+    [onPageChange],
+  );
+
+  const filterModel = useMemo<FilterModel | undefined>(
+    () =>
+      filters && {
+        ...filters,
+        onChange: (next) => {
+          filters.onChange(next);
+          revealResults();
+        },
+        onClearAll: () => {
+          filters.onClearAll();
+          revealResults();
+        },
+      },
+    [filters, revealResults],
+  );
+  const showFilters = !!filterModel && hasFilterGroups(filterModel);
+  const filterCount = filters ? activeFilterCount(filters.filters) : 0;
+
+  // Two different empty states. Filters or a search that matched nothing are
+  // the shopper's to undo and get a control to undo them; a collection with
   // no products at all is the store's state and gets no advice the shopper
   // cannot act on.
-  const isFiltering = currentSearch.trim().length > 0;
+  const isFiltering = filterCount > 0 || currentSearch.length > 0;
+  const searchOnly = filterCount === 0 && currentSearch.length > 0;
+  const clearFiltering = () => {
+    if (filterModel) filterModel.onClearAll();
+    else onSearchChange("");
+  };
 
   return (
     <div className="perce-header-offset min-h-screen bg-perce-bg">
@@ -384,123 +523,170 @@ export function MinimalCategoryPage({
             <h1 className="perce-section-title">
               {categoryName || ct("breadcrumb.shop")}
             </h1>
-            {/* Result count is read from the API's own total, never estimated.
-                Hidden while loading so the number never counts up from a
-                stale page. */}
             {categoryDescription?.trim() && (
               <p className="mt-2 max-w-prose text-[length:var(--perce-text-body)] text-perce-ink-muted">
                 {categoryDescription}
               </p>
             )}
-            {!isLoading && totalProducts > 0 && (
+            {/* Result count is read from the API's own total, never estimated.
+                Hidden while loading so the number never counts up from a
+                stale page. */}
+            {!isLoading && !loadFailed && totalProducts > 0 && (
               <p
                 aria-live="polite"
                 className="perce-eyebrow mt-2">
-                {ct("results.count", { count: totalProducts })}
+                {totalProducts === 1
+                  ? ct("results.count_one")
+                  : ct("results.count", { count: totalProducts })}
               </p>
             )}
           </div>
 
           {subcategoryNav && <SubcategoryTabs nav={subcategoryNav} />}
 
-          {/* Toolbar: search + sort */}
-          {/* Toolbar. Search and sort only — both are backed by real
-              `product.search` parameters. No price/brand/rating facets: the
-              product schema has no fields behind them, and a filter that
-              filters nothing is worse than no filter. */}
-          <div className="mb-8 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4">
-            {/* Search */}
-            <div className="relative min-w-0 flex-1 sm:max-w-sm">
-              <label htmlFor="minimal-cat-search" className="sr-only">
-                {ct("search.placeholder")}
-              </label>
-              <Search
-                aria-hidden
-                className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-perce-ink-subtle"
-              />
-              <input
-                id="minimal-cat-search"
-                type="search"
-                placeholder={ct("search.placeholder")}
-                value={currentSearch}
-                onChange={(e) => onSearchChange(e.target.value)}
-                className="min-h-11 w-full border border-perce-line-strong bg-perce-surface-raised pe-4 ps-10 text-[length:var(--perce-text-body)] text-perce-ink placeholder:text-perce-ink-subtle focus:border-perce-ink focus:outline-none"
-              />
-            </div>
-
-            {/* Sort */}
-            <div className="flex min-w-0 items-center gap-3">
-              <label
-                htmlFor="minimal-cat-sort"
-                className="perce-eyebrow whitespace-nowrap"
-              >
-                {ct("sort.label")}
-              </label>
-              <select
-                id="minimal-cat-sort"
-                value={currentSort}
-                onChange={(e) => onSortChange(e.target.value)}
-                className="min-h-11 min-w-0 flex-1 border border-perce-line-strong bg-perce-surface-raised px-3 text-[length:var(--perce-text-body)] text-perce-ink focus:border-perce-ink focus:outline-none sm:flex-none sm:w-52 sm:px-4"
-              >
-                {sortOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Product grid */}
-          {isLoading ? (
-            <GridSkeleton />
-          ) : products.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 lg:py-24">
-              <div className="max-w-md text-center">
-                <h2 className="perce-section-title">
-                  {isFiltering ? ct("empty.title") : ct("empty.catalogue.title")}
-                </h2>
-                <p className="mt-2 text-[length:var(--perce-text-body)] text-perce-ink-muted">
-                  {isFiltering
-                    ? ct("empty.subtitle")
-                    : ct("empty.catalogue.subtitle")}
-                </p>
-                {isFiltering ? (
-                  <button
-                    type="button"
-                    onClick={() => onSearchChange("")}
-                    className="perce-underline mt-6 inline-flex min-h-11 items-center text-[length:var(--perce-text-small)] font-medium text-perce-ink">
-                    {ct("empty.clear_search")}
-                  </button>
-                ) : (
-                  <Link
-                    href="/"
-                    className="perce-underline mt-6 inline-flex min-h-11 items-center text-[length:var(--perce-text-small)] font-medium text-perce-ink">
-                    {ct("empty.catalogue.action")}
-                  </Link>
+          <div
+            ref={resultsRef}
+            className="scroll-mt-[calc(var(--perce-header-offset)+1rem)]">
+            {/* Toolbar. Filters (left, desktop) only expose dimensions backed
+                by real product fields — see backend/products/listing-facets.
+                Below lg the filters live in a drawer behind one button. */}
+            <div className="mb-8 space-y-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-6">
+                {showFilters && filterModel && (
+                  <div className="hidden lg:block">
+                    <DesktopFilterBar model={filterModel} />
+                  </div>
                 )}
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-8 sm:gap-x-6">
-                {products.map((product) => (
-                  <MinimalProductCard
-                    key={product.id}
-                    product={product}
-                    onQuickView={handleQuickView}
-                  />
-                ))}
-              </div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center lg:ms-auto">
+                  {/* Search */}
+                  <div className="relative min-w-0 sm:flex-1 lg:w-64 lg:flex-none">
+                    <label htmlFor="minimal-cat-search" className="sr-only">
+                      {ct("search.placeholder")}
+                    </label>
+                    <Search
+                      aria-hidden
+                      className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-perce-ink-subtle"
+                    />
+                    <input
+                      id="minimal-cat-search"
+                      type="search"
+                      placeholder={ct("search.placeholder")}
+                      value={searchText}
+                      onChange={(e) => setSearchText(e.target.value)}
+                      className="min-h-11 w-full border border-perce-line-strong bg-perce-surface-raised pe-4 ps-10 text-[length:var(--perce-text-body)] text-perce-ink placeholder:text-perce-ink-subtle focus:border-perce-ink focus:outline-none"
+                    />
+                  </div>
 
-              {/* Pagination */}
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={onPageChange}
-              />
-            </>
-          )}
+                  <div className="flex min-w-0 items-center gap-3">
+                    {showFilters && (
+                      <FilterButton
+                        count={filterCount}
+                        onClick={() => setDrawerOpen(true)}
+                        className="flex-1 sm:flex-none lg:hidden"
+                      />
+                    )}
+                    {/* Sort */}
+                    <label
+                      htmlFor="minimal-cat-sort"
+                      className="perce-eyebrow sr-only whitespace-nowrap lg:not-sr-only"
+                    >
+                      {ct("sort.label")}
+                    </label>
+                    <select
+                      id="minimal-cat-sort"
+                      value={currentSort}
+                      onChange={(e) => onSortChange(e.target.value as ListingSort)}
+                      className="min-h-11 min-w-0 flex-1 border border-perce-line-strong bg-perce-surface-raised px-3 text-[length:var(--perce-text-body)] text-perce-ink focus:border-perce-ink focus:outline-none sm:w-52 sm:flex-none sm:px-4"
+                    >
+                      {sortOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+              {filterModel && <ActiveFilterChips model={filterModel} />}
+            </div>
+
+            {/* Product grid */}
+            {isLoading ? (
+              <GridSkeleton />
+            ) : loadFailed ? (
+              <div role="alert" className="flex flex-col items-center justify-center py-16 lg:py-24">
+                <div className="max-w-md text-center">
+                  <h2 className="perce-section-title">{ct("error.title")}</h2>
+                  <p className="mt-2 text-[length:var(--perce-text-body)] text-perce-ink-muted">
+                    {ct("error.subtitle")}
+                  </p>
+                  {onRetry && (
+                    <button
+                      type="button"
+                      onClick={onRetry}
+                      className="perce-underline mt-6 inline-flex min-h-11 items-center text-[length:var(--perce-text-small)] font-medium text-perce-ink">
+                      {ct("error.retry")}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : products.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 lg:py-24">
+                <div className="max-w-md text-center">
+                  <h2 className="perce-section-title">
+                    {isFiltering ? ct("empty.title") : ct("empty.catalogue.title")}
+                  </h2>
+                  <p className="mt-2 text-[length:var(--perce-text-body)] text-perce-ink-muted">
+                    {!isFiltering
+                      ? ct("empty.catalogue.subtitle")
+                      : searchOnly
+                        ? ct("empty.subtitle")
+                        : ct("empty.filtered.subtitle")}
+                  </p>
+                  {isFiltering ? (
+                    <button
+                      type="button"
+                      onClick={clearFiltering}
+                      className="perce-underline mt-6 inline-flex min-h-11 items-center text-[length:var(--perce-text-small)] font-medium text-perce-ink">
+                      {searchOnly ? ct("empty.clear_search") : ct("empty.clear_filters")}
+                    </button>
+                  ) : (
+                    <Link
+                      href="/"
+                      className="perce-underline mt-6 inline-flex min-h-11 items-center text-[length:var(--perce-text-small)] font-medium text-perce-ink">
+                      {ct("empty.catalogue.action")}
+                    </Link>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div
+                  aria-busy={isRefreshing || undefined}
+                  data-testid="product-grid"
+                  className={cn(
+                    "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-8 sm:gap-x-6 transition-opacity duration-[var(--perce-duration)]",
+                    isRefreshing && "opacity-50",
+                  )}>
+                  {products.map((product) => (
+                    <MinimalProductCard
+                      key={product.id}
+                      product={product}
+                      onQuickView={handleQuickView}
+                    />
+                  ))}
+                </div>
+
+                {/* Pagination */}
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={handlePageChange}
+                  pageHref={pageHref}
+                />
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -509,6 +695,10 @@ export function MinimalCategoryPage({
 
       {/* Testimonials */}
       <MinimalTestimonialsSection />
+
+      {showFilters && filterModel && (
+        <MobileFilterDrawer model={filterModel} open={drawerOpen} onOpenChange={setDrawerOpen} />
+      )}
 
       {/* Quick View Dialog */}
       <QuickViewDialog

@@ -3,6 +3,7 @@ import { trackingEventBus } from "#root/shared/utils/tracking-event-bus";
 import { TrackingEventName } from "#root/shared/types/pixel-tracking";
 import { getSessionId } from "#root/shared/utils/session-id";
 import { v7 } from "uuid";
+import { isSamePageNavigation } from "./page-transition-guard";
 
 /**
  * Phase 3 — CSS-overlay page transition (end).
@@ -43,7 +44,11 @@ export async function onPageTransitionEnd(
     }, 20);
   }
 
-  // Emit page_viewed on every SPA navigation
+  // Emit page_viewed on every SPA navigation to another page. A change of
+  // query string only (a listing's page, sort, search or filters) is the
+  // same page in a new state, not a page view — with paid campaigns
+  // optimising on PageView, those would be fake visits.
+  if (isSamePageNavigation(pageContext)) return;
   trackingEventBus.emit({
     eventId: v7(),
     eventName: TrackingEventName.PAGE_VIEWED,

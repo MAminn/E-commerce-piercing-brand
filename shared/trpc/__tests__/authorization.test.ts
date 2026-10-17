@@ -29,6 +29,8 @@ const PUBLIC = new Set([
   "category.getContent",
   "product.view",
   "product.search",
+  // Filter counts + price bounds over the same visible products as search.
+  "product.facets",
   "product.getReviews",
   "product.createReview",
   "product.uploadReviewImage",
