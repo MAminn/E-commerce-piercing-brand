@@ -420,8 +420,13 @@ function GlobalNavbarChrome({
         {children}
       </div>
       {/* Spacer — only in solid mode so page content isn't hidden behind the
-          fixed chrome. Auto-adjusts as banner wraps to 1/2/3 lines. */}
-      {!isOverlay && <div aria-hidden='true' style={{ height }} />}
+          fixed chrome. Auto-adjusts as banner wraps to 1/2/3 lines. Until the
+          chrome has been measured it takes the header's server-render height
+          (--perce-header-offset) instead of 0, so the page does not drop by a
+          whole header when hydration measures it. */}
+      {!isOverlay && (
+        <div aria-hidden='true' style={{ height: height || "var(--perce-header-offset)" }} />
+      )}
     </>
   );
 }

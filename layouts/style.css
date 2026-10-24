@@ -323,10 +323,17 @@ html[data-page-transition="out"] body {
      measurement below exists rather than a fixed sum. */
   --perce-header-h: 64px;
   --perce-header-h-desktop: 72px;
+  /* Height of the fixed header chrome as the server renders it: the navbar
+     row plus its 1px bottom rule (65px phone / 73px from sm). It used to be
+     6rem, so every page that clears the header (and the solid-mode spacer,
+     which rendered 0) moved 31–65px the moment GlobalNavbarChrome measured
+     the real height — the checkout's whole layout shift. A configured
+     marquee/banner still adds to the measured value at runtime. */
+  --perce-header-ssr-height: calc(var(--perce-header-h) + 1px);
   /* Offset for content that must clear the fixed header chrome. The shell
      also measures the real height at runtime (GlobalNavbarChrome); this is
      the SSR-safe starting value so nothing jumps on first paint. */
-  --perce-header-offset: var(--perce-header-measured, 6rem);
+  --perce-header-offset: var(--perce-header-measured, var(--perce-header-ssr-height));
 
   /* ── Shape — square. No pills, no soft radii. ── */
   --perce-radius-none: 0;
@@ -357,6 +364,9 @@ html[data-page-transition="out"] body {
   :root {
     --perce-gutter: var(--perce-gutter-sm);
     --perce-section-y: var(--perce-section-y-sm);
+    /* The navbar row is sm:h-[72px]. */
+    --perce-header-ssr-height: calc(var(--perce-header-h-desktop) + 1px);
+    --perce-header-offset: var(--perce-header-measured, var(--perce-header-ssr-height));
   }
 }
 
@@ -364,7 +374,7 @@ html[data-page-transition="out"] body {
   :root {
     --perce-gutter: var(--perce-gutter-lg);
     --perce-section-y: var(--perce-section-y-lg);
-    --perce-header-offset: var(--perce-header-measured, 6rem);
+    --perce-header-offset: var(--perce-header-measured, var(--perce-header-ssr-height));
   }
 }
 
