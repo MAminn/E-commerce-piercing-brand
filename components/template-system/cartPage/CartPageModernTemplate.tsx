@@ -20,12 +20,97 @@ import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { formatItemCount } from "#root/lib/i18n/item-count";
 import { cartUnitCount } from "#root/shared/bundles/cart-instance";
 import { useCouponFeedback } from "#root/components/template-system/useCouponFeedback";
+import { BOTTOM_NAV_CLEARANCE } from "#root/components/template-system/minimal/bottom-nav";
+
+/** `bottom` of the mobile sticky checkout bar: on top of the bottom nav. */
+const CART_STICKY_BAR_BOTTOM = BOTTOM_NAV_CLEARANCE;
+
+/**
+ * A cart line's image or name, linked to its product page. A plain <a>, so
+ * Vike routes it client-side and Back returns to the cart (which lives in
+ * localStorage, so nothing about it changes on the way). Without an href it
+ * renders the content unlinked, as before.
+ */
+function LineLink({
+  href,
+  className,
+  tabIndex,
+  children,
+}: {
+  href?: string;
+  className?: string;
+  /** -1 on the image: it duplicates the name's link, so it stays out of the tab order. */
+  tabIndex?: number;
+  children: React.ReactNode;
+}) {
+  if (!href) return <span className={className}>{children}</span>;
+  return (
+    <a href={href} className={className} tabIndex={tabIndex}>
+      {children}
+    </a>
+  );
+}
+
+/**
+ * Shown until the saved cart has been read (CartContext `isHydrated`). It
+ * holds the populated cart's geometry — same page frame, heading, one line,
+ * promo row and summary card — so the real lines replace it in place rather
+ * than replacing a centred "Your cart is empty" and shoving the page down.
+ * States nothing about the cart's contents.
+ */
+function CartPageModernSkeleton({ title, label }: { title: string; label: string }) {
+  const bar = "animate-pulse rounded bg-muted";
+  return (
+    <div aria-busy='true' data-testid='cart-loading' className='min-h-screen bg-background pb-24 sm:pb-0'>
+      <output className='sr-only'>{label}</output>
+      <div className='max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-12'>
+        <h1 className='text-2xl sm:text-3xl font-extrabold uppercase tracking-tight mb-6'>
+          {title}
+          <span aria-hidden className={`ms-3 inline-block h-4 w-16 align-middle ${bar}`} />
+        </h1>
+        <div className='lg:grid lg:grid-cols-[1fr_380px] lg:gap-12' aria-hidden>
+          <div>
+            <div className='hidden sm:block pb-4 border-b'>
+              <div className={`h-4 w-40 ${bar}`} />
+            </div>
+            <div className='py-6 flex gap-4'>
+              <div className={`w-20 h-20 shrink-0 rounded-lg ${bar}`} />
+              <div className='flex-1 space-y-2.5'>
+                <div className={`h-4 w-3/4 ${bar}`} />
+                <div className={`h-3 w-1/3 ${bar}`} />
+                <div className={`mt-3 h-9 w-28 ${bar}`} />
+              </div>
+            </div>
+            <div className='mt-6 pt-6 border-t'>
+              <div className={`h-9 w-full ${bar}`} />
+            </div>
+          </div>
+          <div className='mt-8 lg:mt-0'>
+            <div className='border rounded-2xl p-6 space-y-5'>
+              <div className={`h-5 w-36 ${bar}`} />
+              <div className='space-y-3'>
+                <div className={`h-4 w-full ${bar}`} />
+                <div className={`h-4 w-full ${bar}`} />
+              </div>
+              <div className='border-t pt-4'>
+                <div className={`h-6 w-full ${bar}`} />
+              </div>
+              <div className={`h-10 w-full ${bar}`} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Cart item interface
  */
 export interface CartPageCartItem {
   id: string;
+  /** The line's product page. Image and name link to it when present. */
+  href?: string;
   name: string;
   price: number;
   /** Original price before discount — present only when the item was discounted */
@@ -153,11 +238,7 @@ export function CartPageModernTemplate({
   };
 
   if (isLoading) {
-    return (
-      <div className='min-h-[60vh] flex items-center justify-center'>
-        <ShoppingCart className='w-10 h-10 text-muted-foreground animate-pulse' />
-      </div>
-    );
+    return <CartPageModernSkeleton title={t("cart.title") || "Shopping Cart"} label={t("cart.loading")} />;
   }
 
   if (items.length === 0 && bundles.length === 0) {
@@ -235,7 +316,10 @@ export function CartPageModernTemplate({
                   className={`py-6 transition-opacity ${isUpdating ? "opacity-50 pointer-events-none" : ""}`}>
                   {/* Mobile */}
                   <div className='flex gap-4 sm:hidden'>
-                    <div className='w-20 h-20 shrink-0 bg-muted rounded-lg overflow-hidden border'>
+                    <LineLink
+                      href={item.href}
+                      tabIndex={-1}
+                      className='block w-20 h-20 shrink-0 bg-muted rounded-lg overflow-hidden border'>
                       {item.imageUrl ? (
                         <img
                           src={item.imageUrl}
@@ -247,12 +331,14 @@ export function CartPageModernTemplate({
                           <ShoppingCart className='w-5 h-5 text-muted-foreground/30' />
                         </div>
                       )}
-                    </div>
+                    </LineLink>
                     <div className='flex-1 min-w-0'>
                       <div className='flex items-start justify-between gap-2'>
                         <div className='min-w-0'>
                           <p className='font-semibold text-sm leading-snug'>
-                            {item.name}
+                            <LineLink href={item.href} className='hover:underline underline-offset-2'>
+                              {item.name}
+                            </LineLink>
                           </p>
                           {item.variant && (
                             <p className='text-xs text-muted-foreground mt-0.5'>
@@ -353,7 +439,10 @@ export function CartPageModernTemplate({
                   <div className='hidden sm:grid grid-cols-[1fr_160px_110px_40px] gap-4 items-center'>
                     {/* Product info */}
                     <div className='flex items-center gap-4'>
-                      <div className='w-20 h-20 shrink-0 bg-muted rounded-xl overflow-hidden border'>
+                      <LineLink
+                        href={item.href}
+                        tabIndex={-1}
+                        className='block w-20 h-20 shrink-0 bg-muted rounded-xl overflow-hidden border'>
                         {item.imageUrl ? (
                           <img
                             src={item.imageUrl}
@@ -365,9 +454,13 @@ export function CartPageModernTemplate({
                             <ShoppingCart className='w-5 h-5 text-muted-foreground/30' />
                           </div>
                         )}
-                      </div>
+                      </LineLink>
                       <div className='min-w-0'>
-                        <p className='font-semibold'>{item.name}</p>
+                        <p className='font-semibold'>
+                          <LineLink href={item.href} className='hover:underline underline-offset-2'>
+                            {item.name}
+                          </LineLink>
+                        </p>
                         {item.variant && (
                           <p className='text-xs text-muted-foreground mt-0.5'>
                             {item.variant}
@@ -703,8 +796,15 @@ export function CartPageModernTemplate({
       </div>
     </div>
 
-    {/* ── Mobile sticky checkout bar ─────────────────────────────────────── */}
-    <div className='sm:hidden fixed bottom-15 inset-x-0 z-40 bg-white border-t border-gray-200 shadow-[0_-4px_20px_rgba(0,0,0,0.10)]'>
+    {/* ── Mobile sticky checkout bar ─────────────────────────────────────────
+        Rests on top of the fixed mobile bottom nav. It used to sit at
+        `bottom-15` (60px) under a 64px nav painted above it, so the nav
+        covered the bottom of the bar. Same offset rule as the PDP's sticky
+        Add to bag (see CART_STICKY_BAR_BOTTOM). */}
+    <div
+      data-testid='cart-sticky-checkout'
+      style={{ bottom: CART_STICKY_BAR_BOTTOM }}
+      className='sm:hidden fixed inset-x-0 z-40 bg-white border-t border-gray-200 shadow-[0_-4px_20px_rgba(0,0,0,0.10)]'>
       <AppliedOffersSavings
         appliedOffers={appliedOffers}
         promoDiscount={totals.discount ?? 0}

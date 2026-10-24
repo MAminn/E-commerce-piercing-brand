@@ -1,5 +1,6 @@
 import { Layers, ShoppingCart, Trash2 } from "lucide-react";
 import { formatMoney } from "#root/shared/pricing/format-money";
+import { getProductUrl } from "#root/lib/utils/route-helpers";
 
 /**
  * One completed Build Your Stack instance as the cart templates receive it.
@@ -96,7 +97,12 @@ export function CartBundleGroup({ bundle, currency, onRemove, disabled }: CartBu
       <ul className="ms-[52px] mt-3 space-y-2">
         {bundle.items.map((item, index) => (
           <li key={`${item.productId}-${index}`} className="flex items-center gap-3">
-            <div className="h-11 w-11 shrink-0 overflow-hidden bg-perce-surface">
+            {/* Each piece links to its own product page. The set stays one
+                unit in the cart; looking at a piece changes nothing about it. */}
+            <a
+              href={getProductUrl({ id: item.productId })}
+              tabIndex={-1}
+              className="block h-11 w-11 shrink-0 overflow-hidden bg-perce-surface">
               {item.imageUrl ? (
                 <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" loading="lazy" />
               ) : (
@@ -104,9 +110,13 @@ export function CartBundleGroup({ bundle, currency, onRemove, disabled }: CartBu
                   <ShoppingCart className="h-4 w-4 text-perce-ink-subtle" />
                 </div>
               )}
-            </div>
+            </a>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] text-perce-ink">{item.name}</p>
+              <p className="truncate text-[13px] text-perce-ink">
+                <a href={getProductUrl({ id: item.productId })} className="hover:underline underline-offset-2">
+                  {item.name}
+                </a>
+              </p>
               {item.variant && <p className="text-[11px] text-perce-ink-muted">{item.variant}</p>}
             </div>
             <div className="shrink-0 text-end text-[11px] text-perce-ink-muted">

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
+import { usePageContext } from "vike-react/usePageContext";
 import { trpc } from "#root/shared/trpc/client";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { Dialog, DialogContent, DialogTitle } from "#root/components/ui/dialog";
 import { Button } from "#root/components/ui/button";
 import { Input } from "#root/components/ui/input";
 import { Label } from "#root/components/ui/label";
-import { Loader2, X } from "lucide-react";
+import { Check, Copy, Loader2, X } from "lucide-react";
 import { getCartSessionToken } from "#root/lib/cart-session";
 
 const DISMISSED_AT_KEY = "store-popup-dismissed-at";
@@ -33,6 +34,57 @@ interface PopupConfig {
   reshowAfterDays: number;
 }
 
+/**
+ * Routes where the popup never opens: the shopper is already buying, and an
+ * interruption there costs more than an email address is worth. Only WHERE it
+ * may appear changes — offer, fields, timing and reshow rules are untouched.
+ * A trigger that fires on one of these routes waits: the popup opens once the
+ * shopper is on an ordinary page again (the dialog's `open` is gated, the
+ * trigger itself is not re-armed or dropped).
+ */
+const SUPPRESSED_PATHS = ["/cart", "/checkout"];
+
+export function isPopupSuppressedPath(pathname: string): boolean {
+  const path = pathname.replace(/\/+$/, "") || "/";
+  return SUPPRESSED_PATHS.some((p) => path === p || path.startsWith(`${p}/`));
+}
+
+/**
+ * Touch-first devices (phones, in-app browsers): focusing the email field on
+ * open raises the on-screen keyboard over the popup before the shopper has
+ * read it. There the dialog itself takes focus instead, so the keyboard opens
+ * only when they tap a field. Mouse/keyboard devices keep the field focused.
+ */
+function isTouchPrimary(): boolean {
+  return typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches === true;
+}
+
+/** Copies text, falling back to a hidden textarea where the async Clipboard API is missing or blocked (some in-app browsers). */
+async function copyText(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // fall through to the legacy path
+  }
+  try {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+    const ok = document.execCommand("copy");
+    area.remove();
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
 function shouldSuppress(reshowAfterDays: number): boolean {
   if (typeof window === "undefined") return true;
   if (localStorage.getItem(CLAIMED_KEY) === "true") return true;
@@ -46,7 +98,9 @@ function shouldSuppress(reshowAfterDays: number): boolean {
 }
 
 export function EntryPopup() {
-  const { locale, dir } = useMinimalI18n();
+  const { locale, dir, t } = useMinimalI18n();
+  const { urlPathname } = usePageContext();
+  const suppressedHere = isPopupSuppressedPath(urlPathname);
   const [config, setConfig] = useState<PopupConfig | null>(null);
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
@@ -54,6 +108,7 @@ export function EntryPopup() {
   const [submitting, setSubmitting] = useState(false);
   const [claimedCode, setClaimedCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const triggeredRef = useRef(false);
 
   // Fetch config once, client-side only (avoids SSR flicker/hydration mismatch
@@ -141,6 +196,11 @@ export function EntryPopup() {
     }
   };
 
+  const handleCopy = async () => {
+    if (!claimedCode) return;
+    setCopyState((await copyText(claimedCode)) ? "copied" : "failed");
+  };
+
   if (!config || !config.enabled) return null;
 
   const title = locale === "ar" ? config.titleAr : config.titleEn;
@@ -152,9 +212,16 @@ export function EntryPopup() {
   ).replace("{{code}}", claimedCode ?? "");
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open && !suppressedHere} onOpenChange={handleOpenChange}>
       <DialogContent
         dir={dir}
+        onOpenAutoFocus={(event) => {
+          if (!isTouchPrimary()) return;
+          event.preventDefault();
+          // Keep focus inside the dialog (screen readers still land on it),
+          // just not on a text field.
+          (event.currentTarget as HTMLElement | null)?.focus({ preventScroll: true });
+        }}
         className='p-0 overflow-hidden gap-0 w-[calc(100%-2rem)] max-w-[420px] sm:max-w-[420px] [&>button]:hidden'>
         <DialogTitle className='sr-only'>{title}</DialogTitle>
 
@@ -179,9 +246,26 @@ export function EntryPopup() {
           {claimedCode ? (
             <div className='text-center space-y-3'>
               <p className='text-base font-medium'>{successMessage}</p>
-              <div className='inline-block border border-dashed rounded-md px-4 py-2 font-mono text-sm tracking-wider bg-muted'>
+              {/* select-all: a long-press selects the whole code, the fallback
+                  when the Copy action cannot reach the clipboard. */}
+              <div
+                data-testid='popup-claimed-code'
+                className='inline-block select-all border border-dashed rounded-md px-4 py-2 font-mono text-sm tracking-wider bg-muted'>
                 {claimedCode}
               </div>
+              <div>
+                <Button type='button' variant='outline' onClick={handleCopy} className='min-h-11 gap-2'>
+                  {copyState === "copied" ? (
+                    <Check className='w-4 h-4' aria-hidden />
+                  ) : (
+                    <Copy className='w-4 h-4' aria-hidden />
+                  )}
+                  {copyState === "copied" ? t("popup.copied") : t("popup.copy_code")}
+                </Button>
+              </div>
+              <p aria-live='polite' className='min-h-4 text-xs text-muted-foreground'>
+                {copyState === "failed" ? t("popup.copy_failed") : ""}
+              </p>
             </div>
           ) : (
             <>

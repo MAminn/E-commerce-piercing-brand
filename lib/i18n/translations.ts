@@ -68,6 +68,10 @@ export const translations: Record<Locale, Record<string, string>> = {
     "cart.empty_cta": "Add some items to get started!",
     "cart.continue_shopping": "Continue shopping",
     "cart.loading": "Loading cart...",
+    // Entry popup — the claimed code's Copy action
+    "popup.copy_code": "Copy code",
+    "popup.copied": "Copied",
+    "popup.copy_failed": "Couldn't copy. Press and hold the code to copy it.",
     "cart.order_summary": "Order summary",
     "cart.subtotal": "Subtotal",
     "cart.discount": "Discount",
@@ -401,6 +405,10 @@ export const translations: Record<Locale, Record<string, string>> = {
     "cart.empty_cta": "أضف بعض المنتجات للبدء!",
     "cart.continue_shopping": "متابعة التسوق",
     "cart.loading": "جاري تحميل السلة...",
+    // Entry popup — the claimed code's Copy action
+    "popup.copy_code": "نسخ الكود",
+    "popup.copied": "تم النسخ",
+    "popup.copy_failed": "تعذّر النسخ. اضغط مطوّلًا على الكود لنسخه.",
     "cart.order_summary": "ملخص الطلب",
     "cart.subtotal": "المجموع الفرعي",
     "cart.discount": "الخصم",

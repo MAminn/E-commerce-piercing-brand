@@ -57,6 +57,8 @@ export function MinimalMobileBottomNav() {
 
   return (
     <nav
+      // Found by bottomNavOcclusion() (./bottom-nav) — keep in step with BOTTOM_NAV_ATTR.
+      data-perce-bottom-nav=''
       style={{ zIndex: "var(--perce-z-bottom-nav)" }}
       className='lg:hidden fixed bottom-0 inset-x-0 h-16 bg-perce-ground text-perce-frame-ink border-t border-perce-frame-line pb-[env(safe-area-inset-bottom)]'
       aria-label='Bottom navigation'>

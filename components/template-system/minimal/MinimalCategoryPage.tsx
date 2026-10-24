@@ -492,6 +492,11 @@ export function MinimalCategoryPage({
     [filters, revealResults],
   );
   const showFilters = !!filterModel && hasFilterGroups(filterModel);
+  // The Filters trigger is drawn from the first render whenever this listing
+  // has a filter model, disabled until the facets say there is something to
+  // filter by — it used to appear only once `product.facets` answered, which
+  // re-flowed the toolbar on every phone visit.
+  const filtersPending = !!filterModel && !showFilters;
   const filterCount = filters ? activeFilterCount(filters.filters) : 0;
 
   // Two different empty states. Filters or a search that matched nothing are
@@ -529,17 +534,19 @@ export function MinimalCategoryPage({
               </p>
             )}
             {/* Result count is read from the API's own total, never estimated.
-                Hidden while loading so the number never counts up from a
-                stale page. */}
-            {!isLoading && !loadFailed && totalProducts > 0 && (
-              <p
-                aria-live="polite"
-                className="perce-eyebrow mt-2">
-                {totalProducts === 1
+                Blank while loading so the number never counts up from a stale
+                page — but the line itself is always there, so the count
+                arriving does not push the toolbar and grid down. */}
+            <p
+              aria-live="polite"
+              data-testid="results-count"
+              className="perce-eyebrow mt-2">
+              {!isLoading && !loadFailed && totalProducts > 0
+                ? totalProducts === 1
                   ? ct("results.count_one")
-                  : ct("results.count", { count: totalProducts })}
-              </p>
-            )}
+                  : ct("results.count", { count: totalProducts })
+                : "\u00A0" /* keeps the line's height while empty */}
+            </p>
           </div>
 
           {subcategoryNav && <SubcategoryTabs nav={subcategoryNav} />}
@@ -578,10 +585,11 @@ export function MinimalCategoryPage({
                   </div>
 
                   <div className="flex min-w-0 items-center gap-3">
-                    {showFilters && (
+                    {(showFilters || filtersPending) && (
                       <FilterButton
                         count={filterCount}
                         onClick={() => setDrawerOpen(true)}
+                        disabled={filtersPending}
                         className="flex-1 sm:flex-none lg:hidden"
                       />
                     )}

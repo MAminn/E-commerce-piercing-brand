@@ -31,6 +31,7 @@ import { formatMoney } from "#root/shared/pricing/format-money";
 import { fillTemplate } from "#root/components/bundles/bundle-ui";
 import { cn } from "#root/lib/utils";
 import { ProductDecisionSummary } from "./ProductDecisionSummary";
+import { BOTTOM_NAV_CLEARANCE, useFullyUsable } from "../minimal/bottom-nav";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -548,26 +549,16 @@ export function ProductPagePremium({
     };
   }, [locale]);
 
-  // ── Sticky Add to bag (phones): only once the main button has scrolled out
-  // of view, so the page never shows two Add to bag buttons at once.
+  // ── Sticky Add to bag (phones): shown whenever the main button cannot
+  // actually be tapped — below the fold, under the fixed bottom nav, or
+  // scrolled away — and hidden while it is fully usable, so there is always
+  // exactly one usable Add to bag and never two at once. It used to wait
+  // until the button had scrolled ABOVE the viewport, so on a 650–760px
+  // in-app browser a button sitting under the nav counted as "visible" and
+  // the tap landed on the nav's Wishlist tab instead.
   const addToBagRef = useRef<HTMLButtonElement>(null);
-  const [showSticky, setShowSticky] = useState(false);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: re-observe when the button remounts (skeleton → product, product → product)
-  useEffect(() => {
-    const btn = addToBagRef.current;
-    if (!btn || typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0];
-        // Only once it has gone ABOVE the viewport — not while the shopper is
-        // still looking at the gallery and the button is below the fold.
-        if (entry) setShowSticky(!entry.isIntersecting && entry.boundingClientRect.top < 0);
-      },
-      { threshold: 0 },
-    );
-    observer.observe(btn);
-    return () => observer.disconnect();
-  }, [product.id, isLoading]);
+  // Re-observe when the button remounts (skeleton → product, product → product).
+  const showSticky = !useFullyUsable(addToBagRef, [product.id, isLoading]);
 
   const currentImage = images[selectedIdx] || images[0];
 
@@ -949,12 +940,13 @@ export function ProductPagePremium({
       )}
 
       {/* ── Mobile sticky Add to bag ──
-          Appears only after the main button has scrolled away, and sits ABOVE
-          the fixed mobile bottom nav (h-16 + safe area) instead of under it. */}
+          Appears whenever the main button is not fully usable (see
+          useFullyUsable above), and sits ABOVE the fixed mobile bottom nav
+          (h-16 + safe area) instead of under it. */}
       {inStock && (
         <div
           style={{
-            bottom: "calc(4rem + env(safe-area-inset-bottom))",
+            bottom: BOTTOM_NAV_CLEARANCE,
             zIndex: "var(--perce-z-sticky)",
           }}
           aria-hidden={!showSticky}

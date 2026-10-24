@@ -14,10 +14,12 @@ import type { CartPageBundleGroup } from "#root/components/template-system/cartP
 import { navigate } from "vike/client/router";
 import { formatMoney } from "#root/shared/pricing/format-money";
 import { cartSummaryShipping, isShippingWaived } from "#root/shared/shipping/checkout-shipping";
+import { getProductUrl } from "#root/lib/utils/route-helpers";
 
 export default function CartPage() {
   const {
     items,
+    isHydrated,
     removeItem,
     updateQuantity,
     totalItems,
@@ -40,7 +42,10 @@ export default function CartPage() {
     bundleFreeShipping,
   } = useCart();
   const { getTemplateId } = useTemplate();
-  const [isLoading, setIsLoading] = useState(false);
+  // Until the saved cart has been read the page has nothing true to say: an
+  // empty `items` here means "not read yet", so the template shows its
+  // loading skeleton instead of a false "Your cart is empty".
+  const isLoading = !isHydrated;
   const [isUpdating, setIsUpdating] = useState(false);
 
   // Create a stable key for each cart item (product ID + selected options)
@@ -56,6 +61,9 @@ export default function CartPage() {
   const cartItems: CartPageCartItem[] = useMemo(() => {
     return items.map((item, index) => ({
       id: getCartItemKey(item),
+      // The line's product page — from the product id, never the composite
+      // line key (which carries the selected options).
+      href: getProductUrl({ id: item.id }),
       name: item.name,
       price: item.price,
       originalPrice: item.originalPrice ?? undefined,

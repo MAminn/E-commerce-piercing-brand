@@ -490,10 +490,13 @@ export function DesktopFilterBar({ model }: { model: FilterModel }) {
 export function FilterButton({
   count,
   onClick,
+  disabled = false,
   className,
 }: {
   count: number;
   onClick: () => void;
+  /** Drawn but inert while the facets load, so the toolbar never re-flows when they land. */
+  disabled?: boolean;
   className?: string;
 }) {
   const ct = useCategoryT();
@@ -501,9 +504,10 @@ export function FilterButton({
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       aria-haspopup="dialog"
       className={cn(
-        "inline-flex min-h-11 items-center justify-center gap-2 border border-perce-line-strong bg-perce-surface-raised px-4 text-[length:var(--perce-text-body)] font-medium text-perce-ink transition-colors hover:border-perce-ink",
+        "inline-flex min-h-11 items-center justify-center gap-2 border border-perce-line-strong bg-perce-surface-raised px-4 text-[length:var(--perce-text-body)] font-medium text-perce-ink transition-colors hover:border-perce-ink disabled:cursor-wait disabled:opacity-50 disabled:hover:border-perce-line-strong",
         className,
       )}>
       <SlidersHorizontal aria-hidden className="h-4 w-4" />

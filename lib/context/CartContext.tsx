@@ -8,6 +8,7 @@ import { computeFreeItemQuantities } from "#root/shared/pricing/cart-math";
 import type { GovernorateCode } from "#root/shared/shipping/egypt-governorates";
 import type { ShippingQuoteResponse } from "#root/shared/shipping/quote";
 import type { ShippingMode } from "#root/shared/shipping/rules";
+import { EXPECTED_SHIPPING_MODE } from "#root/shared/config/storefront";
 import { deriveShippingLine, type ShippingLine } from "#root/shared/shipping/checkout-shipping";
 import {
   addBundleInstance,
@@ -84,6 +85,13 @@ export interface PromoCodeApplyResult {
 
 interface CartContextType {
   items: CartItem[];
+  /**
+   * False on the server and on the first client render, true once the saved
+   * cart (lines and stacks) has been read from localStorage. Until then
+   * `items`/`bundles` are empty because they have not been read yet, not
+   * because the cart is empty — never render an empty-cart state off them.
+   */
+  isHydrated: boolean;
   addItem: (
     item: Product,
     quantity: number,
@@ -104,7 +112,7 @@ interface CartContextType {
   total: number;
   /** Server quote state for the summary line: pending / quoted / unavailable. */
   shippingLine: ShippingLine;
-  /** "flat" until the first quote answers; "zones" means a governorate is required before ordering. */
+  /** EXPECTED_SHIPPING_MODE until the first quote answers; "zones" means a governorate is required before ordering. */
   shippingMode: ShippingMode;
   shippingDestination: GovernorateCode | null;
   /** Re-quotes shipping for the chosen governorate; `null` clears it. */
@@ -409,7 +417,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
   );
   const baseShippingFee = shippingLine.baseFee;
   const shipping = shippingLine.fee;
-  const shippingMode: ShippingMode = shippingResponse?.mode ?? "flat";
+  // Before the first quote: the store's expected mode, so the server render
+  // and the hydrated page agree (no "(optional)" → required flip at checkout).
+  const shippingMode: ShippingMode = shippingResponse?.mode ?? EXPECTED_SHIPPING_MODE;
 
   // Derived, not state — see shared/bundles/cart-pricing.ts for the order of operations.
   const totals = useMemo(
@@ -813,6 +823,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
     <CartContext.Provider
       value={{
         items,
+        // Set in the same effect, after both the lines and the stacks are read.
+        isHydrated: bundlesHydrated,
         addItem,
         removeItem,
         updateQuantity,

@@ -813,19 +813,25 @@ export function CheckoutPageModernTemplate({
                       }}
                       className={fieldErrors.state ? "border-destructive" : ""}
                     />
-                    {governorateRequired && !governorateCode && !fieldErrors.state && (
-                      <p className='text-xs text-perce-ink-muted'>
-                        {t("checkout.shipping_select_to_calculate") ||
-                          "Select your governorate to see the shipping fee."}
-                      </p>
-                    )}
-                    {totals.shippingStatus === "unavailable" && !fieldErrors.state && (
-                      <p className='text-xs text-perce-sale'>
-                        {t("checkout.shipping_unavailable_destination") ||
-                          "We don't deliver to this governorate yet. Please choose another destination."}
-                      </p>
-                    )}
-                    <FieldError id='state-error' message={fieldErrors.state} />
+                    {/* One reserved status line under the field: the hint,
+                        the unavailable notice and the validation error take
+                        turns in it, so choosing a governorate (or a quote
+                        landing) never inserts or removes a row. */}
+                    <div data-testid='governorate-status' className='min-h-4 text-xs leading-4'>
+                      {governorateRequired && !governorateCode && !fieldErrors.state && (
+                        <p className='text-perce-ink-muted'>
+                          {t("checkout.shipping_select_to_calculate") ||
+                            "Select your governorate to see the shipping fee."}
+                        </p>
+                      )}
+                      {totals.shippingStatus === "unavailable" && !fieldErrors.state && (
+                        <p className='text-perce-sale'>
+                          {t("checkout.shipping_unavailable_destination") ||
+                            "We don't deliver to this governorate yet. Please choose another destination."}
+                        </p>
+                      )}
+                      <FieldError id='state-error' message={fieldErrors.state} />
+                    </div>
                   </div>
                 </div>
               </div>

@@ -33,6 +33,17 @@
  */
 
 import type { NavbarStyle } from "#root/shared/types/layout-settings";
+import type { ShippingMode } from "#root/shared/shipping/rules";
+
+/**
+ * Shipping mode assumed until the first `shipping.quote` answers — i.e. on
+ * the server render and the first client render. Percé prices shipping per
+ * governorate, so checkout renders Governorate as required from the start
+ * instead of drawing it "(optional)" and flipping it once the quote lands.
+ * The live quote still wins: a store switched to flat mode renders flat as
+ * soon as it answers.
+ */
+export const EXPECTED_SHIPPING_MODE: ShippingMode = "zones";
 
 /** Global shell used when `layoutSettings.header.navbarStyle` is unset. */
 export const DEFAULT_NAVBAR_STYLE: NavbarStyle = "minimal";
