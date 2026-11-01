@@ -1,6 +1,7 @@
 import { useCart } from "#root/lib/context/CartContext";
 import { usePageContext } from "vike-react/usePageContext";
-import { ShoppingBag, ArrowRight, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
+import { buttonClass } from "#root/components/storefront/Button";
 import { trpc } from "#root/shared/trpc/client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { OfferCondition, OfferReward } from "#root/shared/database/drizzle/schema";
@@ -46,15 +47,15 @@ type StripState =
 function rewardHeadline(reward: OfferReward): string {
   switch (reward.type) {
     case "percentage_off":
-      return `GET ${reward.percentOff}% OFF`;
+      return `Get ${reward.percentOff}% off`;
     case "fixed_off":
-      return `GET ${reward.amountOff} OFF`;
+      return `Get ${formatMoney(reward.amountOff)} off`;
     case "free_shipping":
-      return "GET FREE SHIPPING";
+      return "Get free shipping";
     case "free_items":
-      return `GET ${reward.quantity} FREE`;
+      return `Get ${reward.quantity} free`;
     default:
-      return "GET A DEAL";
+      return "Get the offer";
   }
 }
 
@@ -105,7 +106,7 @@ function buildStripState(
         : `${latestApplied.name} unlocked`,
       rewardText,
       href: "/cart",
-      ctaLabel: "VIEW CART",
+      ctaLabel: "View bag",
     };
   }
 
@@ -153,21 +154,18 @@ function buildStripState(
 
   return {
     kind: "cart",
-    actionText: `${cartQuantity} ITEM${cartQuantity === 1 ? "" : "S"} IN CART`,
+    actionText: `${cartQuantity} item${cartQuantity === 1 ? "" : "s"} in your bag`,
     rewardText: `${formatMoney(total, { currency })}`,
     href: "/cart",
-    ctaLabel: "VIEW CART",
+    ctaLabel: "View bag",
   };
 }
 
 export function StickyCartBar({
-  raiseForBottomNav = false,
   desktopOnly = false,
   ctaHref,
 }: {
-  /** When true, adds extra bottom clearance below `lg` so this bar stacks above a fixed mobile bottom nav instead of overlapping it. */
-  raiseForBottomNav?: boolean;
-  /** When true, only renders on `lg` and up (the minimal template already has its own mobile bottom nav + dedicated offers page). */
+  /** When true, only renders on `lg` and up (phones reach the bag and the offers page from the header and menu). */
   desktopOnly?: boolean;
   /** When set, overrides every state's CTA link + label to point here instead of /cart or /shop. */
   ctaHref?: { href: string; label: string };
@@ -239,35 +237,33 @@ export function StickyCartBar({
   return (
     <div
       className={cn(
-        "fixed inset-x-0 bottom-0 z-[9990] px-3 sm:px-4 pointer-events-none",
+        "pointer-events-none fixed inset-x-0 bottom-0 px-4 pb-4 transition-opacity duration-[var(--perce-duration)]",
         desktopOnly && "hidden lg:block",
-        raiseForBottomNav ? "pb-20 lg:pb-4" : "pb-3 sm:pb-4",
-        visible ? "animate-offer-bar-enter" : "translate-y-full opacity-0",
+        visible ? "opacity-100" : "translate-y-full opacity-0",
       )}
-      aria-label="Cart and offers"
+      style={{ zIndex: "var(--perce-z-sticky)" }}
+      aria-label="Bag and offers"
     >
-      <div className="mx-auto w-full max-w-3xl pointer-events-auto relative">
+      <div className="pointer-events-auto relative mx-auto w-full max-w-3xl">
         {isUnlocked && savingsExpanded && hasSavingsBreakdown && (
-          <div className="mb-2 border border-perce-frame-line bg-perce-ground/95 px-4 py-3 shadow-[0_8px_32px_rgba(0,0,0,0.35)] backdrop-blur-sm">
-            <p className="mb-2 text-xs font-medium text-perce-frame-ink-muted">
-              Savings breakdown
-            </p>
-            <ul className="space-y-1.5">
+          <div className="mb-2 border border-line bg-surface px-4 py-3">
+            <p className="mb-2 t-micro text-ink-2">Savings breakdown</p>
+            <ul className="space-y-2">
               {appliedOffers.map((offer) => (
                 <li
                   key={offer.name}
-                  className="flex items-start justify-between gap-3 text-[11px] leading-snug text-perce-frame-ink"
+                  className="flex items-start justify-between gap-3 t-small text-ink"
                 >
                   <span className="min-w-0 break-words">{offer.name}</span>
-                  <span className="shrink-0 font-semibold text-perce-accent">
+                  <span className="shrink-0 t-label tabular-nums">
                     {formatOfferSaving(offer, currency)}
                   </span>
                 </li>
               ))}
               {discount > 0 && (
-                <li className="flex items-center justify-between gap-3 text-[11px] text-perce-frame-ink">
+                <li className="flex items-center justify-between gap-3 t-small text-ink">
                   <span>Promo code</span>
-                  <span className="font-semibold text-perce-accent">
+                  <span className="t-label tabular-nums">
                     −{formatMoney(discount, { currency })}
                   </span>
                 </li>
@@ -276,101 +272,69 @@ export function StickyCartBar({
           </div>
         )}
 
-        <div
-          className={cn(
-            // Percé: a Ground pill with Paper type. No gold, no gradient, no
-            // glow — the single accent is the reward figure and the count.
-            "relative flex items-center gap-2 sm:gap-3 border border-perce-frame-line bg-perce-ground px-3 py-2.5 sm:px-4 sm:py-3 shadow-[0_8px_32px_rgba(0,0,0,0.35)]",
-            isUnlocked && "border-perce-accent/60",
-          )}
-        >
-          {/* Progress fill (subtle) */}
+        <div className="relative flex items-center gap-3 border border-line bg-surface px-4 py-2">
+          {/* Progress toward the offer: a 1px ink rule along the top edge. */}
           {isProgress && (
             <div
-              className="absolute inset-y-0 left-0 bg-perce-paper/10 transition-all duration-700 ease-out"
-              style={{ width: `${Math.round(strip.progress * 100)}%` }}
-              aria-hidden
-            />
+              className="absolute inset-x-0 top-0 h-px bg-line"
+              role="progressbar"
+              aria-label="Progress toward the offer"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(strip.progress * 100)}
+            >
+              <div
+                className="h-px bg-ink transition-[width] duration-[var(--perce-duration-slow)]"
+                style={{ width: `${Math.round(strip.progress * 100)}%` }}
+              />
+            </div>
           )}
 
-          {/* Bag icon */}
-          <div className="relative z-10 shrink-0">
-            <ShoppingBag
-              className={cn(
-                "h-5 w-5 sm:h-[22px] sm:w-[22px]",
-                isUnlocked ? "text-perce-accent" : "text-perce-frame-ink",
-              )}
-              strokeWidth={1.75}
-            />
-            <span
-              className={cn(
-                "absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-0.5 text-[9px] font-bold leading-none",
-                "bg-perce-accent text-perce-accent-ink",
-              )}
-            >
-              {totalItems > 99 ? "99+" : totalItems}
-            </span>
-          </div>
+          <p className="shrink-0 t-label tabular-nums text-ink">
+            Bag ({totalItems > 99 ? "99+" : totalItems})
+          </p>
 
           {/* Offer copy */}
-          <div className="relative z-10 min-w-0 flex-1">
+          <div className="min-w-0 flex-1">
             {isUnlocked && hasSavingsBreakdown ? (
               <button
                 type="button"
                 onClick={() => setSavingsExpanded((prev) => !prev)}
-                className="flex w-full min-w-0 items-center gap-1 text-left"
+                className="flex min-h-11 w-full min-w-0 items-center gap-1 text-start"
                 aria-expanded={savingsExpanded}
               >
-                <p className="min-w-0 flex-1 truncate text-xs font-medium leading-tight text-perce-frame-ink sm:text-[13px]">
+                <span className="min-w-0 flex-1 truncate t-small text-ink-2">
                   <span>{strip.actionText}</span>
-                  <span className="mx-1.5 font-normal text-perce-frame-ink-muted">·</span>
-                  <span className="font-semibold text-perce-accent">
-                    {strip.rewardText}
-                  </span>
-                </p>
+                  <span className="mx-2" aria-hidden>·</span>
+                  <span className="t-label text-ink">{strip.rewardText}</span>
+                </span>
                 <ChevronDown
+                  aria-hidden
+                  size={16}
+                  strokeWidth={1.5}
                   className={cn(
-                    "h-3.5 w-3.5 shrink-0 text-perce-frame-ink-muted transition-transform sm:h-4 sm:w-4",
+                    "shrink-0 text-ink-2 transition-transform",
                     savingsExpanded && "rotate-180",
                   )}
                 />
               </button>
             ) : (
-              <p className="truncate text-xs font-medium leading-tight text-perce-frame-ink sm:text-[13px]">
-                <span>{strip.actionText}</span>
-                <span className="mx-1.5 font-normal text-perce-frame-ink-muted">·</span>
-                <span
-                  className={cn(
-                    "font-semibold",
-                    isUnlocked ? "text-perce-accent" : "text-perce-frame-ink",
-                  )}
-                >
-                  {strip.rewardText}
+              <p className="flex min-h-11 items-center truncate t-small text-ink-2">
+                <span className="truncate">
+                  <span>{strip.actionText}</span>
+                  <span className="mx-2" aria-hidden>·</span>
+                  <span className="t-label text-ink">{strip.rewardText}</span>
                 </span>
               </p>
             )}
           </div>
 
-          {/* CTA */}
-          <a
-            href={ctaLink}
-            className={cn(
-              "relative z-10 flex shrink-0 items-center gap-1.5 overflow-hidden px-3 py-2 text-xs font-medium text-perce-ground transition-colors active:translate-y-px sm:px-4 sm:py-2.5 sm:text-[12px]",
-              "bg-perce-paper hover:bg-white",
-            )}
-          >
-            <span className="hidden sm:inline">{ctaText}</span>
-            <span
-              className={cn(
-                "flex h-6 w-6 items-center justify-center rounded-full sm:h-7 sm:w-7",
-                "bg-perce-ground/10",
-              )}
-            >
-              <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" strokeWidth={2.5} />
-            </span>
+          <a href={ctaLink} className={buttonClass({ variant: "secondary", size: "sm", className: "shrink-0" })}>
+            {ctaText}
           </a>
         </div>
       </div>
     </div>
   );
 }
+

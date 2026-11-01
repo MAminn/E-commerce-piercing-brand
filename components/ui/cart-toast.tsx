@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Check, X } from "lucide-react";
-import { Link } from "#root/components/utils/Link";
+import { buttonClass } from "#root/components/storefront/Button";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { formatMoney } from "#root/shared/pricing/format-money";
 
@@ -29,6 +29,8 @@ export function showCartToast(item: CartToastItem) {
  */
 export function flyToCart(sourceEl: HTMLElement | null, imageUrl?: string) {
   if (!sourceEl || typeof document === "undefined") return;
+  // Decorative motion: skipped entirely for anyone who asked for less.
+  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
 
   const rect = sourceEl.getBoundingClientRect();
   const ghost = document.createElement("img");
@@ -45,9 +47,7 @@ export function flyToCart(sourceEl: HTMLElement | null, imageUrl?: string) {
     objectFit: "cover",
     zIndex: "20000",
     pointerEvents: "none",
-    borderRadius: "8px",
-    boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
-    transition: "all 1.1s cubic-bezier(0.22, 0.68, 0, 1.1)",
+    transition: "all 0.8s cubic-bezier(0.16, 1, 0.3, 1)",
     opacity: "1",
   });
 
@@ -63,9 +63,7 @@ export function flyToCart(sourceEl: HTMLElement | null, imageUrl?: string) {
       left: "16px",
       width: "56px",
       height: "56px",
-      opacity: "0.3",
-      borderRadius: "50%",
-      transform: "rotate(-8deg)",
+      opacity: "0",
     });
   });
 
@@ -106,52 +104,48 @@ export function CartToastContainer() {
 
   if (!visible || !item) return null;
 
+  // Square `surface` panel with a hairline — no shadow, no colour wash. The
+  // whole panel is a polite live region so the addition is announced.
   return (
-    <div className="fixed top-4 start-4 z-[10001] w-[320px] bg-white border border-emerald-200 shadow-xl animate-[slideDown_400ms_ease-out_forwards,cartToastPulse_1.5s_ease-in-out_400ms_2]">
-      <div className="h-1 bg-emerald-500 w-full animate-[shrink_4s_linear_forwards]" />
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed start-4 top-4 w-[320px] max-w-[calc(100vw-2rem)] border border-line bg-surface text-ink"
+      style={{ zIndex: "var(--perce-z-overlay)" }}>
       <div className="p-4">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center gap-2 text-emerald-600">
-            <Check className="w-4 h-4" />
-            <span className="text-sm font-medium">
-              {t("product.added_to_cart") || "Added to cart"}
-            </span>
-          </div>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <p className="flex items-center gap-2 t-label">
+            <Check size={16} strokeWidth={1.5} aria-hidden />
+            {t("product.added_to_cart") || "Added to cart"}
+          </p>
           <button
             type="button"
             onClick={dismiss}
-            className="text-stone-400 hover:text-stone-600 transition-colors">
-            <X className="w-4 h-4" />
+            aria-label={t("product.close_image") || "Close"}
+            className="-me-3 -mt-3 flex h-11 w-11 items-center justify-center text-ink-2 transition-colors hover:text-ink">
+            <X size={16} strokeWidth={1.5} aria-hidden />
           </button>
         </div>
         <div className="flex items-center gap-3">
           {item.imageUrl && (
             <img
               src={item.imageUrl}
-              alt={item.name}
-              className="w-14 h-14 object-cover flex-none"
+              alt=""
+              className="h-15 w-12 flex-none bg-surface-2 object-cover"
             />
           )}
           <div className="min-w-0 flex-1">
-            <p className="text-sm text-stone-800 font-medium truncate">
-              {item.name}
-            </p>
-            <p className="text-sm text-stone-500">
-              {formatMoney(item.price)}
-            </p>
+            <p className="truncate t-small text-ink">{item.name}</p>
+            <p className="t-label tabular-nums text-ink">{formatMoney(item.price)}</p>
           </div>
         </div>
-        <div className="flex gap-2 mt-3">
-          <Link
-            href="/cart"
-            className="flex-1 py-2 text-center text-xs font-medium border border-stone-200 text-stone-700 hover:bg-stone-50 transition-colors">
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <a href="/cart" className={buttonClass({ variant: "secondary", size: "sm" })}>
             {t("product.view_cart") || "View Cart"}
-          </Link>
-          <Link
-            href="/checkout"
-            className="flex-1 py-2 text-center text-xs font-medium bg-stone-900 text-white hover:bg-stone-800 transition-colors">
+          </a>
+          <a href="/checkout" className={buttonClass({ variant: "primary", size: "sm" })}>
             {t("product.checkout") || "Checkout"}
-          </Link>
+          </a>
         </div>
       </div>
     </div>

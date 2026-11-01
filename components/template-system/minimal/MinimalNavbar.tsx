@@ -1,23 +1,18 @@
-import { useContext, useState, useRef, useEffect, useCallback } from "react";
-import { Search, ShoppingCart, User, X, Menu, Globe, LogOut, Loader2, Package, Heart, LayoutDashboard, ChevronDown } from "lucide-react";
+import { useContext, useState, useRef, useEffect, useId } from "react";
+import { Search, User, X, Menu, ChevronDown } from "lucide-react";
+import { usePageContext } from "vike-react/usePageContext";
 import { Link } from "#root/components/utils/Link";
 import { AuthContext } from "#root/context/AuthContext";
 import { useCart } from "#root/lib/context/CartContext";
 import { useLayoutSettings } from "#root/frontend/contexts/LayoutSettingsContext";
-import { useNavbarMode } from "#root/components/globals/NavbarContext";
 import { HeaderLogo } from "#root/components/globals/HeaderLogo";
 import { Marquee } from "#root/components/ui/marquee";
 import { navigate } from "vike/client/router";
 import { trpc } from "#root/shared/trpc/client";
-import { toast } from "sonner";
 import { getProductUrl } from "#root/lib/utils/route-helpers";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { isUsableHref } from "#root/shared/config/storefront";
-import {
-  Sheet,
-  SheetTrigger,
-  SheetContent,
-} from "#root/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle } from "#root/components/ui/sheet";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,48 +20,79 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "#root/components/ui/dropdown-menu";
-import { formatMoney } from "#root/shared/pricing/format-money";
 import { visibleToShoppers } from "#root/shared/categories/tree";
+import { ICON_PROPS, IconButton, buttonClass } from "#root/components/storefront/Button";
+import { Price } from "#root/components/storefront/Price";
+import { cn } from "#root/lib/utils";
+
+interface NavLinkItem {
+  id: string;
+  label: string;
+  to: string;
+  isDropdown: boolean;
+  categoryIds: string[];
+}
+
+interface LiveResults {
+  products: {
+    id: string;
+    slug?: string | null;
+    name: string;
+    price: number;
+    /** Present only when the product is genuinely discounted. */
+    discountPrice?: number | null;
+    imageUrl?: string;
+  }[];
+  categories: { id: string; name: string; slug?: string }[];
+}
+
+const EMPTY_RESULTS: LiveResults = { products: [], categories: [] };
 
 /**
- * Percé navbar — the dark brand frame.
+ * A nav link is the current page when its path matches and it names the same
+ * listing section (`/shop` vs `/shop?section=newarrivals`).
+ */
+function isCurrentLink(to: string, pathname: string, search: Record<string, string>): boolean {
+  const [path = "", query = ""] = to.split("?");
+  const normalize = (p: string) => p.replace(/\/+$/, "") || "/";
+  if (normalize(path) !== normalize(pathname)) return false;
+  const section = new URLSearchParams(query).get("section");
+  return (section ?? null) === (search.section ?? null);
+}
+
+/**
+ * Percé navbar — Object Index.
  *
- * Ground (#0E0E0E) bar, Paper type, one hairline. The only accent on the
- * bar is the cart count. Search results and the mobile drawer open as light
- * "windows" over it, like every product surface. Over the homepage hero the
- * bar starts transparent and turns solid on scroll.
+ * A solid stone bar with one hairline, on every route (no transparent
+ * state). 56px on phones, 64px from 1024px.
  *
- * Layout: [icons (left)]  ·  [nav links (centre-right)]  ·  [wordmark (far right)]
- * Flips naturally with RTL via the i18n dir attribute.
+ *   desktop  wordmark · primary links ·············· search · account · Bag (N)
+ *   mobile   menu ·········· wordmark ·········· search · Bag (N)
+ *
+ * The mobile menu is a full-height sheet from the start edge carrying the
+ * links, Offers, Wishlist, Account, Orders, language and sign-out — every
+ * destination the old bottom nav had. Logical properties throughout, so the
+ * whole bar mirrors under RTL.
  */
 export function MinimalNavbar() {
-  const mode = useNavbarMode();
   const layoutSettings = useLayoutSettings();
   const { session, logout } = useContext(AuthContext);
   const { totalItems } = useCart();
   const { t, locale, toggleLocale, dir } = useMinimalI18n();
+  const { urlPathname, urlParsed } = usePageContext();
+  const currentSearch = (urlParsed?.search ?? {}) as Record<string, string>;
 
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchPanelRef = useRef<HTMLDivElement>(null);
+  const searchToggleRef = useRef<HTMLButtonElement>(null);
+  const searchPanelId = useId();
   const [categories, setCategories] = useState<{ id: string; name: string; slug?: string }[]>([]);
 
-  // Live search state
-  const [liveResults, setLiveResults] = useState<{
-    products: {
-      id: string;
-      slug?: string | null;
-      name: string;
-      price: number;
-      /** Present only when the product is genuinely discounted. */
-      discountPrice?: number | null;
-      imageUrl?: string;
-    }[];
-    categories: { id: string; name: string; slug?: string }[];
-  }>({ products: [], categories: [] });
+  const [liveResults, setLiveResults] = useState<LiveResults>(EMPTY_RESULTS);
   const [isSearching, setIsSearching] = useState(false);
-  const searchDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     trpc.category.view.query().then((res) => {
@@ -91,7 +117,7 @@ export function MinimalNavbar() {
   // Live search with debounce
   useEffect(() => {
     if (!searchQuery.trim() || searchQuery.trim().length < 2) {
-      setLiveResults({ products: [], categories: [] });
+      setLiveResults(EMPTY_RESULTS);
       setIsSearching(false);
       return;
     }
@@ -131,27 +157,43 @@ export function MinimalNavbar() {
     return () => clearTimeout(timer);
   }, [searchQuery, categories]);
 
-  // Close search dropdown on outside click
+  const closeSearch = (restoreFocus = false) => {
+    setIsSearchOpen(false);
+    setSearchQuery("");
+    setLiveResults(EMPTY_RESULTS);
+    if (restoreFocus) searchToggleRef.current?.focus();
+  };
+
+  // Close the search panel on an outside click or Escape.
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (searchDropdownRef.current && !searchDropdownRef.current.contains(e.target as Node)) {
-        if (isSearchOpen && !searchInputRef.current?.contains(e.target as Node)) {
-          setIsSearchOpen(false);
-          setSearchQuery("");
-          setLiveResults({ products: [], categories: [] });
-        }
-      }
+    if (!isSearchOpen) return;
+    const onPointer = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (searchPanelRef.current?.contains(target)) return;
+      if (searchToggleRef.current?.contains(target)) return;
+      closeSearch();
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeSearch(true);
+    };
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+    // biome-ignore lint/correctness/useExhaustiveDependencies: closeSearch only touches setters and refs
+  }, [isSearchOpen]);
+
+  useEffect(() => {
+    if (isSearchOpen) searchInputRef.current?.focus();
   }, [isSearchOpen]);
 
   const handleSearchSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
     if (searchQuery.trim()) {
       navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-      setIsSearchOpen(false);
-      setSearchQuery("");
+      closeSearch();
       setIsSheetOpen(false);
     }
   };
@@ -163,7 +205,7 @@ export function MinimalNavbar() {
   const cmsNavLinks = layoutSettings.header.navigationLinks.filter(
     (l) => l.isDropdown || isUsableHref(l.url),
   );
-  const baseLinks =
+  const baseLinks: NavLinkItem[] =
     cmsNavLinks.length > 0
       ? cmsNavLinks.map((l) => ({
           id: l.id,
@@ -172,30 +214,14 @@ export function MinimalNavbar() {
           isDropdown: l.isDropdown ?? false,
           categoryIds: l.categoryIds ?? [],
         }))
-      : [{ id: "default-shop", label: "Shop", to: "/shop", isDropdown: false, categoryIds: [] as string[] }];
+      : [{ id: "default-shop", label: "Shop", to: "/shop", isDropdown: false, categoryIds: [] }];
   const cmsLinksToBundles = baseLinks.some((l) => l.to.split("?")[0]?.replace(/\/$/, "") === "/bundles");
-  const links =
+  const links: NavLinkItem[] =
     hasLiveBundles && !cmsLinksToBundles
-      ? [...baseLinks, { id: "auto-bundles", label: t("nav.bundles"), to: "/bundles", isDropdown: false, categoryIds: [] as string[] }]
+      ? [...baseLinks, { id: "auto-bundles", label: t("nav.bundles"), to: "/bundles", isDropdown: false, categoryIds: [] }]
       : baseLinks;
 
   const handleCloseSheet = () => setIsSheetOpen(false);
-
-  // Overlay routes (the homepage) float the bar over a full-bleed hero: it is
-  // transparent while the page sits at the top and turns solid as soon as the
-  // page scrolls. `data-at-top` only marks the state — the transparency itself
-  // is gated in CSS on a hero actually being under the header (`.perce-nav`
-  // in layouts/style.css), so a page without one never gets white-on-white.
-  // Starts `true` so the server render matches a fresh load at the top.
-  const isOverlay = mode === "overlay";
-  const [atTop, setAtTop] = useState(true);
-  useEffect(() => {
-    if (!isOverlay) return;
-    const update = () => setAtTop(window.scrollY <= 8);
-    update();
-    window.addEventListener("scroll", update, { passive: true });
-    return () => window.removeEventListener("scroll", update);
-  }, [isOverlay]);
 
   const marqueeEnabled = layoutSettings.header.marqueeEnabled;
   const marqueeText = locale === "ar" && layoutSettings.header.marqueeTextAr
@@ -204,16 +230,30 @@ export function MinimalNavbar() {
   const marqueeBackgroundColor = layoutSettings.header.marqueeBackgroundColor;
   const marqueeTextColor = layoutSettings.header.marqueeTextColor;
 
+  const isAdmin = session?.role === "admin" || session?.role === "superadmin";
+  const bagLabel =
+    totalItems === 1
+      ? t("nav.bag_count_one")
+      : t("nav.bag_count").replace("{count}", String(totalItems));
+
+  const navLinkClass = (active: boolean) =>
+    cn(
+      "inline-flex min-h-11 items-center t-label transition-colors",
+      active
+        ? "text-ink underline decoration-1 underline-offset-[6px]"
+        : "text-ink-2 hover:text-ink",
+    );
+
   return (
     <>
-      {/* ── Scrolling Marquee ── */}
+      {/* ── Scrolling Marquee (CMS, off unless an admin enables it) ── */}
       {marqueeEnabled && marqueeText && (
         <Marquee
           key={marqueeText}
           text={marqueeText}
           repeat={14}
           duration={240}
-          className='bg-perce-ground text-perce-frame-ink border-b border-perce-frame-line'
+          className='bg-ink text-bg'
           style={{
             ...(marqueeBackgroundColor
               ? { backgroundColor: marqueeBackgroundColor }
@@ -223,496 +263,388 @@ export function MinimalNavbar() {
         />
       )}
 
-      <nav
-        aria-label='Main'
-        className='perce-nav w-full text-perce-frame-ink'
-        data-at-top={isOverlay && atTop ? "" : undefined}
-        dir={dir === "rtl" ? "ltr" : "rtl"}>
+      <nav aria-label='Main' className='perce-nav relative w-full'>
         <div className='perce-container'>
-          <div className='flex items-center justify-between h-16 sm:h-[72px]'>
-            {/* ── Left: Action icons ── */}
-            <div className='flex items-center gap-1 sm:gap-2'>
-              
-
-              {/* User / Auth */}
-              {!session ? (
-                <Link
-                  href='/login'
-                  className='inline-flex items-center justify-center min-w-11 min-h-11 md:min-w-0 md:min-h-0 p-2 text-perce-frame-ink-muted hover:text-perce-frame-ink transition-colors'
-                  aria-label={t("nav.login")}>
-                  <User className='w-[18px] h-[18px]' />
-                </Link>
-              ) : (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      className='p-1.5 w-8 h-8 rounded-full bg-perce-paper text-perce-ground text-xs font-medium flex items-center justify-center hover:bg-white transition-colors'
-                      aria-label="Account menu">
-                      {session.name ? session.name.charAt(0).toUpperCase() : <User className="w-4 h-4" />}
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" style={{ zIndex: "var(--perce-z-overlay)" }}
-                    className="w-52">
-                    <div className="px-3 py-2 border-b border-gray-100">
-                      <p className="text-sm font-medium text-gray-900 truncate">{session.name || "Account"}</p>
-                      <p className="text-xs text-gray-400 truncate">{session.email}</p>
-                    </div>
-                    <DropdownMenuItem asChild>
-                      <Link href="/account" className="flex items-center gap-2.5 cursor-pointer">
-                        <User className="w-4 h-4 text-gray-500" /> My Account
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/account?tab=orders" className="flex items-center gap-2.5 cursor-pointer">
-                        <Package className="w-4 h-4 text-gray-500" /> Orders
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/account?tab=wishlist" className="flex items-center gap-2.5 cursor-pointer">
-                        <Heart className="w-4 h-4 text-gray-500" /> Wishlist
-                      </Link>
-                    </DropdownMenuItem>
-                    {(session.role === "admin" || session.role === "superadmin") && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem asChild>
-                          <Link href="/dashboard" className="flex items-center gap-2.5 cursor-pointer">
-                            <LayoutDashboard className="w-4 h-4 text-gray-500" /> Dashboard
-                          </Link>
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => logout()}
-                      className="flex items-center gap-2.5 cursor-pointer text-red-600 focus:text-red-600">
-                      <LogOut className="w-4 h-4" /> Logout
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-                {/* Cart */}
-              <Link
-                href='/cart'
-                className='relative inline-flex items-center justify-center min-w-11 min-h-11 md:min-w-0 md:min-h-0 p-2 text-perce-frame-ink-muted hover:text-perce-frame-ink transition-colors'
-                aria-label={
-                  totalItems > 0
-                    ? `${t("nav.cart")} (${totalItems})`
-                    : t("nav.cart")
-                }>
-                <ShoppingCart className='w-[18px] h-[18px]' />
-                {totalItems > 0 && (
-                  <span
-                    aria-hidden='true'
-                    className='absolute top-1.5 right-1.5 md:-top-0.5 md:-right-0.5 inline-flex items-center justify-center w-[18px] h-[18px] text-[10px] font-medium leading-none bg-perce-accent text-perce-accent-ink rounded-full'>
-                    {totalItems}
-                  </span>
-                )}
-              </Link>
-
-              {/* Desktop Search */}
-              <div className='hidden lg:block relative' ref={searchDropdownRef}>
-                {isSearchOpen ? (
-                  <div className='flex items-center'>
-                    <form onSubmit={handleSearchSubmit} className='flex items-center'>
-                      <div className='relative'>
-                        <Search className='absolute start-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-perce-frame-ink-muted' />
-                        <input
-                          ref={searchInputRef}
-                          type='text'
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          placeholder={t("nav.search")}
-                          autoFocus
-                          className='w-48 ps-8 pe-8 py-1.5 text-sm border border-perce-frame-line bg-transparent text-perce-frame-ink placeholder:text-perce-frame-ink-muted outline-none focus:border-perce-frame-ink transition-colors'
-                        />
-                        <button
-                          type='button'
-                          onClick={() => {
-                            setIsSearchOpen(false);
-                            setSearchQuery("");
-                            setLiveResults({ products: [], categories: [] });
-                          }}
-                          className='absolute end-2 top-1/2 -translate-y-1/2 text-perce-frame-ink-muted hover:text-perce-frame-ink'>
-                          <X className='w-3.5 h-3.5' />
-                        </button>
-                      </div>
-                    </form>
-                    {/* Live results dropdown */}
-                    {(searchQuery.trim().length >= 2) && (
-                      <div className='absolute top-full start-0 mt-1 w-72 bg-white border border-gray-200 shadow-lg z-50 max-h-80 overflow-y-auto'>
-                        {isSearching ? (
-                          <div className='flex items-center justify-center py-4'>
-                            <Loader2 className='w-4 h-4 animate-spin text-gray-400' />
-                          </div>
-                        ) : (
-                          <>
-                            {liveResults.categories.length > 0 && (
-                              <div className='px-3 py-2 border-b border-gray-100'>
-                                <p className='text-xs text-gray-400 mb-1'>
-                                  {locale === "ar" ? "الأقسام" : "Categories"}
-                                </p>
-                                {liveResults.categories.map((cat) => (
-                                  <Link
-                                    key={cat.id}
-                                    href={`/shop?category=${cat.slug || cat.id}`}
-                                    className='block py-1.5 text-sm text-gray-700 hover:text-black transition-colors'
-                                    onClick={() => {
-                                      setIsSearchOpen(false);
-                                      setSearchQuery("");
-                                      setLiveResults({ products: [], categories: [] });
-                                    }}>
-                                    {cat.name}
-                                  </Link>
-                                ))}
-                              </div>
-                            )}
-                            {liveResults.products.length > 0 && (
-                              <div className='px-3 py-2'>
-                                <p className='text-xs text-gray-400 mb-1'>
-                                  {locale === "ar" ? "المنتجات" : "Products"}
-                                </p>
-                                {liveResults.products.map((p) => (
-                                  <Link
-                                    key={p.id}
-                                    href={getProductUrl(p)}
-                                    className='flex items-center gap-3 py-2 hover:bg-gray-50 -mx-3 px-3 transition-colors'
-                                    onClick={() => {
-                                      setIsSearchOpen(false);
-                                      setSearchQuery("");
-                                      setLiveResults({ products: [], categories: [] });
-                                    }}>
-                                    {p.imageUrl && (
-                                      <img src={p.imageUrl} alt={p.name} className='w-10 h-10 object-cover bg-gray-50' />
-                                    )}
-                                    <div className='flex-1 min-w-0'>
-                                      <p className='truncate text-sm text-perce-ink'>{p.name}</p>
-                                      <p className='flex items-baseline gap-1.5 text-xs'>
-                                        {p.discountPrice != null && (
-                                          <span className='text-perce-ink-subtle line-through'>
-                                            {formatMoney(p.price)}
-                                          </span>
-                                        )}
-                                        <span
-                                          className={
-                                            p.discountPrice != null
-                                              ? "font-medium text-perce-sale"
-                                              : "text-perce-ink-muted"
-                                          }>
-                                          {formatMoney((p.discountPrice ?? p.price))}
-                                        </span>
-                                      </p>
-                                    </div>
-                                  </Link>
-                                ))}
-                              </div>
-                            )}
-                            {liveResults.products.length === 0 && liveResults.categories.length === 0 && (
-                              <p className='px-3 py-4 text-sm text-gray-400 text-center'>
-                                {locale === "ar" ? "لا توجد نتائج" : "No results found"}
-                              </p>
-                            )}
-                            {searchQuery.trim().length >= 2 && (
-                              <div className='border-t border-gray-100 px-3 py-2'>
-                                <button
-                                  type='button'
-                                  onClick={() => handleSearchSubmit()}
-                                  className='text-xs text-gray-500 hover:text-black transition-colors w-full text-center'>
-                                  {locale === "ar" ? "عرض جميع النتائج" : "View all results"} →
-                                </button>
-                              </div>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <button
-                    type='button'
-                    onClick={() => {
-                      setIsSearchOpen(true);
-                      setTimeout(() => searchInputRef.current?.focus(), 100);
-                    }}
-                    className='p-2 text-perce-frame-ink-muted hover:text-perce-frame-ink transition-colors'
-                    aria-label={t("nav.search")}>
-                    <Search className='w-[18px] h-[18px]' />
-                  </button>
-                )}
-              </div>
-              
-
-              {/* Language toggle */}
-              {/* <button
-                type='button'
-                onClick={toggleLocale}
-                className='p-2 text-gray-700 hover:text-black transition-colors text-xs font-medium'
-                aria-label='Toggle language'>
-                {locale === "en" ? "AR" : "EN"}
-              </button> */}
+          <div className='relative flex h-14 items-center lg:h-16'>
+            {/* ── Mobile: menu (start) ── */}
+            <div className='-ms-3 flex items-center lg:hidden'>
+              <IconButton
+                aria-label={t("nav.menu")}
+                aria-expanded={isSheetOpen}
+                aria-haspopup='dialog'
+                onClick={() => setIsSheetOpen(true)}>
+                <Menu {...ICON_PROPS} />
+              </IconButton>
             </div>
 
-            {/* ── Center / Right: Navigation Links (desktop) ──
-                The <nav> flips its direction to put the wordmark at the far
-                end; restore the reading direction here so the links keep
-                their CMS order (Shop All · New In · Sets), not the reverse. */}
-            <div className='hidden lg:flex items-center gap-1' dir={dir}>
+            {/* ── Wordmark: centred on phones, at the start from 1024px ── */}
+            <div className='absolute inset-x-0 mx-auto flex w-max items-center lg:static lg:mx-0'>
+              <HeaderLogo
+                variant='responsive'
+                textClassName='perce-logo-text inline-flex min-h-11 items-center text-[1.375rem] text-ink lg:text-2xl'
+              />
+            </div>
+
+            {/* ── Desktop: primary links beside the wordmark ── */}
+            <ul className='ms-8 hidden items-center gap-6 lg:flex'>
               {links.map((link) => {
                 if (link.isDropdown && link.categoryIds.length > 0) {
-                  // Desktop: hover dropdown listing the categories.
-                  // (Mobile menu still renders these flattened — see below.)
+                  // Desktop: hover/focus dropdown listing the categories.
+                  // (The mobile menu renders these flattened — see below.)
                   const dropdownCats = categories.filter((c) => link.categoryIds.includes(c.id));
                   if (dropdownCats.length === 0) return null;
                   return (
-                    <div key={link.id} className='relative group'>
+                    <li key={link.id} className='group relative'>
                       <button
                         type='button'
-                        style={{ fontFamily: "var(--font-nav)" }}
-                        className='px-2 xl:px-3 py-1.5 text-sm xl:text-[15px] font-medium text-perce-frame-ink-muted hover:text-perce-frame-ink transition-colors whitespace-nowrap flex items-center gap-1'>
+                        aria-haspopup='true'
+                        className={cn(navLinkClass(false), "gap-1")}>
                         {link.label}
-                        <ChevronDown className='w-3.5 h-3.5 transition-transform duration-150 group-hover:rotate-180' />
+                        <ChevronDown aria-hidden size={16} strokeWidth={1.5} />
                       </button>
-                      <div className='absolute top-full start-0 pt-2 opacity-0 invisible translate-y-1 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-150 z-50'>
-                        <div className='bg-white border border-gray-200 shadow-lg min-w-[200px] py-2 rounded-md'>
+                      <div className='invisible absolute start-0 top-full z-50 pt-2 opacity-0 transition-opacity duration-[var(--perce-duration-fast)] group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100'>
+                        <ul className='min-w-[200px] border border-line bg-surface py-2'>
                           {dropdownCats.map((cat) => (
-                            <Link
-                              key={cat.id}
-                              href={`/shop?category=${cat.slug || cat.id}`}
-                              className='block px-4 py-2 text-sm font-semibold text-gray-800 tracking-wide hover:bg-gray-50 hover:text-black transition-colors whitespace-nowrap'>
-                              {cat.name}
-                            </Link>
+                            <li key={cat.id}>
+                              <Link
+                                href={`/shop?category=${cat.slug || cat.id}`}
+                                className='flex min-h-11 items-center whitespace-nowrap px-4 t-small text-ink transition-colors hover:bg-surface-2'>
+                                {cat.name}
+                              </Link>
+                            </li>
                           ))}
-                        </div>
+                        </ul>
                       </div>
-                    </div>
+                    </li>
                   );
                 }
+                const active = isCurrentLink(link.to, urlPathname, currentSearch);
                 return (
-                  <Link
-                    key={link.id}
-                    href={link.to}
-                    className='px-3 py-1.5 text-[15px] font-medium text-perce-frame-ink-muted hover:text-perce-frame-ink transition-colors'>
-                    {link.label}
-                  </Link>
+                  <li key={link.id}>
+                    <a
+                      href={link.to}
+                      aria-current={active ? "page" : undefined}
+                      className={navLinkClass(active)}>
+                      {link.label}
+                    </a>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
 
-            {/* ── Far Right: Logo + Mobile hamburger ── */}
-            <div className='flex items-center gap-2'>
-              {/* Logo — CMS mobile size below lg (hamburger layout), desktop size above */}
-              <HeaderLogo
-                variant='responsive'
-                textClassName='perce-logo-text text-2xl sm:text-[28px] text-perce-frame-ink hover:text-perce-frame-ink-muted transition-colors'
-              />
+            {/* ── End: search · account (desktop) · Bag (N) ── */}
+            <div className='-me-3 ms-auto flex items-center'>
+              <IconButton
+                ref={searchToggleRef}
+                aria-label={isSearchOpen ? t("nav.close_search") : t("nav.search_label")}
+                aria-expanded={isSearchOpen}
+                aria-controls={searchPanelId}
+                onClick={() => (isSearchOpen ? closeSearch() : setIsSearchOpen(true))}>
+                {isSearchOpen ? <X {...ICON_PROPS} /> : <Search {...ICON_PROPS} />}
+              </IconButton>
 
-              {/* Mobile hamburger */}
-              <div className='lg:hidden'>
-                <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-                  <SheetTrigger asChild>
-                    <button
-                      type='button'
-                      className='p-2 text-perce-frame-ink-muted hover:text-perce-frame-ink transition-colors'
-                      aria-label={t("nav.menu")}>
-                      <Menu className='w-5 h-5' />
-                    </button>
-                  </SheetTrigger>
-                  <SheetContent side={dir === "rtl" ? "right" : "left"} className='w-72 bg-white p-0 [&>button:last-child]:hidden'>
-                    <div className='flex flex-col h-full'>
-                      {/* Mobile header: logo + close */}
-                      <div className='p-6 border-b border-gray-100 flex items-center justify-between'>
-                        <HeaderLogo
-                          variant='mobile'
-                          onClick={() => {
-                            handleCloseSheet();
-                            navigate('/');
-                          }}
-                          textClassName='perce-logo-text text-xl text-perce-ink'
-                        />
-                        <button
-                          type='button'
-                          onClick={handleCloseSheet}
-                          className='p-1 text-gray-500 hover:text-black transition-colors'
-                          aria-label='Close menu'>
-                          <X className='w-5 h-5' />
-                        </button>
+              <div className='hidden lg:block'>
+                {!session ? (
+                  <a
+                    href='/login'
+                    aria-label={t("nav.sign_in")}
+                    className={buttonClass({ variant: "icon", size: "md" })}>
+                    <User {...ICON_PROPS} />
+                  </a>
+                ) : (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <IconButton aria-label={t("nav.account_menu")}>
+                        <User {...ICON_PROPS} />
+                      </IconButton>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align='end'
+                      style={{ zIndex: "var(--perce-z-overlay)" }}
+                      className='w-56 rounded-none border-line bg-surface p-0 shadow-none'>
+                      <div className='border-b border-line px-4 py-3'>
+                        <p className='truncate t-label text-ink'>{session.name || t("nav.account")}</p>
+                        <p className='truncate t-small text-ink-2'>{session.email}</p>
                       </div>
-
-                      {/* Mobile search */}
-                      <div className='px-5 pt-5'>
-                        <form onSubmit={handleSearchSubmit}>
-                          <div className='relative'>
-                            <Search className='absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400' />
-                            <input
-                              type='text'
-                              value={searchQuery}
-                              onChange={(e) => setSearchQuery(e.target.value)}
-                              placeholder={t("nav.search")}
-                              className='w-full ps-9 pe-4 py-2.5 text-sm border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 outline-none focus:border-gray-400 transition-colors'
-                            />
-                          </div>
-                        </form>
-                        {/* Mobile live results */}
-                        {searchQuery.trim().length >= 2 && (
-                          <div className='mt-2 bg-white border border-gray-200 max-h-60 overflow-y-auto'>
-                            {isSearching ? (
-                              <div className='flex items-center justify-center py-4'>
-                                <Loader2 className='w-4 h-4 animate-spin text-gray-400' />
-                              </div>
-                            ) : (
-                              <>
-                                {liveResults.categories.length > 0 && (
-                                  <div className='px-3 py-2 border-b border-gray-100'>
-                                    <p className='text-xs text-gray-400 mb-1'>
-                                      {locale === "ar" ? "الأقسام" : "Categories"}
-                                    </p>
-                                    {liveResults.categories.map((cat) => (
-                                      <Link
-                                        key={cat.id}
-                                        href={`/shop?category=${cat.slug || cat.id}`}
-                                        className='block py-1.5 text-sm text-gray-700 hover:text-black transition-colors'
-                                        onClick={() => {
-                                          setSearchQuery("");
-                                          setLiveResults({ products: [], categories: [] });
-                                          setIsSheetOpen(false);
-                                        }}>
-                                        {cat.name}
-                                      </Link>
-                                    ))}
-                                  </div>
-                                )}
-                                {liveResults.products.length > 0 && (
-                                  <div className='px-3 py-2'>
-                                    <p className='text-xs text-gray-400 mb-1'>
-                                      {locale === "ar" ? "المنتجات" : "Products"}
-                                    </p>
-                                    {liveResults.products.map((p) => (
-                                      <Link
-                                        key={p.id}
-                                        href={getProductUrl(p)}
-                                        className='flex items-center gap-3 py-2 hover:bg-gray-50 -mx-3 px-3 transition-colors'
-                                        onClick={() => {
-                                          setSearchQuery("");
-                                          setLiveResults({ products: [], categories: [] });
-                                          setIsSheetOpen(false);
-                                        }}>
-                                        {p.imageUrl && (
-                                          <img src={p.imageUrl} alt={p.name} className='w-10 h-10 object-cover bg-gray-50' />
-                                        )}
-                                        <div className='flex-1 min-w-0'>
-                                          <p className='truncate text-sm text-perce-ink'>{p.name}</p>
-                                          <p className='flex items-baseline gap-1.5 text-xs'>
-                                            {p.discountPrice != null && (
-                                              <span className='text-perce-ink-subtle line-through'>
-                                                {formatMoney(p.price)}
-                                              </span>
-                                            )}
-                                            <span
-                                              className={
-                                                p.discountPrice != null
-                                                  ? "font-medium text-perce-sale"
-                                                  : "text-perce-ink-muted"
-                                              }>
-                                              {formatMoney((p.discountPrice ?? p.price))}
-                                            </span>
-                                          </p>
-                                        </div>
-                                      </Link>
-                                    ))}
-                                  </div>
-                                )}
-                                {liveResults.products.length === 0 && liveResults.categories.length === 0 && (
-                                  <p className='px-3 py-4 text-sm text-gray-400 text-center'>
-                                    {locale === "ar" ? "لا توجد نتائج" : "No results found"}
-                                  </p>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Mobile nav links */}
-                      <div className='flex-1 px-5 pt-6'>
-                        <div className='flex flex-col gap-4'>
-                          {links.map((link) => {
-                            if (link.isDropdown && link.categoryIds.length > 0) {
-                              // Flattened: each category renders as its own
-                              // top-level link instead of an accordion.
-                              const dropdownCats = categories.filter((c) => link.categoryIds.includes(c.id));
-                              if (dropdownCats.length === 0) return null;
-                              return dropdownCats.map((cat) => (
-                                <Link
-                                  key={cat.id}
-                                  href={`/shop?category=${cat.slug || cat.id}`}
-                                  className='text-[15px] font-medium text-perce-ink hover:text-perce-ink-muted transition-colors'
-                                  onClick={handleCloseSheet}>
-                                  {cat.name}
-                                </Link>
-                              ));
-                            }
-                            return (
-                              <Link
-                                key={link.id}
-                                href={link.to}
-                                className='text-[15px] font-medium text-perce-ink hover:text-perce-ink-muted transition-colors'
-                                onClick={handleCloseSheet}>
-                                {link.label}
-                              </Link>
-                            );
-                          })}
-                        </div>
-
-                        {session && (
-                          <div className='border-t border-gray-100 pt-5 mt-6 space-y-4'>
-                            <Link href='/account' className='flex items-center gap-2.5 text-sm text-gray-600 hover:text-black' onClick={handleCloseSheet}>
-                              <User className="w-4 h-4" /> My Account
-                            </Link>
-                            <Link href='/account?tab=orders' className='flex items-center gap-2.5 text-sm text-gray-600 hover:text-black' onClick={handleCloseSheet}>
-                              <Package className="w-4 h-4" /> Orders
-                            </Link>
-                            <Link href='/account?tab=wishlist' className='flex items-center gap-2.5 text-sm text-gray-600 hover:text-black' onClick={handleCloseSheet}>
-                              <Heart className="w-4 h-4" /> Wishlist
-                            </Link>
-                            {(session.role === "admin" || session.role === "superadmin") && (
-                              <Link href='/dashboard' className='flex items-center gap-2.5 text-sm text-gray-600 hover:text-black' onClick={handleCloseSheet}>
-                                <LayoutDashboard className="w-4 h-4" /> Dashboard
-                              </Link>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Language toggle — bottom of menu, just above Logout */}
-                        <div className={session ? "mt-4 space-y-4" : "border-t border-gray-100 pt-5 mt-6"}>
-                          <button
-                            type='button'
-                            onClick={() => {
-                              toggleLocale();
-                            }}
-                            className='flex items-center gap-2 text-sm text-gray-600 hover:text-black transition-colors'>
-                            <Globe className='w-4 h-4' />
-                            {locale === "en" ? "العربية" : "English"}
-                          </button>
-
-                          {session && (
-                            <button
-                              onClick={() => { logout(); handleCloseSheet(); }}
-                              className='flex items-center gap-2.5 text-sm text-red-600 hover:text-red-700'
-                              type='button'>
-                              <LogOut className="w-4 h-4" /> Logout
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </SheetContent>
-                </Sheet>
+                      <DropdownMenuItem asChild className='min-h-11 rounded-none px-4 t-small text-ink focus:bg-surface-2'>
+                        <a href='/account'>{t("nav.account")}</a>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild className='min-h-11 rounded-none px-4 t-small text-ink focus:bg-surface-2'>
+                        <a href='/account?tab=orders'>{t("nav.orders")}</a>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild className='min-h-11 rounded-none px-4 t-small text-ink focus:bg-surface-2'>
+                        <a href='/account?tab=wishlist'>{t("nav.wishlist")}</a>
+                      </DropdownMenuItem>
+                      {isAdmin && (
+                        <>
+                          <DropdownMenuSeparator className='m-0 bg-line' />
+                          <DropdownMenuItem asChild className='min-h-11 rounded-none px-4 t-small text-ink focus:bg-surface-2'>
+                            <a href='/dashboard'>{t("nav.dashboard")}</a>
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                      <DropdownMenuSeparator className='m-0 bg-line' />
+                      <DropdownMenuItem
+                        onClick={() => logout()}
+                        className='min-h-11 rounded-none px-4 t-small text-ink focus:bg-surface-2'>
+                        {t("nav.logout")}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
+
+              <a
+                href='/cart'
+                aria-label={bagLabel}
+                aria-current={urlPathname === "/cart" ? "page" : undefined}
+                data-testid='nav-bag'
+                className='inline-flex min-h-11 min-w-11 items-center justify-center gap-1 px-3 t-label text-ink transition-colors hover:text-ink-2'>
+                {t("nav.bag")}
+                <span aria-hidden='true' className='tabular-nums' data-testid='nav-bag-count'>
+                  ({totalItems})
+                </span>
+              </a>
             </div>
           </div>
         </div>
+
+        {/* ── Search panel: drops below the bar, never shifts the page ── */}
+        {isSearchOpen && (
+          <div
+            id={searchPanelId}
+            ref={searchPanelRef}
+            className='absolute inset-x-0 top-full border-b border-line bg-surface'>
+            <div className='perce-container py-4'>
+              <form role='search' onSubmit={handleSearchSubmit}>
+                <label htmlFor={`${searchPanelId}-input`} className='sr-only'>
+                  {t("nav.search_label")}
+                </label>
+                <div className='relative'>
+                  <Search
+                    aria-hidden
+                    size={20}
+                    strokeWidth={1.5}
+                    className='pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-ink-2'
+                  />
+                  <input
+                    ref={searchInputRef}
+                    id={`${searchPanelId}-input`}
+                    type='search'
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder={t("nav.search")}
+                    autoComplete='off'
+                    className='h-12 w-full border border-line-input bg-surface pe-3 ps-11 t-body text-ink placeholder:text-ink-3 focus:border-ink focus:outline-none'
+                  />
+                </div>
+              </form>
+              <SearchResults
+                query={searchQuery}
+                isSearching={isSearching}
+                results={liveResults}
+                onPick={() => closeSearch()}
+                onViewAll={() => handleSearchSubmit()}
+              />
+            </div>
+          </div>
+        )}
       </nav>
+
+      {/* ── Mobile menu: full-height sheet from the start edge ── */}
+      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+        <SheetContent
+          side={dir === "rtl" ? "right" : "left"}
+          dir={dir}
+          aria-describedby={undefined}
+          className='w-[min(22rem,88vw)] gap-0 border-line bg-surface p-0 shadow-none sm:max-w-none [&>button:last-child]:hidden'>
+          <SheetTitle className='sr-only'>{t("nav.menu")}</SheetTitle>
+          <div className='flex h-full flex-col'>
+            <div className='flex h-14 items-center justify-between border-b border-line px-4'>
+              <HeaderLogo
+                variant='mobile'
+                onClick={() => {
+                  handleCloseSheet();
+                  navigate("/");
+                }}
+                textClassName='perce-logo-text inline-flex min-h-11 items-center text-[1.375rem] text-ink'
+              />
+              <IconButton aria-label={t("nav.close_menu")} onClick={handleCloseSheet} className='-me-3'>
+                <X {...ICON_PROPS} />
+              </IconButton>
+            </div>
+
+            <div className='flex-1 overflow-y-auto px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]'>
+              <ul className='py-2'>
+                {links.flatMap((link) => {
+                  if (link.isDropdown && link.categoryIds.length > 0) {
+                    // Flattened: each category renders as its own top-level link.
+                    const dropdownCats = categories.filter((c) => link.categoryIds.includes(c.id));
+                    return dropdownCats.map((cat) => (
+                      <li key={cat.id} className='border-b border-line'>
+                        <Link
+                          href={`/shop?category=${cat.slug || cat.id}`}
+                          className='flex min-h-13 items-center t-h3 text-ink'
+                          onClick={handleCloseSheet}>
+                          {cat.name}
+                        </Link>
+                      </li>
+                    ));
+                  }
+                  const active = isCurrentLink(link.to, urlPathname, currentSearch);
+                  return [
+                    <li key={link.id} className='border-b border-line'>
+                      <a
+                        href={link.to}
+                        aria-current={active ? "page" : undefined}
+                        onClick={handleCloseSheet}
+                        className={cn(
+                          "flex min-h-13 items-center t-h3 text-ink",
+                          active && "underline decoration-1 underline-offset-[6px]",
+                        )}>
+                        {link.label}
+                      </a>
+                    </li>,
+                  ];
+                })}
+              </ul>
+
+              {/* Everything the old bottom nav carried (Offers, Wishlist,
+                  Account) plus orders, language and sign-out. */}
+              <ul className='pt-4'>
+                {[
+                  { key: "offers", href: "/offers", label: t("nav.offers") },
+                  { key: "wishlist", href: "/account?tab=wishlist", label: t("nav.wishlist") },
+                  session
+                    ? { key: "account", href: "/account", label: t("nav.account") }
+                    : { key: "login", href: "/login", label: t("nav.sign_in") },
+                  ...(session ? [{ key: "orders", href: "/account?tab=orders", label: t("nav.orders") }] : []),
+                  ...(isAdmin ? [{ key: "dashboard", href: "/dashboard", label: t("nav.dashboard") }] : []),
+                ].map((item) => (
+                  <li key={item.key}>
+                    <a
+                      href={item.href}
+                      onClick={handleCloseSheet}
+                      aria-current={
+                        item.href.split("?")[0] === urlPathname && !item.href.includes("?") ? "page" : undefined
+                      }
+                      className='flex min-h-11 items-center t-body text-ink-2 transition-colors hover:text-ink'>
+                      {item.label}
+                    </a>
+                  </li>
+                ))}
+                <li>
+                  <button
+                    type='button'
+                    lang={locale === "en" ? "ar" : "en"}
+                    onClick={() => toggleLocale()}
+                    className='flex min-h-11 w-full items-center t-body text-ink-2 transition-colors hover:text-ink'>
+                    {t("nav.language")}
+                  </button>
+                </li>
+                {session && (
+                  <li>
+                    <button
+                      type='button'
+                      onClick={() => {
+                        logout();
+                        handleCloseSheet();
+                      }}
+                      className='flex min-h-11 w-full items-center t-body text-ink-2 transition-colors hover:text-ink'>
+                      {t("nav.logout")}
+                    </button>
+                  </li>
+                )}
+              </ul>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
+  );
+}
+
+function SearchResults({
+  query,
+  isSearching,
+  results,
+  onPick,
+  onViewAll,
+}: {
+  query: string;
+  isSearching: boolean;
+  results: LiveResults;
+  onPick: () => void;
+  onViewAll: () => void;
+}) {
+  const { t, locale } = useMinimalI18n();
+  if (query.trim().length < 2) return null;
+  const empty = results.products.length === 0 && results.categories.length === 0;
+
+  return (
+    <div className='mt-4 max-h-[min(60vh,28rem)] overflow-y-auto' aria-live='polite' aria-busy={isSearching || undefined}>
+      {isSearching ? (
+        <p className='py-4 t-small text-ink-2'>…</p>
+      ) : (
+        <>
+          {results.categories.length > 0 && (
+            <div className='border-b border-line pb-3'>
+              <p className='mb-1 t-micro text-ink-2'>{t("nav.search_categories")}</p>
+              <ul>
+                {results.categories.map((cat) => (
+                  <li key={cat.id}>
+                    <a
+                      href={`/shop?category=${cat.slug || cat.id}`}
+                      onClick={onPick}
+                      className='flex min-h-11 items-center t-small text-ink hover:text-ink-2'>
+                      {cat.name}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {results.products.length > 0 && (
+            <div className='pt-3'>
+              <p className='mb-1 t-micro text-ink-2'>{t("nav.search_products")}</p>
+              <ul>
+                {results.products.map((p) => (
+                  <li key={p.id}>
+                    <a
+                      href={getProductUrl(p)}
+                      onClick={onPick}
+                      className='flex items-center gap-3 py-2 transition-colors hover:bg-surface-2'>
+                      <span className='block h-12 w-10 shrink-0 bg-surface-2'>
+                        {p.imageUrl && (
+                          <img src={p.imageUrl} alt='' className='h-full w-full object-cover' loading='lazy' decoding='async' />
+                        )}
+                      </span>
+                      <span className='min-w-0 flex-1'>
+                        <span className='block truncate t-small text-ink'>{p.name}</span>
+                        <Price
+                          amount={p.discountPrice ?? p.price}
+                          compareAt={p.discountPrice != null ? p.price : null}
+                          locale={locale}
+                          size='line'
+                        />
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {empty && <p className='py-4 t-small text-ink-2'>{t("nav.search_no_results")}</p>}
+          <div className='mt-2 border-t border-line pt-2'>
+            <button
+              type='button'
+              onClick={onViewAll}
+              className={buttonClass({ variant: "text", size: "sm" })}>
+              {t("nav.search_view_all")}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
   );
 }

@@ -2,7 +2,6 @@ import Navbar from "#root/components/globals/Navbar.jsx";
 import { EditorialNavbar } from "#root/components/template-system/editorial/EditorialNavbar";
 import { MinimalNavbar } from "#root/components/template-system/minimal/MinimalNavbar";
 import { MinimalFooter } from "#root/components/template-system/minimal/MinimalFooter";
-import { MinimalMobileBottomNav } from "#root/components/template-system/minimal/MinimalMobileBottomNav";
 import { MinimalComingSoonPage } from "#root/components/template-system/minimal/MinimalComingSoonPage";
 import { MinimalI18nProvider } from "#root/lib/i18n/MinimalI18nContext";
 import { Footer } from "#root/components/globals/Footer";
@@ -296,7 +295,7 @@ function LayoutShell({
                every element, not just the handful of tags listed there.
                Dashboard routes keep the fixed Poppins utility — internal
                tooling must not follow the public brand font. */
-            className={`bg-background h-full text-foreground w-full${isDashboardRoute ? " font-poppins" : " storefront-shell"}${isMinimal && !isDashboardRoute ? " minimal-template pb-20 lg:pb-0" : ""}`}>
+            className={`bg-background h-full text-foreground w-full${isDashboardRoute ? " font-poppins" : " storefront-shell"}${isMinimal && !isDashboardRoute ? " minimal-template" : ""}`}>
             {showGlobalChrome && (
               <GlobalNavbarChrome navbarMode={navbarMode}>
                 {renderNavbar()}
@@ -312,17 +311,13 @@ function LayoutShell({
             {showGlobalChrome && <GlobalFooter isMinimal={isMinimal} />}
             {!isDashboardRoute && <CartToastContainer />}
             {!isDashboardRoute && <EntryPopup />}
-            {/* Minimal template: mobile relies on the bottom nav's "Offers" tab
-                instead, but desktop still gets this pill — CTA uses the
-                component's own default (/shop, "SHOP MORE") so users chasing
-                a reward threshold land on the catalogue, not a dead end. */}
-            {!isDashboardRoute && !isMinimal && (
-              <StickyCartBar raiseForBottomNav={isMinimal} />
-            )}
+            {/* Minimal template: phones reach the bag from the header and
+                the offers page from the menu, so this offer/bag bar is
+                desktop-only there. There is no mobile bottom nav. */}
+            {!isDashboardRoute && !isMinimal && <StickyCartBar />}
             {!isDashboardRoute && isMinimal && <StickyCartBar desktopOnly />}
-            {!isDashboardRoute && isMinimal && <MinimalMobileBottomNav />}
-            {/* Bottom-anchored toasts can visually collide with the fixed
-                mobile bottom nav on the minimal template — keep them up top there. */}
+            {/* Toasts sit at the top on the minimal template, clear of the
+                PDP and cart sticky bars at the bottom of a phone screen. */}
             <Toaster position={isMinimal ? "top-center" : undefined} />
             <ShadcnToaster />
             {/* Phase 3 — page-transition overlay (CSS-only, SSR-inert) */}

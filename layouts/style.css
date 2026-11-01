@@ -1,13 +1,12 @@
-/* Percé typeface: one tight modern grotesque (Inter Tight, variable weight),
-   self-hosted like every other font here. Poppins is kept ONLY for the admin
-   dashboard (`font-poppins`); Rubik is the Arabic face. */
+/* Percé typeface: Inter Tight (variable), used at 400 and 500 only.
+   Poppins is kept ONLY for the admin dashboard (`font-poppins`). Rubik is the
+   Arabic face — Inter Tight has no Arabic glyphs — loaded at the same two
+   weights. */
 @import "@fontsource-variable/inter-tight";
 @import "@fontsource/poppins/400.css";
 @import "@fontsource-variable/roboto-flex";
 @import "@fontsource/rubik/400.css";
 @import "@fontsource/rubik/500.css";
-@import "@fontsource/rubik/600.css";
-@import "@fontsource/rubik/700.css";
 @import "tailwindcss";
 
 @plugin "tailwindcss-animate";
@@ -142,7 +141,7 @@ label[for] {
   inset: 0;
   z-index: 9999;
   opacity: 0;
-  background: rgba(242, 240, 237, 0.96);
+  background: color-mix(in srgb, var(--color-bg) 96%, transparent);
   pointer-events: none;
   transition: opacity 240ms cubic-bezier(0.16, 1, 0.3, 1);
   will-change: opacity;
@@ -172,174 +171,164 @@ html[data-page-transition="out"] body {
 }
 
 /* ════════════════════════════════════════════════════════════════════════
-   PERCÉ DESIGN TOKENS — the single visual source of truth for the
+   PERCÉ — OBJECT INDEX. The single visual source of truth for the
    customer-facing storefront.
    ────────────────────────────────────────────────────────────────────────
-   This is NOT a second theming system. The repo already ships Tailwind 4's
-   `@theme` + shadcn CSS custom properties (see `:root` further down); this
-   block extends that same mechanism with the storefront-level tokens the
-   templates read instead of magic values (stone-900, py-16, max-w-[1400px],
-   z-[10000], 240ms …).
+   The jewellery is the object. Everything around it is a quiet typographic
+   index: warm stone, ink, hairline rules, sentence-case labels, tabular
+   prices, square geometry. Ink is the only accent. No gradients, no
+   shadows, no radii, no decorative UI.
 
-   THE PALETTE (Percé Brand Source of Truth) is exactly five colours:
+   The locked tokens are declared in the `@theme` block below, so Tailwind
+   generates utilities straight from them:
 
-     Ground  #0E0E0E   the dark brand frame — header, footer, bottom nav
-     Paper   #F2F0ED   the light product window — page and card grounds
-     Line    #2A2A2A   hairlines on the dark frame
-     Muted   #8A8785   secondary type, decorative rules
-     Accent  #FF4326   sparingly — never more than ~5% of a screen
+     bg-bg  bg-surface  bg-surface-2  bg-hover  bg-overlay
+     text-ink  text-ink-2  text-ink-3  text-error  text-success
+     border-line  border-line-input  border-ink  border-error
 
-   Gold and silver come from the product photography, never from the UI.
-   No champagne, no cream, no gradients, no foil. Everything below is either
-   one of those five values or a neutral step between Paper and Ground that
-   exists only so text meets WCAG AA on the surface it sits on.
+   The older `--perce-*` names further down are kept as ALIASES of those
+   tokens (dozens of components and tests read them), so every existing call
+   site lands on the locked palette. New code uses the short names.
 
-   PRINCIPLE: dark brand frame, light product windows. The page body is
-   Paper so jewellery photography stays legible; the chrome around it is
-   Ground.
-
-   HOW TO REBRAND: change the values here. Nothing else should hardcode a
-   storefront colour, gutter, section rhythm, radius, duration or z-index.
    Fonts are NOT set here — they come from the admin Typography system via
-   the --font-* custom properties (see shared/typography/build-head-css.ts).
+   the --font-* custom properties (see shared/typography/build-head-css.ts),
+   falling back to Inter Tight.
    ════════════════════════════════════════════════════════════════════════ */
 
+@theme {
+  --color-bg: #f2f0ed;
+  --color-surface: #faf9f7;
+  --color-surface-2: #e8e5e0;
+
+  --color-ink: #0e0e0e;
+  --color-ink-2: #5c5954;
+  --color-ink-3: #8a867f;
+
+  --color-line: #d9d5cf;
+  --color-line-input: #8a867f;
+
+  --color-hover: #2a2826;
+
+  --color-error: #a3271f;
+  --color-success: #2f5d3a;
+
+  --color-overlay: rgba(14, 14, 14, 0.4);
+}
+
 :root {
-  /* ── The five brand colours, verbatim ── */
-  --perce-brand-ground: #0e0e0e;
-  --perce-brand-paper: #f2f0ed;
-  --perce-brand-line: #2a2a2a;
-  --perce-brand-muted: #8a8785;
-  --perce-brand-accent: #ff4326;
+  /* ── Legacy aliases → locked tokens ── */
+  --perce-brand-ground: var(--color-ink);
+  --perce-brand-paper: var(--color-bg);
+  --perce-brand-line: var(--color-hover);
+  --perce-brand-muted: var(--color-ink-3);
+  /* The old orange accent is retired: ink is the only accent. */
+  --perce-brand-accent: var(--color-ink);
 
-  /* ── Colour: surfaces (light product windows) ──
-     `bg` is Paper. `surface` is one neutral step down so a section can
-     separate from the page without a border; `surface-raised` is white for
-     cards that need to lift off Paper (product tiles, dialogs). */
-  --perce-bg: var(--perce-brand-paper);
-  --perce-surface: #e9e7e4;
-  --perce-surface-raised: #ffffff;
-  --perce-surface-inverse: var(--perce-brand-ground);
+  --perce-bg: var(--color-bg);
+  --perce-surface: var(--color-surface-2);
+  --perce-surface-raised: var(--color-surface);
+  --perce-surface-inverse: var(--color-ink);
 
-  /* ── Colour: text on Paper ──
-     Ground on Paper measures ~17:1. `ink-muted` is a neutral step darker
-     than the brand Muted because #8A8785 on #F2F0ED is ~3.1:1 — fine for
-     large or decorative type, not for body copy. Brand Muted is exposed as
-     `ink-subtle` for labels, struck-through prices and rules. */
-  --perce-ink: var(--perce-brand-ground);
-  --perce-ink-secondary: var(--perce-brand-line);   /* ~13:1 on paper */
-  --perce-ink-muted: #5f5c5a;                        /* ~6.2:1 on paper — AA */
-  --perce-ink-subtle: var(--perce-brand-muted);      /* decorative only */
-  --perce-ink-inverse: var(--perce-brand-paper);
+  --perce-ink: var(--color-ink);
+  --perce-ink-secondary: var(--color-ink-2);
+  --perce-ink-muted: var(--color-ink-2);
+  --perce-ink-subtle: var(--color-ink-3);
+  --perce-ink-inverse: var(--color-bg);
 
-  /* ── Colour: text on Ground (the dark frame) ── */
-  --perce-frame-ink: var(--perce-brand-paper);
-  --perce-frame-ink-muted: #b3b0ad;                  /* ~9.5:1 on ground */
-  --perce-frame-line: var(--perce-brand-line);
+  /* Type and rules on an ink ground (announcement bar). */
+  --perce-frame-ink: var(--color-bg);
+  --perce-frame-ink-muted: var(--color-line-input);
+  --perce-frame-line: var(--color-hover);
 
-  /* ── Colour: lines on Paper ── */
-  --perce-border: #dad7d3;
-  --perce-border-strong: #c4c1bd;
+  --perce-border: var(--color-line);
+  --perce-border-strong: var(--color-line-input);
 
-  /* ── Colour: call to action ──
-     Buttons are Ground on Paper (and Paper on Ground). The brand accent is
-     NOT the button colour — that would put it on every screen at well over
-     5%. */
-  --perce-cta: var(--perce-brand-ground);
-  --perce-cta-hover: var(--perce-brand-line);
-  --perce-cta-ink: var(--perce-brand-paper);
+  --perce-cta: var(--color-ink);
+  --perce-cta-hover: var(--color-hover);
+  --perce-cta-ink: var(--color-bg);
 
-  /* ── Colour: accent — #FF4326, sparingly ──
-     One live indicator per screen: the cart count, an active state, a
-     single rule. `accent-ink` is what sits on top of it. The keyboard focus
-     ring uses it too, because it is the one colour that reads on both
-     Paper and Ground. */
-  --perce-accent: var(--perce-brand-accent);
-  --perce-accent-ink: var(--perce-brand-ground);
-  --perce-focus: var(--perce-brand-accent);
+  --perce-accent: var(--color-ink);
+  --perce-accent-ink: var(--color-bg);
+  --perce-focus: var(--color-ink);
 
-  /* ── Colour: state ──
-     Sale is the brand accent darkened until it passes AA for small text on
-     Paper (#FF4326 itself is ~3:1 there). Same hue, so a struck-through
-     price and the accent dot read as one family. */
-  --perce-sale: #c42e15;
-  --perce-danger: #c42e15;
-  --perce-success: #3f6b4f;
-  --perce-disabled: #c4c1bd;
+  /* A real reduced price is ink like every other price; the struck-through
+     compare-at price beside it carries the meaning. No red sale UI. */
+  --perce-sale: var(--color-ink);
+  --perce-danger: var(--color-error);
+  --perce-success: var(--color-success);
+  --perce-disabled: var(--color-line);
 
-  /* ── Typography scale (families come from --font-*) ──
-     One tight modern grotesque throughout. Headings 500–600, tracking
-     −0.02em, generous body leading, lowercase-forward. No display serif,
-     no luxury letter-spacing. */
-  --perce-text-display: clamp(2.25rem, 6vw, 4rem);
-  --perce-text-h1: clamp(1.75rem, 3.5vw, 2.5rem);
-  --perce-text-h2: clamp(1.25rem, 2.5vw, 1.75rem);
-  --perce-text-h3: clamp(1.125rem, 2vw, 1.375rem);
+  /* ── Type scale (mobile; desktop values from 1024px below) ── */
+  --perce-text-display: 2.5rem;
+  --perce-text-h1: 1.75rem;
+  --perce-text-h2: 1.375rem;
+  --perce-text-h3: 1.0625rem;
   --perce-text-body: 0.9375rem;
   --perce-text-small: 0.8125rem;
-  --perce-text-label: 0.75rem;
+  --perce-text-label: 0.8125rem;
 
   --perce-weight-regular: 400;
   --perce-weight-medium: 500;
-  --perce-weight-semibold: 600;
+  /* Kept so older references resolve — the system has no 600. */
+  --perce-weight-semibold: 500;
 
-  --perce-tracking-display: -0.02em;
+  --perce-tracking-display: -0.03em;
   --perce-tracking-heading: -0.02em;
   --perce-tracking-body: 0;
-  /* Labels used to be wide uppercase (0.12em). The brand avoids luxury-style
-     letter spacing, so labels are now plain-case with a hair of tracking. */
   --perce-tracking-label: 0.01em;
-  --perce-tracking-wide: 0.04em;
+  --perce-tracking-wide: 0.01em;
 
   --perce-leading-display: 1;
-  --perce-leading-heading: 1.15;
-  --perce-leading-body: 1.65;
+  --perce-leading-heading: 1.1;
+  --perce-leading-body: 1.5;
 
-  /* ── Spacing: page gutters ── */
+  /* ── Spacing: page gutter 16 / 24 (768px) / 32 (1024px) ── */
   --perce-gutter: 1rem;
   --perce-gutter-sm: 1.5rem;
   --perce-gutter-lg: 2rem;
 
-  /* ── Spacing: vertical section rhythm ── */
-  --perce-section-y: 3rem;
+  /* ── Spacing: section rhythm 64 / 96 (1024px) ── */
+  --perce-section-y: 4rem;
   --perce-section-y-sm: 4rem;
-  --perce-section-y-lg: 5rem;
+  --perce-section-y-lg: 6rem;
 
-  /* ── Spacing: component gaps ── */
+  /* ── Spacing: component gaps (4 8 12 16 24 32 48 64 96 only) ── */
   --perce-gap-xs: 0.5rem;
   --perce-gap-sm: 0.75rem;
   --perce-gap: 1rem;
   --perce-gap-lg: 1.5rem;
-  --perce-gap-xl: 2.5rem;
+  --perce-gap-xl: 3rem;
 
   /* ── Layout widths ── */
-  --perce-content-max: 1400px;
+  --perce-content-max: 1440px;
   --perce-content-narrow: 768px;
   --perce-content-prose: 65ch;
 
-  /* ── Layout: header heights (mobile-first) ── */
-  /* Matches the minimal navbar's own h-16 / sm:h-[72px] row. The banner and
-     marquee above it are variable-height, which is why the runtime
-     measurement below exists rather than a fixed sum. */
-  --perce-header-h: 64px;
-  --perce-header-h-desktop: 72px;
+  /* ── Layout: header heights ──
+     The navbar row is h-14 (56px) below 1024px and h-16 (64px) from 1024px,
+     plus its 1px bottom rule. The banner above it (announcement bar,
+     marquee) is variable-height, which is why the runtime measurement below
+     exists rather than a fixed sum. */
+  --perce-header-h: 56px;
+  --perce-header-h-desktop: 64px;
   /* Height of the fixed header chrome as the server renders it: the navbar
-     row plus its 1px bottom rule (65px phone / 73px from sm). It used to be
-     6rem, so every page that clears the header (and the solid-mode spacer,
-     which rendered 0) moved 31–65px the moment GlobalNavbarChrome measured
-     the real height — the checkout's whole layout shift. A configured
-     marquee/banner still adds to the measured value at runtime. */
+     row plus its 1px bottom rule (57px phone / 65px from 1024px). Every page
+     that clears the header (and the solid-mode spacer) starts from this, so
+     nothing moves when GlobalNavbarChrome measures the real height after
+     hydration. A configured marquee/banner still adds to the measured value
+     at runtime. */
   --perce-header-ssr-height: calc(var(--perce-header-h) + 1px);
   /* Offset for content that must clear the fixed header chrome. The shell
      also measures the real height at runtime (GlobalNavbarChrome); this is
      the SSR-safe starting value so nothing jumps on first paint. */
   --perce-header-offset: var(--perce-header-measured, var(--perce-header-ssr-height));
 
-  /* ── Shape — square. No pills, no soft radii. ── */
+  /* ── Shape — square everywhere. ── */
   --perce-radius-none: 0;
   --perce-radius-sm: 0;
   --perce-radius: 0;
   --perce-radius-lg: 0;
+  /* Only for the native radio indicator, which must read as a radio. */
   --perce-radius-full: 9999px;
 
   /* ── Motion ── */
@@ -354,19 +343,14 @@ html[data-page-transition="out"] body {
      the shell rather than introducing a competing 1/10/100 scale — mixing
      two scales is how a dropdown ends up behind a fixed header. Names, not
      new numbers. */
-  --perce-z-sticky: 9990;        /* StickyCartBar */
-  --perce-z-bottom-nav: 9995;    /* MinimalMobileBottomNav */
+  --perce-z-sticky: 9990;        /* StickyCartBar, PDP / cart sticky bars */
   --perce-z-header: 10000;       /* #global-navbar */
   --perce-z-overlay: 10001;      /* drawers, dropdowns, toasts above header */
 }
 
-@media (min-width: 640px) {
+@media (min-width: 768px) {
   :root {
     --perce-gutter: var(--perce-gutter-sm);
-    --perce-section-y: var(--perce-section-y-sm);
-    /* The navbar row is sm:h-[72px]. */
-    --perce-header-ssr-height: calc(var(--perce-header-h-desktop) + 1px);
-    --perce-header-offset: var(--perce-header-measured, var(--perce-header-ssr-height));
   }
 }
 
@@ -374,12 +358,21 @@ html[data-page-transition="out"] body {
   :root {
     --perce-gutter: var(--perce-gutter-lg);
     --perce-section-y: var(--perce-section-y-lg);
+
+    --perce-text-display: 3.5rem;
+    --perce-text-h1: 2.25rem;
+    --perce-text-h2: 1.625rem;
+    --perce-text-h3: 1.125rem;
+    --perce-text-body: 1rem;
+
+    /* The navbar row is lg:h-16. */
+    --perce-header-ssr-height: calc(var(--perce-header-h-desktop) + 1px);
     --perce-header-offset: var(--perce-header-measured, var(--perce-header-ssr-height));
   }
 }
 
-/* Expose the tokens as Tailwind utilities (bg-perce-bg, text-perce-ink,
-   border-perce-line, bg-perce-ground, text-perce-frame-ink …). */
+/* Legacy utility names (bg-perce-bg, text-perce-ink, border-perce-line …),
+   all resolving to the locked tokens above. */
 @theme inline {
   --color-perce-ground: var(--perce-brand-ground);
   --color-perce-paper: var(--perce-brand-paper);
@@ -416,14 +409,113 @@ html[data-page-transition="out"] body {
   --container-perce-narrow: var(--perce-content-narrow);
 }
 
+/* ── Type styles ─────────────────────────────────────────────────────────
+   The whole scale. Inter Tight 400/500, sentence case, no wide tracking.
+   "Desktop" sizes apply from 1024px. Prices, quantities and counts are
+   tabular so columns of numbers line up. */
+@utility t-display {
+  font-size: 2.5rem;
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  @media (width >= 1024px) {
+    font-size: 3.5rem;
+  }
+}
+@utility t-h1 {
+  font-size: 1.75rem;
+  line-height: 1.1;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  @media (width >= 1024px) {
+    font-size: 2.25rem;
+  }
+}
+@utility t-h2 {
+  font-size: 1.375rem;
+  line-height: 1.2;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  @media (width >= 1024px) {
+    font-size: 1.625rem;
+  }
+}
+@utility t-h3 {
+  font-size: 1.0625rem;
+  line-height: 1.3;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  @media (width >= 1024px) {
+    font-size: 1.125rem;
+  }
+}
+@utility t-pdp-title {
+  font-size: 1.5rem;
+  line-height: 1.15;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  @media (width >= 1024px) {
+    font-size: 1.75rem;
+  }
+}
+@utility t-body {
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  font-weight: 400;
+  letter-spacing: 0;
+  @media (width >= 1024px) {
+    font-size: 1rem;
+  }
+}
+@utility t-small {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+@utility t-label {
+  font-size: 0.8125rem;
+  line-height: 1.3;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+@utility t-button {
+  font-size: 0.875rem;
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+@utility t-card-title {
+  font-size: 0.875rem;
+  line-height: 1.3;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+@utility t-card-price {
+  font-size: 0.875rem;
+  line-height: 1.3;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+@utility t-pdp-price {
+  font-size: 1.25rem;
+  line-height: 1.2;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+@utility t-micro {
+  font-size: 0.75rem;
+  line-height: 1.3;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
 /* ── Neutral scale ───────────────────────────────────────────────────────
-   Hundreds of storefront call sites still use Tailwind's `stone-*` and
-   `gray-*` utilities as "some neutral". Tailwind's stone is warm (the old
-   cream direction) and gray is cool; neither is the brand. Both scales are
-   remapped here to ONE neutral ramp between Paper and Ground so every
-   remaining `text-stone-500` / `border-gray-200` lands on the Percé palette
-   without touching each file. Same lightness order as Tailwind's, so nothing
-   that was legible becomes illegible. */
+   Storefront code no longer uses `stone-*` / `gray-*` utilities (the
+   Object Index sweep moved every live surface onto the tokens above). The
+   admin dashboard and the alternative, non-default templates still do, so
+   both scales stay remapped to one warm neutral ramp rather than Tailwind's
+   cool defaults. */
 @theme {
   --color-stone-50: #f2f0ed;
   --color-stone-100: #e9e7e4;
@@ -489,97 +581,45 @@ html[data-page-transition="out"] body {
     padding-block-start: var(--perce-header-offset);
   }
 
-  /* Header bar (MinimalNavbar). Solid ground by default. On the homepage it
-     floats over the hero: while the page is at the top (`data-at-top`, set
-     only on overlay routes) AND a hero is actually under the header
-     (`.perce-hero-under-header`), the bar is transparent and the hero media
-     shows through. `:has()` keeps that decision in CSS, so the server render
-     is already right and a page whose hero is disabled never gets light type
-     on a light page. Muted links go full Paper over media for contrast. */
+  /* Header bar (MinimalNavbar): solid stone with one hairline, on every
+     route. There is no transparent state. */
   .perce-nav {
-    background-color: var(--perce-brand-ground);
-    border-bottom: 1px solid var(--perce-frame-line);
-    transition:
-      background-color var(--perce-duration-slow) var(--perce-ease),
-      border-color var(--perce-duration-slow) var(--perce-ease);
+    background-color: var(--color-bg);
+    border-bottom: 1px solid var(--color-line);
+    color: var(--color-ink);
   }
 
-  :root:has(.perce-hero-under-header) .perce-nav[data-at-top] {
-    background-color: transparent;
-    border-bottom-color: transparent;
-    --perce-frame-ink-muted: var(--perce-frame-ink);
-  }
+  /* Homepage hero (PerceHero): the campaign media as one clean frame, with
+     the copy set below it on stone — no scrim, no overlaid type. The height
+     is fixed by CSS, never by the media, so nothing shifts while the image
+     decodes or the video starts.
 
-  @media (prefers-reduced-motion: reduce) {
-    .perce-nav {
-      transition: none;
-    }
-  }
-
-  /* Homepage hero (PerceHero): full-bleed media with the copy overlaid,
-     starting at the very top of the page — the fixed header floats over it.
-     The height is fixed by CSS, never by the media, so nothing shifts while
-     the image decodes or the video starts. It uses the static header tokens,
-     not the runtime-measured --perce-header-offset, so the height is already
-     final on the server render. `vh` lines are fallbacks for browsers
-     without small-viewport units.
-
-     Phones: reach down to the fixed bottom nav, but never taller than 9:16
-     of the width — so a 9:16 reel is shown whole instead of being cropped at
-     the sides (its top now sits behind the transparent header). */
+     Phones: the 4:5 product ratio, but never so tall that the headline
+     under it falls off a short screen. */
   .perce-hero-frame {
-    height: min(calc(100vh - 4rem), 177.78vw);
-    height: min(
-      calc(100svh - 4rem - env(safe-area-inset-bottom)),
-      177.78vw
-    );
-    min-height: calc(26rem + var(--perce-header-h));
+    width: 100%;
+    aspect-ratio: 4 / 5;
+    max-height: calc(100vh - var(--perce-header-h) - 12rem);
+    max-height: calc(100svh - var(--perce-header-h) - 12rem);
+    min-height: 20rem;
   }
 
-  /* Tablet/desktop: cinematic, ending ~88% down the viewport (the same
-     bottom edge as when the hero started below the header), so the next
-     section still shows and the page reads as scrollable. */
+  /* Tablet/desktop: a wide frame ending well inside the viewport, so the
+     headline below it is on screen without scrolling. */
   @media (min-width: 768px) {
     .perce-hero-frame {
-      height: calc(
-        clamp(32rem, calc(88vh - var(--perce-header-h-desktop)), 62rem) +
-          var(--perce-header-h-desktop)
-      );
-      height: calc(
-        clamp(32rem, calc(88svh - var(--perce-header-h-desktop)), 62rem) +
-          var(--perce-header-h-desktop)
-      );
-    }
-  }
-
-  /* A short fade behind the floating header so the logo, links and icons
-     stay readable over a bright frame. Fades out well above the copy. */
-  .perce-hero-top-scrim {
-    height: calc(var(--perce-header-h) * 2.25);
-    background: linear-gradient(
-      to bottom,
-      rgb(0 0 0 / 0.42) 0%,
-      rgb(0 0 0 / 0.18) 55%,
-      transparent 100%
-    );
-  }
-
-  @media (min-width: 768px) {
-    .perce-hero-top-scrim {
-      height: calc(var(--perce-header-h-desktop) * 2.25);
+      aspect-ratio: auto;
+      height: clamp(24rem, calc(100vh - var(--perce-header-h-desktop) - 14rem), 52rem);
+      height: clamp(24rem, calc(100svh - var(--perce-header-h-desktop) - 14rem), 52rem);
+      max-height: none;
     }
   }
 
   /* Where the cover crop lands, shared by the hero video and its poster
      image so the fade from one to the other never jumps. Tuned for the
-     9:16 launch reel ("Reel One"), used as the single hero video at every
-     width:
-     - Phones: 75% down. On a 390×844 phone the frame is exactly 9:16 and
-       nothing is cropped; on shorter phones (375×667) this keeps the whole
-       ear stack in frame and the lobe charms clear of the copy.
-     - 768px+: a full-width 9:16 video shows only ~26–28% of its height, so
-       the whole ear stack can't fit. 35% down keeps the eyes, the crescent,
-       the cuff and the lobe hoops; centring showed cheek and jaw instead. */
+     9:16 launch reel ("Reel One"): 75% down on phones keeps the ear stack
+     in frame; from 768px a wide frame shows only a band of the reel, and
+     35% down keeps the eyes, the crescent, the cuff and the lobe hoops. */
   .perce-hero-media {
     object-position: 50% 75%;
   }
@@ -589,84 +629,56 @@ html[data-page-transition="out"] body {
       object-position: 50% 35%;
     }
   }
-
-  /* Readability without a panel: a soft scrim only where the copy sits —
-     the lower part on phones, the lower-left on wider screens. The rest of
-     the frame is untouched. */
-  .perce-hero-scrim {
-    background: linear-gradient(
-      to top,
-      rgb(0 0 0 / 0.62) 0%,
-      rgb(0 0 0 / 0.38) 28%,
-      rgb(0 0 0 / 0.12) 50%,
-      transparent 62%
-    );
-  }
-
-  @media (min-width: 768px) {
-    .perce-hero-scrim {
-      background:
-        radial-gradient(
-          ellipse 75% 85% at 0% 100%,
-          rgb(0 0 0 / 0.55) 0%,
-          rgb(0 0 0 / 0.28) 45%,
-          transparent 75%
-        ),
-        linear-gradient(to top, rgb(0 0 0 / 0.25) 0%, transparent 35%);
-    }
-  }
-
-  /* A faint halo so a bright frame in the loop never washes the type out. */
-  .perce-hero-copy {
-    text-shadow: 0 1px 24px rgb(0 0 0 / 0.28);
-  }
 }
 
-/* ── Typography utilities ────────────────────────────────────────────────
-   One grotesque, medium weight, tight tracking, lowercase-forward. Section
-   headings are set small and plain — the weight is carried by product
-   photography, not by large headings competing with it. */
+/* ── Typography helpers ──────────────────────────────────────────────────
+   Older class names, now mapped onto the locked scale (see the t-* type
+   styles above). New code uses the t-* utilities directly. */
 @layer components {
+  /* Label: 13 / 500 / +0.01em, ink-2. Sentence case — never uppercase. */
   .perce-eyebrow {
     font-family: var(--font-nav, inherit);
-    font-size: var(--perce-text-label);
-    font-weight: var(--perce-weight-medium);
-    letter-spacing: var(--perce-tracking-label);
-    color: var(--perce-ink-muted);
+    font-size: 0.8125rem;
+    line-height: 1.3;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    color: var(--color-ink-2);
   }
 
+  /* H2. */
   .perce-section-title {
     font-family: var(--font-heading, inherit);
     font-size: var(--perce-text-h2);
-    font-weight: var(--perce-weight-medium);
-    letter-spacing: var(--perce-tracking-heading);
-    line-height: var(--perce-leading-heading);
-    color: var(--perce-ink);
+    font-weight: 500;
+    letter-spacing: -0.015em;
+    line-height: 1.2;
+    color: var(--color-ink);
   }
 
+  /* Display. */
   .perce-display {
     font-family: var(--font-heading, inherit);
     font-size: var(--perce-text-display);
-    font-weight: var(--perce-weight-semibold);
-    letter-spacing: var(--perce-tracking-display);
-    line-height: var(--perce-leading-display);
+    font-weight: 500;
+    letter-spacing: -0.03em;
+    line-height: 1;
   }
 
   /* The wordmark: lowercase "percé", tight, medium. No icon, no badge. */
   .perce-wordmark {
     font-family: var(--font-heading, inherit);
-    font-weight: var(--perce-weight-semibold);
+    font-weight: 500;
     letter-spacing: -0.03em;
     text-transform: lowercase;
     line-height: 1;
   }
 
   /* The header's text logo (shown only when no logo image is uploaded).
-     Wordmark styling WITHOUT the forced lowercase: it renders exactly what
-     it is given — "Percé" by default, or the admin's Text Logo as typed. */
+     Renders exactly what it is given — "Percé" by default, or the admin's
+     Text Logo as typed. */
   .perce-logo-text {
     font-family: var(--font-heading, inherit);
-    font-weight: var(--perce-weight-semibold);
+    font-weight: 500;
     letter-spacing: -0.03em;
     text-transform: none;
     line-height: 1;
@@ -681,29 +693,25 @@ html[data-page-transition="out"] body {
     hyphens: auto;
   }
 
-  /* Underline that draws in from the left on hover — the single link
-     signature used across nav, CTAs and "view all" controls. */
+  /* The text-link signature: a 1px ink underline, always drawn
+     (.perce-underline) or drawn on hover/focus (.perce-underline-hover). */
   .perce-underline {
-    background-image: linear-gradient(currentColor, currentColor);
-    background-repeat: no-repeat;
-    background-position: 0 100%;
-    background-size: 100% 1px;
-    padding-bottom: 2px;
-    transition: background-size var(--perce-duration) var(--perce-ease);
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
   }
 
   .perce-underline-hover {
-    background-image: linear-gradient(currentColor, currentColor);
-    background-repeat: no-repeat;
-    background-position: 0 100%;
-    background-size: 0 1px;
-    padding-bottom: 2px;
-    transition: background-size var(--perce-duration) var(--perce-ease);
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
+    text-decoration-color: transparent;
+    transition: text-decoration-color var(--perce-duration) var(--perce-ease);
   }
 
   .perce-underline-hover:hover,
   .perce-underline-hover:focus-visible {
-    background-size: 100% 1px;
+    text-decoration-color: currentColor;
   }
 }
 
@@ -733,11 +741,80 @@ html[data-page-transition="out"] body {
    Every interactive element in the storefront gets a visible keyboard focus
    ring. Scoped to .storefront-shell so the dashboard keeps shadcn's ring. */
 @layer base {
-  .storefront-shell :is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
-    outline: 2px solid var(--perce-focus);
+  /* Keyed on the storefront <main> being on the page so portalled dialogs,
+     drawers and menus get the same ring. */
+  :root:has(main.storefront-shell) :is(a, button, input, select, textarea, summary, [role="radio"], [role="tab"], [tabindex]):focus-visible {
+    outline: 2px solid var(--color-ink);
     outline-offset: 2px;
-    border-radius: var(--perce-radius-sm);
   }
+
+  /* On an ink ground (announcement bar) the ring flips to stone. */
+  :root:has(main.storefront-shell) .on-ink :focus-visible {
+    outline-color: var(--color-bg);
+  }
+
+  /* Inter Tight at 400 and 500 only: browser defaults would otherwise draw
+     <strong>, <b> and <th> at 700. */
+  :root:has(main.storefront-shell) :is(b, strong, th) {
+    font-weight: 500;
+  }
+}
+
+/* ── Storefront-only overrides of the shared shadcn variables ──────────────
+   Keyed on the storefront <main> being on the page (not on the element
+   itself) so Radix portals — dialogs, sheets, popovers, dropdowns, which
+   render at the end of <body> — pick them up too. The admin dashboard has
+   no .storefront-shell, so it keeps its own radius and neutrals. */
+:root:has(main.storefront-shell) {
+  --radius: 0rem;
+  --card: var(--color-surface);
+  --card-foreground: var(--color-ink);
+  --popover: var(--color-surface);
+  --popover-foreground: var(--color-ink);
+  --secondary: var(--color-surface-2);
+  --secondary-foreground: var(--color-ink);
+  --muted: var(--color-surface-2);
+  --muted-foreground: var(--color-ink-2);
+  --accent: var(--color-surface-2);
+  --accent-foreground: var(--color-ink);
+  --destructive: var(--color-error);
+  --destructive-foreground: var(--color-bg);
+  --border: var(--color-line);
+  --input: var(--color-line-input);
+  --ring: var(--color-ink);
+}
+
+/* The shared shadcn sheet/dialog files are also the dashboard's, so their
+   storefront look is set here instead: the overlay token, and no shadow or
+   radius on the panels they open. */
+:root:has(main.storefront-shell) :is(
+    [data-slot="sheet-overlay"],
+    [data-slot="dialog-overlay"],
+    [data-slot="alert-dialog-overlay"]
+  ) {
+  background-color: var(--color-overlay);
+}
+
+:root:has(main.storefront-shell) :is(
+    [data-slot="sheet-content"],
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"],
+    [data-slot="dropdown-menu-content"],
+    [data-slot="popover-content"],
+    [data-slot="select-content"]
+  ) {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Sonner toasts (wishlist, account notices): square surface panels. */
+:root:has(main.storefront-shell) [data-sonner-toast] {
+  border-radius: 0;
+  box-shadow: none;
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: var(--perce-font-sans);
 }
 
 :root {

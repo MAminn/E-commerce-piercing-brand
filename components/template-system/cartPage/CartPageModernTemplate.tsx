@@ -1,29 +1,27 @@
 import React from "react";
 import type { CartShippingStatus } from "#root/shared/shipping/checkout-shipping";
-import { OfferProgressBanner } from "./OfferProgressBanner";
 import { CartBundleGroup, type CartPageBundleGroup } from "./CartBundleGroup";
 import {
   AppliedOffersSavings,
   computeOfferSavingsTotal,
 } from "./AppliedOffersSavings";
-import { Button } from "#root/components/ui/button";
-import { Input } from "#root/components/ui/input";
-import {
-  Trash2,
-  Plus,
-  Minus,
-  ShoppingCart,
-  ArrowRight,
-  ArrowLeft,
-} from "lucide-react";
+import { Button, ButtonLink, buttonClass } from "#root/components/storefront/Button";
+import { Input } from "#root/components/storefront/Field";
+import { Stepper } from "#root/components/storefront/Stepper";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { formatItemCount } from "#root/lib/i18n/item-count";
 import { cartUnitCount } from "#root/shared/bundles/cart-instance";
+import { formatMoney } from "#root/shared/pricing/format-money";
 import { useCouponFeedback } from "#root/components/template-system/useCouponFeedback";
-import { BOTTOM_NAV_CLEARANCE } from "#root/components/template-system/minimal/bottom-nav";
+import {
+  STICKY_BAR_BOTTOM,
+  STICKY_BAR_PADDING_BOTTOM,
+} from "#root/components/template-system/minimal/sticky-bar";
 
-/** `bottom` of the mobile sticky checkout bar: on top of the bottom nav. */
-const CART_STICKY_BAR_BOTTOM = BOTTOM_NAV_CLEARANCE;
+/** `bottom` of the mobile sticky checkout bar: the viewport edge (no bottom nav). */
+const CART_STICKY_BAR_BOTTOM = STICKY_BAR_BOTTOM;
+/** Its content clears the device's home indicator. */
+const CART_STICKY_BAR_PADDING_BOTTOM = STICKY_BAR_PADDING_BOTTOM;
 
 /**
  * A cart line's image or name, linked to its product page. A plain <a>, so
@@ -54,48 +52,41 @@ function LineLink({
 /**
  * Shown until the saved cart has been read (CartContext `isHydrated`). It
  * holds the populated cart's geometry — same page frame, heading, one line,
- * promo row and summary card — so the real lines replace it in place rather
- * than replacing a centred "Your cart is empty" and shoving the page down.
- * States nothing about the cart's contents.
+ * promo row and totals — so the real lines replace it in place rather than
+ * replacing a "Your cart is empty" and shoving the page down. States nothing
+ * about the cart's contents.
  */
 function CartPageModernSkeleton({ title, label }: { title: string; label: string }) {
-  const bar = "animate-pulse rounded bg-muted";
+  const bar = "animate-pulse bg-surface-2";
   return (
-    <div aria-busy='true' data-testid='cart-loading' className='min-h-screen bg-background pb-24 sm:pb-0'>
+    <div aria-busy='true' data-testid='cart-loading' className='min-h-screen bg-bg pb-48 lg:pb-0'>
       <output className='sr-only'>{label}</output>
-      <div className='max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-12'>
-        <h1 className='text-2xl sm:text-3xl font-extrabold uppercase tracking-tight mb-6'>
+      <div className='perce-container py-8 lg:py-12'>
+        <h1 className='mb-6 t-h1 text-ink lg:mb-8'>
           {title}
           <span aria-hidden className={`ms-3 inline-block h-4 w-16 align-middle ${bar}`} />
         </h1>
-        <div className='lg:grid lg:grid-cols-[1fr_380px] lg:gap-12' aria-hidden>
-          <div>
-            <div className='hidden sm:block pb-4 border-b'>
-              <div className={`h-4 w-40 ${bar}`} />
-            </div>
-            <div className='py-6 flex gap-4'>
-              <div className={`w-20 h-20 shrink-0 rounded-lg ${bar}`} />
-              <div className='flex-1 space-y-2.5'>
+        <div className='lg:grid lg:grid-cols-12 lg:gap-12' aria-hidden>
+          <div className='lg:col-span-7'>
+            <div className='grid grid-cols-[80px_1fr] gap-4 border-y border-line py-6'>
+              <div className={`h-25 w-20 ${bar}`} />
+              <div className='space-y-3'>
                 <div className={`h-4 w-3/4 ${bar}`} />
                 <div className={`h-3 w-1/3 ${bar}`} />
-                <div className={`mt-3 h-9 w-28 ${bar}`} />
+                <div className={`mt-4 h-9 w-28 ${bar}`} />
               </div>
             </div>
-            <div className='mt-6 pt-6 border-t'>
-              <div className={`h-9 w-full ${bar}`} />
+            <div className='py-6'>
+              <div className={`h-12 w-full ${bar}`} />
             </div>
           </div>
-          <div className='mt-8 lg:mt-0'>
-            <div className='border rounded-2xl p-6 space-y-5'>
+          <div className='mt-4 lg:col-span-5 lg:mt-0'>
+            <div className='space-y-4 border-t border-ink pt-4'>
               <div className={`h-5 w-36 ${bar}`} />
-              <div className='space-y-3'>
-                <div className={`h-4 w-full ${bar}`} />
-                <div className={`h-4 w-full ${bar}`} />
-              </div>
-              <div className='border-t pt-4'>
-                <div className={`h-6 w-full ${bar}`} />
-              </div>
-              <div className={`h-10 w-full ${bar}`} />
+              <div className={`h-4 w-full ${bar}`} />
+              <div className={`h-4 w-full ${bar}`} />
+              <div className={`h-6 w-full ${bar}`} />
+              <div className={`hidden h-13 w-full lg:block ${bar}`} />
             </div>
           </div>
         </div>
@@ -183,9 +174,18 @@ export interface CartPageModernTemplateProps {
 }
 
 /**
- * CartPageModernTemplate Component
+ * CartPageModernTemplate — the Percé cart (template id `cart-modern`), in the
+ * Object Index language.
  *
- * Modern cart page layout with item management and checkout flow
+ * Lines on the left (7/12), totals on the right (5/12, sticky) from 1024px;
+ * one column below. A line is an 80×100 photo, the title, the option, a
+ * tabular price, a square stepper and a text "Remove". Sets render as one
+ * indexed block (CartBundleGroup). Totals sit on hairlines. Below 1024px the
+ * checkout action lives in a `surface` panel fixed to the bottom edge, its
+ * content padded above the home indicator.
+ *
+ * Presentation only: quantities, removal, sets, promo codes, offers,
+ * shipping and every total come from the cart page exactly as before.
  */
 export function CartPageModernTemplate({
   items = [],
@@ -209,6 +209,8 @@ export function CartPageModernTemplate({
   // Cleared automatically when CartContext drops the code (see the hook).
   const [couponFeedback, setCouponFeedback] = useCouponFeedback(appliedCoupon?.code, couponNotice);
   const { t, locale } = useMinimalI18n();
+  const money = (amount: number) =>
+    formatMoney(amount, { locale, currency, alwaysShowFraction: true });
 
   const handleApplyCoupon = async () => {
     const code = couponCode.trim();
@@ -243,15 +245,12 @@ export function CartPageModernTemplate({
 
   if (items.length === 0 && bundles.length === 0) {
     return (
-      <div className='min-h-[60vh] flex flex-col items-center justify-center gap-4 px-4 text-center'>
-        <ShoppingCart className='w-14 h-14 text-muted-foreground/40' />
-        <h2 className='text-2xl font-bold'>{t("cart.empty")}</h2>
-        <p className='text-muted-foreground'>{t("cart.empty_cta")}</p>
-        <Button
-          onClick={() => (window.location.href = "/shop")}
-          className='mt-2'>
+      <div className='perce-container flex min-h-[60vh] flex-col items-start justify-center gap-4 py-16'>
+        <h1 className='t-h1 text-ink'>{t("cart.empty")}</h1>
+        <p className='t-body text-ink-2'>{t("cart.empty_cta")}</p>
+        <ButtonLink href='/shop' variant='primary' size='md' className='mt-4'>
           {t("cart.continue_shopping")}
-        </Button>
+        </ButtonLink>
       </div>
     );
   }
@@ -261,366 +260,180 @@ export function CartPageModernTemplate({
     totals.discount ?? 0,
   );
 
-  const cartSubtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
-  const cartQuantity = items.reduce((s, i) => s + i.quantity, 0);
   const appliedOffers = totals.appliedOffers ?? [];
+  const hasDiscount = (line: CartPageCartItem) =>
+    line.originalPrice != null && line.originalPrice > line.price;
+  const checkoutDisabled = isUpdating || (items.length === 0 && bundles.length === 0);
+  const promoInvalid = couponFeedback?.success === false;
 
   return (
     <>
-    <div className='min-h-screen bg-background pb-24 sm:pb-0'>
-      <div className='max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-12'>
+    <div className='min-h-screen bg-bg pb-48 lg:pb-0'>
+      <div className='perce-container py-8 lg:py-12'>
 
         {/* ── Page heading ───────────────────────────────── */}
-        <h1 className='text-2xl sm:text-3xl font-extrabold uppercase tracking-tight mb-6'>
+        <h1 className='mb-6 t-h1 text-ink lg:mb-8'>
           {t("cart.title") || "Shopping Cart"}
-          <span className='ms-3 text-sm font-semibold tracking-widest text-muted-foreground uppercase'>
+          <span className='ms-3 t-small tabular-nums text-ink-2'>
             ({formatItemCount(cartUnitCount(items, bundles), locale, t)})
           </span>
         </h1>
 
-        {/* Offer progress banner */}
-        {/* <OfferProgressBanner
-          cartSubtotal={cartSubtotal}
-          cartQuantity={cartQuantity}
-          appliedOffers={appliedOffers}
-          currency={currency}
-        /> */}
-
-        <div className='lg:grid lg:grid-cols-[1fr_380px] lg:gap-12'>
-          {/* ── Items list ─────────────────────────────────── */}
-          <div>
-            {/* Column headers — desktop */}
-            <div className='hidden sm:grid grid-cols-[1fr_160px_110px_40px] gap-4 pb-4 border-b text-xs font-semibold uppercase tracking-widest text-muted-foreground'>
-              <span>{t("cart.product") || "Product"}</span>
-              <span className='text-center'>
-                {t("cart.quantity") || "Quantity"}
-              </span>
-              <span className='text-right'>{t("cart.total") || "Total"}</span>
-              <span />
-            </div>
-
-            {/* Items */}
-            <div className='divide-y'>
+        <div className='lg:grid lg:grid-cols-12 lg:gap-12'>
+          {/* ── Lines ─────────────────────────────────── */}
+          <div className='lg:col-span-7'>
+            <ul className='border-t border-line'>
               {bundles.map((bundle) => (
-                <CartBundleGroup
-                  key={bundle.instanceId}
-                  bundle={bundle}
-                  currency={currency}
-                  onRemove={onRemoveBundle}
-                  disabled={isUpdating}
-                />
+                <li key={bundle.instanceId} className='border-b border-line'>
+                  <CartBundleGroup
+                    bundle={bundle}
+                    currency={currency}
+                    onRemove={onRemoveBundle}
+                    disabled={isUpdating}
+                  />
+                </li>
               ))}
-              {items.map((item) => (
-                <div
-                  key={item.id}
-                  className={`py-6 transition-opacity ${isUpdating ? "opacity-50 pointer-events-none" : ""}`}>
-                  {/* Mobile */}
-                  <div className='flex gap-4 sm:hidden'>
+              {items.map((item) => {
+                const free = item.freeQuantity ?? 0;
+                const paidUnits = Math.max(0, item.quantity - free);
+                return (
+                  <li
+                    key={item.id}
+                    className={`grid grid-cols-[80px_1fr] gap-4 border-b border-line py-6 transition-opacity ${isUpdating ? "pointer-events-none opacity-50" : ""}`}>
                     <LineLink
                       href={item.href}
                       tabIndex={-1}
-                      className='block w-20 h-20 shrink-0 bg-muted rounded-lg overflow-hidden border'>
-                      {item.imageUrl ? (
+                      className='block h-25 w-20 bg-surface-2'>
+                      {item.imageUrl && (
                         <img
                           src={item.imageUrl}
                           alt={item.name}
-                          className='w-full h-full object-cover'
+                          className='h-full w-full object-cover'
                         />
-                      ) : (
-                        <div className='w-full h-full flex items-center justify-center'>
-                          <ShoppingCart className='w-5 h-5 text-muted-foreground/30' />
-                        </div>
                       )}
                     </LineLink>
-                    <div className='flex-1 min-w-0'>
-                      <div className='flex items-start justify-between gap-2'>
+
+                    <div className='flex min-w-0 flex-col'>
+                      <div className='flex items-start justify-between gap-4'>
                         <div className='min-w-0'>
-                          <p className='font-semibold text-sm leading-snug'>
-                            <LineLink href={item.href} className='hover:underline underline-offset-2'>
+                          <p className='t-body text-ink'>
+                            <LineLink href={item.href} className='hover:underline hover:decoration-1 hover:underline-offset-4'>
                               {item.name}
                             </LineLink>
                           </p>
                           {item.variant && (
-                            <p className='text-xs text-muted-foreground mt-0.5'>
-                              {item.variant}
-                            </p>
+                            <p className='mt-1 t-small text-ink-2'>{item.variant}</p>
                           )}
-                          <div className='flex items-center gap-1.5 mt-1 flex-wrap'>
-                            {item.originalPrice != null && item.originalPrice > item.price && (
-                              <span className='text-xs text-muted-foreground line-through'>
-                                {currency}{item.originalPrice.toFixed(2)}
-                              </span>
-                            )}
-                            {/* Per-unit price is only shown when it isn't already
-                                identical to the line total below (qty > 1) —
-                                otherwise it just repeats the same number. */}
-                            {item.quantity > 1 && (
-                              <span className={`text-sm ${item.originalPrice != null && item.originalPrice > item.price ? "text-red-500 font-semibold" : "text-muted-foreground"}`}>
-                                {currency}{item.price.toFixed(2)}
-                              </span>
-                            )}
-                            {item.originalPrice != null && item.originalPrice > item.price && (
-                              <span className='text-[10px] bg-red-100 text-red-600 font-semibold px-1.5 py-0.5 rounded'>
-                                -{Math.round((1 - item.price / item.originalPrice) * 100)}%
-                              </span>
-                            )}
-                          </div>
+                          <p className='mt-1 flex flex-wrap gap-x-2 t-small tabular-nums text-ink-2'>
+                            <span>
+                              {money(item.price)} {t("checkout.each") || "each"}
+                            </span>
+                            {hasDiscount(item) && <s>{money(item.originalPrice as number)}</s>}
+                          </p>
                         </div>
+
+                        {/* Line total */}
+                        <div className='shrink-0 text-end' style={{ fontFamily: "var(--font-price)" }}>
+                          {free > 0 ? (
+                            <>
+                              <p className='t-small tabular-nums text-ink-2'>
+                                <s>{money(item.price * item.quantity)}</s>
+                              </p>
+                              <p className='t-label tabular-nums text-ink'>
+                                {free >= item.quantity ? t("cart.free") || "Free" : money(item.price * paidUnits)}
+                              </p>
+                              {free < item.quantity && (
+                                <p className='t-micro text-ink-2'>
+                                  {free} {t("cart.free") || "free"}
+                                </p>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              {hasDiscount(item) && (
+                                <p className='t-small tabular-nums text-ink-2'>
+                                  <s>{money((item.originalPrice as number) * item.quantity)}</s>
+                                </p>
+                              )}
+                              <p className='t-label tabular-nums text-ink'>{money(item.price * item.quantity)}</p>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className='mt-auto flex items-center justify-between gap-4 pt-4'>
+                        <Stepper
+                          size='sm'
+                          value={item.quantity}
+                          onDecrement={() => onQuantityChange?.(item.id, Math.max(1, item.quantity - 1))}
+                          onIncrement={() => onQuantityChange?.(item.id, item.quantity + 1)}
+                          canDecrement={!isUpdating && item.quantity > 1}
+                          canIncrement={!isUpdating && !(item.stock != null && item.quantity >= item.stock)}
+                          label={(t("cart.quantity_for") || "Quantity, {name}").replace("{name}", item.name)}
+                          decrementLabel={t("product.decrease")}
+                          incrementLabel={t("product.increase")}
+                        />
                         <button
                           type='button'
                           onClick={() => onRemoveItem?.(item.id)}
                           disabled={isUpdating}
-                          aria-label='Remove item'
-                          className='shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-destructive transition-colors'>
-                          <Trash2 className='w-4 h-4' />
-                        </button>
-                      </div>
-                      {/* Quantity and line total stack vertically on phone —
-                          side by side overflowed the card at narrow widths. */}
-                      <div className='flex flex-col gap-2 mt-3'>
-                        <div className='inline-flex items-center border rounded-lg self-start'>
-                          <button
-                            type='button'
-                            onClick={() =>
-                              onQuantityChange?.(
-                                item.id,
-                                Math.max(1, item.quantity - 1),
-                              )
-                            }
-                            disabled={isUpdating || item.quantity <= 1}
-                            aria-label='Decrease quantity'
-                            className='w-9 h-9 flex items-center justify-center hover:bg-muted transition-colors rounded-l-lg disabled:opacity-40'>
-                            <Minus className='w-3.5 h-3.5' />
-                          </button>
-                          <span className='w-10 text-center text-sm font-semibold'>
-                            {item.quantity}
-                          </span>
-                          <button
-                            type='button'
-                            onClick={() =>
-                              onQuantityChange?.(item.id, item.quantity + 1)
-                            }
-                            disabled={
-                              isUpdating ||
-                              (item.stock != null &&
-                                item.quantity >= item.stock)
-                            }
-                            aria-label='Increase quantity'
-                            className='w-9 h-9 flex items-center justify-center hover:bg-muted transition-colors rounded-r-lg disabled:opacity-40'>
-                            <Plus className='w-3.5 h-3.5' />
-                          </button>
-                        </div>
-                        <div className='flex items-center justify-between'>
-                          <span className='text-xs text-muted-foreground'>
-                            {t("cart.total") || "Total"}
-                          </span>
-                          {item.freeQuantity && item.freeQuantity >= item.quantity ? (
-                            <p className='font-bold text-emerald-600 uppercase tracking-wide'>
-                              {t("cart.free") || "Free"}
-                            </p>
-                          ) : item.freeQuantity && item.freeQuantity > 0 ? (
-                            <p className='font-bold'>
-                              {currency}{(item.price * (item.quantity - item.freeQuantity)).toFixed(2)}
-                              <span className='ms-1 text-[10px] text-emerald-600 font-semibold'>
-                                ({item.freeQuantity} {t("cart.free") || "free"})
-                              </span>
-                            </p>
-                          ) : (
-                            <p className='font-bold'>
-                              {currency}{(item.price * item.quantity).toFixed(2)}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Desktop */}
-                  <div className='hidden sm:grid grid-cols-[1fr_160px_110px_40px] gap-4 items-center'>
-                    {/* Product info */}
-                    <div className='flex items-center gap-4'>
-                      <LineLink
-                        href={item.href}
-                        tabIndex={-1}
-                        className='block w-20 h-20 shrink-0 bg-muted rounded-xl overflow-hidden border'>
-                        {item.imageUrl ? (
-                          <img
-                            src={item.imageUrl}
-                            alt={item.name}
-                            className='w-full h-full object-cover'
-                          />
-                        ) : (
-                          <div className='w-full h-full flex items-center justify-center'>
-                            <ShoppingCart className='w-5 h-5 text-muted-foreground/30' />
-                          </div>
-                        )}
-                      </LineLink>
-                      <div className='min-w-0'>
-                        <p className='font-semibold'>
-                          <LineLink href={item.href} className='hover:underline underline-offset-2'>
-                            {item.name}
-                          </LineLink>
-                        </p>
-                        {item.variant && (
-                          <p className='text-xs text-muted-foreground mt-0.5'>
-                            {item.variant}
-                          </p>
-                        )}
-                        <div className='flex items-center gap-1.5 mt-1 flex-wrap'>
-                          {item.originalPrice != null && item.originalPrice > item.price && (
-                            <span className='text-xs text-muted-foreground line-through'>
-                              {currency}{item.originalPrice.toFixed(2)}
-                            </span>
-                          )}
-                          <span className={`text-sm ${item.originalPrice != null && item.originalPrice > item.price ? "text-red-500 font-semibold" : "text-muted-foreground"}`}>
-                            {currency}{item.price.toFixed(2)} {t("checkout.each") || "each"}
-                          </span>
-                          {item.originalPrice != null && item.originalPrice > item.price && (
-                            <span className='text-[10px] bg-red-100 text-red-600 font-semibold px-1.5 py-0.5 rounded'>
-                              -{Math.round((1 - item.price / item.originalPrice) * 100)}%
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Quantity stepper */}
-                    <div className='flex justify-center'>
-                      <div className='inline-flex items-center border rounded-lg'>
-                        <button
-                          type='button'
-                          onClick={() =>
-                            onQuantityChange?.(
-                              item.id,
-                              Math.max(1, item.quantity - 1),
-                            )
-                          }
-                          disabled={isUpdating || item.quantity <= 1}
-                          aria-label='Decrease quantity'
-                          className='w-9 h-9 flex items-center justify-center hover:bg-muted transition-colors rounded-l-lg disabled:opacity-40'>
-                          <Minus className='w-3.5 h-3.5' />
-                        </button>
-                        <span className='w-10 text-center text-sm font-semibold'>
-                          {item.quantity}
-                        </span>
-                        <button
-                          type='button'
-                          onClick={() =>
-                            onQuantityChange?.(item.id, item.quantity + 1)
-                          }
-                          disabled={
-                            isUpdating ||
-                            (item.stock != null && item.quantity >= item.stock)
-                          }
-                          aria-label='Increase quantity'
-                          className='w-9 h-9 flex items-center justify-center hover:bg-muted transition-colors rounded-r-lg disabled:opacity-40'>
-                          <Plus className='w-3.5 h-3.5' />
+                          aria-label={`${t("cart.remove") || "Remove"}: ${item.name}`}
+                          className='inline-flex min-h-11 items-center t-small text-ink underline decoration-1 underline-offset-4 hover:text-ink-2 disabled:text-ink-3'>
+                          {t("cart.remove") || "Remove"}
                         </button>
                       </div>
                     </div>
+                  </li>
+                );
+              })}
+            </ul>
 
-                    {/* Line total */}
-                    <div className='text-right'>
-                      {item.freeQuantity && item.freeQuantity > 0 ? (
-                        <>
-                          <p className='text-xs text-muted-foreground line-through'>
-                            {currency}{(item.price * item.quantity).toFixed(2)}
-                          </p>
-                          {item.freeQuantity >= item.quantity ? (
-                            <p className='font-bold text-emerald-600 uppercase tracking-wide'>
-                              {t("cart.free") || "Free"}
-                            </p>
-                          ) : (
-                            <>
-                              <p className='font-bold'>
-                                {currency}{(item.price * (item.quantity - item.freeQuantity)).toFixed(2)}
-                              </p>
-                              <p className='text-[10px] text-emerald-600 font-semibold'>
-                                {item.freeQuantity} {t("cart.free") || "free"}
-                              </p>
-                            </>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          {item.originalPrice != null && item.originalPrice > item.price && (
-                            <p className='text-xs text-muted-foreground line-through'>
-                              {currency}{(item.originalPrice * item.quantity).toFixed(2)}
-                            </p>
-                          )}
-                          <p className={`font-bold ${item.originalPrice != null && item.originalPrice > item.price ? "text-red-500" : ""}`}>
-                            {currency}{(item.price * item.quantity).toFixed(2)}
-                          </p>
-                        </>
-                      )}
-                    </div>
-
-                    {/* Remove */}
-                    <button
-                      type='button'
-                      onClick={() => onRemoveItem?.(item.id)}
-                      disabled={isUpdating}
-                      aria-label='Remove item'
-                      className='justify-self-end p-1.5 rounded-md text-muted-foreground hover:text-destructive transition-colors'>
-                      <Trash2 className='w-4 h-4' />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* ── Coupon code ──────────────────────────────── */}
-            <div className='mt-6 pt-6 border-t'>
-              <div className='flex flex-col sm:flex-row items-start sm:items-center gap-4'>
-                <p className='text-sm font-semibold shrink-0'>
-                  Apply promo code
-                </p>
-                <div className='flex gap-2 flex-1 w-full sm:w-auto items-center'>
-                  <Input
-                    placeholder={t("cart.enter_code") || "Enter coupon code"}
-                    value={couponCode}
-                    onChange={(e) => {
-                      setCouponCode(e.target.value);
-                      if (couponFeedback) setCouponFeedback(null);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleApplyCoupon();
-                    }}
-                    disabled={isUpdating || isApplyingCoupon}
-                    aria-invalid={couponFeedback?.success === false}
-                    aria-describedby='promo-code-feedback'
-                    className={`flex-1 text-sm ${
-                      couponFeedback && !couponFeedback.success
-                        ? "border-red-300 focus-visible:ring-red-300"
-                        : ""
-                    }`}
-                  />
-                  <Button
-                    variant='primary'
-                    onClick={handleApplyCoupon}
-                    disabled={isUpdating || isApplyingCoupon || !couponCode.trim()}
-                    className='shrink-0 font-bold tracking-wide'>
-                    {isApplyingCoupon
-                      ? t("cart.checking") || "Checking…"
-                      : t("cart.apply") || "Apply"}
-                  </Button>
-                </div>
+            {/* ── Promo code ──────────────────────────────── */}
+            <div className='py-6'>
+              <label htmlFor='cart-promo-code' className='mb-2 block t-label text-ink'>
+                {t("cart.promo_code") || "Promo code"}
+              </label>
+              <div className='flex gap-2'>
+                <Input
+                  id='cart-promo-code'
+                  placeholder={t("cart.enter_code") || "Enter coupon code"}
+                  value={couponCode}
+                  onChange={(e) => {
+                    setCouponCode(e.target.value);
+                    if (couponFeedback) setCouponFeedback(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleApplyCoupon();
+                  }}
+                  disabled={isUpdating || isApplyingCoupon}
+                  aria-invalid={promoInvalid || undefined}
+                  aria-describedby='promo-code-feedback'
+                  autoCapitalize='characters'
+                  className='min-w-0 flex-1'
+                />
+                <Button
+                  variant='secondary'
+                  size='lg'
+                  onClick={handleApplyCoupon}
+                  disabled={isUpdating || isApplyingCoupon || !couponCode.trim()}
+                  className='h-12 shrink-0'>
+                  {isApplyingCoupon
+                    ? t("cart.checking") || "Checking…"
+                    : t("cart.apply") || "Apply"}
+                </Button>
               </div>
 
               <div id='promo-code-feedback' aria-live='polite'>
                 {/* A code that stopped being valid on its own (cart edited,
                     code expired between visits, etc.) */}
                 {couponNotice && (
-                  <p className='text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-3 py-2 mt-3'>
+                  <p className='mt-3 border border-line px-3 py-2 t-small text-ink'>
                     {couponNotice}
                   </p>
                 )}
 
                 {couponFeedback && (
-                  <p
-                    className={`text-xs mt-2 ${
-                      couponFeedback.success ? "text-green-600" : "text-red-600"
-                    }`}>
+                  <p className={`mt-2 t-small ${couponFeedback.success ? "text-success" : "text-error"}`}>
                     {couponFeedback.message}
                   </p>
                 )}
@@ -628,208 +441,140 @@ export function CartPageModernTemplate({
 
               {/* Currently applied code, with a way to remove it */}
               {appliedCoupon && (
-                <div className='flex items-center justify-between gap-3 mt-3 px-3 py-2 rounded-md bg-green-50 border border-green-100'>
-                  <p className='text-xs text-green-700 min-w-0'>
-                    <span className='font-semibold'>{appliedCoupon.code}</span>
+                <div className='mt-3 flex items-center justify-between gap-4 border border-line px-3'>
+                  <p className='min-w-0 py-2 t-small text-ink'>
+                    <span className='t-label'>{appliedCoupon.code}</span>
                     {appliedCoupon.discountLabel
                       ? ` — ${appliedCoupon.discountLabel}`
                       : ""}
                     {totals.discount != null && totals.discount > 0
-                      ? ` · saving ${currency}${totals.discount.toFixed(2)}`
+                      ? ` · saving ${money(totals.discount)}`
                       : ""}
                   </p>
                   {onRemoveCoupon && (
                     <button
                       type='button'
                       onClick={handleRemoveCoupon}
-                      className='text-[11px] font-medium uppercase tracking-wide text-green-700 hover:text-green-900 underline shrink-0'>
-                      Remove
+                      className='inline-flex min-h-11 shrink-0 items-center t-small text-ink underline decoration-1 underline-offset-4 hover:text-ink-2'>
+                      {t("cart.remove") || "Remove"}
                     </button>
                   )}
                 </div>
               )}
             </div>
-
-            {/* Trust badges removed entirely — "100% Authentic Products",
-                "Secure Payments", "Fast & Reliable Delivery" and "Easy
-                Returns" were four claims the business has not made. The empty
-                grid went with them rather than leaving a bordered blank row. */}
           </div>
 
-          {/* ── Order Summary ──────────────────────────────── */}
-          <div className='mt-8 lg:mt-0 lg:sticky lg:top-6 lg:self-start'>
-            <div className='border rounded-2xl bg-card p-6 space-y-5'>
-              <h2 className='font-extrabold text-base uppercase tracking-widest'>
+          {/* ── Totals ──────────────────────────────── */}
+          <div className='mt-4 lg:sticky lg:top-[calc(var(--perce-header-offset)+2rem)] lg:col-span-5 lg:mt-0 lg:self-start'>
+            <div className='border-t border-ink pt-4'>
+              <h2 className='t-h3 text-ink'>
                 {t("cart.order_summary") || "Order Summary"}
               </h2>
 
-              <div className='space-y-3 text-sm'>
-                {/* Subtotal */}
-                <div className='flex justify-between'>
-                  <span className='text-muted-foreground'>
-                    {t("cart.subtotal") || "Subtotal"}
-                  </span>
-                  <span className='font-semibold'>
-                    {currency}
-                    {totals.subtotal.toFixed(2)}
-                  </span>
+              <dl className='mt-4 t-body'>
+                <div className='flex justify-between border-b border-line py-3'>
+                  <dt className='text-ink-2'>{t("cart.subtotal") || "Subtotal"}</dt>
+                  <dd className='tabular-nums text-ink'>{money(totals.subtotal)}</dd>
                 </div>
 
                 {totals.bundleSavings !== undefined && totals.bundleSavings > 0 && (
-                  <div className='flex justify-between text-red-600'>
-                    <span className='font-medium'>Stack savings</span>
-                    <span className='font-semibold'>
-                      -{currency}
-                      {totals.bundleSavings.toFixed(2)}
-                    </span>
+                  <div className='flex justify-between border-b border-line py-3'>
+                    <dt className='text-ink-2'>Set savings</dt>
+                    <dd className='tabular-nums text-ink'>−{money(totals.bundleSavings)}</dd>
                   </div>
                 )}
 
                 {/* Promo code discount */}
                 {totals.discount !== undefined && totals.discount > 0 && (
-                  <div className='flex justify-between text-red-600'>
-                    <span className='font-medium'>
-                      {t("cart.discount") || "Discount"}
-                    </span>
-                    <span className='font-semibold'>
-                      -{currency}
-                      {totals.discount.toFixed(2)}
-                    </span>
+                  <div className='flex justify-between border-b border-line py-3'>
+                    <dt className='text-ink-2'>{t("cart.discount") || "Discount"}</dt>
+                    <dd className='tabular-nums text-ink'>−{money(totals.discount)}</dd>
                   </div>
                 )}
 
-                <AppliedOffersSavings
-                  appliedOffers={appliedOffers}
-                  currency={currency}
-                />
+                {appliedOffers.length > 0 && (
+                  <div className='border-b border-line py-3'>
+                    <AppliedOffersSavings appliedOffers={appliedOffers} currency={currency} />
+                  </div>
+                )}
 
                 {/* Shipping */}
                 {totals.shippingStatus === "pending" ? (
-                  <div className='flex justify-between' data-testid='shipping-line'>
-                    <span className='text-muted-foreground'>
-                      {t("cart.shipping") || "Shipping"}
-                    </span>
-                    <span className='text-muted-foreground'>
+                  <div className='flex justify-between gap-4 border-b border-line py-3' data-testid='shipping-line'>
+                    <dt className='text-ink-2'>{t("cart.shipping") || "Shipping"}</dt>
+                    <dd className='text-end text-ink-2'>
                       {t("cart.shipping_calculated_at_checkout") || "Calculated at checkout"}
-                    </span>
+                    </dd>
                   </div>
                 ) : totals.shipping !== undefined ? (
-                  <div className='flex justify-between' data-testid='shipping-line'>
-                    <span className='text-muted-foreground'>
-                      {t("cart.shipping") || "Shipping"}
-                    </span>
-                    <span className='font-semibold'>
-                      {totals.shipping === 0
-                        ? t("cart.free") || "Free"
-                        : `${currency}${totals.shipping.toFixed(2)}`}
-                    </span>
+                  <div className='flex justify-between border-b border-line py-3' data-testid='shipping-line'>
+                    <dt className='text-ink-2'>{t("cart.shipping") || "Shipping"}</dt>
+                    <dd className='tabular-nums text-ink'>
+                      {totals.shipping === 0 ? t("cart.free") || "Free" : money(totals.shipping)}
+                    </dd>
                   </div>
                 ) : null}
-              </div>
 
-              {/* Total */}
-              <div className='border-t pt-4 flex justify-between items-center font-extrabold text-lg'>
-                <span className='uppercase tracking-wide'>
-                  {t("cart.total") || "Total"}
-                </span>
-                <span>
-                  {currency}
-                  {totals.grandTotal.toFixed(2)}
-                </span>
-              </div>
+                {/* Total */}
+                <div className='flex items-baseline justify-between py-4'>
+                  <dt className='t-h3 text-ink'>{t("cart.total") || "Total"}</dt>
+                  <dd className='t-h3 tabular-nums text-ink'>{money(totals.grandTotal)}</dd>
+                </div>
+              </dl>
 
-              {/* Trust signals removed. "Fast Delivery" and "Easy Returns"
-                  were asserted as fact directly above the checkout button —
-                  Percé has set no delivery time and published no returns
-                  policy, so both were promises the business had not made.
-                  "Secure Checkout" went with them: this store is COD-only
-                  until a gateway is configured, and there is nothing for a
-                  padlock to be securing.
+              {/* No trust badges, payment logos or delivery promises: none of
+                  them is a claim this store has made (see git history). */}
 
-                  This template is not the Percé production cart (see
-                  PERCE_TEMPLATE_PRESET in shared/config/storefront.ts) but it
-                  remains selectable from Dashboard > Templates, so it must
-                  not carry claims either. */}
-
-              {/* Proceed button — hidden on mobile (sticky bar handles it) */}
+              {/* Checkout — from 1024px; the sticky panel carries it below. */}
               <Button
-                className='w-full font-bold tracking-wide uppercase hidden sm:flex'
+                variant='primary'
                 size='lg'
+                fullWidth
+                className='hidden lg:inline-flex'
                 onClick={onProceedToCheckout}
-                disabled={isUpdating || (items.length === 0 && bundles.length === 0)}>
+                disabled={checkoutDisabled}>
                 {t("cart.proceed_to_checkout") || "Proceed to Checkout"}
-                <ArrowRight className='w-4 h-4 ms-2' />
               </Button>
 
-              {/* Divider */}
-              <div className='hidden sm:flex items-center gap-3 text-xs text-muted-foreground'>
-                <div className='flex-1 border-t' />
-                <span>or</span>
-                <div className='flex-1 border-t' />
-              </div>
-
-              {/* Continue shopping */}
-              <Button
-                variant='outline'
-                className='w-full font-semibold'
-                onClick={() => (window.location.href = "/shop")}>
-                <ArrowLeft className='w-4 h-4 me-2' />
+              <a
+                href='/shop'
+                className={buttonClass({ variant: "text", size: "md", className: "mt-2" })}>
                 {t("cart.continue_shopping") || "Continue Shopping"}
-              </Button>
-
-              {/* Payment logos removed.
-                  This read "We accept" followed by Visa, Mastercard, Meeza
-                  and Apple Pay marks. None of them is accepted: no payment
-                  gateway is configured, the only method `payment.methods`
-                  returns is Cash on Delivery, and Apple Pay has no code path
-                  in this repo at all. It sat in the cart summary, one click
-                  before checkout, telling a shopper they could pay by card.
-
-                  If a gateway is enabled later, the accepted methods are
-                  already listed on the checkout page from the server's own
-                  response — they must never be hardcoded here. */}
+              </a>
             </div>
           </div>
         </div>
-
-
       </div>
     </div>
 
-    {/* ── Mobile sticky checkout bar ─────────────────────────────────────────
-        Rests on top of the fixed mobile bottom nav. It used to sit at
-        `bottom-15` (60px) under a 64px nav painted above it, so the nav
-        covered the bottom of the bar. Same offset rule as the PDP's sticky
-        Add to bag (see CART_STICKY_BAR_BOTTOM). */}
+    {/* ── Sticky checkout (below 1024px) ─────────────────────────────────────
+        A `surface` panel on the viewport's bottom edge with a top hairline;
+        its content is padded above the device's home indicator. */}
     <div
       data-testid='cart-sticky-checkout'
-      style={{ bottom: CART_STICKY_BAR_BOTTOM }}
-      className='sm:hidden fixed inset-x-0 z-40 bg-white border-t border-gray-200 shadow-[0_-4px_20px_rgba(0,0,0,0.10)]'>
-      <AppliedOffersSavings
-        appliedOffers={appliedOffers}
-        promoDiscount={totals.discount ?? 0}
-        currency={currency}
-        variant='sticky-banner'
-      />
-      <div className='px-4 py-3'>
-        <div className='flex items-center justify-between mb-2.5'>
-          <span className='text-xs text-muted-foreground uppercase tracking-widest font-semibold'>Total</span>
-          <div className='text-right'>
-            {totalSavings > 0 && (
-              <p className='text-[10px] text-emerald-600 font-medium'>Saving {currency}{totalSavings.toFixed(2)}</p>
-            )}
-            <p className='text-base font-extrabold'>{currency}{totals.grandTotal.toFixed(2)}</p>
-          </div>
+      style={{
+        bottom: CART_STICKY_BAR_BOTTOM,
+        paddingBottom: CART_STICKY_BAR_PADDING_BOTTOM,
+        zIndex: "var(--perce-z-sticky)",
+      }}
+      className='fixed inset-x-0 border-t border-line bg-surface px-4 pt-3 lg:hidden'>
+      <div className='mb-3 flex items-baseline justify-between gap-4'>
+        <span className='t-label text-ink'>{t("cart.total") || "Total"}</span>
+        <div className='text-end'>
+          {totalSavings > 0 && (
+            <p className='t-micro tabular-nums text-ink-2'>Saving {money(totalSavings)}</p>
+          )}
+          <p className='t-h3 tabular-nums text-ink'>{money(totals.grandTotal)}</p>
         </div>
-        <Button
-          className='w-full font-bold tracking-wide text-xs uppercase'
-          size='lg'
-          onClick={onProceedToCheckout}
-          disabled={isUpdating || (items.length === 0 && bundles.length === 0)}>
-          {t("cart.proceed_to_checkout") || "Proceed to Checkout"}
-          <ArrowRight className='w-4 h-4 ms-2' />
-        </Button>
       </div>
+      <Button
+        variant='primary'
+        size='lg'
+        fullWidth
+        onClick={onProceedToCheckout}
+        disabled={checkoutDisabled}>
+        {t("cart.proceed_to_checkout") || "Proceed to Checkout"}
+      </Button>
     </div>
     </>
   );

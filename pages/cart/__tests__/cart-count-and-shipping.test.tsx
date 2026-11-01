@@ -4,12 +4,13 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 
 /**
  * The cart's item count and shipping row, through the REAL CartProvider, the
- * real /cart page + cart templates and the real mobile bottom nav. Only the
- * network (tRPC) and the template selection are stubbed.
+ * real /cart page + cart templates and the real header (MinimalNavbar, whose
+ * "Bag (N)" replaced the removed mobile bottom nav's badge). Only the network
+ * (tRPC) and the template selection are stubbed.
  *
  *   • the count is product UNITS — a PICK6 alone is 6, never "0 items" —
- *     and the title, the bottom-nav badge and useCart().totalItems (what
- *     every header badge renders) always agree;
+ *     and the title, the header's Bag (N) and useCart().totalItems (what
+ *     every header count renders) always agree;
  *   • a valid PICK6 makes the cart say shipping "Free" / "مجاني" before any
  *     governorate is chosen; a broken (5/6) set, a PICK3 or a plain cart keep
  *     "Calculated at checkout".
@@ -38,26 +39,31 @@ vi.mock("#root/shared/trpc/client", () => ({
         }),
       },
     },
-    bundle: { evaluateSelection: { query: (input: unknown) => evaluateSelection(input) } },
+    bundle: {
+      evaluateSelection: { query: (input: unknown) => evaluateSelection(input) },
+      listLive: { query: async () => ({ success: true, result: [] }) },
+    },
     offer: {
       evaluate: { query: async () => ({ success: true, result: [] }) },
       listActive: { query: async () => ({ success: true, result: [] }) },
     },
     cartCapture: { sync: { mutate: async () => ({ success: true }) } },
+    // The header's own reads: categories for search, live sets for the nav.
+    category: { view: { query: async () => ({ success: false }) } },
     promoCode: { validate: { query: async () => ({ success: false }) } },
   },
 }));
 vi.mock("#root/frontend/contexts/TemplateContext", () => ({
   useTemplate: () => ({ getTemplateId: () => templateId }),
 }));
-vi.mock("vike-react/usePageContext", () => ({ usePageContext: () => ({ urlPathname: "/cart" }) }));
+vi.mock("vike-react/usePageContext", () => ({ usePageContext: () => ({ urlPathname: "/cart", urlParsed: { search: {} } }) }));
 vi.mock("vike/client/router", () => ({ navigate: () => {} }));
 vi.mock("#root/lib/hooks/useWishlist", () => ({ useWishlist: () => ({ items: [] }) }));
 
 import CartPage from "../+Page";
 import { CartProvider, useCart } from "#root/lib/context/CartContext";
 import { MinimalI18nProvider } from "#root/lib/i18n/MinimalI18nContext";
-import { MinimalMobileBottomNav } from "#root/components/template-system/minimal/MinimalMobileBottomNav";
+import { MinimalNavbar } from "#root/components/template-system/minimal/MinimalNavbar";
 
 const piece = (id: string, price = 100) => ({
   productId: id,
@@ -113,19 +119,15 @@ const renderCart = (locale: "en" | "ar" = "en") =>
     <MinimalI18nProvider ssrLocale={locale}>
       <CartProvider>
         <TotalItemsProbe />
+        <MinimalNavbar />
         <CartPage />
-        <MinimalMobileBottomNav />
       </CartProvider>
     </MinimalI18nProvider>,
   );
 
 const titleCount = () => screen.getByRole("heading", { level: 1 }).textContent ?? "";
-const bottomNavBadge = () => {
-  const cartTab = within(screen.getByRole("navigation", { name: "Bottom navigation" })).getByRole("link", {
-    name: /cart|السلة/i,
-  });
-  return cartTab.querySelector("span.rounded-full")?.textContent ?? "";
-};
+const headerBagCount = () =>
+  (within(screen.getByRole("navigation", { name: "Main" })).getByTestId("nav-bag-count").textContent ?? "").replace(/[()]/g, "");
 const shippingRow = () => screen.getAllByTestId("shipping-line")[0]!.textContent ?? "";
 
 beforeEach(() => {
@@ -152,7 +154,7 @@ describe.each(["cart-minimal", "cart-modern"])("cart item count (%s)", (template
     renderCart();
     await waitFor(() => expect(titleCount()).toMatch(/\(6 items\)/i));
     expect(screen.getByTestId("header-badge").textContent).toBe("6");
-    expect(bottomNavBadge()).toBe("6");
+    expect(headerBagCount()).toBe("6");
   });
 
   it("PICK6 + a loose piece ×2 → 8 everywhere", async () => {
@@ -160,7 +162,7 @@ describe.each(["cart-minimal", "cart-modern"])("cart item count (%s)", (template
     renderCart();
     await waitFor(() => expect(titleCount()).toMatch(/\(8 items\)/i));
     expect(screen.getByTestId("header-badge").textContent).toBe("8");
-    expect(bottomNavBadge()).toBe("8");
+    expect(headerBagCount()).toBe("8");
   });
 
   it("a loose piece ×2 → 2; ×1 → singular", async () => {
@@ -168,7 +170,7 @@ describe.each(["cart-minimal", "cart-modern"])("cart item count (%s)", (template
     const view = renderCart();
     await waitFor(() => expect(titleCount()).toMatch(/\(2 items\)/i));
     expect(screen.getByTestId("header-badge").textContent).toBe("2");
-    expect(bottomNavBadge()).toBe("2");
+    expect(headerBagCount()).toBe("2");
     view.unmount();
 
     seed({ items: [loose(1)] });
@@ -181,7 +183,7 @@ describe.each(["cart-minimal", "cart-modern"])("cart item count (%s)", (template
     renderCart("ar");
     await waitFor(() => expect(titleCount()).toContain("(8 قطع)"));
     expect(titleCount()).not.toMatch(/item/i);
-    expect(bottomNavBadge()).toBe("8");
+    expect(headerBagCount()).toBe("8");
   });
 });
 

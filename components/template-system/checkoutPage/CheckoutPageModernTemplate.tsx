@@ -1,24 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { Input } from "#root/components/ui/input";
+import { ChevronDown } from "lucide-react";
 import { GovernorateSelect } from "#root/components/checkout/GovernorateSelect";
 import { getGovernorate, type GovernorateCode } from "#root/shared/shipping/egypt-governorates";
 import type { ShippingLineStatus } from "#root/shared/shipping/checkout-shipping";
-import { Textarea } from "#root/components/ui/textarea";
-import { Button } from "#root/components/ui/button";
-import { Alert, AlertDescription } from "#root/components/ui/alert";
-import {
-  AlertCircle,
-  ShoppingCart,
-  User,
-  MapPin,
-  Loader2,
-  CreditCard,
-  Banknote,
-  Wallet,
-  Shield,
-  Lock,
-  ChevronDown,
-} from "lucide-react";
+import { Button, buttonClass } from "#root/components/storefront/Button";
+import { Input, fieldClass } from "#root/components/storefront/Field";
 import { cn } from "#root/lib/utils";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { formatItemCount } from "#root/lib/i18n/item-count";
@@ -139,15 +125,9 @@ export interface CheckoutPageModernTemplateProps {
 
 
 /**
- * Every input on this form was previously labelled by its placeholder alone.
- * A placeholder is not a label: it disappears the moment the shopper types,
- * screen readers are not required to announce it, and autofill has nothing
- * stable to match. It also meant the inline error text underneath an invalid
- * field was not associated with it at all, so a screen-reader user tabbing
- * into "Phone Number" heard no indication that it had been rejected.
- *
- * These two wrappers put a real <label htmlFor>, `aria-invalid` and
- * `aria-describedby` on every field in one place.
+ * Every field has a real <label htmlFor>, `aria-invalid` and an
+ * `aria-describedby` pointing at its error line — a placeholder is not a
+ * label (it disappears on typing and is not reliably announced).
  */
 function FieldLabel({
   htmlFor,
@@ -159,15 +139,9 @@ function FieldLabel({
   optional?: boolean;
 }) {
   return (
-    <label
-      htmlFor={htmlFor}
-      className='block text-xs font-medium text-perce-ink-muted'>
+    <label htmlFor={htmlFor} className='mb-2 block t-label text-ink'>
       {children}
-      {optional && (
-        <span className='ms-1 normal-case tracking-normal text-perce-ink-subtle'>
-          (optional)
-        </span>
-      )}
+      {optional && <span className='ms-1 font-normal text-ink-2'>(optional)</span>}
     </label>
   );
 }
@@ -177,16 +151,52 @@ function FieldError({ id, message }: { id: string; message?: string }) {
   // — a region created at the same moment as its content is not reliably
   // announced.
   return (
-    <p id={id} role='alert' className='min-h-0 text-xs text-perce-sale empty:hidden'>
+    <p id={id} role='alert' className='mt-2 t-small text-error empty:hidden'>
       {message ?? ""}
     </p>
   );
 }
 
+/** A numbered form section: "1 Contact", "2 Delivery", "3 Payment". */
+function CheckoutSection({
+  n,
+  id,
+  title,
+  children,
+}: {
+  n: number;
+  id: string;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section aria-labelledby={id} className='border-t border-line py-8 first:border-t-ink'>
+      <h2 id={id} className='mb-6 flex items-baseline gap-3 t-h3 text-ink'>
+        <span aria-hidden='true' className='t-label tabular-nums text-ink-2'>
+          {n}
+        </span>
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+function scrollBehavior(): ScrollBehavior {
+  return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+    ? "auto"
+    : "smooth";
+}
+
 /**
- * CheckoutPageModernTemplate Component
+ * CheckoutPageModernTemplate — the Percé checkout (template id
+ * `checkout-modern`), in the Object Index language.
  *
- * Modern checkout page layout with form fields, order review and submission
+ * Desktop: the form takes 7/12 and the order summary 5/12, sticky. Phones:
+ * one column, with a collapsible summary above Place order. Sections are
+ * numbered — 1 Contact, 2 Delivery, 3 Payment. Presentation only: fields,
+ * validation, shipping quotes, governorates, COD, promo codes and order
+ * submission are exactly as before.
  */
 export function CheckoutPageModernTemplate({
   customer,
@@ -214,18 +224,11 @@ export function CheckoutPageModernTemplate({
   const { t, locale } = useMinimalI18n();
 
   /**
-   * The checkout used to assert "By placing your order, you agree to our
-   * Terms & Conditions", linking to /links — the link-tree page, not a terms
-   * document. Percé has published no terms, so the sentence told a paying
-   * customer they had agreed to something that does not exist.
-   *
-   * Both locale defaults for `checkout.terms` are now empty strings, so this
-   * resolves to "" and the line is not rendered at all. It comes back only
-   * when an administrator supplies real policy copy through the
-   * `checkout.terms` translation override — and `t()` falls back to the key
-   * itself for an unknown key, so an accidentally *deleted* key would render
-   * the literal "checkout.terms"; guard against that and against a
-   * whitespace-only override here rather than at each of the two call sites.
+   * `checkout.terms` defaults to "" in both locales: Percé has published no
+   * terms, so no "you agree to our Terms" line renders until an admin
+   * supplies real copy through the translation override. `t()` falls back to
+   * the key itself for an unknown key, so guard against that and against a
+   * whitespace-only override here.
    */
   const rawTerms = t("checkout.terms");
   const termsCopy =
@@ -320,13 +323,13 @@ export function CheckoutPageModernTemplate({
 
     setFieldErrors(errors);
 
-    // Scroll to first error field
+    // Move to the first invalid field (errors are collected in form order).
     if (Object.keys(errors).length > 0) {
       const firstErrorField = Object.keys(errors)[0];
       const el = document.getElementById(firstErrorField!);
       if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-        el.focus();
+        el.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
+        el.focus({ preventScroll: true });
       }
     }
 
@@ -356,17 +359,6 @@ export function CheckoutPageModernTemplate({
   // credentials, so this cannot be true for an unconfigured store.
   const hasOnlinePaymentMethod = methods.some((m) => m.id !== "cod");
 
-  const getPaymentIcon = (id: string) => {
-    switch (id) {
-      case "stripe":
-        return <CreditCard className='w-5 h-5' />;
-      case "paymob":
-        return <Wallet className='w-5 h-5' />;
-      default:
-        return <Banknote className='w-5 h-5' />;
-    }
-  };
-
   // Auto-select the only payment method when there's exactly one
   useEffect(() => {
     if (methods.length === 1 && form.paymentMethod !== methods[0]!.id) {
@@ -389,143 +381,114 @@ export function CheckoutPageModernTemplate({
   // the button and be pointed at the governorate field by validation.
   const shippingBlocksOrder =
     totals.shippingStatus === "unavailable" || totals.shippingLoading === true;
+  const money = (amount: number) => formatMoney(amount, { currency, locale });
+  const placeOrderDisabled = isSubmitting || items.length === 0 || shippingBlocksOrder;
+  const placeOrderLabel = isSubmitting
+    ? t("checkout.processing") || "Processing..."
+    : form.paymentMethod === "cod"
+      ? t("checkout.place_order") || "Place Order"
+      : t("checkout.place_order_pay") || "Place Order & Pay";
 
-  // Section number component
-  const SectionNum = ({ n }: { n: number }) => (
-    <span
-      aria-hidden
-      className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-perce-cta text-xs font-medium text-perce-ink-inverse'>
-      {n}
-    </span>
-  );
-
-  // Shared item rows — used by both the desktop card and the mobile expanded panel
+  // Shared item rows — used by both the desktop summary and the mobile panel
   const renderItemsList = () => (
-    <div className='space-y-4'>
-      {items.map((item) => (
-        <div key={item.id} className='flex items-center gap-3'>
-          <div className='w-14 h-14 shrink-0 rounded-lg overflow-hidden bg-muted border'>
-            {item.imageUrl ? (
-              <img
-                src={item.imageUrl}
-                alt={item.name}
-                className='w-full h-full object-cover'
-              />
-            ) : (
-              <div className='w-full h-full flex items-center justify-center'>
-                <ShoppingCart className='w-4 h-4 text-muted-foreground/30' />
-              </div>
-            )}
-          </div>
-          <div className='flex-1 min-w-0'>
-            <p className='font-semibold text-sm leading-snug truncate'>
-              {item.name}
-            </p>
-            {item.variant && (
-              <p className='text-xs text-muted-foreground truncate'>
-                {item.variant}
-              </p>
-            )}
-            <p className='text-xs text-muted-foreground'>
-              Qty: {item.quantity}
-            </p>
-          </div>
-          <div className='text-right shrink-0'>
-            {item.originalPrice != null &&
-              item.originalPrice > item.price && (
-                <p className='text-xs text-muted-foreground line-through'>
-                  {formatMoney(item.originalPrice * item.quantity, { currency })}
+    <div>
+      <ul className='divide-y divide-line'>
+        {items.map((item) => (
+          <li key={item.id} className='flex items-center gap-3 py-3'>
+            <div className='h-15 w-12 shrink-0 bg-surface-2'>
+              {item.imageUrl && (
+                <img src={item.imageUrl} alt={item.name} className='h-full w-full object-cover' />
+              )}
+            </div>
+            <div className='min-w-0 flex-1'>
+              <p className='truncate t-small text-ink'>{item.name}</p>
+              {item.variant && <p className='truncate t-micro font-normal text-ink-2'>{item.variant}</p>}
+              <p className='t-micro font-normal tabular-nums text-ink-2'>Qty: {item.quantity}</p>
+            </div>
+            <div className='shrink-0 text-end'>
+              {item.originalPrice != null && item.originalPrice > item.price && (
+                <p className='t-micro font-normal tabular-nums text-ink-2'>
+                  <s>{money(item.originalPrice * item.quantity)}</s>
                 </p>
               )}
-            <p className='font-semibold text-sm'>
-              {formatMoney(item.price * item.quantity, { currency })}
-            </p>
-          </div>
-        </div>
-      ))}
+              <p className='t-label tabular-nums text-ink'>{money(item.price * item.quantity)}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
       {onEditCart && (
         <button
           type='button'
           onClick={onEditCart}
-          className='text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors'>
+          className={buttonClass({ variant: "text", size: "sm" })}>
           {t("checkout.edit_cart") || "Edit cart"}
         </button>
       )}
     </div>
   );
 
-  // Shared totals breakdown — used by both the desktop card and the mobile expanded panel
+  // Shared totals breakdown — hairline rows
   const renderTotalsBreakdown = () => (
-    <div className='space-y-2.5 text-xs w-full'>
-      <div className='flex justify-between'>
-        <span className='text-muted-foreground'>
-          {t("cart.subtotal") || "Subtotal"}
-        </span>
-        <span className='font-semibold'>
-          {formatMoney(totals.subtotal, { currency })}
-        </span>
+    <dl className='w-full t-small'>
+      <div className='flex justify-between border-b border-line py-3'>
+        <dt className='text-ink-2'>{t("cart.subtotal") || "Subtotal"}</dt>
+        <dd className='tabular-nums text-ink'>{money(totals.subtotal)}</dd>
       </div>
       {totals.discount !== undefined && totals.discount > 0 && (
-        <div className='flex justify-between text-perce-sale'>
-          <span className='font-medium'>
-            {t("cart.discount") || "Discount"}
-          </span>
-          <span className='font-semibold'>
-            −{formatMoney(totals.discount, { currency })}
-          </span>
+        <div className='flex justify-between border-b border-line py-3'>
+          <dt className='text-ink-2'>{t("cart.discount") || "Discount"}</dt>
+          <dd className='tabular-nums text-ink'>−{money(totals.discount)}</dd>
         </div>
       )}
-      <AppliedOffersSavings
-        appliedOffers={appliedOffers}
-        currency={currency}
-      />
+      {appliedOffers.length > 0 && (
+        <div className='border-b border-line py-2'>
+          <AppliedOffersSavings appliedOffers={appliedOffers} currency={currency} />
+        </div>
+      )}
       {totals.shippingStatus === "pending" ? (
-        <div className='flex justify-between' data-testid='shipping-line'>
-          <span className='text-muted-foreground'>
-            {t("cart.shipping") || "Shipping"}
-          </span>
-          <span className='text-muted-foreground'>
+        <div className='flex justify-between gap-4 border-b border-line py-3' data-testid='shipping-line'>
+          <dt className='text-ink-2'>{t("cart.shipping") || "Shipping"}</dt>
+          <dd className='text-end text-ink-2'>
             {t("cart.shipping_calculated_at_checkout") || "Calculated at checkout"}
-          </span>
+          </dd>
         </div>
       ) : totals.shippingStatus === "unavailable" ? (
-        <div className='flex justify-between text-perce-sale' data-testid='shipping-line'>
-          <span className='font-medium'>
-            {t("cart.shipping") || "Shipping"}
-          </span>
-          <span className='font-semibold'>
+        <div className='flex justify-between gap-4 border-b border-line py-3' data-testid='shipping-line'>
+          <dt className='text-ink-2'>{t("cart.shipping") || "Shipping"}</dt>
+          <dd className='text-end text-error'>
             {t("cart.shipping_unavailable") || "Not available for this destination"}
-          </span>
+          </dd>
         </div>
       ) : totals.shipping !== undefined ? (
-        <div className='flex justify-between' data-testid='shipping-line'>
-          <span className='text-muted-foreground'>
-            {t("cart.shipping") || "Shipping"}
-          </span>
-          <span className='font-semibold'>
+        <div className='flex justify-between border-b border-line py-3' data-testid='shipping-line'>
+          <dt className='text-ink-2'>{t("cart.shipping") || "Shipping"}</dt>
+          <dd className='tabular-nums text-ink'>
             {totals.shippingLoading
               ? "…"
               : totals.shipping === 0
                 ? t("cart.free") || "Free"
-                : formatMoney(totals.shipping, { currency })}
-          </span>
+                : money(totals.shipping)}
+          </dd>
         </div>
       ) : null}
-    </div>
+    </dl>
   );
 
-  // Shared coupon box — used by both the desktop card and the mobile expanded panel
+  // Shared coupon box — used by both the desktop summary and the mobile panel
   const renderCouponBlock = (scope: "desktop" | "mobile") => {
-    // The desktop card and the mobile panel are BOTH in the DOM (one is
-    // hidden with `lg:hidden` / `hidden lg:block`), so a single hardcoded id
-    // produced two elements sharing `checkout-promo-code-feedback` — invalid
-    // HTML, and `aria-describedby` on the input resolved to whichever came
-    // first, which on mobile is the hidden one.
+    // The desktop summary and the mobile panel are BOTH in the DOM (one is
+    // hidden per breakpoint), so every id is scoped — one shared id would be
+    // invalid HTML and `aria-describedby` would resolve to the hidden one.
     const feedbackId = `checkout-promo-code-feedback-${scope}`;
+    const inputId = `checkout-promo-code-${scope}`;
     return onApplyCoupon ? (
-      <div className='space-y-2'>
+      <div>
+        <label htmlFor={inputId} className='mb-2 block t-label text-ink'>
+          {t("cart.promo_code") || "Promo code"}
+        </label>
         <div className='flex gap-2'>
           <Input
+            id={inputId}
             placeholder={t("cart.enter_code") || "Enter coupon code"}
             value={couponCode}
             onChange={(e) => {
@@ -533,23 +496,25 @@ export function CheckoutPageModernTemplate({
               if (couponFeedback) setCouponFeedback(null);
             }}
             onKeyDown={(e) => {
-              if (e.key === "Enter") handleApplyCoupon();
+              if (e.key === "Enter") {
+                // Enter applies the code; it must not submit the order form.
+                e.preventDefault();
+                handleApplyCoupon();
+              }
             }}
             disabled={isApplyingCoupon}
-            aria-invalid={couponFeedback?.success === false}
+            aria-invalid={couponFeedback?.success === false || undefined}
             aria-describedby={feedbackId}
-            className={cn(
-              "flex-1 text-sm",
-              couponFeedback?.success === false &&
-                "border-perce-sale focus-visible:ring-perce-sale",
-            )}
+            autoCapitalize='characters'
+            className='min-w-0 flex-1'
           />
           <Button
             type='button'
-            variant='outline'
+            variant='secondary'
+            size='lg'
             onClick={handleApplyCoupon}
             disabled={isApplyingCoupon || !couponCode.trim()}
-            className='shrink-0 text-xs font-bold tracking-wide'>
+            className='h-12 shrink-0'>
             {isApplyingCoupon
               ? t("cart.checking") || "Checking…"
               : t("cart.apply") || "Apply"}
@@ -558,32 +523,28 @@ export function CheckoutPageModernTemplate({
 
         <div id={feedbackId} aria-live='polite'>
           {couponNotice && (
-            <p className='rounded-md border border-perce-line bg-perce-surface px-3 py-2 text-xs text-perce-ink-secondary'>
+            <p className='mt-3 border border-line px-3 py-2 t-small text-ink'>
               {couponNotice}
             </p>
           )}
           {couponFeedback && (
-            <p
-              className={cn(
-                "text-xs",
-                couponFeedback.success ? "text-perce-success" : "text-perce-sale",
-              )}>
+            <p className={cn("mt-2 t-small", couponFeedback.success ? "text-success" : "text-error")}>
               {couponFeedback.message}
             </p>
           )}
         </div>
 
         {appliedCoupon && (
-          <div className='flex items-center justify-between gap-3 rounded-md border border-perce-line bg-perce-surface px-3 py-2'>
-            <p className='min-w-0 text-xs text-perce-success'>
-              <span className='font-semibold'>{appliedCoupon.code}</span>
+          <div className='mt-3 flex items-center justify-between gap-3 border border-line px-3'>
+            <p className='min-w-0 py-2 t-small text-ink'>
+              <span className='t-label'>{appliedCoupon.code}</span>
               {appliedCoupon.discountLabel ? ` — ${appliedCoupon.discountLabel}` : ""}
             </p>
             {onRemoveCoupon && (
               <button
                 type='button'
                 onClick={handleRemoveCoupon}
-                className='shrink-0 text-[11px] font-medium text-perce-success underline hover:text-perce-ink'>
+                className='inline-flex min-h-11 shrink-0 items-center t-small text-ink underline decoration-1 underline-offset-4 hover:text-ink-2'>
                 {t("cart.remove") || "Remove"}
               </button>
             )}
@@ -593,24 +554,33 @@ export function CheckoutPageModernTemplate({
     ) : null;
   };
 
+  const placeOrder = (
+    <>
+      <Button type='submit' variant='primary' size='lg' fullWidth disabled={placeOrderDisabled}>
+        {placeOrderLabel}
+      </Button>
+      {/* Renders only when an admin has supplied real terms copy through the
+          `checkout.terms` translation override (see termsCopy above). */}
+      {termsCopy ? <p className='mt-3 t-small text-ink-2'>{termsCopy}</p> : null}
+    </>
+  );
+
   return (
-    <div className='perce-header-offset perce-container bg-perce-bg py-10 sm:py-12'>
-      <h1 className='perce-section-title mb-8'>
+    <div className='perce-container bg-bg py-8 lg:py-12'>
+      <h1 className='mb-6 t-h1 text-ink lg:mb-8'>
         {t("checkout.title") || "Checkout"}
       </h1>
 
       {errorMessage && (
-        <Alert variant='destructive' className='mb-6'>
-          <AlertCircle className='h-4 w-4' />
-          <AlertDescription>{errorMessage}</AlertDescription>
-        </Alert>
+        <div role='alert' className='mb-6 border border-error px-4 py-3 t-small text-error'>
+          {errorMessage}
+        </div>
       )}
 
       {Object.keys(fieldErrors).length > 0 && (
-        <Alert variant='destructive' className='mb-6'>
-          <AlertCircle className='h-4 w-4' />
-          <AlertDescription>{t("validation.fix_errors")}</AlertDescription>
-        </Alert>
+        <div role='alert' className='mb-6 border border-error px-4 py-3 t-small text-error'>
+          {t("validation.fix_errors")}
+        </div>
       )}
 
       <OfferProgressBanner
@@ -620,24 +590,15 @@ export function CheckoutPageModernTemplate({
         currency={currency}
       />
 
-      <form onSubmit={handleSubmit}>
-        <div className='grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-10'>
-          {/* ── Left column: form sections ─────────────────── */}
-          <div className='space-y-6'>
-            {/* 1. Customer Information */}
-            <div className='border rounded-2xl p-6'>
-              <div className='flex items-center justify-between mb-5'>
-                <div className='flex items-center gap-3'>
-                  <SectionNum n={1} />
-                  <h2 className='font-bold text-base'>
-                    {t("checkout.customer_info") || "Customer Information"}
-                  </h2>
-                </div>
-                <User className='w-5 h-5 text-muted-foreground' />
-              </div>
-              <div className='space-y-4'>
-                <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-                  <div className='space-y-1.5'>
+      <form onSubmit={handleSubmit} noValidate>
+        <div className='grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-12'>
+          {/* ── Form (7/12) ─────────────────── */}
+          <div className='lg:col-span-7'>
+            {/* 1. Contact */}
+            <CheckoutSection n={1} id='checkout-contact' title={t("checkout.step_contact") || "Contact"}>
+              <div className='space-y-6'>
+                <div className='grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-4'>
+                  <div>
                     <FieldLabel htmlFor='fullName'>
                       {t("checkout.full_name") || "Full Name"}
                     </FieldLabel>
@@ -646,18 +607,14 @@ export function CheckoutPageModernTemplate({
                       name='name'
                       autoComplete='name'
                       required
-                      aria-invalid={!!fieldErrors.fullName}
+                      aria-invalid={!!fieldErrors.fullName || undefined}
                       aria-describedby='fullName-error'
-                      placeholder={t("checkout.full_name") || "Full Name"}
                       value={form.fullName}
                       onChange={(e) => updateField("fullName", e.target.value)}
-                      className={
-                        fieldErrors.fullName ? "border-destructive" : ""
-                      }
                     />
                     <FieldError id='fullName-error' message={fieldErrors.fullName} />
                   </div>
-                  <div className='space-y-1.5'>
+                  <div>
                     <FieldLabel htmlFor='email'>
                       {t("checkout.email") || "Email Address"}
                     </FieldLabel>
@@ -668,17 +625,15 @@ export function CheckoutPageModernTemplate({
                       inputMode='email'
                       autoComplete='email'
                       required
-                      aria-invalid={!!fieldErrors.email}
+                      aria-invalid={!!fieldErrors.email || undefined}
                       aria-describedby='email-error'
-                      placeholder={t("checkout.email") || "Email Address"}
                       value={form.email}
                       onChange={(e) => updateField("email", e.target.value)}
-                      className={fieldErrors.email ? "border-destructive" : ""}
                     />
                     <FieldError id='email-error' message={fieldErrors.email} />
                   </div>
                 </div>
-                <div className='space-y-1.5'>
+                <div>
                   <FieldLabel htmlFor='phoneNumber'>
                     {t("checkout.phone") || "Phone Number"}
                   </FieldLabel>
@@ -693,36 +648,22 @@ export function CheckoutPageModernTemplate({
                     inputMode='tel'
                     autoComplete='tel'
                     required
-                    aria-invalid={!!fieldErrors.phoneNumber}
+                    aria-invalid={!!fieldErrors.phoneNumber || undefined}
                     aria-describedby='phoneNumber-error'
                     placeholder='01XXXXXXXXX'
                     value={form.phoneNumber}
                     onChange={(e) => updateField("phoneNumber", e.target.value)}
-                    className={
-                      fieldErrors.phoneNumber ? "border-destructive" : ""
-                    }
+                    className='tabular-nums'
                   />
-                  <FieldError
-                    id='phoneNumber-error'
-                    message={fieldErrors.phoneNumber}
-                  />
+                  <FieldError id='phoneNumber-error' message={fieldErrors.phoneNumber} />
                 </div>
               </div>
-            </div>
+            </CheckoutSection>
 
-            {/* 2. Shipping Address */}
-            <div className='border rounded-2xl p-6'>
-              <div className='flex items-center justify-between mb-5'>
-                <div className='flex items-center gap-3'>
-                  <SectionNum n={2} />
-                  <h2 className='font-bold text-base'>
-                    {t("checkout.shipping_address") || "Shipping Address"}
-                  </h2>
-                </div>
-                <MapPin className='w-5 h-5 text-muted-foreground' />
-              </div>
-              <div className='space-y-4'>
-                <div className='space-y-1.5'>
+            {/* 2. Delivery */}
+            <CheckoutSection n={2} id='checkout-delivery' title={t("checkout.step_delivery") || "Delivery"}>
+              <div className='space-y-6'>
+                <div>
                   <FieldLabel htmlFor='address'>
                     {t("checkout.street") || "Street Address"}
                   </FieldLabel>
@@ -731,17 +672,15 @@ export function CheckoutPageModernTemplate({
                     name='address-line1'
                     autoComplete='address-line1'
                     required
-                    aria-invalid={!!fieldErrors.address}
+                    aria-invalid={!!fieldErrors.address || undefined}
                     aria-describedby='address-error'
-                    placeholder={t("checkout.street") || "Street Address"}
                     value={form.address}
                     onChange={(e) => updateField("address", e.target.value)}
-                    className={fieldErrors.address ? "border-destructive" : ""}
                   />
                   <FieldError id='address-error' message={fieldErrors.address} />
                 </div>
-                <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-                  <div className='space-y-1.5'>
+                <div className='grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-4'>
+                  <div>
                     <FieldLabel htmlFor='buildingNumber' optional>
                       {t("checkout.building_number") || "Building Number"}
                     </FieldLabel>
@@ -749,30 +688,24 @@ export function CheckoutPageModernTemplate({
                       id='buildingNumber'
                       name='address-line2'
                       autoComplete='address-line2'
-                      placeholder={
-                        t("checkout.building_number") || "Building Number"
-                      }
                       value={form.buildingNumber}
-                      onChange={(e) =>
-                        updateField("buildingNumber", e.target.value)
-                      }
+                      onChange={(e) => updateField("buildingNumber", e.target.value)}
                     />
                   </div>
-                  <div className='space-y-1.5'>
+                  <div>
                     <FieldLabel htmlFor='apartment' optional>
                       {t("checkout.apartment") || "Apartment / Unit"}
                     </FieldLabel>
                     <Input
                       id='apartment'
                       name='address-line3'
-                      placeholder={t("checkout.apartment") || "Apartment / Unit"}
                       value={form.apartment}
                       onChange={(e) => updateField("apartment", e.target.value)}
                     />
                   </div>
                 </div>
-                <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-                  <div className='space-y-1.5'>
+                <div className='grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-4'>
+                  <div>
                     <FieldLabel htmlFor='city'>
                       {t("checkout.city") || "City"}
                     </FieldLabel>
@@ -781,16 +714,14 @@ export function CheckoutPageModernTemplate({
                       name='address-level2'
                       autoComplete='address-level2'
                       required
-                      aria-invalid={!!fieldErrors.city}
+                      aria-invalid={!!fieldErrors.city || undefined}
                       aria-describedby='city-error'
-                      placeholder={t("checkout.city") || "City"}
                       value={form.city}
                       onChange={(e) => updateField("city", e.target.value)}
-                      className={fieldErrors.city ? "border-destructive" : ""}
                     />
                     <FieldError id='city-error' message={fieldErrors.city} />
                   </div>
-                  <div className='space-y-1.5'>
+                  <div>
                     <FieldLabel htmlFor='state' optional={!governorateRequired}>
                       {t("checkout.state") || "Governorate"}
                     </FieldLabel>
@@ -798,317 +729,199 @@ export function CheckoutPageModernTemplate({
                         is priced from this code, so free text would leave the
                         order unpriceable. Under flat shipping the pick is
                         optional and only stored on the address. */}
-                    <GovernorateSelect
-                      id='state'
-                      name='address-level1'
-                      autoComplete='address-level1'
-                      locale={locale}
-                      required={governorateRequired}
-                      aria-invalid={!!fieldErrors.state}
-                      aria-describedby='state-error'
-                      value={governorateCode}
-                      onChange={(code) => {
-                        updateField("state", code ? getGovernorate(code)?.nameEn ?? "" : "");
-                        onGovernorateChange?.(code);
-                      }}
-                      className={fieldErrors.state ? "border-destructive" : ""}
-                    />
+                    <div className='relative'>
+                      <GovernorateSelect
+                        id='state'
+                        name='address-level1'
+                        autoComplete='address-level1'
+                        locale={locale}
+                        required={governorateRequired}
+                        aria-invalid={!!fieldErrors.state || undefined}
+                        aria-describedby='state-error'
+                        value={governorateCode}
+                        onChange={(code) => {
+                          updateField("state", code ? getGovernorate(code)?.nameEn ?? "" : "");
+                          onGovernorateChange?.(code);
+                        }}
+                        className='appearance-none pe-10'
+                      />
+                      <ChevronDown
+                        aria-hidden
+                        size={16}
+                        strokeWidth={1.5}
+                        className='pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-ink-2'
+                      />
+                    </div>
                     {/* One reserved status line under the field: the hint,
                         the unavailable notice and the validation error take
                         turns in it, so choosing a governorate (or a quote
                         landing) never inserts or removes a row. */}
-                    <div data-testid='governorate-status' className='min-h-4 text-xs leading-4'>
+                    <div data-testid='governorate-status' className='mt-2 min-h-4 t-small'>
                       {governorateRequired && !governorateCode && !fieldErrors.state && (
-                        <p className='text-perce-ink-muted'>
+                        <p className='text-ink-2'>
                           {t("checkout.shipping_select_to_calculate") ||
                             "Select your governorate to see the shipping fee."}
                         </p>
                       )}
                       {totals.shippingStatus === "unavailable" && !fieldErrors.state && (
-                        <p className='text-perce-sale'>
+                        <p className='text-error'>
                           {t("checkout.shipping_unavailable_destination") ||
                             "We don't deliver to this governorate yet. Please choose another destination."}
                         </p>
                       )}
-                      <FieldError id='state-error' message={fieldErrors.state} />
+                      <p id='state-error' role='alert' className='text-error empty:hidden'>
+                        {fieldErrors.state ?? ""}
+                      </p>
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
 
-            {/* Order Notes — inline collapsible, not numbered */}
-            <div className='px-1'>
-              {!notesOpen ? (
-                <button
-                  type='button'
-                  onClick={() => setNotesOpen(true)}
-                  className='min-h-11 text-sm text-perce-ink-muted underline underline-offset-4 hover:text-perce-ink'>
-                  + Add special instructions (optional)
-                </button>
-              ) : (
-                <>
-                  <FieldLabel htmlFor='notes' optional>
-                    {t("checkout.notes") || "Order notes"}
-                  </FieldLabel>
-                  <Textarea
-                    id='notes'
-                    className='mt-1.5'
-                    placeholder={
-                      t("checkout.notes_placeholder") ||
-                      "Any special instructions for your order\u2026"
-                    }
-                    value={form.notes}
-                    onChange={(e) => updateField("notes", e.target.value)}
-                    rows={3}
-                  />
-                </>
-              )}
-            </div>
-
-            {/* 3. Payment Method */}
-            <div className='border rounded-2xl p-6'>
-              <div className='flex items-center justify-between mb-5'>
-                <div className='flex items-center gap-3'>
-                  <SectionNum n={3} />
-                  <h2 className='font-bold text-base'>
-                    {t("checkout.payment_method") || "Payment Method"}
-                  </h2>
-                </div>
-                <Lock className='w-5 h-5 text-muted-foreground' />
-              </div>
-              {paymentMethodsLoading ? (
-                <div className='flex items-center gap-2 text-muted-foreground py-2'>
-                  <Loader2 className='w-4 h-4 animate-spin' />
-                  {t("checkout.loading_payment") ||
-                    "Loading payment options..."}
-                </div>
-              ) : (
-                <div className='space-y-3'>
-                  {methods.map((method) => (
-                    <label
-                      key={method.id}
-                      className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all duration-300 ${
-                        form.paymentMethod === method.id
-                          ? "border-perce-ink bg-perce-surface"
-                          : "border-perce-line hover:border-perce-line-strong"
-                      }`}>
-                      <input
-                        type='radio'
-                        name='paymentMethod'
-                        value={method.id}
-                        checked={form.paymentMethod === method.id}
-                        onChange={(e) =>
-                          updateField("paymentMethod", e.target.value)
+                {/* Order notes — optional, opened on request */}
+                <div>
+                  {!notesOpen ? (
+                    <button
+                      type='button'
+                      onClick={() => setNotesOpen(true)}
+                      aria-expanded={false}
+                      className={buttonClass({ variant: "text", size: "sm" })}>
+                      Add special instructions (optional)
+                    </button>
+                  ) : (
+                    <>
+                      <FieldLabel htmlFor='notes' optional>
+                        {t("checkout.notes") || "Order notes"}
+                      </FieldLabel>
+                      <textarea
+                        id='notes'
+                        className={cn(fieldClass, "h-auto min-h-24 py-3")}
+                        placeholder={
+                          t("checkout.notes_placeholder") ||
+                          "Any special instructions for your order…"
                         }
-                        className='mt-1 accent-foreground'
+                        value={form.notes}
+                        onChange={(e) => updateField("notes", e.target.value)}
+                        rows={3}
                       />
-                      <div className='flex items-start gap-3 flex-1'>
-                        <div
-                          className={`mt-0.5 ${form.paymentMethod === method.id ? "text-foreground" : "text-muted-foreground"}`}>
-                          {getPaymentIcon(method.id)}
-                        </div>
-                        <div className='flex-1'>
-                          <p className='font-semibold'>{method.label}</p>
-                          <p className='text-sm text-muted-foreground'>
-                            {method.description}
-                          </p>
-                        </div>
-                      </div>
-                      {method.id !== "cod" && (
-                        <div className='mt-1 flex shrink-0 items-center gap-1 text-xs text-perce-success'>
-                          <Shield className='w-3 h-3' />
-                          {t("checkout.secure") || "SECURE"}
-                        </div>
-                      )}
-                    </label>
-                  ))}
+                    </>
+                  )}
                 </div>
+              </div>
+            </CheckoutSection>
+
+            {/* 3. Payment */}
+            <CheckoutSection n={3} id='checkout-payment' title={t("checkout.step_payment") || "Payment"}>
+              {paymentMethodsLoading ? (
+                <p className='t-small text-ink-2' aria-live='polite'>
+                  {t("checkout.loading_payment") || "Loading payment options..."}
+                </p>
+              ) : (
+                <fieldset>
+                  <legend className='sr-only'>{t("checkout.payment_method") || "Payment Method"}</legend>
+                  <div className='space-y-2'>
+                    {methods.map((method) => {
+                      const selected = form.paymentMethod === method.id;
+                      return (
+                        <label
+                          key={method.id}
+                          className={cn(
+                            "flex cursor-pointer items-start gap-3 border p-4 transition-colors",
+                            selected ? "border-ink" : "border-line hover:border-line-input",
+                          )}>
+                          {/* Native radio: its circular indicator is kept
+                              deliberately — it is what reads as a radio. */}
+                          <input
+                            type='radio'
+                            name='paymentMethod'
+                            value={method.id}
+                            checked={selected}
+                            onChange={(e) => updateField("paymentMethod", e.target.value)}
+                            className='mt-0.5 h-5 w-5 shrink-0 accent-ink'
+                          />
+                          <span className='min-w-0 flex-1'>
+                            <span className='block t-label text-ink'>{method.label}</span>
+                            <span className='mt-1 block t-small text-ink-2'>{method.description}</span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
               )}
-            </div>
+            </CheckoutSection>
           </div>
 
-          {/* ── Right column: Order Summary ────────────────── */}
-          <div className='lg:sticky lg:top-6 lg:self-start w-full space-y-3'>
-            {/* Desktop: full itemized card */}
-            <div className='hidden lg:block border rounded-2xl p-6 space-y-5 w-full'>
-              <h2 className='font-extrabold text-base'>
+          {/* ── Order summary (5/12) ────────────────── */}
+          <div className='w-full lg:sticky lg:top-[calc(var(--perce-header-offset)+2rem)] lg:col-span-5 lg:self-start'>
+            {/* Desktop: itemised summary */}
+            <div className='hidden border-t border-ink pt-6 lg:block'>
+              <h2 className='t-h3 text-ink'>
                 {t("checkout.order_summary") || "Order Summary"}
               </h2>
+              <div className='mt-2'>{renderItemsList()}</div>
+              <div className='mt-2 border-t border-line'>{renderTotalsBreakdown()}</div>
+              <div className='mt-6'>{renderCouponBlock("desktop")}</div>
 
-              {renderItemsList()}
-
-              <div className='border-t' />
-
-              {renderTotalsBreakdown()}
-
-              {renderCouponBlock("desktop")}
-
-              {/* Grand total */}
-              <div className='border-t pt-4 flex justify-between items-center'>
-                <span className='font-semibold text-base'>
-                  {t("cart.total") || "Total"}
-                </span>
-                <span className='text-xl font-semibold text-perce-ink'>
-                  {formatMoney(totals.grandTotal, { currency })}
-                </span>
+              <div className='mt-6 flex items-baseline justify-between border-t border-line pt-4'>
+                <span className='t-h3 text-ink'>{t("cart.total") || "Total"}</span>
+                <span className='t-h3 tabular-nums text-ink'>{money(totals.grandTotal)}</span>
               </div>
 
-              {/* Trust badges.
-                  "Fast Delivery — Quick delivery to your doorstep." is gone:
-                  Percé has not set a delivery time, no courier integration is
-                  configured, and the claim was made at the exact moment the
-                  shopper decides to pay. "Easy Returns — 14-day return
-                  policy." was removed for the same reason in Phase 2.
-                  What is left is the one statement that is true, and only
-                  when it applies: card details are handled by the gateway's
-                  own hosted page, which does not exist in a COD-only store,
-                  so the line is hidden when COD is the only method. */}
+              {/* The one payment statement that is true, and only when it
+                  applies: card details are entered on the gateway's own page,
+                  which does not exist in a COD-only store. */}
               {hasOnlinePaymentMethod && (
-                <div className='space-y-2.5 text-sm text-perce-ink-muted'>
-                  <div className='flex items-center gap-2'>
-                    <Lock aria-hidden className='h-4 w-4 shrink-0' />
-                    <div>
-                      <p className='text-xs font-medium text-perce-ink'>
-                        Secure payment
-                      </p>
-                      <p className='text-xs'>
-                        Card details are entered on the payment provider's own
-                        page — this store never sees them.
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                <p className='mt-4 t-small text-ink-2'>
+                  Card details are entered on the payment provider's own page — this store never sees them.
+                </p>
               )}
 
-              {/* Submit */}
-              <Button
-                type='submit'
-                className='w-full font-bold'
-                size='lg'
-                disabled={isSubmitting || items.length === 0 || shippingBlocksOrder}>
-                {isSubmitting ? (
-                  <span className='flex items-center gap-2'>
-                    <Loader2 className='w-4 h-4 animate-spin' />
-                    {t("checkout.processing") || "Processing..."}
-                  </span>
-                ) : (
-                  <span className='flex items-center gap-2'>
-                    <Lock className='w-4 h-4' />
-                    {form.paymentMethod === "cod"
-                      ? t("checkout.place_order") || "Place Order"
-                      : t("checkout.place_order_pay") || "Place Order & Pay"}
-                  </span>
-                )}
-              </Button>
-
-              {/* The default read "By placing your order, you agree to our
-                  Terms & Conditions", linking to /links — which is the
-                  link-tree page, not a terms document. Percé has no published
-                  terms, so the sentence pointed a paying customer at an
-                  agreement that does not exist. It renders only when an admin
-                  has supplied real copy through the `checkout.terms`
-                  translation override. */}
-              {termsCopy ? (
-                <p className='text-center text-xs text-perce-ink-muted'>
-                  {termsCopy}
-                </p>
-              ) : null}
+              <div className='mt-6'>{placeOrder}</div>
             </div>
 
-            {/* Mobile: compact collapsed summary bar */}
-            <div className='lg:hidden border rounded-2xl p-4'>
+            {/* Phones: collapsible summary, then Place order */}
+            <div className='border-t border-ink lg:hidden'>
               <button
                 type='button'
                 onClick={() => setSummaryExpanded((v) => !v)}
-                className='w-full flex items-center gap-3'
-                aria-expanded={summaryExpanded}>
-                <div className='w-12 h-12 shrink-0 rounded-lg overflow-hidden bg-muted border'>
-                  {items[0]?.imageUrl ? (
-                    <img
-                      src={items[0].imageUrl}
-                      alt={items[0].name}
-                      className='w-full h-full object-cover'
-                    />
-                  ) : (
-                    <div className='w-full h-full flex items-center justify-center'>
-                      <ShoppingCart className='w-4 h-4 text-muted-foreground/30' />
-                    </div>
-                  )}
-                </div>
-                <div className='flex-1 min-w-0 text-left'>
-                  <p className='font-bold text-sm'>
-                    {t("cart.total") || "Total"}
-                  </p>
-                  <p className='text-xs text-muted-foreground'>
+                className='flex min-h-14 w-full items-center gap-3 text-start'
+                aria-expanded={summaryExpanded}
+                aria-controls='checkout-summary-panel'>
+                <span className='min-w-0 flex-1'>
+                  <span className='block t-label text-ink'>{t("checkout.order_summary") || "Order Summary"}</span>
+                  <span className='block t-small text-ink-2'>
                     {formatItemCount(itemCount ?? cartQuantity, locale, t)}
-                  </p>
-                </div>
-                <div className='text-right shrink-0'>
+                  </span>
+                </span>
+                <span className='shrink-0 text-end'>
                   {hasDiscount && (
-                    <p className='text-xs text-muted-foreground line-through'>
-                      {formatMoney(originalTotal, { currency })}
-                    </p>
+                    <span className='block t-micro font-normal tabular-nums text-ink-2'>
+                      <s>{money(originalTotal)}</s>
+                    </span>
                   )}
-                  <p className='font-extrabold text-base'>
-                    {formatMoney(totals.grandTotal, { currency })}
-                  </p>
-                </div>
+                  <span className='block t-label tabular-nums text-ink'>{money(totals.grandTotal)}</span>
+                </span>
                 <ChevronDown
-                  className={cn(
-                    "w-4 h-4 text-muted-foreground shrink-0 transition-transform",
-                    summaryExpanded && "rotate-180",
-                  )}
+                  aria-hidden
+                  size={16}
+                  strokeWidth={1.5}
+                  className={cn("shrink-0 text-ink-2 transition-transform", summaryExpanded && "rotate-180")}
                 />
               </button>
 
-              {summaryExpanded && (
-                <div className='mt-4 pt-4 border-t space-y-4'>
-                  {renderItemsList()}
-                  <div className='border-t' />
-                  {renderTotalsBreakdown()}
-                </div>
-              )}
-
-              {/* Always visible on mobile, not tucked behind the collapse toggle */}
-              <div className='mt-4 pt-4 border-t'>
-                {renderCouponBlock("mobile")}
+              <div id='checkout-summary-panel' hidden={!summaryExpanded} className='border-t border-line'>
+                {renderItemsList()}
+                <div className='border-t border-line'>{renderTotalsBreakdown()}</div>
               </div>
-            </div>
 
-            <div className='lg:hidden space-y-3'>
-              <Button
-                type='submit'
-                className='w-full font-bold'
-                size='lg'
-                disabled={isSubmitting || items.length === 0 || shippingBlocksOrder}>
-                {isSubmitting ? (
-                  <span className='flex items-center gap-2'>
-                    <Loader2 className='w-4 h-4 animate-spin' />
-                    {t("checkout.processing") || "Processing..."}
-                  </span>
-                ) : (
-                  <span className='flex items-center gap-2'>
-                    <Lock className='w-4 h-4' />
-                    {form.paymentMethod === "cod"
-                      ? t("checkout.place_order") || "Place Order"
-                      : t("checkout.place_order_pay") || "Place Order & Pay"}
-                  </span>
-                )}
-              </Button>
+              {/* Always visible on phones, not tucked behind the toggle */}
+              <div className='border-t border-line py-6'>{renderCouponBlock("mobile")}</div>
 
-              {/* The default read "By placing your order, you agree to our
-                  Terms & Conditions", linking to /links — which is the
-                  link-tree page, not a terms document. Percé has no published
-                  terms, so the sentence pointed a paying customer at an
-                  agreement that does not exist. It renders only when an admin
-                  has supplied real copy through the `checkout.terms`
-                  translation override. */}
-              {termsCopy ? (
-                <p className='text-center text-xs text-perce-ink-muted'>
-                  {termsCopy}
-                </p>
-              ) : null}
+              <div className='flex items-baseline justify-between border-t border-line py-4'>
+                <span className='t-h3 text-ink'>{t("cart.total") || "Total"}</span>
+                <span className='t-h3 tabular-nums text-ink'>{money(totals.grandTotal)}</span>
+              </div>
+
+              {placeOrder}
             </div>
           </div>
         </div>

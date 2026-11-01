@@ -47,12 +47,12 @@ export function ProductDecisionSummary({ product, className }: { product: Decisi
   return (
     <dl
       aria-label={t("product.summary_label")}
-      className={cn("grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13px] leading-snug", className)}
+      className={cn("grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 t-small", className)}
       data-testid="decision-summary">
       {rows.map((row) => (
         <div key={row.key} className="contents">
-          <dt className="text-perce-ink-muted">{row.label}</dt>
-          <dd className="font-medium text-perce-ink">{row.value}</dd>
+          <dt className="text-ink-2">{row.label}</dt>
+          <dd className="text-ink">{row.value}</dd>
         </div>
       ))}
     </dl>

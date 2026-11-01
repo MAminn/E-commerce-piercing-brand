@@ -73,7 +73,7 @@ beforeEach(() => localStorage.clear());
 afterEach(cleanup);
 
 describe("Arabic product page — system CTAs", () => {
-  it("Premium: Add to bag, zoom hint, related heading, card Add and View all products are Arabic", () => {
+  it("Premium: Add to bag, zoom hint, related heading, card add and View all products are Arabic", () => {
     render(
       <MinimalI18nProvider ssrLocale='ar'>
         {createElement(ProductPagePremium, { product, relatedProducts: related } as never)}
@@ -82,7 +82,9 @@ describe("Arabic product page — system CTAs", () => {
     expect(screen.getAllByText("أضيفي إلى الحقيبة").length).toBeGreaterThan(0);
     expect(screen.getByText("اضغطي للتكبير")).toBeTruthy();
     expect(screen.getByText("قد يعجبك أيضاً")).toBeTruthy();
-    expect(screen.getByText("أضيفي")).toBeTruthy();
+    // The related card's add control is a square "+" (Object Index); its
+    // name is its accessible label.
+    expect(screen.getAllByRole("button", { name: /^أضيفي إلى الحقيبة: / }).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: /عرض كل المنتجات/ })).toBeTruthy();
 
     const text = systemText(document.body);
@@ -120,7 +122,7 @@ describe("Arabic product page — system CTAs", () => {
     );
     expect(screen.getAllByText("Add to bag").length).toBeGreaterThan(0);
     expect(screen.getByText("Click to expand")).toBeTruthy();
-    expect(screen.getByText("Add")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: /^Add to bag: / }).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: /View all products/ })).toBeTruthy();
   });
 });

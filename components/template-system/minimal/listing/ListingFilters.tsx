@@ -1,7 +1,9 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import * as Popover from "@radix-ui/react-popover";
 import * as Slider from "@radix-ui/react-slider";
-import { Check, ChevronDown, SlidersHorizontal, X } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
+import { buttonClass } from "#root/components/storefront/Button";
+import { Chip } from "#root/components/storefront/Chip";
 import { type ReactNode, useEffect, useId, useState } from "react";
 import type { ListingFacets } from "#root/backend/products/listing-facets/compute";
 import {
@@ -121,8 +123,8 @@ function FacetCheckbox({
     <label
       htmlFor={id}
       className={cn(
-        "flex min-h-11 cursor-pointer items-center gap-3 text-[length:var(--perce-text-body)] text-perce-ink",
-        disabled && "cursor-default text-perce-ink-muted",
+        "flex min-h-11 cursor-pointer items-center gap-3 t-body text-ink",
+        disabled && "cursor-default text-ink-2",
       )}>
       <input
         id={id}
@@ -131,12 +133,12 @@ function FacetCheckbox({
         disabled={disabled}
         onChange={onChange}
         aria-describedby={hint ? `${id}-hint` : undefined}
-        className="h-4 w-4 shrink-0 cursor-pointer accent-[var(--perce-ink)] disabled:cursor-default"
+        className="h-5 w-5 shrink-0 cursor-pointer accent-ink disabled:cursor-default"
       />
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {count !== undefined && (
         <>
-          <span aria-hidden className="tabular-nums text-[length:var(--perce-text-small)] text-perce-ink-muted">
+          <span aria-hidden className="t-small tabular-nums text-ink-2">
             {count}
           </span>
           <span className="sr-only">
@@ -185,7 +187,7 @@ function CategoryFacetList({
               onChange={() => onChange(toggleCategory(filters, main, refToId))}
             />
             {main.children.length > 0 && (
-              <ul className="border-s border-perce-line ps-4 ms-2">
+              <ul className="ms-2 border-s border-line ps-4">
                 {main.children.map((child) => (
                   <li key={child.id}>
                     <FacetCheckbox
@@ -259,7 +261,7 @@ export function PriceRangeField({
   };
 
   const inputClass =
-    "min-h-11 w-full border border-perce-line-strong bg-perce-surface-raised pe-3 ps-12 text-[length:var(--perce-text-body)] tabular-nums text-perce-ink focus:border-perce-ink focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
+    "h-12 w-full border border-line-input bg-surface pe-3 ps-12 t-body tabular-nums text-ink focus:border-ink focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
 
   return (
     <div className="space-y-5 pt-1">
@@ -277,27 +279,27 @@ export function PriceRangeField({
         }}
         onValueCommit={(v) => commit(v[0] ?? lo, v[1] ?? hi)}
         className="relative flex h-6 w-full touch-none select-none items-center">
-        <Slider.Track className="relative h-px grow bg-perce-line-strong">
-          <Slider.Range className="absolute h-px bg-perce-ink" />
+        <Slider.Track className="relative h-px grow bg-line-input">
+          <Slider.Range className="absolute h-px bg-ink" />
         </Slider.Track>
         {[ct("filter.min"), ct("filter.max")].map((label) => (
           <Slider.Thumb
             key={label}
             aria-label={label}
-            className="block h-5 w-5 rounded-full border border-perce-ink bg-perce-surface-raised transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--perce-focus)]"
+            className="relative block h-5 w-5 border border-ink bg-surface before:absolute before:-inset-3 before:content-[''] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
           />
         ))}
       </Slider.Root>
       <div className="grid grid-cols-2 gap-3">
         {([0, 1] as const).map((i) => (
           <div key={i}>
-            <label htmlFor={`${id}-${i}`} className="perce-eyebrow mb-1.5 block">
+            <label htmlFor={`${id}-${i}`} className="mb-2 block t-label text-ink">
               {i === 0 ? ct("filter.min") : ct("filter.max")}
             </label>
             <div className="relative">
               <span
                 aria-hidden
-                className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-[length:var(--perce-text-small)] text-perce-ink-muted">
+                className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 t-small text-ink-2">
                 {ct("filter.currency")}
               </span>
               <input
@@ -333,15 +335,14 @@ export function PriceRangeField({
 /* ── Desktop: bar of popovers and toggles ───────────────────────────── */
 
 const triggerClass =
-  "inline-flex min-h-11 items-center gap-2 border px-4 text-[length:var(--perce-text-small)] font-medium transition-colors";
+  "inline-flex min-h-11 items-center gap-2 border px-4 t-label transition-colors";
 
+/** "(2)" after a filter's name — the same count notation as Bag (N). */
 function CountBadge({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
-    <span
-      aria-hidden
-      className="inline-flex h-5 min-w-5 items-center justify-center bg-perce-ink px-1 text-[11px] leading-none tabular-nums text-perce-ink-inverse">
-      {count}
+    <span aria-hidden className="tabular-nums">
+      ({count})
     </span>
   );
 }
@@ -368,10 +369,10 @@ function FilterPopover({
           type="button"
           className={cn(
             triggerClass,
-            "group data-[state=open]:border-perce-ink",
+            "group data-[state=open]:border-ink",
             active
-              ? "border-perce-ink text-perce-ink"
-              : "border-perce-line-strong text-perce-ink-secondary hover:border-perce-ink hover:text-perce-ink",
+              ? "border-ink text-ink"
+              : "border-line-input text-ink-2 hover:border-ink hover:text-ink",
           )}>
           {label}
           <CountBadge count={count} />
@@ -384,14 +385,14 @@ function FilterPopover({
           align="start"
           sideOffset={8}
           collisionPadding={16}
-          className="z-[10001] w-80 border border-perce-line bg-perce-surface-raised p-5 shadow-[0_12px_32px_-12px_rgba(14,14,14,0.18)] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0">
+          className="z-[10001] w-80 border border-line bg-surface p-6 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0">
           <div className="max-h-[min(60vh,28rem)] overflow-y-auto">{children}</div>
           {onClear && active && (
-            <div className="mt-3 border-t border-perce-line pt-3">
+            <div className="mt-4 border-t border-line pt-2">
               <button
                 type="button"
                 onClick={onClear}
-                className="perce-underline inline-flex min-h-9 items-center text-[length:var(--perce-text-small)] font-medium text-perce-ink">
+                className={buttonClass({ variant: "text", size: "sm" })}>
                 {ct("filter.clear_all")}
               </button>
             </div>
@@ -419,10 +420,9 @@ function ToggleFilter({
       className={cn(
         triggerClass,
         pressed
-          ? "border-perce-ink text-perce-ink"
-          : "border-perce-line-strong text-perce-ink-secondary hover:border-perce-ink hover:text-perce-ink",
+          ? "border-ink bg-ink text-bg"
+          : "border-line-input text-ink-2 hover:border-ink hover:text-ink",
       )}>
-      {pressed && <Check aria-hidden className="h-4 w-4" />}
       {label}
     </button>
   );
@@ -506,11 +506,7 @@ export function FilterButton({
       onClick={onClick}
       disabled={disabled}
       aria-haspopup="dialog"
-      className={cn(
-        "inline-flex min-h-11 items-center justify-center gap-2 border border-perce-line-strong bg-perce-surface-raised px-4 text-[length:var(--perce-text-body)] font-medium text-perce-ink transition-colors hover:border-perce-ink disabled:cursor-wait disabled:opacity-50 disabled:hover:border-perce-line-strong",
-        className,
-      )}>
-      <SlidersHorizontal aria-hidden className="h-4 w-4" />
+      className={buttonClass({ variant: "secondary", size: "md", className: cn("disabled:cursor-wait", className) })}>
       {ct("filter.button")}
       <CountBadge count={count} />
       {count > 0 && <span className="sr-only">, {ct("filter.active_count", { count })}</span>}
@@ -522,16 +518,16 @@ function DrawerGroup({ title, children }: { title: string; children: ReactNode }
   const [open, setOpen] = useState(true);
   const id = useId();
   return (
-    <section className="border-b border-perce-line last:border-b-0">
+    <section className="border-b border-line last:border-b-0">
       <h3>
         <button
           type="button"
           aria-expanded={open}
           aria-controls={id}
           onClick={() => setOpen((v) => !v)}
-          className="flex min-h-14 w-full items-center justify-between text-[length:var(--perce-text-body)] font-medium text-perce-ink">
+          className="flex min-h-14 w-full items-center justify-between t-label text-ink">
           {title}
-          <ChevronDown aria-hidden className={cn("h-4 w-4 text-perce-ink-muted transition-transform", open && "rotate-180")} />
+          <ChevronDown aria-hidden size={16} strokeWidth={1.5} className={cn("text-ink-2 transition-transform", open && "rotate-180")} />
         </button>
       </h3>
       <div id={id} hidden={!open} className="pb-5">
@@ -578,29 +574,29 @@ export function MobileFilterDrawer({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-[10001] bg-[rgba(14,14,14,0.4)] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
+        <Dialog.Overlay className="fixed inset-0 z-[10001] bg-overlay data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
         <Dialog.Content
           dir={dir}
           aria-describedby={undefined}
           data-testid="filter-drawer"
           className={cn(
-            "fixed inset-y-0 z-[10001] flex w-full max-w-md flex-col bg-perce-bg shadow-[0_0_48px_-12px_rgba(14,14,14,0.3)] focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:duration-300 data-[state=closed]:duration-200",
+            "fixed inset-y-0 z-[10001] flex w-full max-w-md flex-col bg-surface focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:duration-300 data-[state=closed]:duration-200",
             dir === "rtl"
               ? "left-0 data-[state=open]:slide-in-from-left data-[state=closed]:slide-out-to-left"
               : "right-0 data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right",
           )}>
-          <div className="flex items-center justify-between border-b border-perce-line px-5 py-3">
-            <Dialog.Title className="text-[length:var(--perce-text-h3)] font-medium tracking-[var(--perce-tracking-heading)] text-perce-ink">
+          <div className="flex h-14 items-center justify-between border-b border-line px-4">
+            <Dialog.Title className="t-h3 text-ink">
               {ct("filter.title")}
             </Dialog.Title>
             <Dialog.Close
               aria-label={ct("filter.close")}
-              className="-me-3 inline-flex h-11 w-11 items-center justify-center text-perce-ink-muted transition-colors hover:text-perce-ink">
-              <X aria-hidden className="h-5 w-5" />
+              className="-me-3 inline-flex h-11 w-11 items-center justify-center text-ink transition-colors hover:bg-surface-2">
+              <X aria-hidden size={20} strokeWidth={1.5} />
             </Dialog.Close>
           </div>
 
-          <div className="flex-1 overflow-y-auto overscroll-contain px-5">
+          <div className="flex-1 overflow-y-auto overscroll-contain px-4">
             {groups.category && (
               <DrawerGroup title={ct("filter.category")}>
                 <CategoryFacetList
@@ -647,12 +643,12 @@ export function MobileFilterDrawer({
             )}
           </div>
 
-          <div className="grid grid-cols-[auto_1fr] items-center gap-3 border-t border-perce-line px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <div className="grid grid-cols-[auto_1fr] items-center gap-4 border-t border-line px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <button
               type="button"
               onClick={() => setDraft(EMPTY_FILTERS)}
               disabled={activeFilterCount(draft) === 0}
-              className="perce-underline-hover inline-flex min-h-12 items-center px-1 text-[length:var(--perce-text-small)] font-medium text-perce-ink disabled:cursor-not-allowed disabled:opacity-40">
+              className={buttonClass({ variant: "text", size: "md" })}>
               {ct("filter.clear_all")}
             </button>
             <button
@@ -662,7 +658,7 @@ export function MobileFilterDrawer({
                 onOpenChange(false);
               }}
               aria-live="polite"
-              className="inline-flex min-h-12 items-center justify-center bg-perce-cta px-5 text-[length:var(--perce-text-small)] font-medium text-perce-cta-ink transition-colors hover:bg-perce-cta-hover">
+              className={buttonClass({ variant: "primary", size: "lg" })}>
               {applyLabel}
             </button>
           </div>
@@ -722,14 +718,9 @@ export function ActiveFilterChips({ model }: { model: FilterModel }) {
       <ul className="contents">
         {chips.map((chip) => (
           <li key={chip.key}>
-            <button
-              type="button"
-              onClick={chip.remove}
-              aria-label={ct("filter.remove", { label: chip.label })}
-              className="inline-flex min-h-9 max-w-[16rem] items-center gap-2 bg-perce-surface px-3 text-[length:var(--perce-text-small)] text-perce-ink transition-colors hover:bg-perce-border">
-              <span className="truncate">{chip.label}</span>
-              <X aria-hidden className="h-3.5 w-3.5 shrink-0 text-perce-ink-muted" />
-            </button>
+            <Chip removable onClick={chip.remove} aria-label={ct("filter.remove", { label: chip.label })}>
+              {chip.label}
+            </Chip>
           </li>
         ))}
       </ul>
@@ -737,7 +728,7 @@ export function ActiveFilterChips({ model }: { model: FilterModel }) {
         <button
           type="button"
           onClick={model.onClearAll}
-          className="perce-underline ms-1 inline-flex min-h-9 items-center text-[length:var(--perce-text-small)] font-medium text-perce-ink">
+          className={buttonClass({ variant: "text", size: "sm", className: "ms-2" })}>
           {ct("filter.clear_all")}
         </button>
       )}

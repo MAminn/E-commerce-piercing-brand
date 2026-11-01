@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ChevronDown, Gift } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { cn } from "#root/lib/utils";
 import { formatMoney } from "#root/shared/pricing/format-money";
 
@@ -44,22 +44,22 @@ export function AppliedOffersSavings({
   const toggle = () => setExpanded((prev) => !prev);
 
   const details = (
-    <ul className="mt-2 space-y-1.5 border-t border-current/20 pt-2">
+    <ul className="mt-2 space-y-1 border-t border-line pt-2">
       {appliedOffers.map((offer) => (
         <li
           key={offer.name}
-          className="flex items-start justify-between gap-3 text-[11px] leading-snug"
+          className="flex items-start justify-between gap-3 t-small"
         >
           <span className="min-w-0 break-words">{offer.name}</span>
-          <span className="shrink-0 font-semibold">
+          <span className="shrink-0 tabular-nums">
             {formatOfferAmount(offer, currency)}
           </span>
         </li>
       ))}
       {promoDiscount > 0 && (
-        <li className="flex items-center justify-between gap-3 text-[11px]">
+        <li className="flex items-center justify-between gap-3 t-small">
           <span>Promo code</span>
-          <span className="font-semibold">
+          <span className="tabular-nums">
             −{formatMoney(promoDiscount, { currency })}
           </span>
         </li>
@@ -71,28 +71,26 @@ export function AppliedOffersSavings({
     if (totalSavings <= 0) return null;
 
     return (
-      <div className="bg-perce-success text-perce-ink-inverse">
+      <div className="border-b border-line bg-surface-2 text-ink">
         <button
           type="button"
           onClick={toggle}
-          className="flex w-full items-center justify-between gap-2 px-4 py-2 text-left"
+          className="flex min-h-11 w-full items-center justify-between gap-2 px-4 text-start"
           aria-expanded={expanded}
         >
-          <span className="text-[11px] font-semibold tracking-wide">
-            Saving {formatMoney(totalSavings, { currency })}
-            {!expanded && (
-              <span className="font-normal opacity-90"> — tap for details</span>
-            )}
+          <span className="t-small">
+            <span className="t-label tabular-nums">Saving {formatMoney(totalSavings, { currency })}</span>
+            {!expanded && <span className="text-ink-2"> — details</span>}
           </span>
           <ChevronDown
-            className={cn(
-              "h-4 w-4 shrink-0 transition-transform",
-              expanded && "rotate-180",
-            )}
+            aria-hidden
+            size={16}
+            strokeWidth={1.5}
+            className={cn("shrink-0 transition-transform", expanded && "rotate-180")}
           />
         </button>
         {expanded && (
-          <div className="border-t border-perce-ink-inverse/25 px-4 pb-2.5 opacity-95">
+          <div className="px-4 pb-3">
             {details}
           </div>
         )}
@@ -103,38 +101,35 @@ export function AppliedOffersSavings({
   if (offersTotal <= 0) return null;
 
   return (
-    <div className="text-[13px] text-perce-sale">
+    <div className="t-body text-ink">
       <button
         type="button"
         onClick={toggle}
-        className="flex w-full items-start justify-between gap-2 text-left"
+        className="flex min-h-11 w-full items-center justify-between gap-2 text-start"
         aria-expanded={expanded}
       >
-        <span className="flex min-w-0 items-start gap-1 font-medium">
-          <Gift className="mt-0.5 h-3 w-3 shrink-0" />
-          <span className="leading-snug">
-            Offer savings
-            <ChevronDown
-              className={cn(
-                "ml-1 inline h-3 w-3 align-middle transition-transform",
-                expanded && "rotate-180",
-              )}
-            />
-          </span>
+        <span className="flex min-w-0 items-center gap-1 text-ink-2">
+          Offer savings
+          <ChevronDown
+            aria-hidden
+            size={16}
+            strokeWidth={1.5}
+            className={cn("shrink-0 transition-transform", expanded && "rotate-180")}
+          />
         </span>
-        <span className="shrink-0 font-semibold">
+        <span className="shrink-0 tabular-nums">
           −{formatMoney(offersTotal, { currency })}
         </span>
       </button>
       {expanded && (
-        <div className="ml-4 mt-1.5 space-y-1 border-l border-perce-sale/30 pl-3 text-[12px] text-perce-sale/90">
+        <div className="mt-1 space-y-1 border-s border-line ps-3 t-small text-ink-2">
           {appliedOffers.map((offer) => (
             <div
               key={offer.name}
               className="flex items-start justify-between gap-2"
             >
               <span className="min-w-0 break-words">{offer.name}</span>
-              <span className="shrink-0 font-medium">
+              <span className="shrink-0 tabular-nums">
                 {formatOfferAmount(offer, currency)}
               </span>
             </div>

@@ -8,15 +8,15 @@ import {
   useRef,
   useState,
 } from "react";
-import { Search, ChevronRight, ChevronLeft } from "lucide-react";
+import { Search, ChevronDown } from "lucide-react";
 import { Link } from "#root/components/utils/Link";
 import {
   MinimalProductCard,
   type MinimalProduct,
 } from "#root/components/template-system/minimal/MinimalProductCard";
 import { QuickViewDialog } from "#root/components/template-system/minimal/QuickViewDialog";
-import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { cn } from "#root/lib/utils";
+import { buttonClass } from "#root/components/storefront/Button";
 import {
   ActiveFilterChips,
   DesktopFilterBar,
@@ -93,6 +93,10 @@ export interface MinimalCategoryPageProps {
 
 const PRODUCTS_PER_PAGE = 12; // 3 rows × 4 cols
 
+/** Listing grid: 2 / 12 / 32 on phones, 3 / 24 / 48 from 768px, 4 from 1200px. */
+const GRID_CLASS =
+  "grid grid-cols-2 gap-x-3 gap-y-8 md:grid-cols-3 md:gap-x-6 md:gap-y-12 min-[1200px]:grid-cols-4";
+
 /* ── Sort options ───────────────────────────────────────────────────── */
 
 function useSortOptions() {
@@ -118,23 +122,19 @@ function CategoryBreadcrumbs({
   parentCategory?: { name: string; href: string };
 }) {
   const ct = useCategoryT();
-  const { locale } = useMinimalI18n();
 
   return (
-    <div className="border-b border-perce-line bg-perce-bg">
-      <div className="perce-container py-4">
+    <div className="bg-bg">
+      <div className="perce-container pt-4 lg:pt-6">
         <nav
           aria-label="Breadcrumb"
-          className="flex items-center gap-2 text-[length:var(--perce-text-small)] text-perce-ink-muted">
+          className="flex items-center gap-2 overflow-x-auto whitespace-nowrap t-small text-ink-2 scrollbar-hide">
           <Link
             href="/"
             className="perce-underline-hover transition-colors hover:text-perce-ink">
             {ct("breadcrumb.home")}
           </Link>
-          <ChevronRight
-            aria-hidden
-            className={cn("w-3.5 h-3.5 shrink-0", locale === "ar" && "rotate-180")}
-          />
+          <span aria-hidden="true">/</span>
           <Link
             href="/shop"
             className="perce-underline-hover transition-colors hover:text-perce-ink">
@@ -142,10 +142,7 @@ function CategoryBreadcrumbs({
           </Link>
           {parentCategory && (
             <>
-              <ChevronRight
-                aria-hidden
-                className={cn("w-3.5 h-3.5 shrink-0", locale === "ar" && "rotate-180")}
-              />
+              <span aria-hidden="true">/</span>
               <Link
                 href={parentCategory.href}
                 className="perce-underline-hover truncate transition-colors hover:text-perce-ink">
@@ -155,11 +152,8 @@ function CategoryBreadcrumbs({
           )}
           {categoryName && (
             <>
-              <ChevronRight
-                aria-hidden
-                className={cn("w-3.5 h-3.5 shrink-0", locale === "ar" && "rotate-180")}
-              />
-              <span aria-current="page" className="truncate text-perce-ink">
+              <span aria-hidden="true">/</span>
+              <span aria-current="page" className="truncate text-ink">
                 {categoryName}
               </span>
             </>
@@ -204,10 +198,10 @@ function SubcategoryTabs({ nav }: { nav: SubcategoryNav }) {
               href={tab.href}
               aria-current={tab.active ? "page" : undefined}
               className={cn(
-                "inline-flex min-h-11 items-center whitespace-nowrap border-b text-[length:var(--perce-text-small)] font-medium transition-colors",
+                "inline-flex min-h-11 items-center whitespace-nowrap border-b t-label transition-colors",
                 tab.active
-                  ? "border-perce-ink text-perce-ink"
-                  : "border-transparent text-perce-ink-muted hover:text-perce-ink",
+                  ? "border-ink text-ink"
+                  : "border-transparent text-ink-2 hover:text-ink",
               )}>
               {tab.name}
             </a>
@@ -220,8 +214,7 @@ function SubcategoryTabs({ nav }: { nav: SubcategoryNav }) {
 
 /* ── Pagination ──────────────────────────────────────────────────────── */
 
-const pagerButtonClass =
-  "inline-flex min-h-11 items-center gap-1.5 border border-perce-line-strong px-4 text-[length:var(--perce-text-small)] font-medium text-perce-ink-secondary transition-colors hover:border-perce-ink hover:text-perce-ink";
+const pagerButtonClass = buttonClass({ variant: "secondary", size: "md" });
 
 /**
  * A page control. With an href it is a real link — middle-click and "open in
@@ -249,7 +242,7 @@ function PageControl({
 }) {
   if (disabled) {
     return (
-      <span aria-disabled="true" className={cn(className, "pointer-events-none opacity-30")} {...aria}>
+      <span aria-disabled="true" className={cn(className, "pointer-events-none border-line text-ink-3")} {...aria}>
         {children}
       </span>
     );
@@ -285,7 +278,6 @@ function Pagination({
   pageHref?: (page: number) => string;
 }) {
   const ct = useCategoryT();
-  const { locale } = useMinimalI18n();
 
   if (totalPages <= 1) return null;
 
@@ -306,7 +298,7 @@ function Pagination({
   return (
     <nav
       aria-label="Pagination"
-      className="flex items-center justify-center gap-2 pt-12 pb-4">
+      className="flex items-center justify-between gap-4 border-t border-line pt-6 mt-12 sm:justify-center">
       {/* Previous */}
       <PageControl
         page={currentPage - 1}
@@ -314,18 +306,17 @@ function Pagination({
         onNavigate={onPageChange}
         disabled={currentPage <= 1}
         className={pagerButtonClass}>
-        <ChevronLeft aria-hidden className={cn("w-4 h-4", locale === "ar" && "rotate-180")} />
         {ct("pagination.previous")}
       </PageControl>
 
       {/* Page numbers */}
-      <div className="hidden sm:flex items-center gap-1">
+      <div className="hidden items-center sm:flex">
         {pages.map((page, idx) =>
           page === "..." ? (
             <span
               key={`ellipsis-${idx}`}
               aria-hidden
-              className="px-2 text-perce-ink-subtle">
+              className="px-2 t-label text-ink-2">
               …
             </span>
           ) : (
@@ -340,10 +331,10 @@ function Pagination({
                 total: totalPages,
               })}
               className={cn(
-                "flex h-11 w-11 items-center justify-center text-[length:var(--perce-text-small)] font-medium transition-colors",
+                "flex h-11 min-w-11 items-center justify-center t-label tabular-nums transition-colors",
                 page === currentPage
-                  ? "bg-perce-cta text-perce-ink-inverse"
-                  : "text-perce-ink-secondary hover:bg-perce-surface",
+                  ? "text-ink underline decoration-1 underline-offset-[6px]"
+                  : "text-ink-2 hover:text-ink",
               )}>
               {page}
             </PageControl>
@@ -352,8 +343,11 @@ function Pagination({
       </div>
 
       {/* Mobile page indicator */}
-      <span className="sm:hidden text-[length:var(--perce-text-small)] text-perce-ink-muted">
-        {ct("pagination.page_of", { current: currentPage, total: totalPages })}
+      <span className="t-label tabular-nums text-ink sm:hidden">
+        <span aria-hidden="true">
+          {currentPage} / {totalPages}
+        </span>
+        <span className="sr-only">{ct("pagination.page_of", { current: currentPage, total: totalPages })}</span>
       </span>
 
       {/* Next */}
@@ -364,7 +358,6 @@ function Pagination({
         disabled={currentPage >= totalPages}
         className={pagerButtonClass}>
         {ct("pagination.next")}
-        <ChevronRight aria-hidden className={cn("w-4 h-4", locale === "ar" && "rotate-180")} />
       </PageControl>
     </nav>
   );
@@ -374,16 +367,15 @@ function Pagination({
 
 function GridSkeleton() {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-8 sm:gap-x-6">
+    <div className={GRID_CLASS}>
       {[...Array(PRODUCTS_PER_PAGE)].map((_, i) => (
         <div key={i} className="flex flex-col">
           {/* 4:5 to match MinimalProductCard. A square skeleton reflowed the
               whole grid the moment the real cards arrived. */}
-          <div className="aspect-[4/5] animate-pulse bg-perce-surface" />
+          <div className="aspect-[4/5] animate-pulse bg-surface-2" />
           <div className="space-y-2 pt-3">
-            <div className="h-4 w-3/4 animate-pulse bg-perce-surface" />
-            <div className="h-4 w-1/3 animate-pulse bg-perce-surface" />
-            <div className="h-4 w-1/2 animate-pulse bg-perce-surface" />
+            <div className="h-4 w-3/4 animate-pulse bg-surface-2" />
+            <div className="h-4 w-1/3 animate-pulse bg-surface-2" />
           </div>
         </div>
       ))}
@@ -511,25 +503,25 @@ export function MinimalCategoryPage({
   };
 
   return (
-    <div className="perce-header-offset min-h-screen bg-perce-bg">
+    <div className="perce-header-offset min-h-screen bg-bg">
       {/* Breadcrumbs */}
       <CategoryBreadcrumbs
         categoryName={categoryName}
         parentCategory={parentCategory}
       />
 
-      <div className="bg-perce-bg">
-        <div className="perce-container py-6">
+      <div className="bg-bg">
+        <div className="perce-container pb-16 pt-6 lg:pb-24 lg:pt-8">
           {/* Page heading. /shop and /categories/[slug] previously rendered no
               <h1> at all — the first heading on the page was an <h3> inside a
               product card, so assistive tech and crawlers had nothing naming
               the page. Uses the category name when browsing one. */}
           <div className="mb-6 sm:mb-8">
-            <h1 className="perce-section-title">
+            <h1 className="t-h1 text-ink">
               {categoryName || ct("breadcrumb.shop")}
             </h1>
             {categoryDescription?.trim() && (
-              <p className="mt-2 max-w-prose text-[length:var(--perce-text-body)] text-perce-ink-muted">
+              <p className="mt-2 max-w-prose t-body text-ink-2">
                 {categoryDescription}
               </p>
             )}
@@ -540,7 +532,7 @@ export function MinimalCategoryPage({
             <p
               aria-live="polite"
               data-testid="results-count"
-              className="perce-eyebrow mt-2">
+              className="mt-2 t-small tabular-nums text-ink-2">
               {!isLoading && !loadFailed && totalProducts > 0
                 ? totalProducts === 1
                   ? ct("results.count_one")
@@ -557,7 +549,7 @@ export function MinimalCategoryPage({
             {/* Toolbar. Filters (left, desktop) only expose dimensions backed
                 by real product fields — see backend/products/listing-facets.
                 Below lg the filters live in a drawer behind one button. */}
-            <div className="mb-8 space-y-4">
+            <div className="mb-8 space-y-4 border-b border-line pb-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-6">
                 {showFilters && filterModel && (
                   <div className="hidden lg:block">
@@ -572,7 +564,7 @@ export function MinimalCategoryPage({
                     </label>
                     <Search
                       aria-hidden
-                      className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-perce-ink-subtle"
+                      className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-2"
                     />
                     <input
                       id="minimal-cat-search"
@@ -580,7 +572,7 @@ export function MinimalCategoryPage({
                       placeholder={ct("search.placeholder")}
                       value={searchText}
                       onChange={(e) => setSearchText(e.target.value)}
-                      className="min-h-11 w-full border border-perce-line-strong bg-perce-surface-raised pe-4 ps-10 text-[length:var(--perce-text-body)] text-perce-ink placeholder:text-perce-ink-subtle focus:border-perce-ink focus:outline-none"
+                      className="h-11 w-full border border-line-input bg-surface pe-4 ps-10 t-body text-ink placeholder:text-ink-3 focus:border-ink focus:outline-none"
                     />
                   </div>
 
@@ -596,22 +588,32 @@ export function MinimalCategoryPage({
                     {/* Sort */}
                     <label
                       htmlFor="minimal-cat-sort"
-                      className="perce-eyebrow sr-only whitespace-nowrap lg:not-sr-only"
+                      className="sr-only whitespace-nowrap t-small text-ink-2 lg:not-sr-only"
                     >
                       {ct("sort.label")}
                     </label>
-                    <select
-                      id="minimal-cat-sort"
-                      value={currentSort}
-                      onChange={(e) => onSortChange(e.target.value as ListingSort)}
-                      className="min-h-11 min-w-0 flex-1 border border-perce-line-strong bg-perce-surface-raised px-3 text-[length:var(--perce-text-body)] text-perce-ink focus:border-perce-ink focus:outline-none sm:w-52 sm:flex-none sm:px-4"
-                    >
-                      {sortOptions.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
+                    {/* Text-style sort: the native select (so phones get the
+                        platform picker), drawn as an underlined label. */}
+                    <div className="relative min-w-0 flex-1 sm:flex-none">
+                      <select
+                        id="minimal-cat-sort"
+                        value={currentSort}
+                        onChange={(e) => onSortChange(e.target.value as ListingSort)}
+                        className="h-11 w-full min-w-0 appearance-none border-0 bg-transparent pe-6 t-label text-ink underline decoration-1 underline-offset-4 focus:outline-none"
+                      >
+                        {sortOptions.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown
+                        aria-hidden
+                        size={16}
+                        strokeWidth={1.5}
+                        className="pointer-events-none absolute end-0 top-1/2 -translate-y-1/2 text-ink-2"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -624,15 +626,15 @@ export function MinimalCategoryPage({
             ) : loadFailed ? (
               <div role="alert" className="flex flex-col items-center justify-center py-16 lg:py-24">
                 <div className="max-w-md text-center">
-                  <h2 className="perce-section-title">{ct("error.title")}</h2>
-                  <p className="mt-2 text-[length:var(--perce-text-body)] text-perce-ink-muted">
+                  <h2 className="t-h2 text-ink">{ct("error.title")}</h2>
+                  <p className="mt-2 t-body text-ink-2">
                     {ct("error.subtitle")}
                   </p>
                   {onRetry && (
                     <button
                       type="button"
                       onClick={onRetry}
-                      className="perce-underline mt-6 inline-flex min-h-11 items-center text-[length:var(--perce-text-small)] font-medium text-perce-ink">
+                      className="perce-underline mt-6 inline-flex min-h-11 items-center t-label text-ink">
                       {ct("error.retry")}
                     </button>
                   )}
@@ -641,10 +643,10 @@ export function MinimalCategoryPage({
             ) : products.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 lg:py-24">
                 <div className="max-w-md text-center">
-                  <h2 className="perce-section-title">
+                  <h2 className="t-h2 text-ink">
                     {isFiltering ? ct("empty.title") : ct("empty.catalogue.title")}
                   </h2>
-                  <p className="mt-2 text-[length:var(--perce-text-body)] text-perce-ink-muted">
+                  <p className="mt-2 t-body text-ink-2">
                     {!isFiltering
                       ? ct("empty.catalogue.subtitle")
                       : searchOnly
@@ -655,13 +657,13 @@ export function MinimalCategoryPage({
                     <button
                       type="button"
                       onClick={clearFiltering}
-                      className="perce-underline mt-6 inline-flex min-h-11 items-center text-[length:var(--perce-text-small)] font-medium text-perce-ink">
+                      className="perce-underline mt-6 inline-flex min-h-11 items-center t-label text-ink">
                       {searchOnly ? ct("empty.clear_search") : ct("empty.clear_filters")}
                     </button>
                   ) : (
                     <Link
                       href="/"
-                      className="perce-underline mt-6 inline-flex min-h-11 items-center text-[length:var(--perce-text-small)] font-medium text-perce-ink">
+                      className="perce-underline mt-6 inline-flex min-h-11 items-center t-label text-ink">
                       {ct("empty.catalogue.action")}
                     </Link>
                   )}
@@ -673,7 +675,8 @@ export function MinimalCategoryPage({
                   aria-busy={isRefreshing || undefined}
                   data-testid="product-grid"
                   className={cn(
-                    "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-8 sm:gap-x-6 transition-opacity duration-[var(--perce-duration)]",
+                    GRID_CLASS,
+                    "transition-opacity duration-[var(--perce-duration)]",
                     isRefreshing && "opacity-50",
                   )}>
                   {products.map((product) => (

@@ -4,15 +4,16 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 /**
- * The PDP's mobile sticky Add to bag (product-perce / ProductPagePremium)
- * against the fixed mobile bottom nav.
+ * The PDP's mobile sticky Add to bag (product-perce / ProductPagePremium).
  *
- * The bar used to appear only once the main button had scrolled ABOVE the
- * viewport. On a 650–760px in-app browser the main button sits under the
- * 64px nav: still "intersecting" the viewport, so no bar — and the tap landed
- * on the nav's Wishlist tab. Now the bar shows whenever the main button is
- * not fully usable (below the fold, under the nav, cut off, scrolled away)
- * and hides while it is, and the observer's root excludes the nav.
+ * PR #1: the bar shows whenever the main button is not fully usable (below
+ * the fold, cut off, scrolled away) and hides while it is — never two usable
+ * Add to bag buttons at once.
+ *
+ * Object Index: the fixed mobile bottom nav is gone (its destinations moved
+ * to the header and menu), so the bar now sits on the viewport's bottom edge
+ * with its content padded above the home indicator, and the observer watches
+ * the whole viewport.
  */
 vi.mock("#root/shared/trpc/client", () => ({
   trpc: {
@@ -25,10 +26,10 @@ vi.mock("#root/lib/hooks/useWishlist", () => ({ useWishlist: () => ({ toggle: ()
 import { ProductPagePremium } from "../ProductPagePremium";
 import { MinimalI18nProvider } from "#root/lib/i18n/MinimalI18nContext";
 import {
-  BOTTOM_NAV_CLEARANCE,
-  bottomNavOcclusion,
+  STICKY_BAR_BOTTOM,
+  STICKY_BAR_PADDING_BOTTOM,
   isFullyUsable,
-} from "#root/components/template-system/minimal/bottom-nav";
+} from "#root/components/template-system/minimal/sticky-bar";
 
 /* ── IntersectionObserver double ─────────────────────────────────────── */
 
@@ -51,16 +52,6 @@ class FakeIO {
   takeRecords() {
     return [];
   }
-}
-
-const NAV_HEIGHT = 64;
-function mountBottomNav() {
-  const nav = document.createElement("nav");
-  nav.setAttribute("data-perce-bottom-nav", "");
-  nav.getBoundingClientRect = () =>
-    ({ top: window.innerHeight - NAV_HEIGHT, height: NAV_HEIGHT, width: 390, bottom: window.innerHeight }) as DOMRect;
-  document.body.appendChild(nav);
-  return nav;
 }
 
 const product = {
@@ -101,31 +92,24 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
-  for (const n of Array.from(document.querySelectorAll("[data-perce-bottom-nav]"))) n.remove();
 });
 
-describe("bottom-nav geometry", () => {
-  it("measures how much of the viewport the nav covers", () => {
-    expect(bottomNavOcclusion()).toBe(0);
-    mountBottomNav();
-    expect(bottomNavOcclusion()).toBe(NAV_HEIGHT);
+describe("sticky bar geometry", () => {
+  it("there is no bottom nav to rest on", () => {
+    render(page());
+    expect(document.querySelector("[data-perce-bottom-nav]")).toBeNull();
   });
 
-  it("a hidden nav (lg:hidden, /checkout) covers nothing", () => {
-    const nav = mountBottomNav();
-    nav.getBoundingClientRect = () => ({ top: 0, height: 0, width: 0, bottom: 0 }) as DOMRect;
-    expect(bottomNavOcclusion()).toBe(0);
-  });
-
-  it("fully usable means entirely inside the nav-free viewport", () => {
+  it("fully usable means entirely inside the viewport", () => {
     expect(isFullyUsable({ isIntersecting: true, intersectionRatio: 1 })).toBe(true);
     expect(isFullyUsable({ isIntersecting: true, intersectionRatio: 0.995 })).toBe(true);
-    expect(isFullyUsable({ isIntersecting: true, intersectionRatio: 0.5 })).toBe(false); // half under the nav
+    expect(isFullyUsable({ isIntersecting: true, intersectionRatio: 0.5 })).toBe(false); // cut off by the fold
     expect(isFullyUsable({ isIntersecting: false, intersectionRatio: 0 })).toBe(false); // below the fold / scrolled past
   });
 
-  it("bars sit on top of the nav, safe area included", () => {
-    expect(BOTTOM_NAV_CLEARANCE).toBe("calc(4rem + env(safe-area-inset-bottom))");
+  it("bars sit on the viewport edge and pad above the home indicator", () => {
+    expect(STICKY_BAR_BOTTOM).toBe("0px");
+    expect(STICKY_BAR_PADDING_BOTTOM).toContain("env(safe-area-inset-bottom)");
   });
 });
 
@@ -136,29 +120,24 @@ describe("PDP sticky Add to bag", () => {
     expect(html).toContain('aria-hidden="true"');
   });
 
-  it("observes the main button with the nav cut out of the root", () => {
-    mountBottomNav();
+  it("observes the main button against the whole viewport", () => {
     render(page());
-    expect(pdpObserver().options?.rootMargin).toBe(`0px 0px -${NAV_HEIGHT}px 0px`);
+    expect(pdpObserver().options?.rootMargin).toBeUndefined();
   });
 
-  it("shows on first load when the main button sits under the nav", () => {
-    mountBottomNav();
+  it("shows on first load when the main button is only partly on screen", () => {
     render(page());
-    // Main button straddles the nav line: only part of it is in the nav-free root.
     act(() => pdpObserver().fire({ isIntersecting: true, intersectionRatio: 0.4 }));
     expect(isShown()).toBe(true);
   });
 
   it("shows while the main button is below the fold (not reached yet)", () => {
-    mountBottomNav();
     render(page());
     act(() => pdpObserver().fire({ isIntersecting: false, intersectionRatio: 0 }));
     expect(isShown()).toBe(true);
   });
 
   it("hides while the main button is fully usable — never two usable buttons", () => {
-    mountBottomNav();
     render(page());
     act(() => pdpObserver().fire({ isIntersecting: false, intersectionRatio: 0 }));
     expect(isShown()).toBe(true);
@@ -168,15 +147,16 @@ describe("PDP sticky Add to bag", () => {
   });
 
   it("shows again once the main button is scrolled away above", () => {
-    mountBottomNav();
     render(page());
     act(() => pdpObserver().fire({ isIntersecting: true, intersectionRatio: 1 }));
     act(() => pdpObserver().fire({ isIntersecting: false, intersectionRatio: 0 }));
     expect(isShown()).toBe(true);
   });
 
-  it("rests on top of the nav", () => {
+  it("rests on the viewport edge with the safe area as padding", () => {
     render(page());
-    expect(sticky().getAttribute("style")).toContain("calc(4rem + env(safe-area-inset-bottom))");
+    const style = sticky().getAttribute("style") ?? "";
+    expect(style).toContain("bottom: 0px");
+    expect(style).toContain("safe-area-inset-bottom");
   });
 });

@@ -16,7 +16,8 @@ import { renderToString } from "react-dom/server";
  *     never by the composite line key that carries the selected options;
  *   • the pieces of a set link to their own product pages;
  *   • a saved promo code and an applied offer still show;
- *   • the mobile sticky checkout bar sits on top of the bottom nav.
+ *   • the mobile sticky checkout bar sits on the viewport edge with the
+ *     safe area as padding (the bottom nav it used to rest on is gone).
  */
 const promoValidate = vi.fn();
 const offerEvaluate = vi.fn();
@@ -240,14 +241,14 @@ describe("cart after the saved cart is read", () => {
     expect(screen.queryByTestId("cart-loading")).toBeNull();
   });
 
-  it("the mobile sticky checkout bar rests on top of the bottom nav", async () => {
+  it("the mobile sticky checkout bar sits on the viewport edge, clear of the home indicator", async () => {
     seed({ items: [line()] });
     render(tree());
     const bar = await screen.findByTestId("cart-sticky-checkout");
-    const bottom = bar.getAttribute("style") ?? "";
-    expect(bottom).toContain("bottom");
-    expect(bottom).toContain("4rem");
-    expect(bottom).toContain("safe-area-inset-bottom");
+    const style = bar.getAttribute("style") ?? "";
+    expect(style).toContain("bottom: 0px");
+    expect(style).toContain("padding-bottom");
+    expect(style).toContain("safe-area-inset-bottom");
     expect(bar.className).not.toContain("bottom-15");
   });
 });

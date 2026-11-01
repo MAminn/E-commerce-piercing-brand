@@ -1,6 +1,5 @@
 import { useState, useMemo, useCallback, useRef } from "react";
-import { Eye, Heart, ShoppingBag } from "lucide-react";
-import { Link } from "#root/components/utils/Link";
+import { Heart, Plus } from "lucide-react";
 import { useCart } from "#root/lib/context/CartContext";
 import { useTracking } from "#root/frontend/contexts/TrackingContext";
 import { trackAddToCartEvent } from "#root/frontend/tracking/add-to-cart-event";
@@ -9,8 +8,8 @@ import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { getProductUrl } from "#root/lib/utils/route-helpers";
 import { cn } from "#root/lib/utils";
 import { showCartToast, flyToCart } from "#root/components/ui/cart-toast";
-import { formatMoney } from "#root/shared/pricing/format-money";
 import { needsNoPiercing } from "#root/shared/products/no-piercing";
+import { Price } from "#root/components/storefront/Price";
 
 interface ProductImage {
   url: string;
@@ -36,6 +35,10 @@ export interface MinimalProduct {
 
 interface MinimalProductCardProps {
   product: MinimalProduct;
+  /**
+   * @deprecated The Object Index card has no quick-view affordance; the
+   * product page is one tap away. Accepted so existing callers compile.
+   */
   onQuickView?: (product: MinimalProduct) => void;
   className?: string;
 }
@@ -46,11 +49,21 @@ function resolveImageUrl(url?: string | null): string {
   return `/uploads/${url}`;
 }
 
-export function MinimalProductCard({
-  product,
-  onQuickView,
-  className,
-}: MinimalProductCardProps) {
+/**
+ * Product card — Object Index.
+ *
+ * The photograph is the card: a 4:5 frame on `surface-2` with no border,
+ * radius or shadow, then the title (14/400, two lines) and the price as
+ * tabular data, with a compare-at price only when it is real. Desktop
+ * crossfades to a second photo on hover when the product has one.
+ *
+ * Add to bag is a 36px square `+` inside the photo, bottom-end, 8px in, with
+ * a 44px hit area — always visible on touch, on hover/focus from 1024px. It
+ * adds exactly what the old full-width bar added (same cart call, same
+ * tracking, same toast). Sold out: the photo dims to 70%, the `+` is gone
+ * and a "Sold out" label sits under the price.
+ */
+export function MinimalProductCard({ product, className }: MinimalProductCardProps) {
   const { addItem } = useCart();
   const { trackEvent } = useTracking();
   const { toggle, isWishlisted } = useWishlist();
@@ -72,6 +85,12 @@ export function MinimalProductCard({
     }
     return resolveImageUrl(product.imageUrl);
   }, [product.images, product.imageUrl]);
+
+  // The first photo that is not the one on show, for the desktop hover.
+  const secondImageUrl = useMemo(() => {
+    const other = product.images?.find((img) => resolveImageUrl(img.url) !== displayImageUrl);
+    return other ? resolveImageUrl(other.url) : null;
+  }, [product.images, displayImageUrl]);
 
   const hasDiscount =
     product.discountPrice !== undefined &&
@@ -125,56 +144,54 @@ export function MinimalProductCard({
     [product, displayPrice, displayImageUrl, addItem, trackEvent, hasDiscount],
   );
 
-  // One short badge, from real data only: an explicit tag, then "No piercing
-  // needed" (the product's category says so), then New / Sale.
-  const tagText =
-    product.tag ||
-    (needsNoPiercing(product) ? t("product.no_piercing_needed") : product.isNew ? t("new") : hasDiscount ? t("sale") : null);
+  // One short line of product fact, from real data only: an explicit tag,
+  // else "No piercing needed" when the product's category says so. No New /
+  // Sale badges — the struck-through price already says it is reduced.
+  const factText = product.tag || (needsNoPiercing(product) ? t("product.no_piercing_needed") : null);
 
   const wishlisted = isWishlisted(product.id);
   const productUrl = getProductUrl(product);
+  const soldOut = !product.available;
+
+  // Mobile: always visible. From 1024px: on hover or keyboard focus.
+  const revealOnDesktop =
+    "lg:opacity-0 lg:transition-opacity lg:duration-[var(--perce-duration-fast)] lg:group-hover:opacity-100 lg:group-focus-within:opacity-100";
 
   return (
-    <div className={cn("group flex flex-col", className)}>
-      {/* Image container */}
-      <div className='relative aspect-[4/5] overflow-hidden bg-perce-surface'>
-        <Link href={productUrl} className='block w-full h-full'>
+    <article className={cn("group flex flex-col", className)}>
+      <div className='relative aspect-[4/5] overflow-hidden bg-surface-2'>
+        {/* The title below is the card's one link in the tab order; the photo
+            repeats it for pointer users only. */}
+        <a href={productUrl} tabIndex={-1} aria-hidden='true' className='block h-full w-full'>
           <img
             ref={(node) => {
               cardImageRef.current = node;
               if (node?.complete) setImageLoaded(true);
             }}
             src={displayImageUrl}
-            alt={product.name}
+            alt=''
             className={cn(
-              "w-full h-full object-cover transition-transform duration-500 group-hover:scale-105",
-              !imageLoaded && "opacity-0",
+              "h-full w-full object-cover transition-opacity duration-[var(--perce-duration)]",
+              !imageLoaded ? "opacity-0" : soldOut ? "opacity-70" : "opacity-100",
+              secondImageUrl && !soldOut && "lg:group-hover:opacity-0",
             )}
             loading='lazy'
             decoding='async'
             onLoad={() => setImageLoaded(true)}
             onError={() => setImageLoaded(true)}
           />
-        </Link>
+          {secondImageUrl && !soldOut && (
+            <img
+              src={secondImageUrl}
+              alt=''
+              className='absolute inset-0 hidden h-full w-full object-cover opacity-0 transition-opacity duration-[var(--perce-duration)] motion-reduce:transition-none lg:block lg:group-hover:opacity-100'
+              loading='lazy'
+              decoding='async'
+            />
+          )}
+        </a>
 
-        {/* Tag badge (top-right) */}
-        {tagText && (
-          <span className='absolute start-3 top-3 bg-perce-bg/95 px-2.5 py-1 text-xs font-medium text-perce-ink'>
-            {tagText}
-          </span>
-        )}
-
-        {/* Sold out — stated on the image itself. Previously the only signal
-            was a disabled button below the fold of the card. */}
-        {!product.available && (
-          <div className='absolute inset-0 flex items-center justify-center bg-perce-bg/55'>
-            <span className='bg-perce-bg px-3 py-1.5 text-xs font-medium text-perce-ink'>
-              {t("out_of_stock")}
-            </span>
-          </div>
-        )}
-
-        {/* Wishlist — secondary, always reachable in the corner. */}
+        {/* Wishlist — quiet, top-end; stays shown once saved. */}
         <button
           type='button'
           onClick={(e) => {
@@ -183,81 +200,46 @@ export function MinimalProductCard({
             toggle(product.id);
           }}
           className={cn(
-            "absolute end-1.5 top-1.5 flex h-10 w-10 items-center justify-center rounded-full transition-colors",
-            wishlisted ? "text-perce-sale" : "text-perce-ink-secondary hover:text-perce-ink",
+            "absolute end-1 top-1 flex h-11 w-11 items-center justify-center text-ink",
+            !wishlisted && revealOnDesktop,
           )}
           aria-pressed={wishlisted}
           aria-label={`${t("nav.wishlist")}: ${product.name}`}>
-          <span className='flex h-8 w-8 items-center justify-center rounded-full bg-perce-bg/90 shadow-sm'>
-            <Heart className={cn("w-4 h-4", wishlisted && "fill-current")} />
-          </span>
+          <Heart size={20} strokeWidth={1.5} aria-hidden className={cn(wishlisted && "fill-current")} />
         </button>
 
-        {/* Quick view — a desktop hover affordance; on touch the card itself
-            opens the product page. */}
-        {onQuickView && (
+        {/* Add to bag: 36px square, 8px in, 44px hit area. */}
+        {!soldOut && (
           <button
+            ref={addToCartBtnRef}
             type='button'
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onQuickView(product);
-            }}
-            className='absolute bottom-3 left-1/2 hidden h-9 w-9 -translate-x-1/2 items-center justify-center rounded-full bg-white opacity-0 shadow-md transition-opacity duration-300 hover:bg-perce-surface md:flex md:group-hover:opacity-100 md:focus-visible:opacity-100'
-            aria-label={`${t("quick_view")}: ${product.name}`}>
-            <Eye className='w-4 h-4 text-stone-700' />
+            onClick={handleAddToCart}
+            disabled={isAdding}
+            data-add-to-cart='true'
+            aria-label={`${t("product.add_to_bag")}: ${product.name}`}
+            className={cn(
+              "absolute bottom-2 end-2 flex h-9 w-9 items-center justify-center border border-line bg-surface text-ink transition-colors hover:bg-ink hover:text-bg before:absolute before:-inset-1 before:content-[''] disabled:cursor-wait",
+              revealOnDesktop,
+            )}>
+            <Plus size={20} strokeWidth={1.5} aria-hidden />
           </button>
         )}
       </div>
 
-      {/* Product info */}
-      <div className='pb-1 pt-3 text-start'>
-        <Link href={productUrl}>
+      <div className='pt-3 text-start'>
+        <a href={productUrl} className='block hover:underline hover:decoration-1 hover:underline-offset-4'>
           <h3
             style={{ fontFamily: "var(--font-product-title)" }}
-            className='line-clamp-2 min-h-[2.5em] text-[0.875rem] font-normal leading-snug text-perce-ink transition-colors hover:text-perce-ink-muted'>
+            className='line-clamp-2 t-card-title text-ink'>
             {product.name}
           </h3>
-        </Link>
-        <div className='mt-1.5 flex items-baseline gap-2'>
-          {originalPrice !== null && (
-            <span
-              style={{ fontFamily: "var(--font-price)" }}
-              className='text-sm text-perce-ink-subtle line-through'>
-              {formatMoney(originalPrice, { locale })}
-            </span>
-          )}
-          <span
-            style={{ fontFamily: "var(--font-price)" }}
-            className={cn(
-              "text-[0.9375rem] font-semibold",
-              hasDiscount ? "text-perce-sale" : "text-perce-ink",
-            )}>
-            {formatMoney(displayPrice, { locale })}
-          </span>
+        </a>
+        <div className='mt-1 flex flex-wrap items-baseline gap-x-2' style={{ fontFamily: "var(--font-price)" }}>
+          <Price amount={displayPrice} compareAt={originalPrice} locale={locale} size='card' />
         </div>
+        {soldOut && <p className="mt-1 t-micro text-ink-2">{t("sold_out")}</p>}
+        {!soldOut && factText && <p className='mt-1 t-micro text-ink-2'>{factText}</p>}
       </div>
-
-      {/* Add to cart */}
-      <div>
-        <button
-          ref={addToCartBtnRef}
-          type='button'
-          onClick={handleAddToCart}
-          disabled={!product.available || isAdding}
-          data-add-to-cart='true'
-          className={cn(
-            "mt-2 inline-flex min-h-10 w-full items-center justify-center gap-1.5 whitespace-nowrap px-2 text-[13px] font-medium transition-colors disabled:cursor-not-allowed",
-            product.available
-              ? "bg-perce-cta text-perce-ink-inverse hover:bg-perce-cta-hover"
-              : "border border-perce-line text-perce-ink-muted",
-          )}>
-          {product.available && <ShoppingBag className='h-3.5 w-3.5 shrink-0' aria-hidden />}
-          <span className='truncate'>
-            {product.available ? t("product.add_to_bag") : t("out_of_stock")}
-          </span>
-        </button>
-      </div>
-    </div>
+    </article>
   );
 }

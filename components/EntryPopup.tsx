@@ -3,10 +3,11 @@ import { usePageContext } from "vike-react/usePageContext";
 import { trpc } from "#root/shared/trpc/client";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { Dialog, DialogContent, DialogTitle } from "#root/components/ui/dialog";
-import { Button } from "#root/components/ui/button";
-import { Input } from "#root/components/ui/input";
+import { Button } from "#root/components/storefront/Button";
+import { Input } from "#root/components/storefront/Field";
+import { cn } from "#root/lib/utils";
 import { Label } from "#root/components/ui/label";
-import { Check, Copy, Loader2, X } from "lucide-react";
+import { Check, Copy, X } from "lucide-react";
 import { getCartSessionToken } from "#root/lib/cart-session";
 
 const DISMISSED_AT_KEY = "store-popup-dismissed-at";
@@ -222,56 +223,65 @@ export function EntryPopup() {
           // just not on a text field.
           (event.currentTarget as HTMLElement | null)?.focus({ preventScroll: true });
         }}
-        className='p-0 overflow-hidden gap-0 w-[calc(100%-2rem)] max-w-[420px] sm:max-w-[420px] [&>button]:hidden'>
+        // Phones: a bottom sheet across the full width, padded above the
+        // home indicator. From 640px: a centred 440px modal. Square, flat,
+        // on the overlay token (layouts/style.css), no shadow.
+        className={cn(
+          "gap-0 overflow-hidden rounded-none border-line bg-surface p-0 shadow-none [&>button]:hidden",
+          "inset-x-0 bottom-0 top-auto left-0 w-full max-w-none translate-x-0 translate-y-0 border-x-0 border-b-0 pb-[env(safe-area-inset-bottom)]",
+          "data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom data-[state=open]:zoom-in-100 data-[state=closed]:zoom-out-100",
+          "sm:inset-x-auto sm:bottom-auto sm:top-[50%] sm:left-[50%] sm:w-[calc(100%-2rem)] sm:max-w-[440px] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:border sm:pb-0",
+          "sm:data-[state=open]:slide-in-from-bottom-0 sm:data-[state=closed]:slide-out-to-bottom-0",
+        )}
+        style={{ zIndex: "var(--perce-z-overlay)" }}>
         <DialogTitle className='sr-only'>{title}</DialogTitle>
 
         <button
           type='button'
           onClick={() => handleOpenChange(false)}
           aria-label='Close'
-          className='absolute top-3 z-10 rounded-full bg-white/90 p-1.5 shadow-sm hover:bg-white transition-colors'
-          style={dir === "rtl" ? { left: 12 } : { right: 12 }}>
-          <X className='w-4 h-4' />
+          className='absolute end-1 top-1 z-10 flex h-11 w-11 items-center justify-center bg-surface text-ink transition-colors hover:bg-surface-2'>
+          <X size={20} strokeWidth={1.5} aria-hidden />
         </button>
 
         {config.imageUrl && (
           <img
             src={config.imageUrl}
             alt=''
-            className='w-full h-48 object-cover'
+            className='h-32 w-full bg-surface-2 object-cover sm:h-48'
           />
         )}
 
-        <div className='p-6 space-y-4'>
+        <div className='space-y-4 p-6'>
           {claimedCode ? (
-            <div className='text-center space-y-3'>
-              <p className='text-base font-medium'>{successMessage}</p>
+            <div className='space-y-4'>
+              <p className='pe-8 t-body text-ink'>{successMessage}</p>
               {/* select-all: a long-press selects the whole code, the fallback
                   when the Copy action cannot reach the clipboard. */}
-              <div
-                data-testid='popup-claimed-code'
-                className='inline-block select-all border border-dashed rounded-md px-4 py-2 font-mono text-sm tracking-wider bg-muted'>
-                {claimedCode}
-              </div>
-              <div>
-                <Button type='button' variant='outline' onClick={handleCopy} className='min-h-11 gap-2'>
+              <div className='flex items-stretch gap-2'>
+                <div
+                  data-testid='popup-claimed-code'
+                  className='flex min-h-12 flex-1 select-all items-center border border-line-input bg-bg px-4 t-label tabular-nums text-ink'>
+                  {claimedCode}
+                </div>
+                <Button type='button' variant='secondary' size='lg' onClick={handleCopy} className='h-12 shrink-0'>
                   {copyState === "copied" ? (
-                    <Check className='w-4 h-4' aria-hidden />
+                    <Check size={16} strokeWidth={1.5} aria-hidden />
                   ) : (
-                    <Copy className='w-4 h-4' aria-hidden />
+                    <Copy size={16} strokeWidth={1.5} aria-hidden />
                   )}
                   {copyState === "copied" ? t("popup.copied") : t("popup.copy_code")}
                 </Button>
               </div>
-              <p aria-live='polite' className='min-h-4 text-xs text-muted-foreground'>
+              <p aria-live='polite' className='min-h-4 t-small text-ink-2'>
                 {copyState === "failed" ? t("popup.copy_failed") : ""}
               </p>
             </div>
           ) : (
             <>
-              <div className='text-center space-y-2'>
-                <h2 className='text-xl font-semibold'>{title}</h2>
-                <p className='text-sm text-muted-foreground'>{description}</p>
+              <div className='space-y-2 pe-8'>
+                <h2 className='t-h2 text-ink'>{title}</h2>
+                <p className='t-body text-ink-2'>{description}</p>
               </div>
 
               <form onSubmit={handleSubmit} className='space-y-3'>
@@ -282,11 +292,14 @@ export function EntryPopup() {
                   <Input
                     id='popup-email'
                     type='email'
+                    autoComplete='email'
                     required
                     placeholder='Email address'
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={submitting}
+                    aria-invalid={error ? true : undefined}
+                    aria-describedby={error ? "popup-error" : undefined}
                   />
                 </div>
                 {config.collectPhone && (
@@ -297,6 +310,8 @@ export function EntryPopup() {
                     <Input
                       id='popup-phone'
                       type='tel'
+                      inputMode='tel'
+                      autoComplete='tel'
                       required={config.phoneRequired}
                       placeholder='Phone number'
                       value={phone}
@@ -305,9 +320,12 @@ export function EntryPopup() {
                     />
                   </div>
                 )}
-                {error && <p className='text-sm text-destructive'>{error}</p>}
-                <Button type='submit' disabled={submitting} className='w-full'>
-                  {submitting && <Loader2 className='w-4 h-4 mr-2 animate-spin' />}
+                {error && (
+                  <p id='popup-error' role='alert' className='t-small text-error'>
+                    {error}
+                  </p>
+                )}
+                <Button type='submit' variant='primary' size='lg' fullWidth disabled={submitting} aria-busy={submitting || undefined}>
                   {submitLabel}
                 </Button>
               </form>
@@ -322,7 +340,7 @@ export function EntryPopup() {
                       handleOpenChange(false);
                     }
                   }}
-                  className='block w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors'>
+                  className='flex min-h-11 w-full items-center justify-center t-small text-ink-2 underline decoration-1 underline-offset-4 transition-colors hover:text-ink'>
                   {dismissLabel}
                 </button>
               )}
