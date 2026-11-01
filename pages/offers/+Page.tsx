@@ -232,7 +232,7 @@ export default function OffersPage() {
                         className='flex flex-col border border-dashed border-perce-line-strong bg-perce-surface p-4'
                         data-promo-code={pc.code}>
                         <div className='flex items-start justify-between gap-3'>
-                          <p className='text-base font-semibold tracking-wider text-perce-ink'>{pc.code}</p>
+                          <p className='text-base font-medium text-perce-ink'>{pc.code}</p>
                           <button
                             type='button'
                             onClick={() => handleCopyCode(pc.code)}
@@ -287,7 +287,7 @@ export default function OffersPage() {
                         className={cn(
                           "relative border p-4 lg:p-6 flex flex-row items-start gap-4 lg:gap-6 transition-colors duration-500",
                           isUnlocked
-                            ? "border-emerald-400 bg-emerald-50/60 animate-offer-card-glow"
+                            ? "border-success bg-surface animate-offer-card-glow"
                             : "border-perce-line bg-perce-bg",
                           isFlashing && "animate-offer-card-flash",
                         )}>
@@ -296,7 +296,7 @@ export default function OffersPage() {
                           className='w-16 h-16 sm:w-20 sm:h-20 bg-perce-surface border border-perce-line shrink-0 flex flex-col items-center justify-center text-perce-ink-subtle'>
                           <Tag className='w-5 h-5' />
                           {offerQuantityFor(offer.condition) !== null && (
-                            <span className='mt-1 text-[11px] font-semibold tracking-wide'>
+                            <span className='mt-1 text-[11px] font-medium'>
                               {offerQuantityFor(offer.condition)}+
                             </span>
                           )}
@@ -305,7 +305,7 @@ export default function OffersPage() {
                           {isUnlocked && (
                             <span
                               className={cn(
-                                "mb-1.5 inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 text-[11px] font-medium px-2 py-1 rounded-full",
+                                "mb-1.5 inline-flex items-center gap-1 bg-surface text-success text-[11px] font-medium px-2 py-1 ",
                                 isFlashing && "animate-offer-check-pop",
                               )}>
                               <Check className='w-3 h-3' />

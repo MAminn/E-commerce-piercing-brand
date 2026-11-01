@@ -13,7 +13,7 @@ import {
 import { isUsableHref } from "#root/shared/config/storefront";
 import { withLegalFooterLinks } from "#root/shared/legal/legal-pages";
 import type { SocialPlatform } from "#root/shared/types/layout-settings";
-import { Mail, Phone, Loader2, Send } from "lucide-react";
+import { Loader2, Send } from "lucide-react";
 import { trpc } from "#root/shared/trpc/client";
 import { toast } from "sonner";
 
@@ -157,17 +157,17 @@ export function MinimalFooter() {
   };
 
   return (
-    <footer className='bg-perce-ground text-perce-frame-ink border-t border-perce-frame-line'>
+    <footer className='border-t border-line bg-bg text-ink'>
       {/* ── Newsletter signup ── */}
       {showNewsletter && (
-        <div className='border-b border-perce-frame-line'>
-          <div className='max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-10'>
+        <div className='border-b border-line'>
+          <div className='perce-container py-10'>
             <div className='flex flex-col md:flex-row items-start md:items-center justify-between gap-4'>
               <div>
                 {/* Heading only. The subtitle used to promise "offers" —
                     there is no offers/pricing programme yet, so no marketing
                     line ships by default. */}
-                <h4 className='text-sm font-medium text-perce-frame-ink'>
+                <h4 className='t-label text-ink'>
                   {locale === "ar" ? "اشتركي في النشرة" : "Join the list"}
                 </h4>
               </div>
@@ -197,17 +197,17 @@ export function MinimalFooter() {
                   value={newsletterEmail}
                   onChange={(e) => setNewsletterEmail(e.target.value)}
                   placeholder={locale === "ar" ? "بريدك الإلكتروني" : "Your email address"}
-                  className='flex-1 md:w-64 px-4 py-2.5 text-sm border border-perce-frame-line bg-transparent text-perce-frame-ink placeholder:text-perce-frame-ink-muted outline-none focus:border-perce-frame-ink transition-colors'
+                  className='h-11 min-w-0 flex-1 border border-line-input bg-surface px-3 t-body text-ink placeholder:text-ink-3 outline-none transition-colors focus:border-ink md:w-64'
                 />
                 <button
                   type='submit'
                   disabled={isSubscribing}
-                  className='px-4 py-2.5 bg-perce-paper text-perce-ground text-sm font-medium hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shrink-0'
+                  className='flex h-11 w-11 shrink-0 items-center justify-center bg-ink text-bg transition-colors hover:bg-hover disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-3'
                   aria-label={locale === "ar" ? "اشتراك" : "Subscribe"}>
                   {isSubscribing ? (
-                    <Loader2 className='w-4 h-4 animate-spin' />
+                    <Loader2 aria-hidden size={20} strokeWidth={1.5} className='animate-spin' />
                   ) : (
-                    <Send className='w-4 h-4' />
+                    <Send aria-hidden size={20} strokeWidth={1.5} />
                   )}
                 </button>
               </form>
@@ -217,7 +217,7 @@ export function MinimalFooter() {
       )}
 
       {/* Main content */}
-      <div className='max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16'>
+      <div className='perce-container py-12 sm:py-16'>
         <div className='grid grid-cols-1 md:grid-cols-12 gap-10 md:gap-8'>
           {/* ── Logo + description column ── */}
           <div className='md:col-span-4 flex flex-col items-start'>
@@ -232,14 +232,14 @@ export function MinimalFooter() {
                 }}
               />
             ) : (
-              <span className='perce-wordmark text-2xl text-perce-frame-ink mb-3'>
+              <span className='perce-wordmark mb-3 text-2xl text-ink'>
                 {logoText}
               </span>
             )}
             {/* The brand line, once. Not repeated anywhere else on the page. */}
-            <p className='text-sm text-perce-frame-ink mb-3'>{BRAND_LINE}</p>
+            <p className='mb-3 t-small text-ink'>{BRAND_LINE}</p>
             {footer.description && (
-              <p className='text-sm text-perce-frame-ink-muted leading-relaxed text-start max-w-xs'>
+              <p className='max-w-xs text-start t-small text-ink-2'>
                 {description}
               </p>
             )}
@@ -248,7 +248,7 @@ export function MinimalFooter() {
                 offered (shared/config/payment.ts). The exchange window is
                 deliberately NOT stated here until a returns policy is
                 actually published on /return-policy. */}
-            <p className='mt-4 text-xs text-perce-frame-ink-muted'>
+            <p className='mt-4 t-small text-ink-2'>
               {locale === "ar"
                 ? "توصيل لكل مصر · الدفع عند الاستلام"
                 : "Delivery across Egypt · Cash on delivery"}
@@ -260,15 +260,15 @@ export function MinimalFooter() {
             <div
               key={group.id}
               className='md:col-span-2 flex flex-col items-start'>
-              <h4 className='text-sm font-medium text-perce-frame-ink mb-4'>
+              <h4 className='mb-2 t-label text-ink'>
                 {locale === "ar" && group.titleAr ? group.titleAr : group.title}
               </h4>
-              <ul className='space-y-2.5'>
+              <ul>
                 {group.links.map((link) => (
                   <li key={link.id}>
                     <Link
                       href={link.url}
-                      className='text-sm text-perce-frame-ink-muted hover:text-perce-frame-ink transition-colors'>
+                      className='inline-flex min-h-11 items-center t-small text-ink-2 transition-colors hover:text-ink'>
                       {locale === "ar" && link.labelAr ? link.labelAr : link.label}
                     </Link>
                   </li>
@@ -280,16 +280,15 @@ export function MinimalFooter() {
           {/* ── Contact us column ── */}
           {(footer.contactPhone || footer.contactEmail) && (
             <div className='md:col-span-2 flex flex-col items-start'>
-              <h4 className='text-sm font-medium text-perce-frame-ink mb-4'>
+              <h4 className='mb-2 t-label text-ink'>
                 {t("footer.contact")}
               </h4>
-              <ul className='space-y-2.5'>
+              <ul>
                 {footer.contactPhone && (
                   <li>
                     <a
                       href={`tel:${footer.contactPhone}`}
-                      className='flex items-center gap-2 text-sm text-perce-frame-ink-muted hover:text-perce-frame-ink transition-colors'>
-                      <Phone className='w-4 h-4 shrink-0' />
+                      className='inline-flex min-h-11 items-center t-small tabular-nums text-ink-2 transition-colors hover:text-ink'>
                       <span dir='ltr'>{footer.contactPhone}</span>
                     </a>
                   </li>
@@ -298,8 +297,7 @@ export function MinimalFooter() {
                   <li>
                     <a
                       href={`mailto:${footer.contactEmail}`}
-                      className='flex items-center gap-2 text-sm text-perce-frame-ink-muted hover:text-perce-frame-ink transition-colors'>
-                      <Mail className='w-4 h-4 shrink-0' />
+                      className='inline-flex min-h-11 items-center t-small tabular-nums text-ink-2 transition-colors hover:text-ink'>
                       {footer.contactEmail}
                     </a>
                   </li>
@@ -311,8 +309,8 @@ export function MinimalFooter() {
       </div>
 
       {/* ── Social icons + payments + copyright ── */}
-      <div className='border-t border-perce-frame-line'>
-        <div className='max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6'>
+      <div className='border-t border-line'>
+        <div className='perce-container py-6'>
           <div className='flex flex-col sm:flex-row items-center justify-between gap-4'>
             {/* Social icons */}
             {socialLinks.length > 0 && (
@@ -326,7 +324,7 @@ export function MinimalFooter() {
                       href={link.url}
                       target='_blank'
                       rel='noopener noreferrer'
-                      className='text-perce-frame-ink-muted hover:text-perce-frame-ink transition-colors'
+                      className='inline-flex h-11 w-11 items-center justify-center text-ink-2 transition-colors hover:text-ink'
                       aria-label={link.platform}>
                       <Icon />
                     </a>
@@ -348,7 +346,7 @@ export function MinimalFooter() {
                 checkout where they are derived from live configuration. */}
 
             {/* Copyright */}
-            <p className='text-xs text-perce-frame-ink-muted'>
+            <p className='t-small text-ink-2'>
               {t("footer.copyright")} · {copyright}
             </p>
           </div>

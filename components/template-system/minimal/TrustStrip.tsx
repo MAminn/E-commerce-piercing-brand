@@ -1,13 +1,9 @@
-import type React from "react";
-import { Banknote, Gem, Truck } from "lucide-react";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { cn } from "#root/lib/utils";
 import type { HomepageContent } from "#root/shared/types/homepage-content";
-import { ValuePropIcon } from "#root/components/template-system/shared/value-prop-icons";
 
 interface TrustItem {
   key: string;
-  icon: React.ReactNode;
   title: string;
 }
 
@@ -20,18 +16,17 @@ interface TrustItem {
  * Deliberately NOT here: hypoallergenic, materials, lifetime quality, return
  * windows — nothing in the product or settings data backs those.
  */
-const GRID_COLS: Record<number, string> = { 1: "grid-cols-1", 2: "grid-cols-2", 3: "grid-cols-3" };
-
 const DEFAULT_KEYS = [
-  { key: "delivery", icon: Truck, label: "trust.delivery_egypt" },
-  { key: "cod", icon: Banknote, label: "trust.cash_on_delivery" },
-  { key: "curated", icon: Gem, label: "trust.curated" },
+  { key: "delivery", label: "trust.delivery_egypt" },
+  { key: "cod", label: "trust.cash_on_delivery" },
+  { key: "curated", label: "trust.curated" },
 ] as const;
 
 /**
- * Compact value strip. When the merchant has written value props in the CMS
- * (Homepage → Value props), those are shown instead, as authored; switching
- * that section off hides the strip.
+ * A quiet line of store facts between hairlines — text only, no icons, no
+ * boxes. When the merchant has written value props in the CMS (Homepage →
+ * Value props), those are shown instead, as authored; switching that section
+ * off hides the strip.
  */
 export function TrustStrip({ valueProps, className }: { valueProps?: HomepageContent["valueProps"]; className?: string }) {
   const { t } = useMinimalI18n();
@@ -40,29 +35,16 @@ export function TrustStrip({ valueProps, className }: { valueProps?: HomepageCon
   const authored = (valueProps?.items ?? []).filter((item) => item.title?.trim());
   const items: TrustItem[] =
     authored.length > 0
-      ? authored.slice(0, 3).map((item, i) => ({
-          key: `cms-${i}`,
-          icon: <ValuePropIcon icon={item.icon} className="h-5 w-5" />,
-          title: item.title,
-        }))
-      : DEFAULT_KEYS.map(({ key, icon: Icon, label }) => ({ key, icon: <Icon className="h-5 w-5" />, title: t(label) }));
+      ? authored.slice(0, 3).map((item, i) => ({ key: `cms-${i}`, title: item.title }))
+      : DEFAULT_KEYS.map(({ key, label }) => ({ key, title: t(label) }));
 
   return (
-    <section className={cn("perce-section-tight", className)} aria-label={t("trust.label")} data-trust-strip>
+    <section className={cn("py-8 lg:py-12", className)} aria-label={t("trust.label")} data-trust-strip>
       <div className="perce-container">
-        <ul
-          className={cn(
-            "grid divide-x divide-perce-line border border-perce-line bg-perce-surface rtl:divide-x-reverse",
-            GRID_COLS[items.length] ?? "grid-cols-3",
-          )}>
+        <ul className="flex flex-col divide-y divide-line border-y border-line md:flex-row md:divide-x md:divide-y-0 rtl:md:divide-x-reverse">
           {items.map((item) => (
-            <li
-              key={item.key}
-              className="flex flex-col items-center gap-1.5 px-2 py-4 text-center text-perce-ink sm:flex-row sm:justify-center sm:gap-3 sm:py-5 sm:text-start">
-              <span className="text-perce-ink-secondary" aria-hidden>
-                {item.icon}
-              </span>
-              <span className="text-[12px] font-medium leading-snug sm:text-[13px]">{item.title}</span>
+            <li key={item.key} className="flex-1 py-3 t-label text-ink md:px-4 md:py-4 md:first:ps-0">
+              {item.title}
             </li>
           ))}
         </ul>

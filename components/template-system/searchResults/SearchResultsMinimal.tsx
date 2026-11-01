@@ -138,7 +138,7 @@ export function SearchResultsMinimal({
               value={localSearchTerm}
               onChange={(e) => handleSearchChange(e.target.value)}
               onKeyDown={handleKeyPress}
-              className='h-12 rounded-none border-perce-line-strong bg-perce-surface-raised pe-4 ps-12 text-[length:var(--perce-text-body)] focus:border-perce-ink'
+              className='h-12 border-perce-line-strong bg-perce-surface-raised pe-4 ps-12 text-[length:var(--perce-text-body)] focus:border-perce-ink'
             />
           </div>
         </div>
@@ -162,7 +162,7 @@ export function SearchResultsMinimal({
               <Select value={sortBy} onValueChange={handleSortChange}>
                 <SelectTrigger
                   aria-label='Sort results'
-                  className='min-h-11 w-48 rounded-none border-perce-line-strong bg-perce-surface-raised'>
+                  className='min-h-11 w-48 border-perce-line-strong bg-perce-surface-raised'>
                   <SelectValue placeholder='Sort by' />
                 </SelectTrigger>
                 <SelectContent>
@@ -205,7 +205,7 @@ export function SearchResultsMinimal({
                     setLocalSearchTerm("");
                     if (onSearchChange) onSearchChange("");
                   }}
-                  className='mt-6 min-h-11 rounded-none border-perce-ink text-perce-ink hover:bg-perce-cta hover:text-perce-ink-inverse'>
+                  className='mt-6 min-h-11 border-perce-ink text-perce-ink hover:bg-perce-cta hover:text-perce-ink-inverse'>
                   Clear search
                 </Button>
               )}
@@ -262,7 +262,7 @@ export function SearchResultsMinimal({
                       disabled={currentPage === 1}
                       aria-label='Previous page'
                       onClick={() => onPageChange?.(currentPage - 1)}
-                      className='min-h-11 min-w-11 rounded-none px-2 text-perce-ink-secondary hover:text-perce-ink disabled:opacity-30 sm:px-4'>
+                      className='min-h-11 min-w-11 px-2 text-perce-ink-secondary hover:text-perce-ink disabled:opacity-30 sm:px-4'>
                       <ChevronLeft className='h-4 w-4 sm:mr-1' />
                       <span className='hidden sm:inline'>Previous</span>
                     </Button>
@@ -289,7 +289,7 @@ export function SearchResultsMinimal({
                               size='sm'
                               aria-current={currentPage === page ? "page" : undefined}
                               onClick={() => onPageChange?.(page)}
-                              className={`h-11 min-w-11 shrink-0 rounded-none px-2 ${
+                              className={`h-11 min-w-11 shrink-0  px-2 ${
                                 currentPage === page
                                   ? "bg-perce-cta text-perce-ink-inverse hover:bg-perce-cta-hover hover:text-perce-ink-inverse"
                                   : "text-perce-ink-secondary hover:text-perce-ink"
@@ -305,7 +305,7 @@ export function SearchResultsMinimal({
                       disabled={currentPage === totalPages}
                       aria-label='Next page'
                       onClick={() => onPageChange?.(currentPage + 1)}
-                      className='min-h-11 min-w-11 rounded-none px-2 text-perce-ink-secondary hover:text-perce-ink disabled:opacity-30 sm:px-4'>
+                      className='min-h-11 min-w-11 px-2 text-perce-ink-secondary hover:text-perce-ink disabled:opacity-30 sm:px-4'>
                       <span className='hidden sm:inline'>Next</span>
                       <ChevronRight className='h-4 w-4 sm:ml-1' />
                     </Button>

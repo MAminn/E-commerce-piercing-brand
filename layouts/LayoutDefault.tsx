@@ -231,6 +231,15 @@ function LayoutShell({
   }, [getTemplateId, ssrLayoutSettings]);
 
   const isMinimal = layoutSettings.header.navbarStyle === "minimal";
+  // The minimal (Percé) header is a solid bar on every route — there is no
+  // transparent state for a hero to run up behind — so its homepage takes the
+  // solid-mode spacer like any other page. /shop and /categories keep
+  // overlay mode: their listing clears the header itself
+  // (.perce-header-offset). The alternative shells keep their own modes.
+  const shellNavbarMode =
+    isMinimal && navbarMode === "overlay" && pageContext.urlPathname === "/"
+      ? "solid"
+      : navbarMode;
   const templateOwnsChrome = useTemplateOwnsChrome();
   // Suppress the global navbar/footer wherever the active landing template
   // brings its own — decided at render time so SSR and hydration agree.
@@ -285,7 +294,7 @@ function LayoutShell({
 
   const inner = (
     <LayoutSettingsContext.Provider value={layoutSettings}>
-      <NavbarModeContext.Provider value={navbarMode}>
+      <NavbarModeContext.Provider value={shellNavbarMode}>
         <TrackingProvider>
           <main
             id='page-content'
@@ -297,7 +306,7 @@ function LayoutShell({
                tooling must not follow the public brand font. */
             className={`bg-background h-full text-foreground w-full${isDashboardRoute ? " font-poppins" : " storefront-shell"}${isMinimal && !isDashboardRoute ? " minimal-template" : ""}`}>
             {showGlobalChrome && (
-              <GlobalNavbarChrome navbarMode={navbarMode}>
+              <GlobalNavbarChrome navbarMode={shellNavbarMode}>
                 {renderNavbar()}
               </GlobalNavbarChrome>
             )}

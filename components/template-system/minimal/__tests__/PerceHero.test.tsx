@@ -43,31 +43,25 @@ describe("PerceHero media", () => {
     expect(render({ slides: [slide], video })).toContain("perce-hero-frame");
   });
 
-  it("overlays the copy on the media inside one full-bleed section — no split column", () => {
+  it("sets the copy below a clean media frame inside one section — nothing drawn over the photo", () => {
     const html = render({ slides: [slide], video });
-    // One section holds media, scrim and copy; the old two-column grid is gone.
+    // One section: the media frame first, then the copy on stone.
     expect(html.match(/<section/g)).toHaveLength(1);
     expect(html).not.toContain("md:grid-cols-12");
-    expect(html).not.toContain("md:col-span-7");
     const media = html.indexOf("hero-a.webp");
-    const scrim = html.indexOf("perce-hero-scrim");
+    const frameEnd = html.indexOf("perce-hero-frame");
     const heading = html.indexOf("<h1");
-    expect(media).toBeGreaterThan(-1);
-    expect(scrim).toBeGreaterThan(media);
-    expect(heading).toBeGreaterThan(scrim);
+    expect(media).toBeGreaterThan(frameEnd);
+    expect(heading).toBeGreaterThan(media);
+    // Object Index: no scrim, no gradient, no text shadow over the media.
+    expect(html).not.toContain("perce-hero-scrim");
+    expect(html).not.toContain("perce-hero-copy");
+    expect(html).not.toContain("gradient");
   });
 
-  it("lets clicks through the overlay except on the copy and CTA", () => {
-    const html = render({ slides: [slide] });
-    expect(html).toMatch(/perce-hero-scrim pointer-events-none/);
-    expect(html).toMatch(/pointer-events-none absolute inset-x-0 bottom-0/);
-    expect(html).toMatch(/perce-hero-copy pointer-events-auto/);
-  });
-
-  it("drops the scrim when there is no copy, so bare media stays clean", () => {
+  it("bare media with no copy renders no heading", () => {
     const html = render({ hero: { ...hero, title: "", subtitle: "" }, slides: [slide] });
     expect(html).toContain("hero-a.webp");
-    expect(html).not.toContain("perce-hero-scrim");
     expect(html).not.toContain("<h1");
   });
 
@@ -76,9 +70,12 @@ describe("PerceHero media", () => {
     expect(render({ slides: [slide], video })).toMatch(/<img[^>]*class="perce-hero-media /);
   });
 
-  it("moves carousel dots clear of the lower-left copy", () => {
+  it("indexes several slides with numbers, not dots", () => {
     const slides = [slide, { imageUrl: "/b.webp" }];
-    expect(render({ slides })).toContain("right-(--perce-gutter)");
+    const html = render({ slides });
+    expect(html).toContain(">01</button>");
+    expect(html).toContain(">02</button>");
+    expect(html).not.toContain("rounded-full");
   });
 
   it("shows only the first slide as a still when a video is set — no carousel underneath", () => {

@@ -1,4 +1,5 @@
 import { cn } from "#root/lib/utils";
+import { buttonClass } from "#root/components/storefront/Button";
 
 export interface PerceEditorialBlockProps {
   /** Small label above the heading. Optional. */
@@ -60,14 +61,14 @@ export function PerceEditorialBlock({
     <div
       className={cn(
         "flex flex-col justify-center",
-        "px-[var(--perce-gutter)] py-10 md:py-14 lg:px-14",
+        "px-[var(--perce-gutter)] py-12 md:py-16 lg:px-16",
       )}>
       {eyebrow?.trim() && <p className='perce-eyebrow mb-4'>{eyebrow}</p>}
       {heading?.trim() && (
-        <h2 className='perce-section-title text-balance'>{heading}</h2>
+        <h2 className='t-h2 text-balance text-ink'>{heading}</h2>
       )}
       {body?.trim() && (
-        <p className='mt-4 max-w-prose text-[0.9375rem] leading-relaxed text-perce-ink-muted'>
+        <p className='mt-4 max-w-prose t-body text-ink-2'>
           {body}
         </p>
       )}
@@ -79,11 +80,7 @@ export function PerceEditorialBlock({
             e.preventDefault();
             onCtaClick(ctaLink as string);
           }}
-          className={cn(
-            "perce-underline-hover mt-7 inline-flex min-h-11 w-fit items-center",
-            "text-xs font-medium",
-            "tracking-[var(--perce-tracking-label)] text-perce-ink",
-          )}>
+          className={buttonClass({ variant: "text", size: "md", className: "mt-6 w-fit" })}>
           {ctaText}
         </a>
       )}
@@ -91,7 +88,7 @@ export function PerceEditorialBlock({
   );
 
   const imageBlock = hasImage ? (
-    <div className='relative w-full overflow-hidden bg-perce-surface aspect-[4/5] md:aspect-[3/4] md:h-full'>
+    <div className='relative aspect-[4/5] w-full overflow-hidden bg-surface-2 md:aspect-[3/4] md:h-full'>
       <img
         src={imageUrl}
         // Empty alt when the CMS gives none: the heading beside it carries the
@@ -111,10 +108,10 @@ export function PerceEditorialBlock({
         <div className='perce-container-narrow text-center'>
           {eyebrow?.trim() && <p className='perce-eyebrow mb-4'>{eyebrow}</p>}
           {heading?.trim() && (
-            <h2 className='perce-section-title text-balance'>{heading}</h2>
+            <h2 className='t-h2 text-balance text-ink'>{heading}</h2>
           )}
           {body?.trim() && (
-            <p className='mx-auto mt-4 max-w-prose text-[0.9375rem] leading-relaxed text-perce-ink-muted'>
+            <p className='mx-auto mt-4 max-w-prose t-body text-ink-2'>
               {body}
             </p>
           )}
@@ -127,11 +124,7 @@ export function PerceEditorialBlock({
                   e.preventDefault();
                   onCtaClick(ctaLink as string);
                 }}
-                className={cn(
-                  "perce-underline-hover mt-7 inline-flex min-h-11 items-center",
-                  "text-xs font-medium",
-                  "tracking-[var(--perce-tracking-label)] text-perce-ink",
-                )}>
+                className={buttonClass({ variant: "text", size: "md", className: "mt-6" })}>
                 {ctaText}
               </a>
             </div>

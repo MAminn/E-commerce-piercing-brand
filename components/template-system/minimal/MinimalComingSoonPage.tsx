@@ -47,11 +47,11 @@ export function MinimalComingSoonPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-perce-bg px-4">
         <div className="max-w-md w-full text-center space-y-6 py-16">
-          <div className="w-16 h-16 rounded-full bg-stone-100 flex items-center justify-center mx-auto">
-            <CheckCircle className="w-8 h-8 text-stone-700" />
+          <div className="w-16 h-16 bg-surface-2 flex items-center justify-center mx-auto">
+            <CheckCircle className="w-8 h-8 text-ink-2" />
           </div>
-          <h1 className="text-2xl font-medium tracking-tight text-stone-900">You're on the list!</h1>
-          <p className="text-sm text-stone-500 leading-relaxed max-w-xs mx-auto">
+          <h1 className="text-2xl font-medium tracking-tight text-ink">You're on the list!</h1>
+          <p className="text-sm text-ink-2 leading-relaxed max-w-xs mx-auto">
             Check your inbox — we've sent you something. See you soon.
           </p>
         </div>
@@ -68,22 +68,22 @@ export function MinimalComingSoonPage() {
             promises nothing that isn't decided yet. Swap in real launch
             artwork during the storefront design phase. */}
         <div className="w-full max-w-[460px]">
-          <p className="text-xs text-stone-400 mb-4">
+          <p className="text-xs text-ink-2 mb-4">
             Coming Soon
           </p>
           <h1 className="perce-wordmark text-5xl sm:text-6xl md:text-7xl text-perce-ink mb-3">
             {wordmark}
           </h1>
           <p className="text-base text-perce-ink mb-2">{BRAND_LINE}</p>
-          <p className="text-xs text-stone-600 mb-7">Drop your email — be the first to know when we launch.</p>
+          <p className="text-xs text-ink-2 mb-7">Drop your email — be the first to know when we launch.</p>
         </div>
 
         {/* Email capture card */}
-        <div className="w-full max-w-[460px] border border-stone-200 bg-white p-8 sm:p-10 text-left">
+        <div className="w-full max-w-[460px] border border-line bg-surface p-8 sm:p-10 text-left">
 
           <form onSubmit={onSubmit} className="flex flex-col gap-4">
             <div>
-              <label className="block text-xs text-stone-600 mb-2">
+              <label className="block text-xs text-ink-2 mb-2">
                 Email
               </label>
               <Input
@@ -92,16 +92,16 @@ export function MinimalComingSoonPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@email.com"
                 disabled={submitting}
-                className="border-0 border-b border-stone-300 rounded-none px-0 py-2.5 text-sm bg-transparent focus-visible:ring-0 focus-visible:border-stone-900 placeholder:text-stone-300"
+                className="border-0 border-b border-line-input px-0 py-2.5 text-sm bg-transparent focus-visible:ring-0 focus-visible:border-ink placeholder:text-ink-3"
               />
               {emailError && (
-                <p className="text-red-500 text-xs mt-1">{emailError}</p>
+                <p className="text-error text-xs mt-1">{emailError}</p>
               )}
             </div>
 
             <div>
-              <label className="block text-xs text-stone-600 mb-2">
-                WhatsApp Number <span className="normal-case text-stone-400">(optional)</span>
+              <label className="block text-xs text-ink-2 mb-2">
+                WhatsApp Number <span className="normal-case text-ink-2">(optional)</span>
               </label>
               <Input
                 type="tel"
@@ -109,14 +109,14 @@ export function MinimalComingSoonPage() {
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="WhatsApp number"
                 disabled={submitting}
-                className="border-0 border-b border-stone-300 rounded-none px-0 py-2.5 text-sm bg-transparent focus-visible:ring-0 focus-visible:border-stone-900 placeholder:text-stone-300"
+                className="border-0 border-b border-line-input px-0 py-2.5 text-sm bg-transparent focus-visible:ring-0 focus-visible:border-ink placeholder:text-ink-3"
               />
             </div>
 
             <Button
               type="submit"
               disabled={submitting}
-              className="w-full bg-stone-900 hover:bg-stone-800 text-white text-xs py-3 rounded-none h-auto mt-1">
+              className="w-full bg-ink hover:bg-ink text-bg text-xs py-3 h-auto mt-1">
               {submitting ? "Submitting…" : "Notify me at launch"}
             </Button>
           </form>
@@ -124,8 +124,8 @@ export function MinimalComingSoonPage() {
       </div>
 
       {/* Footer strip */}
-      <div className="border-t border-stone-100 py-4 text-center">
-        <p className="text-xs text-stone-400">© {new Date().getFullYear()} {storeName}</p>
+      <div className="border-t border-line py-4 text-center">
+        <p className="text-xs text-ink-2">© {new Date().getFullYear()} {storeName}</p>
       </div>
     </div>
   );

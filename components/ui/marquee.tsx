@@ -30,17 +30,17 @@ export function Marquee({
   const items = Array.from({ length: repeat }).map((_, i) => (
     <span
       key={i}
-      className='mx-6 text-[11px] sm:text-base font-medium tracking-[0.15em] uppercase'
+      className='mx-6 text-[11px] sm:text-base font-medium'
       aria-hidden={i > 0 ? "true" : undefined}>
       {text}
-      <span className='mx-6 text-white/30'>•</span>
+      <span aria-hidden='true' className='mx-6 opacity-40'>•</span>
     </span>
   ));
 
   return (
     <div
       className={cn(
-        "overflow-hidden whitespace-nowrap bg-stone-900 text-red-500 py-2.5",
+        "overflow-hidden whitespace-nowrap bg-ink text-error py-2.5",
         className,
       )}
       style={style}

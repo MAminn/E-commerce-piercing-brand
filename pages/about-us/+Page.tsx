@@ -14,7 +14,7 @@ function Page() {
   if (!isMinimal) {
     return (
       <div className='min-h-[60vh] flex items-center justify-center'>
-        <p className='text-gray-500'>Page not found</p>
+        <p className='text-ink-2'>Page not found</p>
       </div>
     );
   }
@@ -25,7 +25,7 @@ function Page() {
   if (!aboutUs?.enabled) {
     return (
       <div className='min-h-[60vh] flex items-center justify-center'>
-        <p className='text-gray-500'>
+        <p className='text-ink-2'>
           {isAr ? "هذه الصفحة غير متاحة حالياً" : "This page is not available yet"}
         </p>
       </div>
@@ -63,14 +63,14 @@ function Page() {
 
           {/* Text Content */}
           <div className={`w-full ${imageUrl ? "lg:w-1/2" : "max-w-2xl mx-auto text-center"}`}>
-            <h1 className='text-3xl sm:text-4xl lg:text-5xl font-medium tracking-wide text-gray-900 mb-6 sm:mb-8'>
+            <h1 className='text-3xl sm:text-4xl lg:text-5xl font-medium text-ink mb-6 sm:mb-8'>
               {title}
             </h1>
             <div className='space-y-4'>
               {description.split("\n").map((paragraph, idx) => (
                 <p
                   key={idx}
-                  className='text-base sm:text-lg text-gray-600 leading-relaxed font-light'>
+                  className='text-base sm:text-lg text-ink-2 leading-relaxed font-normal'>
                   {paragraph}
                 </p>
               ))}

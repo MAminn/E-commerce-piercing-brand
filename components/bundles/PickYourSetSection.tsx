@@ -1,6 +1,6 @@
-import { ChevronRight } from "lucide-react";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { cn } from "#root/lib/utils";
+import { buttonClass } from "#root/components/storefront/Button";
 import type { BundleCardCampaign } from "./BundleCampaignCard";
 import { SetOfferCard } from "./SetOfferCard";
 
@@ -21,21 +21,18 @@ export function PickYourSetSection({ campaigns, viewAllHref = "/bundles", classN
   if (campaigns.length === 0) return null;
 
   return (
-    <section id="pick-your-set" className={cn("perce-section-tight", className)} data-pick-your-set>
+    <section id="pick-your-set" className={cn("py-12 lg:py-16", className)} data-pick-your-set>
       <div className="perce-container">
-        <div className="mb-5 flex items-end justify-between gap-4 sm:mb-7">
+        <div className="mb-6 flex items-end justify-between gap-4 lg:mb-8">
           <div className="min-w-0">
-            <p className="perce-eyebrow">{t("sets.eyebrow")}</p>
-            <h2 className="perce-section-title mt-1.5">{t("sets.title")}</h2>
+            <p className="t-label text-ink-2">{t("sets.eyebrow")}</p>
+            <h2 className="mt-2 t-h2 text-ink">{t("sets.title")}</h2>
           </div>
-          <a
-            href={viewAllHref}
-            className="perce-underline-hover inline-flex min-h-11 shrink-0 items-center gap-1 text-xs font-medium text-perce-ink-muted hover:text-perce-ink">
+          <a href={viewAllHref} className={buttonClass({ variant: "text", size: "sm", className: "shrink-0" })}>
             {t("sets.view_all")}
-            <ChevronRight className="h-3.5 w-3.5 rtl:rotate-180" aria-hidden />
           </a>
         </div>
-        <div className={cn("grid gap-3 sm:gap-4", campaigns.length > 1 && "md:grid-cols-2")}>
+        <div className={cn("grid gap-3 md:gap-6", campaigns.length > 1 && "md:grid-cols-2")}>
           {campaigns.map((campaign, index) => (
             <SetOfferCard key={campaign.id} campaign={campaign} eager={index < 2} />
           ))}

@@ -48,7 +48,7 @@ export function OrderConfirmationCard({
     <div className='perce-header-offset flex min-h-screen items-center justify-center bg-perce-bg px-4 py-12 sm:py-16'>
       <div className='flex w-full max-w-2xl flex-col border border-perce-line bg-perce-surface-raised px-6 pb-12 pt-8 text-center sm:px-8'>
         {/* Icon */}
-        <div className='mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-perce-surface'>
+        <div className='mx-auto mb-6 flex h-14 w-14 items-center justify-center bg-perce-surface'>
           {view.kind === "loading" && (
             <Loader2
               aria-hidden
@@ -132,7 +132,7 @@ export function OrderConfirmationCard({
             {orderTotal && (
               <div className='flex justify-between items-center flex-wrap gap-2'>
                 <span className='text-sm text-perce-ink-muted'>Total</span>
-                <span className='text-sm font-semibold text-perce-ink'>
+                <span className='text-sm font-medium text-perce-ink'>
                   {formatMoney(Number.parseFloat(orderTotal))}
                 </span>
               </div>
@@ -148,19 +148,19 @@ export function OrderConfirmationCard({
             <div className='flex justify-between items-center flex-wrap gap-2'>
               <span className='text-sm text-perce-ink-muted'>Status</span>
               {view.kind === "placed" && (
-                <span className='inline-flex items-center gap-1.5 rounded-full bg-perce-surface px-2.5 py-0.5 text-sm font-medium text-perce-ink-secondary'>
+                <span className='inline-flex items-center gap-1.5 bg-perce-surface px-2.5 py-0.5 text-sm font-medium text-perce-ink-secondary'>
                   <Package aria-hidden className='h-3.5 w-3.5' />
                   Processing
                 </span>
               )}
               {view.kind === "pending" && (
-                <span className='inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-perce-surface px-2.5 py-0.5 text-sm font-medium text-perce-ink-secondary'>
+                <span className='inline-flex items-center gap-1.5 whitespace-nowrap bg-perce-surface px-2.5 py-0.5 text-sm font-medium text-perce-ink-secondary'>
                   <Clock aria-hidden className='h-3.5 w-3.5' />
                   Awaiting payment
                 </span>
               )}
               {view.kind === "failed" && (
-                <span className='inline-flex items-center gap-1.5 rounded-full bg-perce-surface px-2.5 py-0.5 text-sm font-medium text-perce-sale'>
+                <span className='inline-flex items-center gap-1.5 bg-perce-surface px-2.5 py-0.5 text-sm font-medium text-perce-sale'>
                   <AlertTriangle aria-hidden className='h-3.5 w-3.5' />
                   Payment {view.reason === "cancelled" ? "cancelled" : "failed"}
                 </span>

@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { cn } from "#root/lib/utils";
-import { ChevronLeft, ChevronRight, ArrowRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { buttonClass } from "#root/components/storefront/Button";
 import {
   MinimalProductCard,
   type MinimalProduct,
@@ -76,12 +77,12 @@ export function MinimalProductCarousel({
             The previous centred title with a 2px underline bar read as a
             generic storefront; this reads as an editorial section head. */}
         {title && (
-          <div className='mb-7 flex items-baseline justify-between gap-4 px-[var(--perce-gutter)] sm:mb-9'>
-            <h2 className='perce-section-title'>{title}</h2>
+          <div className='mb-6 flex items-baseline justify-between gap-4 px-[var(--perce-gutter)] lg:mb-8'>
+            <h2 className='t-h2 text-ink'>{title}</h2>
             {viewAllHref && (
               <a
                 href={viewAllHref}
-                className='perce-underline-hover hidden shrink-0 text-xs font-medium text-perce-ink-muted hover:text-perce-ink sm:inline-flex'>
+                className={buttonClass({ variant: "text", size: "sm", className: "hidden shrink-0 sm:inline-flex" })}>
                 {viewAllText || t("view_all")}
               </a>
             )}
@@ -96,22 +97,22 @@ export function MinimalProductCarousel({
             disabled={!canScrollLeft}
             tabIndex={-1}
             aria-hidden='true'
-            className='absolute -start-2 top-[38%] z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center border border-perce-line bg-perce-bg transition-colors hover:border-perce-cta disabled:opacity-20 md:flex'>
-            <ChevronLeft className='w-4 h-4' />
+            className='absolute start-2 top-[38%] z-10 hidden h-11 w-11 -translate-y-1/2 items-center justify-center border border-line bg-surface text-ink transition-colors hover:bg-surface-2 disabled:invisible md:flex'>
+            <ChevronLeft size={20} strokeWidth={1.5} className='rtl:rotate-180' />
           </button>
           <button
             onClick={() => scroll("right")}
             disabled={!canScrollRight}
             tabIndex={-1}
             aria-hidden='true'
-            className='absolute -end-2 top-[38%] z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center border border-perce-line bg-perce-bg transition-colors hover:border-perce-cta disabled:opacity-20 md:flex'>
-            <ChevronRight className='w-4 h-4' />
+            className='absolute end-2 top-[38%] z-10 hidden h-11 w-11 -translate-y-1/2 items-center justify-center border border-line bg-surface text-ink transition-colors hover:bg-surface-2 disabled:invisible md:flex'>
+            <ChevronRight size={20} strokeWidth={1.5} className='rtl:rotate-180' />
           </button>
 
           {/* Scrollable track */}
           <div
             ref={scrollRef}
-            className='scrollbar-hide flex snap-x snap-mandatory gap-3 overflow-x-auto px-[var(--perce-gutter)] pb-2 sm:gap-5'>
+            className='scrollbar-hide flex snap-x snap-mandatory gap-3 overflow-x-auto px-[var(--perce-gutter)] pb-2 md:gap-6'>
             {products.map((product) => (
               <div
                 key={product.id}
@@ -140,39 +141,10 @@ export function MinimalProductCarousel({
 }
 
 function ViewAllButton({ href, text }: { href: string; text: string }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [isVisible, setIsVisible] = useState(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting) {
-          setIsVisible(true);
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.3 },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
   return (
-    <div
-      ref={ref}
-      className={cn(
-        "mt-10 text-center transition-all duration-700 ease-out",
-        isVisible
-          ? "opacity-100 translate-y-0"
-          : "opacity-0 translate-y-6",
-      )}>
-      <a
-        href={href}
-        className='group inline-flex items-center gap-2 px-8 py-3 border border-stone-900 text-sm font-medium text-stone-900 hover:bg-stone-900 hover:text-white transition-all duration-300'>
+    <div className='mt-8 px-[var(--perce-gutter)]'>
+      <a href={href} className={buttonClass({ variant: "secondary", size: "md", fullWidth: true })}>
         {text}
-        <ArrowRight className='w-4 h-4 transition-transform duration-300 group-hover:translate-x-1' />
       </a>
     </div>
   );

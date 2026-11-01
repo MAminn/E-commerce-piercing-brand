@@ -54,11 +54,11 @@ export default function Page() {
         animateOpacity
         scale={1}
         threshold={0.1}>
-        <div className='w-full max-w-md p-8 bg-white rounded-lg shadow-md'>
+        <div className='w-full max-w-md p-8 bg-surface'>
           {verificationStatus === "loading" && (
             <div className='flex flex-col items-center justify-center py-8'>
               <Loader2 className='h-16 w-16 text-[#1B4571] animate-spin mb-4' />
-              <h1 className='text-2xl font-bold text-center'>
+              <h1 className='text-2xl font-medium text-center'>
                 Verifying Your Email
               </h1>
               <p className='text-perce-ink-muted text-center mt-2'>
@@ -69,8 +69,8 @@ export default function Page() {
 
           {verificationStatus === "success" && (
             <div className='flex flex-col items-center justify-center py-8'>
-              <CheckCircle className='h-16 w-16 text-green-500 mb-4' />
-              <h1 className='text-2xl font-bold text-center text-[#1B4571]'>
+              <CheckCircle className='h-16 w-16 text-success mb-4' />
+              <h1 className='text-2xl font-medium text-center text-[#1B4571]'>
                 Email Verified Successfully!
               </h1>
               <p className='text-perce-ink-muted text-center mt-2 mb-6'>
@@ -85,8 +85,8 @@ export default function Page() {
 
           {verificationStatus === "error" && (
             <div className='flex flex-col items-center justify-center py-8'>
-              <XCircle className='h-16 w-16 text-red-500 mb-4' />
-              <h1 className='text-2xl font-bold text-center text-red-600'>
+              <XCircle className='h-16 w-16 text-error mb-4' />
+              <h1 className='text-2xl font-medium text-center text-error'>
                 Verification Failed
               </h1>
               <p className='text-perce-ink-muted text-center mt-2 mb-6'>

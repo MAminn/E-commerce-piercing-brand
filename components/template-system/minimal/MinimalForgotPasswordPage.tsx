@@ -64,7 +64,7 @@ export function MinimalForgotPasswordPage() {
           {isSuccess ? (
             /* Success state */
             <div className='flex flex-col items-center gap-5 text-center py-6'>
-              <div className='w-14 h-14 rounded-full bg-green-50 flex items-center justify-center'>
+              <div className='w-14 h-14 bg-surface flex items-center justify-center'>
                 <CheckCircle className='w-7 h-7 text-perce-success' />
               </div>
               <div className='space-y-2'>
@@ -107,7 +107,7 @@ export function MinimalForgotPasswordPage() {
                 aria-describedby='forgot-email-error'
                     type='email'
                     placeholder={t("forgot.email_placeholder")}
-                    className='border-0 border-b border-perce-line-strong bg-transparent rounded-none px-0 py-3 text-sm focus:outline-none focus:ring-0 focus:border-perce-ink transition-colors placeholder:text-perce-ink-subtle text-perce-ink'
+                    className='border-0 border-b border-perce-line-strong bg-transparent px-0 py-3 text-sm focus:outline-none focus:ring-0 focus:border-perce-ink transition-colors placeholder:text-perce-ink-subtle text-perce-ink'
                     disabled={isSubmitting}
                   />
                   {form.formState.errors.email && (

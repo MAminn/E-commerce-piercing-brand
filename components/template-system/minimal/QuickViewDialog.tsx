@@ -88,18 +88,18 @@ export function QuickViewDialog({ product, open, onClose }: QuickViewDialogProps
 
   return (
     <div
-      className='fixed inset-0 z-[20000] flex items-center justify-center bg-black/50 backdrop-blur-sm'
+      className='fixed inset-0 z-[20000] flex items-center justify-center bg-overlay'
       onClick={onClose}
       role='dialog'
       aria-modal='true'>
       <div
-        className='relative bg-perce-surface-raised w-[95vw] max-w-[800px] max-h-[90vh] overflow-y-auto shadow-xl'
+        className='relative bg-perce-surface-raised w-[95vw] max-w-[800px] max-h-[90vh] overflow-y-auto'
         onClick={(e) => e.stopPropagation()}>
         {/* Close button */}
         <button
           type='button'
           onClick={onClose}
-          className='absolute top-3 end-3 z-10 w-8 h-8 flex items-center justify-center bg-perce-surface-raised rounded-full shadow hover:bg-perce-surface transition-colors'
+          className='absolute top-3 end-3 z-10 w-8 h-8 flex items-center justify-center bg-perce-surface-raised hover:bg-perce-surface transition-colors'
           aria-label={t("close")}>
           <X className='w-4 h-4' />
         </button>
@@ -121,7 +121,7 @@ export function QuickViewDialog({ product, open, onClose }: QuickViewDialogProps
                       prev === 0 ? images.length - 1 : prev - 1,
                     )
                   }
-                  className='absolute start-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center bg-white/80 hover:bg-white rounded-full shadow transition-colors'
+                  className='absolute start-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center bg-surface hover:bg-surface transition-colors'
                   aria-label='Previous image'>
                   <ChevronLeft className='w-4 h-4' />
                 </button>
@@ -132,7 +132,7 @@ export function QuickViewDialog({ product, open, onClose }: QuickViewDialogProps
                       prev === images.length - 1 ? 0 : prev + 1,
                     )
                   }
-                  className='absolute end-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center bg-white/80 hover:bg-white rounded-full shadow transition-colors'
+                  className='absolute end-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center bg-surface hover:bg-surface transition-colors'
                   aria-label='Next image'>
                   <ChevronRight className='w-4 h-4' />
                 </button>
@@ -141,7 +141,7 @@ export function QuickViewDialog({ product, open, onClose }: QuickViewDialogProps
 
             {/* Tag */}
             {product.tag || product.isNew ? (
-              <span className='absolute top-3 start-3 bg-perce-cta text-perce-ink-inverse text-[10px] font-medium px-2.5 py-1 tracking-wide'>
+              <span className='absolute top-3 start-3 bg-perce-cta text-perce-ink-inverse text-[10px] font-medium px-2.5 py-1'>
                 {product.tag || t("new")}
               </span>
             ) : null}
@@ -187,7 +187,7 @@ export function QuickViewDialog({ product, open, onClose }: QuickViewDialogProps
                   {formatMoney(product.price, { locale })}
                 </span>
               )}
-              <span className={cn("text-base font-semibold", hasDiscount ? "text-perce-sale" : "text-perce-ink")}>
+              <span className={cn("text-base font-medium", hasDiscount ? "text-perce-sale" : "text-perce-ink")}>
                 {formatMoney(displayPrice, { locale })}
               </span>
             </div>

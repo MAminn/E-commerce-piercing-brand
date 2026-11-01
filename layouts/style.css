@@ -317,7 +317,11 @@ html[data-page-transition="out"] body {
      nothing moves when GlobalNavbarChrome measures the real height after
      hydration. A configured marquee/banner still adds to the measured value
      at runtime. */
-  --perce-header-ssr-height: calc(var(--perce-header-h) + 1px);
+  --perce-header-ssr-height: calc(var(--perce-header-h) + 1px + var(--perce-announcement-h));
+  /* The promotional announcement bar (shared/config/promo-layer, off by
+     default) is 32px when it renders; it is in the server HTML, so :has()
+     reserves its height before hydration. */
+  --perce-announcement-h: 0px;
   /* Offset for content that must clear the fixed header chrome. The shell
      also measures the real height at runtime (GlobalNavbarChrome); this is
      the SSR-safe starting value so nothing jumps on first paint. */
@@ -366,9 +370,13 @@ html[data-page-transition="out"] body {
     --perce-text-body: 1rem;
 
     /* The navbar row is lg:h-16. */
-    --perce-header-ssr-height: calc(var(--perce-header-h-desktop) + 1px);
+    --perce-header-ssr-height: calc(var(--perce-header-h-desktop) + 1px + var(--perce-announcement-h));
     --perce-header-offset: var(--perce-header-measured, var(--perce-header-ssr-height));
   }
+}
+
+:root:has([data-announcement-bar]) {
+  --perce-announcement-h: 2rem;
 }
 
 /* Legacy utility names (bg-perce-bg, text-perce-ink, border-perce-line …),

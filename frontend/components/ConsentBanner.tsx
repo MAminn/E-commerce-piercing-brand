@@ -57,7 +57,7 @@ export function ConsentBanner() {
 
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background p-4 shadow-lg"
+      className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background p-4"
       role="dialog"
       aria-label="Cookie consent"
       data-testid="consent-banner"
@@ -66,12 +66,12 @@ export function ConsentBanner() {
         {!showCustomize ? (
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
-              <Shield className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+              <Shield className="mt-0.5 h-5 w-5 shrink-0 text-ink-2" />
               <div>
                 <p className="text-sm font-medium">
                   We value your privacy
                 </p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-ink-2">
                   We use cookies and similar technologies to enhance your
                   experience, analyze traffic, and serve personalized ads.
                 </p>
@@ -107,7 +107,7 @@ export function ConsentBanner() {
         ) : (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold">
+              <h3 className="text-sm font-medium">
                 Customize Cookie Preferences
               </h3>
               <Button
@@ -124,11 +124,11 @@ export function ConsentBanner() {
               {CATEGORY_INFO.map((cat) => (
                 <div
                   key={cat.key}
-                  className="flex items-center justify-between rounded-md border p-3"
+                  className="flex items-center justify-between border p-3"
                 >
                   <div className="mr-4">
                     <p className="text-sm font-medium">{cat.label}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-ink-2">
                       {cat.description}
                     </p>
                   </div>

@@ -1,8 +1,8 @@
-import { ChevronRight } from "lucide-react";
 import { STORE_CURRENCY } from "#root/shared/config/branding";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { Link } from "#root/components/utils/Link";
 import { cn } from "#root/lib/utils";
+import { buttonClass } from "#root/components/storefront/Button";
 import type { BundleCardCampaign } from "./BundleCampaignCard";
 import { bundleHref, resolveBundleImage } from "./bundle-ui";
 import { describeSetOffer } from "./set-offer";
@@ -29,10 +29,10 @@ export function SetOfferCard({ campaign, ctaLabel, eager = false, className }: S
 
   return (
     <article
-      className={cn("flex min-h-[13rem] overflow-hidden border border-perce-line bg-perce-surface", className)}
+      className={cn("flex min-h-52 overflow-hidden border border-line bg-surface", className)}
       data-set-offer={campaign.slug}>
       {/* Decorative image; the title and the CTA are the links. */}
-      <div className="relative w-[42%] shrink-0 overflow-hidden bg-perce-surface-raised">
+      <div className="relative w-[42%] shrink-0 overflow-hidden bg-surface-2">
         <img
           src={resolveBundleImage(campaign.heroImageUrl)}
           alt=""
@@ -42,39 +42,37 @@ export function SetOfferCard({ campaign, ctaLabel, eager = false, className }: S
         />
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col justify-between gap-4 p-4 sm:p-5">
+      <div className="flex min-w-0 flex-1 flex-col justify-between gap-4 p-4 md:p-6">
         <div className="min-w-0">
-          <h3 className="text-[15px] font-medium leading-snug text-perce-ink" style={{ fontFamily: "var(--font-product-title)" }}>
-            <Link href={href} className="hover:text-perce-ink-secondary">
+          <h3 className="t-label text-ink" style={{ fontFamily: "var(--font-product-title)" }}>
+            <Link href={href} className="hover:underline hover:decoration-1 hover:underline-offset-4">
               {campaign.title}
             </Link>
           </h3>
           <p
-            className="mt-2 text-[1.75rem] font-medium leading-[1.1] tracking-tight text-perce-ink sm:text-[2rem]"
+            className="mt-2 t-h1 tabular-nums text-ink"
             style={{ fontFamily: "var(--font-price)" }}
             data-testid="set-offer-headline">
             {offer.headline}
           </p>
           {offer.freeShipping && (
             <p
-              className="mt-0.5 text-[1.0625rem] font-medium leading-tight text-perce-ink sm:text-lg"
+              className="mt-1 t-h3 text-ink"
               data-testid="set-offer-free-shipping">
               {t("sets.plus_free_shipping")}
             </p>
           )}
-          <p className="mt-2 text-[13px] leading-snug text-perce-ink-muted">{offer.rule}</p>
+          <p className="mt-2 t-small text-ink-2">{offer.rule}</p>
         </div>
 
         <Link
           href={href}
-          className={cn(
-            "inline-flex min-h-11 w-full items-center justify-center gap-1.5 px-4 text-[13px] font-medium transition-colors sm:w-auto sm:self-start",
-            offer.soldOut
-              ? "border border-perce-line-strong text-perce-ink-muted"
-              : "bg-perce-cta text-perce-ink-inverse hover:bg-perce-cta-hover",
-          )}>
+          className={buttonClass({
+            variant: "secondary",
+            size: "md",
+            className: cn("w-full sm:w-auto sm:self-start", offer.soldOut && "border-line text-ink-2"),
+          })}>
           {offer.soldOut ? t("bundles.sold_out") : (ctaLabel ?? offer.cta)}
-          {!offer.soldOut && <ChevronRight className="h-4 w-4 rtl:rotate-180" aria-hidden />}
         </Link>
       </div>
     </article>

@@ -47,7 +47,7 @@ export default function BundlesPage() {
 
         {state.status === "loading" ? (
           <div role="status" aria-label="Loading" className="flex min-h-[40vh] items-center justify-center">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-perce-border-strong border-t-perce-ink" />
+            <div className="h-5 w-5 animate-spin border-2 border-perce-border-strong border-t-perce-ink" />
           </div>
         ) : state.campaigns.length === 0 ? (
           <div className="mt-12 max-w-md">

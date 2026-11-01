@@ -57,32 +57,32 @@ const statusConfig: Record<
   pending: {
     label: "Pending",
     icon: Clock,
-    color: "text-amber-700",
-    bg: "bg-amber-50 border-amber-200",
+    color: "text-ink",
+    bg: "bg-surface border-line",
   },
   processing: {
     label: "Processing",
     icon: Package,
-    color: "text-blue-700",
-    bg: "bg-blue-50 border-blue-200",
+    color: "text-ink",
+    bg: "bg-surface border-line",
   },
   shipped: {
     label: "Shipped",
     icon: Truck,
-    color: "text-purple-700",
-    bg: "bg-purple-50 border-purple-200",
+    color: "text-ink",
+    bg: "bg-surface border-line",
   },
   delivered: {
     label: "Delivered",
     icon: CheckCircle,
-    color: "text-green-700",
-    bg: "bg-green-50 border-green-200",
+    color: "text-success",
+    bg: "bg-surface border-success",
   },
   cancelled: {
     label: "Cancelled",
     icon: XCircle,
-    color: "text-red-700",
-    bg: "bg-red-50 border-red-200",
+    color: "text-error",
+    bg: "bg-surface border-error",
   },
 };
 
@@ -128,7 +128,7 @@ export default function OrderHistoryPage() {
     return (
       <div className='min-h-screen bg-perce-surface flex items-center justify-center px-4'>
         <div className='text-center'>
-          <p className='text-red-500 mb-4'>{error}</p>
+          <p className='text-error mb-4'>{error}</p>
           <Button onClick={() => window.location.reload()} variant='outline'>
             Try Again
           </Button>
@@ -142,7 +142,7 @@ export default function OrderHistoryPage() {
       <div className='max-w-3xl mx-auto'>
         {/* Header */}
         <div className='mb-8'>
-          <h1 className='text-2xl md:text-3xl font-semibold text-perce-ink'>
+          <h1 className='text-2xl md:text-3xl font-medium text-perce-ink'>
             My Orders
           </h1>
           <p className='text-perce-ink-muted mt-1'>
@@ -152,7 +152,7 @@ export default function OrderHistoryPage() {
 
         {/* Empty state */}
         {orders.length === 0 ? (
-          <div className='bg-white rounded-2xl border border-perce-line shadow-sm p-12 text-center'>
+          <div className='bg-surface border border-perce-line p-12 text-center'>
             <ShoppingBag className='w-12 h-12 text-perce-ink-subtle mx-auto mb-4' />
             <h2 className='text-lg font-medium text-perce-ink mb-2'>
               No orders yet
@@ -160,7 +160,7 @@ export default function OrderHistoryPage() {
             <p className='text-perce-ink-muted mb-6'>
               When you place an order, it will appear here.
             </p>
-            <Button asChild className='bg-black text-white hover:bg-perce-cta-hover'>
+            <Button asChild className='bg-ink text-bg hover:bg-perce-cta-hover'>
               <Link href='/shop'>Start Shopping</Link>
             </Button>
           </div>
@@ -176,17 +176,17 @@ export default function OrderHistoryPage() {
               return (
                 <div
                   key={order.id}
-                  className='bg-white rounded-xl border border-perce-line shadow-sm overflow-hidden'>
+                  className='bg-surface border border-perce-line overflow-hidden'>
                   {/* Order header — clickable */}
                   <button
                     type='button'
                     onClick={() =>
                       setExpandedOrder(isExpanded ? null : order.id)
                     }
-                    className='w-full p-5 flex items-center justify-between text-left hover:bg-gray-50/50 transition-colors'>
+                    className='w-full p-5 flex items-center justify-between text-left hover:bg-surface-2 transition-colors'>
                     <div className='flex items-center gap-4 min-w-0'>
                       <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${status.bg}`}>
+                        className={`w-10 h-10  flex items-center justify-center shrink-0 ${status.bg}`}>
                         <StatusIcon className={`w-5 h-5 ${status.color}`} />
                       </div>
                       <div className='min-w-0'>
@@ -210,7 +210,7 @@ export default function OrderHistoryPage() {
                     </div>
                     <div className='flex items-center gap-4 shrink-0'>
                       <div className='text-right'>
-                        <p className='text-sm font-semibold text-perce-ink'>
+                        <p className='text-sm font-medium text-perce-ink'>
                           {formatMoney(Number.parseFloat(order.total))}
                         </p>
                         <Badge
@@ -263,7 +263,7 @@ export default function OrderHistoryPage() {
                           </span>
                         </div>
                         {order.discount && (
-                          <div className='flex justify-between text-green-600'>
+                          <div className='flex justify-between text-success'>
                             <span>Discount</span>
                             <span>
                               -{formatMoney(order.discount)}
@@ -279,7 +279,7 @@ export default function OrderHistoryPage() {
                               : formatMoney(Number.parseFloat(order.shipping))}
                           </span>
                         </div>
-                        <div className='flex justify-between font-semibold text-perce-ink pt-1'>
+                        <div className='flex justify-between font-medium text-perce-ink pt-1'>
                           <span>Total</span>
                           <span>
                             {formatMoney(Number.parseFloat(order.total))}

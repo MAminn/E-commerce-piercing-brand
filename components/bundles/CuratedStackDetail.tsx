@@ -238,7 +238,7 @@ export function CuratedStackDetail({ campaign, reload }: CuratedStackDetailProps
 
       {/* ── Price + CTA (sticky bottom on mobile, inline card on desktop) ───── */}
       <div
-        className="fixed inset-x-0 border-t border-perce-border bg-perce-bg shadow-[0_-4px_16px_rgba(36,29,25,0.08)] sm:static sm:border-0 sm:bg-transparent sm:shadow-none"
+        className="fixed inset-x-0 border-t border-perce-border bg-perce-bg sm:static sm:border-0 sm:bg-transparent"
         style={{ bottom: "calc(4rem + env(safe-area-inset-bottom))", zIndex: "var(--perce-z-sticky)" }}>
         <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6 sm:py-0 lg:px-8">
           <div className="sm:ms-auto sm:max-w-md sm:border sm:border-perce-border sm:bg-perce-surface sm:p-6">
@@ -251,7 +251,7 @@ export function CuratedStackDetail({ campaign, reload }: CuratedStackDetailProps
               </div>
               <div className="text-end">
                 <p className="text-xs text-perce-ink-muted">{t("curated.stack_price")}</p>
-                <p className="text-[18px] font-semibold text-perce-ink" style={{ fontFamily: "var(--font-price)" }}>
+                <p className="text-[18px] font-medium text-perce-ink" style={{ fontFamily: "var(--font-price)" }}>
                   {formatMoney(price, currency)}
                 </p>
               </div>
@@ -261,7 +261,7 @@ export function CuratedStackDetail({ campaign, reload }: CuratedStackDetailProps
               type="button"
               onClick={handleAddToBag}
               disabled={soldOut || submitting}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-md bg-perce-cta py-3.5 text-sm font-medium text-perce-ink-inverse transition-colors hover:bg-perce-cta-hover disabled:cursor-not-allowed disabled:opacity-50">
+              className="mt-3 flex w-full items-center justify-center gap-2 bg-perce-cta py-3.5 text-sm font-medium text-perce-ink-inverse transition-colors hover:bg-perce-cta-hover disabled:cursor-not-allowed disabled:opacity-50">
               <ShoppingBag className="h-4 w-4" />
               {soldOut ? t("bundles.sold_out") : submitting ? t("bundle.adding") : t("curated.add_to_bag")}
             </button>

@@ -259,8 +259,8 @@ export default function ProductDetailPage() {
     return (
       <div className='flex items-center justify-center min-h-screen'>
         <div className='text-center'>
-          <h2 className='text-2xl font-bold text-red-600 mb-2'>Error</h2>
-          <p className='text-gray-600'>{error}</p>
+          <h2 className='text-2xl font-medium text-error mb-2'>Error</h2>
+          <p className='text-ink-2'>{error}</p>
         </div>
       </div>
     );

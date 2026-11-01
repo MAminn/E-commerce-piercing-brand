@@ -682,7 +682,7 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
                       type="button"
                       onClick={() => decrement(product, unit.line.selectedOptions)}
                       aria-label={`${t("bundle.remove")}: ${product.name}`}
-                      className="absolute -end-2.5 -top-2.5 flex h-7 w-7 items-center justify-center rounded-full border border-perce-border bg-perce-bg text-perce-ink shadow-sm hover:bg-perce-surface">
+                      className="absolute -end-2.5 -top-2.5 flex h-7 w-7 items-center justify-center border border-perce-border bg-perce-bg text-perce-ink hover:bg-perce-surface">
                       <X className="h-3 w-3" aria-hidden />
                     </button>
                   </li>
@@ -728,7 +728,7 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
               {/* Between tiers there is no price, so none is shown. Falling
                   back to the tier below would quote a total the shopper
                   cannot actually be charged. */}
-              <dd className="text-[17px] font-semibold text-perce-ink" style={{ fontFamily: "var(--font-price)" }} data-testid="bundle-final-total">
+              <dd className="text-[17px] font-medium text-perce-ink" style={{ fontFamily: "var(--font-price)" }} data-testid="bundle-final-total">
                 {price === null ? "—" : money(price, currency)}
               </dd>
             </div>
@@ -808,7 +808,7 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
                         onClick={() => setCategoryFilter(c.id)}
                         aria-pressed={active}
                         className={cn(
-                          "inline-flex min-h-10 shrink-0 items-center whitespace-nowrap rounded-full border px-4 text-[13px] transition-colors",
+                          "inline-flex min-h-10 shrink-0 items-center whitespace-nowrap  border px-4 text-[13px] transition-colors",
                           active
                             ? "border-perce-ink bg-perce-ink text-perce-ink-inverse"
                             : "border-perce-border text-perce-ink hover:border-perce-ink",
@@ -898,7 +898,7 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
                         </span>
                       )}
                       {isSelected && (
-                        <span className="absolute end-2 top-2 flex h-7 min-w-7 items-center justify-center rounded-full bg-perce-ink px-1.5 text-[11px] font-semibold text-perce-ink-inverse">
+                        <span className="absolute end-2 top-2 flex h-7 min-w-7 items-center justify-center bg-perce-ink px-1.5 text-[11px] font-medium text-perce-ink-inverse">
                           {campaign.allowDuplicates ? qty : <Check className="h-4 w-4" />}
                         </span>
                       )}
@@ -918,7 +918,7 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
                         {p.name}
                       </p>
                       <p className="mt-1 flex items-baseline gap-1.5 text-[14px]" style={{ fontFamily: "var(--font-price)" }}>
-                        <span className={hasDiscount ? "text-perce-sale font-semibold" : "font-semibold text-perce-ink"}>
+                        <span className={hasDiscount ? "text-perce-sale font-medium" : "font-medium text-perce-ink"}>
                           {money(unit, currency)}
                         </span>
                         {hasDiscount && (
@@ -1089,7 +1089,7 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
           still needed), and the CTA — disabled until the campaign's own rule
           (exact tier count, stock, duplicates) is met. */}
       <div
-        className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] border-t border-perce-border bg-perce-bg/95 shadow-[0_-4px_16px_rgba(36,29,25,0.08)] backdrop-blur lg:bottom-0"
+        className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] border-t border-perce-border bg-perce-bg/95 backdrop-blur lg:bottom-0"
         style={{ zIndex: "var(--perce-z-sticky)" }}
         data-testid="bundle-action-bar">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">

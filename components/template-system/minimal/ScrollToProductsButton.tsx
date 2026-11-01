@@ -30,7 +30,7 @@ export function ScrollToProductsButton({
           ?.scrollIntoView({ behavior: "smooth", block: "start" });
       }}
       aria-label='Scroll to products'
-      className='fixed bottom-20 lg:bottom-6 end-4 z-30 w-11 h-11 rounded-full bg-gray-900 text-white flex items-center justify-center shadow-lg hover:bg-gray-800 transition-colors'>
+      className='fixed bottom-20 lg:bottom-6 end-4 z-30 w-11 h-11 bg-ink text-bg flex items-center justify-center hover:bg-ink transition-colors'>
       <ArrowUp className='w-5 h-5' />
     </button>
   );

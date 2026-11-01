@@ -37,7 +37,7 @@ export const FAQ: React.FC<FAQProps> = ({
   title = "Frequently Asked Questions",
   description = "Find answers to common questions about shopping with us",
   faqs = defaultFaqData,
-  backgroundColor = "bg-white",
+  backgroundColor = "bg-surface",
 }) => {
   // Nothing to answer — render nothing rather than an empty accordion under
   // a "Frequently Asked Questions" heading.
@@ -47,8 +47,8 @@ export const FAQ: React.FC<FAQProps> = ({
     <section id='faq' className={`py-20 ${backgroundColor}`}>
       <div className='container mx-auto px-4'>
         <div className='text-center mb-12'>
-          <h2 className='text-3xl font-bold mb-4'>{title}</h2>
-          <p className='text-gray-600 max-w-2xl mx-auto'>{description}</p>
+          <h2 className='text-3xl font-medium mb-4'>{title}</h2>
+          <p className='text-ink-2 max-w-2xl mx-auto'>{description}</p>
         </div>
 
         <div className='max-w-3xl mx-auto'>
@@ -57,11 +57,11 @@ export const FAQ: React.FC<FAQProps> = ({
               <AccordionItem
                 key={faq.id}
                 value={faq.id}
-                className='border border-gray-200 rounded-lg p-2 shadow-sm'>
+                className='border border-line p-2'>
                 <AccordionTrigger className='text-lg font-medium px-4 py-3 hover:no-underline'>
                   {faq.question}
                 </AccordionTrigger>
-                <AccordionContent className='text-gray-600 px-4'>
+                <AccordionContent className='text-ink-2 px-4'>
                   {faq.answer}
                 </AccordionContent>
               </AccordionItem>

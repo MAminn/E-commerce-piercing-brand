@@ -24,6 +24,7 @@ import { visibleToShoppers } from "#root/shared/categories/tree";
 import { ICON_PROPS, IconButton, buttonClass } from "#root/components/storefront/Button";
 import { Price } from "#root/components/storefront/Price";
 import { cn } from "#root/lib/utils";
+import { AnnouncementBar } from "#root/components/storefront/promo/PromoLayer";
 
 interface NavLinkItem {
   id: string;
@@ -246,6 +247,9 @@ export function MinimalNavbar() {
 
   return (
     <>
+      {/* ── Promotional announcement (shared/config/promo-layer, off) ── */}
+      <AnnouncementBar />
+
       {/* ── Scrolling Marquee (CMS, off unless an admin enables it) ── */}
       {marqueeEnabled && marqueeText && (
         <Marquee

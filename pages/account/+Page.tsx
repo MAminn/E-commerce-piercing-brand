@@ -90,16 +90,16 @@ interface Order {
 }
 
 const statusConfig: Record<string, { label: string; icon: React.ElementType; color: string; bg: string }> = {
-  pending: { label: "Pending", icon: Clock, color: "text-amber-700", bg: "bg-amber-50 border-amber-200" },
-  processing: { label: "Processing", icon: Package, color: "text-blue-700", bg: "bg-blue-50 border-blue-200" },
-  shipped: { label: "Shipped", icon: Truck, color: "text-purple-700", bg: "bg-purple-50 border-purple-200" },
-  delivered: { label: "Delivered", icon: CheckCircle, color: "text-green-700", bg: "bg-green-50 border-green-200" },
-  cancelled: { label: "Cancelled", icon: XCircle, color: "text-red-700", bg: "bg-red-50 border-red-200" },
+  pending: { label: "Pending", icon: Clock, color: "text-ink", bg: "bg-surface border-line" },
+  processing: { label: "Processing", icon: Package, color: "text-ink", bg: "bg-surface border-line" },
+  shipped: { label: "Shipped", icon: Truck, color: "text-ink", bg: "bg-surface border-line" },
+  delivered: { label: "Delivered", icon: CheckCircle, color: "text-success", bg: "bg-surface border-success" },
+  cancelled: { label: "Cancelled", icon: XCircle, color: "text-error", bg: "bg-surface border-error" },
 };
 
 const AVATAR_COLORS = [
-  "bg-violet-600", "bg-emerald-600", "bg-sky-600", "bg-rose-600", "bg-amber-600",
-  "bg-teal-600", "bg-indigo-600", "bg-orange-600",
+  "bg-violet-600", "bg-success", "bg-ink", "bg-error", "bg-ink",
+  "bg-success", "bg-ink", "bg-ink",
 ];
 
 function getAvatarColor(name: string) {
@@ -160,15 +160,15 @@ function AccountTab({ session, onProfileUpdated }: { session: { name?: string | 
   return (
     <div className="space-y-6">
       {/* Profile Info */}
-      <div className="bg-white rounded-2xl border border-perce-line overflow-hidden">
+      <div className="bg-surface border border-perce-line overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-perce-line">
           <h3 className="text-[15px] font-medium text-perce-ink">Personal Information</h3>
           {!isEditing ? (
-            <button onClick={() => setIsEditing(true)} className="flex items-center gap-1.5 text-[12px] text-perce-ink-subtle hover:text-stone-700 transition-colors">
+            <button onClick={() => setIsEditing(true)} className="flex items-center gap-1.5 text-[12px] text-perce-ink-subtle hover:text-ink-2 transition-colors">
               <Pencil className="w-3 h-3" /> Edit
             </button>
           ) : (
-            <button onClick={() => { form.reset({ name: session.name || "", phone: session.phone || "" }); setIsEditing(false); }} className="flex items-center gap-1.5 text-[12px] text-red-400 hover:text-red-600 transition-colors">
+            <button onClick={() => { form.reset({ name: session.name || "", phone: session.phone || "" }); setIsEditing(false); }} className="flex items-center gap-1.5 text-[12px] text-error hover:text-error transition-colors">
               <X className="w-3 h-3" /> Cancel
             </button>
           )}
@@ -179,11 +179,11 @@ function AccountTab({ session, onProfileUpdated }: { session: { name?: string | 
             <div>
               <label className="block text-[11px] text-perce-ink-subtle mb-1.5 font-medium">Full Name</label>
               <Input {...form.register("name")} disabled={isSubmitting} className="h-10 text-[14px]" />
-              {form.formState.errors.name && <p className="text-red-500 text-[11px] mt-1">{form.formState.errors.name.message}</p>}
+              {form.formState.errors.name && <p className="text-error text-[11px] mt-1">{form.formState.errors.name.message}</p>}
             </div>
             <div>
               <label className="block text-[11px] text-perce-ink-subtle mb-1.5 font-medium">Email</label>
-              <div className="flex items-center gap-2 px-3 py-2.5 bg-perce-surface rounded-md border border-perce-line text-[14px] text-perce-ink-subtle">
+              <div className="flex items-center gap-2 px-3 py-2.5 bg-perce-surface border border-perce-line text-[14px] text-perce-ink-subtle">
                 <Mail className="w-4 h-4 shrink-0" />
                 {session.email}
                 <span className="ml-auto text-[10px] text-perce-ink-subtle">read-only</span>
@@ -192,9 +192,9 @@ function AccountTab({ session, onProfileUpdated }: { session: { name?: string | 
             <div>
               <label className="block text-[11px] text-perce-ink-subtle mb-1.5 font-medium">Phone</label>
               <Input {...form.register("phone")} disabled={isSubmitting} className="h-10 text-[14px]" />
-              {form.formState.errors.phone && <p className="text-red-500 text-[11px] mt-1">{form.formState.errors.phone.message}</p>}
+              {form.formState.errors.phone && <p className="text-error text-[11px] mt-1">{form.formState.errors.phone.message}</p>}
             </div>
-            <Button type="submit" disabled={isSubmitting} size="sm" className="bg-perce-cta hover:bg-perce-cta-hover text-white gap-1.5">
+            <Button type="submit" disabled={isSubmitting} size="sm" className="bg-perce-cta hover:bg-perce-cta-hover text-bg gap-1.5">
               <Check className="w-3.5 h-3.5" />
               {isSubmitting ? "Saving…" : "Save Changes"}
             </Button>
@@ -208,7 +208,7 @@ function AccountTab({ session, onProfileUpdated }: { session: { name?: string | 
               // { icon: Shield, label: "Role", value: session.role === "admin" ? "Administrator" : "Customer" },
             ].map(({ icon: Icon, label, value }) => (
               <div key={label} className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-perce-surface flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 bg-perce-surface flex items-center justify-center shrink-0">
                   <Icon className="w-3.5 h-3.5 text-perce-ink-subtle" />
                 </div>
                 <div>
@@ -222,7 +222,7 @@ function AccountTab({ session, onProfileUpdated }: { session: { name?: string | 
       </div>
 
       {/* Change Password */}
-      <div className="bg-white rounded-2xl border border-perce-line overflow-hidden">
+      <div className="bg-surface border border-perce-line overflow-hidden">
         <div className="px-6 py-4 border-b border-perce-line">
           <h3 className="text-[15px] font-medium text-perce-ink">Change Password</h3>
           <p className="text-[12px] text-perce-ink-subtle mt-0.5">Leave blank to keep your current password</p>
@@ -247,16 +247,16 @@ function AccountTab({ session, onProfileUpdated }: { session: { name?: string | 
                 <button
                   type="button"
                   onClick={() => setShow(!show)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-perce-ink-subtle hover:text-stone-600">
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-perce-ink-subtle hover:text-ink-2">
                   {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
               {pwForm.formState.errors[name] && (
-                <p className="text-red-500 text-[11px] mt-1">{pwForm.formState.errors[name]?.message}</p>
+                <p className="text-error text-[11px] mt-1">{pwForm.formState.errors[name]?.message}</p>
               )}
             </div>
           ))}
-          <Button type="submit" disabled={isChangingPw} size="sm" className="bg-perce-cta hover:bg-perce-cta-hover text-white gap-1.5">
+          <Button type="submit" disabled={isChangingPw} size="sm" className="bg-perce-cta hover:bg-perce-cta-hover text-bg gap-1.5">
             <Shield className="w-3.5 h-3.5" />
             {isChangingPw ? "Updating…" : "Update Password"}
           </Button>
@@ -303,7 +303,7 @@ function OrdersTab() {
       <ShoppingBag className="w-10 h-10 text-perce-ink-inverse mx-auto mb-4" />
       <p className="text-[15px] font-medium text-perce-ink mb-1">No orders yet</p>
       <p className="text-[13px] text-perce-ink-subtle mb-6">Your order history will appear here</p>
-      <Link href="/shop" className="inline-flex items-center gap-2 px-5 py-2.5 bg-perce-cta text-white text-[13px] rounded-lg hover:bg-perce-cta-hover transition-colors">
+      <Link href="/shop" className="inline-flex items-center gap-2 px-5 py-2.5 bg-perce-cta text-bg text-[13px] hover:bg-perce-cta-hover transition-colors">
         Start Shopping
       </Link>
     </div>
@@ -318,18 +318,18 @@ function OrdersTab() {
         const date = new Date(order.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 
         return (
-          <div key={order.id} className="bg-white rounded-2xl border border-perce-line overflow-hidden">
+          <div key={order.id} className="bg-surface border border-perce-line overflow-hidden">
             <button
               type="button"
-              className="w-full px-5 py-4 flex items-center gap-4 text-left hover:bg-stone-50 transition-colors"
+              className="w-full px-5 py-4 flex items-center gap-4 text-left hover:bg-surface-2 transition-colors"
               onClick={() => setExpandedOrder(isExpanded ? null : order.id)}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center border shrink-0 ${cfg.bg}`}>
+              <div className={`w-8 h-8  flex items-center justify-center border shrink-0 ${cfg.bg}`}>
                 <StatusIcon className={`w-3.5 h-3.5 ${cfg.color}`} />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[13px] font-medium text-perce-ink">{formatOrderNumber(order.orderNumber)}</span>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${cfg.bg} ${cfg.color}`}>{cfg.label}</span>
+                  <span className={`text-[10px] px-2 py-0.5  border font-medium ${cfg.bg} ${cfg.color}`}>{cfg.label}</span>
                 </div>
                 <div className="flex items-center gap-2 mt-0.5 text-[12px] text-perce-ink-subtle">
                   <span>{date}</span>
@@ -338,7 +338,7 @@ function OrdersTab() {
                 </div>
               </div>
               <div className="text-right shrink-0">
-                <p className="text-[14px] font-semibold text-perce-ink">{formatMoney(Number(order.total))}</p>
+                <p className="text-[14px] font-medium text-perce-ink">{formatMoney(Number(order.total))}</p>
               </div>
             </button>
 
@@ -363,11 +363,11 @@ function OrdersTab() {
                     <span>Shipping</span><span>{Number(order.shipping) > 0 ? `${formatMoney(Number(order.shipping))}` : "Free"}</span>
                   </div>
                   {order.discount && Number(order.discount) > 0 && (
-                    <div className="flex justify-between text-[12px] text-green-600">
+                    <div className="flex justify-between text-[12px] text-success">
                       <span>Discount</span><span>-{formatMoney(Number(order.discount))}</span>
                     </div>
                   )}
-                  <div className="flex justify-between text-[14px] font-semibold text-perce-ink pt-1 border-t border-perce-line">
+                  <div className="flex justify-between text-[14px] font-medium text-perce-ink pt-1 border-t border-perce-line">
                     <span>Total</span><span>{formatMoney(Number(order.total))}</span>
                   </div>
                 </div>
@@ -420,7 +420,7 @@ function WishlistTab() {
       <Heart className="w-10 h-10 text-perce-ink-inverse mx-auto mb-4" />
       <p className="text-[15px] font-medium text-perce-ink mb-1">Your wishlist is empty</p>
       <p className="text-[13px] text-perce-ink-subtle mb-6">Save products you love by tapping the heart icon</p>
-      <Link href="/shop" className="inline-flex items-center gap-2 px-5 py-2.5 bg-perce-cta text-white text-[13px] rounded-lg hover:bg-perce-cta-hover transition-colors">
+      <Link href="/shop" className="inline-flex items-center gap-2 px-5 py-2.5 bg-perce-cta text-bg text-[13px] hover:bg-perce-cta-hover transition-colors">
         Browse Products
       </Link>
     </div>
@@ -432,7 +432,7 @@ function WishlistTab() {
         const displayPrice = product.discountPrice ?? product.price;
         const hasDiscount = product.discountPrice != null && product.discountPrice < product.price;
         return (
-          <div key={product.id} className="bg-white rounded-xl border border-perce-line overflow-hidden group">
+          <div key={product.id} className="bg-surface border border-perce-line overflow-hidden group">
             <Link href={getProductUrl(product)} className="block relative aspect-square bg-perce-surface overflow-hidden">
               {product.imageUrl ? (
                 <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
@@ -444,16 +444,16 @@ function WishlistTab() {
             </Link>
             <div className="p-3">
               <Link href={getProductUrl(product)} className="block">
-                <p className="text-[13px] font-medium text-perce-ink truncate hover:text-stone-600 transition-colors">{product.name}</p>
+                <p className="text-[13px] font-medium text-perce-ink truncate hover:text-ink-2 transition-colors">{product.name}</p>
               </Link>
               <div className="flex items-center gap-1.5 mt-1">
-                <span className="text-[13px] font-semibold text-perce-ink">{formatMoney(displayPrice)}</span>
+                <span className="text-[13px] font-medium text-perce-ink">{formatMoney(displayPrice)}</span>
                 {hasDiscount && <span className="text-[11px] text-perce-ink-subtle line-through">{formatMoney(product.price)}</span>}
               </div>
               <button
                 type="button"
                 onClick={() => toggle(product.id)}
-                className="mt-2 w-full flex items-center justify-center gap-1.5 py-1.5 text-[11px] text-red-500 hover:text-red-700 border border-red-200 hover:border-red-300 rounded-lg transition-colors">
+                className="mt-2 w-full flex items-center justify-center gap-1.5 py-1.5 text-[11px] text-error hover:text-error border border-error hover:border-error transition-colors">
                 <X className="w-3 h-3" /> Remove
               </button>
             </div>
@@ -503,17 +503,17 @@ export default function Page() {
       <div className="max-w-4xl mx-auto px-4 py-8 sm:py-12">
         {/* Profile header */}
         <div className="flex flex-col sm:flex-row items-center sm:items-end gap-4 mb-8">
-          <div className={`w-16 h-16 rounded-full ${avatarColor} flex items-center justify-center text-white text-xl font-bold shrink-0`}>
+          <div className={`w-16 h-16  ${avatarColor} flex items-center justify-center text-bg text-xl font-medium shrink-0`}>
             {initials}
           </div>
           <div className="text-center sm:text-left">
-            <h1 className="text-[22px] font-semibold text-perce-ink">{session.name || "My Account"}</h1>
+            <h1 className="text-[22px] font-medium text-perce-ink">{session.name || "My Account"}</h1>
             <p className="text-[13px] text-perce-ink-subtle">{session.email}</p>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 rounded-xl shadow-lg border-b border-perce-line mb-6">
+        <div className="flex gap-1 border-b border-perce-line mb-6">
           {tabs.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -521,8 +521,8 @@ export default function Page() {
               onClick={() => setActiveTab(id)}
               className={`flex-1 flex items-center justify-center gap-1 sm:gap-2 px-1.5 sm:px-4 py-2.5 text-[11px] sm:text-[13px] font-medium whitespace-nowrap border-b-2 -mb-px transition-colors ${
                 activeTab === id
-                  ? "border-perce-ink text-black"
-                  : "border-transparent text-perce-ink-subtle hover:text-stone-700"
+                  ? "border-perce-ink text-ink"
+                  : "border-transparent text-perce-ink-subtle hover:text-ink-2"
               }`}>
               <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
               {label}

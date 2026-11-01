@@ -25,7 +25,7 @@ export function LegalPage({ content, locale, dir }: LegalPageProps) {
     <div className='minimal-template' dir={dir}>
       <div className='max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24'>
         <section className='pb-12 sm:pb-16 border-b border-perce-line'>
-          <h1 className='text-3xl sm:text-4xl lg:text-[42px] font-bold leading-tight tracking-tight'>
+          <h1 className='text-3xl sm:text-4xl lg:text-[42px] font-medium leading-tight tracking-tight'>
             {pick(content.title, content.titleAr)}
           </h1>
           {lastUpdated && (
@@ -45,7 +45,7 @@ export function LegalPage({ content, locale, dir }: LegalPageProps) {
               return (
                 <div key={`${title}-${index}`}>
                   {title && (
-                    <h2 className='text-xs sm:text-sm font-bold text-perce-ink mb-4'>
+                    <h2 className='text-xs sm:text-sm font-medium text-perce-ink mb-4'>
                       {title}
                     </h2>
                   )}
@@ -78,7 +78,7 @@ export function LegalPageRoute({
   if (layoutSettings.header.navbarStyle !== "minimal") {
     return (
       <div className='min-h-[60vh] flex items-center justify-center'>
-        <p className='text-gray-500'>Page not found</p>
+        <p className='text-ink-2'>Page not found</p>
       </div>
     );
   }
@@ -86,7 +86,7 @@ export function LegalPageRoute({
   if (!content) {
     return (
       <div className='min-h-[60vh] flex items-center justify-center'>
-        <p className='text-gray-500'>
+        <p className='text-ink-2'>
           {locale === "ar" ? "هذه الصفحة غير متاحة حالياً" : "This page is not available yet"}
         </p>
       </div>

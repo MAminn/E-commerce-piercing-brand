@@ -115,7 +115,7 @@ export function MinimalLoginPage() {
                 type='email'
                 autoComplete='email'
                 placeholder={t("login.email_placeholder")}
-                className='border-0 border-b border-perce-line-strong bg-transparent rounded-none px-0 py-3 text-sm focus:outline-none focus:ring-0 focus:border-perce-ink transition-colors placeholder:text-perce-ink-subtle text-perce-ink'
+                className='border-0 border-b border-perce-line-strong bg-transparent px-0 py-3 text-sm focus:outline-none focus:ring-0 focus:border-perce-ink transition-colors placeholder:text-perce-ink-subtle text-perce-ink'
                 disabled={isSubmitting}
               />
               {form.formState.errors.email && (
@@ -141,7 +141,7 @@ export function MinimalLoginPage() {
                   type={showPassword ? "text" : "password"}
                   autoComplete='current-password'
                   placeholder={t("login.password_placeholder")}
-                  className='border-0 border-b border-perce-line-strong bg-transparent rounded-none px-0 py-3 pe-10 text-sm focus:outline-none focus:ring-0 focus:border-perce-ink transition-colors placeholder:text-perce-ink-subtle text-perce-ink'
+                  className='border-0 border-b border-perce-line-strong bg-transparent px-0 py-3 pe-10 text-sm focus:outline-none focus:ring-0 focus:border-perce-ink transition-colors placeholder:text-perce-ink-subtle text-perce-ink'
                   disabled={isSubmitting}
                 />
                 <button
@@ -184,7 +184,7 @@ export function MinimalLoginPage() {
                 disabled={!!oauthLoading || isSubmitting}
                 className='w-full py-2.5 border border-perce-line-strong flex items-center justify-center gap-3 text-sm text-perce-ink-secondary hover:bg-perce-surface transition-colors disabled:opacity-40'>
                 {oauthLoading === "google" ? (
-                  <div className='w-4 h-4 border-2 border-perce-line-strong border-t-stone-700 rounded-full animate-spin' />
+                  <div className='w-4 h-4 border-2 border-perce-line-strong border-t-ink animate-spin' />
                 ) : (
                   <svg className='w-4 h-4' viewBox='0 0 24 24' aria-hidden='true'>
                     <path fill='#4285F4' d='M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z'/>
@@ -213,7 +213,7 @@ export function MinimalLoginPage() {
 
             <Link
               href='/register'
-              className='text-center text-sm text-perce-ink hover:text-perce-ink-secondary transition-colors font-light -mt-2'>
+              className='text-center text-sm text-perce-ink hover:text-perce-ink-secondary transition-colors font-normal -mt-2'>
               {t("login.create_account")}
             </Link>
           </form>

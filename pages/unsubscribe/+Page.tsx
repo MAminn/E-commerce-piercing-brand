@@ -73,7 +73,7 @@ export default function Page() {
       <div className='absolute inset-0 bg-gradient-to-br from-[#1A1612] via-[#2B231D] to-[#1C1814]' />
       <div className='absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.5)_100%)]' />
 
-      <div className='relative w-full max-w-[440px] bg-[#F8F6F3] rounded-[20px] flex flex-col items-center gap-6 p-12 md:p-14 shadow-[0_12px_60px_rgba(0,0,0,0.08),0_4px_20px_rgba(0,0,0,0.04)] animate-in fade-in duration-700 ease-out text-center'>
+      <div className='relative w-full max-w-[440px] bg-[#F8F6F3] flex flex-col items-center gap-6 p-12 md:p-14 animate-in fade-in duration-700 ease-out text-center'>
         {state.status === "loading" && (
           <>
             <Loader2 className='w-8 h-8 text-[#8B7E74] animate-spin' />
@@ -83,7 +83,7 @@ export default function Page() {
 
         {state.status === "invalid" && (
           <>
-            <div className='w-16 h-16 rounded-full bg-[#FFF3E0] flex items-center justify-center'>
+            <div className='w-16 h-16 bg-[#FFF3E0] flex items-center justify-center'>
               <AlertCircle className='w-8 h-8 text-[#E65100]' />
             </div>
             <div className='space-y-3'>
@@ -97,7 +97,7 @@ export default function Page() {
             </div>
             <Link
               href='/'
-              className='text-[13px] text-[#2B231D] hover:text-[#C4A574] transition-all duration-500 tracking-[0.04em] font-light'>
+              className='text-[13px] text-[#2B231D] hover:text-[#C4A574] transition-all duration-500 font-normal'>
               Return home
             </Link>
           </>
@@ -105,7 +105,7 @@ export default function Page() {
 
         {state.status === "loaded" && state.unsubscribed && (
           <>
-            <div className='w-16 h-16 rounded-full bg-[#E8F5E9] flex items-center justify-center'>
+            <div className='w-16 h-16 bg-[#E8F5E9] flex items-center justify-center'>
               <CheckCircle className='w-8 h-8 text-[#4CAF50]' />
             </div>
             <div className='space-y-3'>
@@ -120,7 +120,7 @@ export default function Page() {
             </div>
             <Button
               variant='outline'
-              className='w-full border-[#D9D3CC] text-[#2B231D] font-normal text-[14px] tracking-[0.04em] py-7 rounded-[14px] uppercase'
+              className='w-full border-[#D9D3CC] text-[#2B231D] font-normal text-[14px] py-7'
               onClick={handleResubscribe}
               disabled={isSubmitting}>
               {isSubmitting ? "Resubscribing…" : "Resubscribe"}
@@ -130,7 +130,7 @@ export default function Page() {
 
         {state.status === "loaded" && !state.unsubscribed && (
           <>
-            <div className='w-16 h-16 rounded-full bg-[#F3EFE9] flex items-center justify-center'>
+            <div className='w-16 h-16 bg-[#F3EFE9] flex items-center justify-center'>
               <MailX className='w-8 h-8 text-[#8B7E74]' />
             </div>
             <div className='space-y-3'>
@@ -144,7 +144,7 @@ export default function Page() {
               </p>
             </div>
             <Button
-              className='w-full bg-[#2B231D] hover:bg-[#3A3028] text-[#F8F6F3] font-normal text-[14px] tracking-[0.04em] py-7 rounded-[14px] transition-all duration-500 shadow-[0_4px_16px_rgba(43,35,29,0.12)] hover:shadow-[0_6px_24px_rgba(43,35,29,0.18)] uppercase'
+              className='w-full bg-[#2B231D] hover:bg-[#3A3028] text-[#F8F6F3] font-normal text-[14px] py-7 transition-all duration-500'
               onClick={handleUnsubscribe}
               disabled={isSubmitting}>
               {isSubmitting ? "Unsubscribing…" : "Unsubscribe"}

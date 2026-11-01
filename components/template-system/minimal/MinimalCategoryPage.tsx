@@ -17,6 +17,7 @@ import {
 import { QuickViewDialog } from "#root/components/template-system/minimal/QuickViewDialog";
 import { cn } from "#root/lib/utils";
 import { buttonClass } from "#root/components/storefront/Button";
+import { BundleEntryTile } from "#root/components/storefront/promo/PromoLayer";
 import {
   ActiveFilterChips,
   DesktopFilterBar,
@@ -679,6 +680,9 @@ export function MinimalCategoryPage({
                     "transition-opacity duration-[var(--perce-duration)]",
                     isRefreshing && "opacity-50",
                   )}>
+                  {/* Promotional Pick Your Set tile (shared/config/promo-layer,
+                      off) — first page only, product-card footprint. */}
+                  {currentPage === 1 && <BundleEntryTile />}
                   {products.map((product) => (
                     <MinimalProductCard
                       key={product.id}

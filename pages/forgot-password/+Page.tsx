@@ -67,12 +67,12 @@ export default function Page() {
       <div className='absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.5)_100%)]' />
 
       {/* Card */}
-      <div className='relative w-full max-w-[420px] h-auto bg-[#F8F6F3] rounded-[20px] flex flex-col gap-10 p-12 md:p-14 shadow-[0_12px_60px_rgba(0,0,0,0.08),0_4px_20px_rgba(0,0,0,0.04)] animate-in fade-in duration-700 ease-out'>
-        <div className='absolute inset-0 rounded-[20px] shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]' />
+      <div className='relative w-full max-w-[420px] h-auto bg-[#F8F6F3] flex flex-col gap-10 p-12 md:p-14 animate-in fade-in duration-700 ease-out'>
+        <div className='absolute inset-0' />
 
         {isSuccess ? (
           <div className='relative flex flex-col items-center gap-6 text-center'>
-            <div className='w-16 h-16 rounded-full bg-[#E8F5E9] flex items-center justify-center'>
+            <div className='w-16 h-16 bg-[#E8F5E9] flex items-center justify-center'>
               <CheckCircle className='w-8 h-8 text-[#4CAF50]' />
             </div>
             <div className='space-y-3'>
@@ -86,7 +86,7 @@ export default function Page() {
             </div>
             <Link
               href='/login'
-              className='inline-flex items-center gap-2 text-[13px] text-[#2B231D] hover:text-[#C4A574] transition-all duration-500 font-light mt-4'>
+              className='inline-flex items-center gap-2 text-[13px] text-[#2B231D] hover:text-[#C4A574] transition-all duration-500 font-normal mt-4'>
               <ArrowLeft className='w-4 h-4' />
               Back to login
             </Link>
@@ -97,7 +97,7 @@ export default function Page() {
               <h1 className='text-[28px] md:text-[32px] text-center font-medium tracking-[-0.02em] text-[#2B231D] leading-tight'>
                 Forgot password?
               </h1>
-              <p className='text-center text-[13px] text-[#8B7E74] tracking-wide leading-relaxed'>
+              <p className='text-center text-[13px] text-[#8B7E74] leading-relaxed'>
                 Enter your email and we'll send you a reset link
               </p>
             </div>
@@ -116,18 +116,18 @@ export default function Page() {
                   id='email'
                   type='email'
                   placeholder='your@email.com'
-                  className='border-0 border-b border-[#D9D3CC] bg-transparent rounded-none px-0 py-3 w-full text-[15px] focus:outline-none focus:ring-0 focus:border-[#C4A574] transition-all duration-500 placeholder:text-[#BFB5AA] text-[#2B231D] font-light'
+                  className='border-0 border-b border-[#D9D3CC] bg-transparent px-0 py-3 w-full text-[15px] focus:outline-none focus:ring-0 focus:border-[#C4A574] transition-all duration-500 placeholder:text-[#BFB5AA] text-[#2B231D] font-normal'
                   disabled={isSubmitting}
                 />
                 {form.formState.errors.email && (
-                  <p className='text-[#9D6B6B] text-[11px] mt-2.5 tracking-wide'>
+                  <p className='text-[#9D6B6B] text-[11px] mt-2.5'>
                     {form.formState.errors.email.message}
                   </p>
                 )}
               </div>
 
               <Button
-                className='w-full bg-[#2B231D] hover:bg-[#3A3028] text-[#F8F6F3] font-normal text-[14px] mt-4 py-7 rounded-[14px] transition-all duration-500 shadow-[0_4px_16px_rgba(43,35,29,0.12)] hover:shadow-[0_6px_24px_rgba(43,35,29,0.18)] uppercase'
+                className='w-full bg-[#2B231D] hover:bg-[#3A3028] text-[#F8F6F3] font-normal text-[14px] mt-4 py-7 transition-all duration-500'
                 type='submit'
                 disabled={isSubmitting}>
                 {isSubmitting ? "Sending..." : "Send Reset Link"}
@@ -135,7 +135,7 @@ export default function Page() {
 
               <Link
                 href='/login'
-                className='inline-flex items-center justify-center gap-2 text-[13px] text-[#2B231D] hover:text-[#C4A574] transition-all duration-500 font-light mt-2'>
+                className='inline-flex items-center justify-center gap-2 text-[13px] text-[#2B231D] hover:text-[#C4A574] transition-all duration-500 font-normal mt-2'>
                 <ArrowLeft className='w-4 h-4' />
                 Back to login
               </Link>

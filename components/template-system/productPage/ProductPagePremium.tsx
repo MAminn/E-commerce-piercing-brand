@@ -21,6 +21,7 @@ import { Button, ICON_PROPS, IconButton, buttonClass } from "#root/components/st
 import { Stepper } from "#root/components/storefront/Stepper";
 import { AccordionRow } from "#root/components/storefront/AccordionRow";
 import { Price } from "#root/components/storefront/Price";
+import { PdpBundleLink } from "#root/components/storefront/promo/PromoLayer";
 import {
   MinimalProductCard,
   type MinimalProduct,
@@ -623,6 +624,10 @@ export function ProductPagePremium({
                 <li aria-hidden='true'>·</li>
                 <li>{t("product.reassure_delivery")}</li>
               </ul>
+
+              {/* Promotional set link (shared/config/promo-layer, off) —
+                  only when this product is in a live Pick Your Set pool. */}
+              <PdpBundleLink productId={product.id} />
 
               {product.sku && (
                 <p className='mt-4 t-micro tabular-nums text-ink-2'>SKU {product.sku}</p>

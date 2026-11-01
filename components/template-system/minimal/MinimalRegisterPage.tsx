@@ -92,7 +92,7 @@ export function MinimalRegisterPage() {
           {isRegistered ? (
             /* Success state */
             <div className='flex flex-col items-center gap-5 text-center py-6'>
-              <div className='w-14 h-14 rounded-full bg-green-50 flex items-center justify-center'>
+              <div className='w-14 h-14 bg-surface flex items-center justify-center'>
                 <CheckCircle className='w-7 h-7 text-perce-success' />
               </div>
               <div className='space-y-2'>
@@ -137,7 +137,7 @@ export function MinimalRegisterPage() {
                 aria-describedby='reg-name-error'
                       type='text'
                       placeholder={t("register.name_placeholder")}
-                      className='border-0 border-b border-perce-line-strong bg-transparent rounded-none px-0 py-3 text-sm focus:outline-none focus:ring-0 focus:border-perce-ink transition-colors placeholder:text-perce-ink-subtle text-perce-ink'
+                      className='border-0 border-b border-perce-line-strong bg-transparent px-0 py-3 text-sm focus:outline-none focus:ring-0 focus:border-perce-ink transition-colors placeholder:text-perce-ink-subtle text-perce-ink'
                       disabled={isSubmitting}
                     />
                     {form.formState.errors.name && (
@@ -161,7 +161,7 @@ export function MinimalRegisterPage() {
                 aria-describedby='reg-email-error'
                       type='email'
                       placeholder={t("register.email_placeholder")}
-                      className='border-0 border-b border-perce-line-strong bg-transparent rounded-none px-0 py-3 text-sm focus:outline-none focus:ring-0 focus:border-perce-ink transition-colors placeholder:text-perce-ink-subtle text-perce-ink'
+                      className='border-0 border-b border-perce-line-strong bg-transparent px-0 py-3 text-sm focus:outline-none focus:ring-0 focus:border-perce-ink transition-colors placeholder:text-perce-ink-subtle text-perce-ink'
                       disabled={isSubmitting}
                     />
                     {form.formState.errors.email && (
@@ -186,7 +186,7 @@ export function MinimalRegisterPage() {
                 aria-describedby='reg-phone-error'
                     type='tel'
                     placeholder={t("register.phone_placeholder")}
-                    className='border-0 border-b border-perce-line-strong bg-transparent rounded-none px-0 py-3 text-sm focus:outline-none focus:ring-0 focus:border-perce-ink transition-colors placeholder:text-perce-ink-subtle text-perce-ink'
+                    className='border-0 border-b border-perce-line-strong bg-transparent px-0 py-3 text-sm focus:outline-none focus:ring-0 focus:border-perce-ink transition-colors placeholder:text-perce-ink-subtle text-perce-ink'
                     disabled={isSubmitting}
                   />
                   {form.formState.errors.phone && (
@@ -213,7 +213,7 @@ export function MinimalRegisterPage() {
                 aria-describedby='reg-password-error'
                         type={showPassword ? "text" : "password"}
                         placeholder={t("register.password_placeholder")}
-                        className='border-0 border-b border-perce-line-strong bg-transparent rounded-none px-0 py-3 pe-10 text-sm focus:outline-none focus:ring-0 focus:border-perce-ink transition-colors placeholder:text-perce-ink-subtle text-perce-ink'
+                        className='border-0 border-b border-perce-line-strong bg-transparent px-0 py-3 pe-10 text-sm focus:outline-none focus:ring-0 focus:border-perce-ink transition-colors placeholder:text-perce-ink-subtle text-perce-ink'
                         disabled={isSubmitting}
                       />
                       <button
@@ -250,7 +250,7 @@ export function MinimalRegisterPage() {
                 aria-describedby='reg-confirm-error'
                         type={showConfirmPassword ? "text" : "password"}
                         placeholder={t("register.confirm_password_placeholder")}
-                        className='border-0 border-b border-perce-line-strong bg-transparent rounded-none px-0 py-3 pe-10 text-sm focus:outline-none focus:ring-0 focus:border-perce-ink transition-colors placeholder:text-perce-ink-subtle text-perce-ink'
+                        className='border-0 border-b border-perce-line-strong bg-transparent px-0 py-3 pe-10 text-sm focus:outline-none focus:ring-0 focus:border-perce-ink transition-colors placeholder:text-perce-ink-subtle text-perce-ink'
                         disabled={isSubmitting}
                       />
                       <button
@@ -290,7 +290,7 @@ export function MinimalRegisterPage() {
 
                 <Link
                   href='/login'
-                  className='text-center text-sm text-perce-ink hover:text-perce-ink-secondary transition-colors font-light -mt-2'>
+                  className='text-center text-sm text-perce-ink hover:text-perce-ink-secondary transition-colors font-normal -mt-2'>
                   {t("register.sign_in")}
                 </Link>
               </form>

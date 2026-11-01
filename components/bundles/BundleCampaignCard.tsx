@@ -1,9 +1,9 @@
-import { Layers, Sparkles } from "lucide-react";
 import type { PublicBundleCampaignDto } from "#root/backend/bundles/service";
 import { STORE_CURRENCY } from "#root/shared/config/branding";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { Link } from "#root/components/utils/Link";
 import { cn } from "#root/lib/utils";
+import { buttonClass } from "#root/components/storefront/Button";
 import {
   bundleHref,
   fillTemplate,
@@ -92,46 +92,37 @@ export function BundleCampaignCard({ campaign, className, eager = false }: Bundl
 
   return (
     <article className={cn("group flex flex-col", className)} data-bundle-card={campaign.slug}>
-      <Link href={href} className="relative block aspect-[4/5] w-full overflow-hidden bg-perce-surface">
+      <Link href={href} className="relative block aspect-[4/5] w-full overflow-hidden bg-surface-2">
         <img
           src={resolveBundleImage(campaign.heroImageUrl)}
           alt={campaign.title}
           loading={eager ? "eager" : "lazy"}
           decoding="async"
           className={cn(
-            "h-full w-full object-cover transition-transform duration-500 group-hover:scale-105",
+            "h-full w-full object-cover",
             soldOut && "opacity-70",
           )}
         />
-        <span className="absolute start-3 top-3 flex items-center gap-1 bg-perce-bg/95 px-2.5 py-1 text-xs font-medium text-perce-ink">
-          {isCurated ? <Sparkles className="h-3 w-3" aria-hidden /> : <Layers className="h-3 w-3" aria-hidden />}
-          {t(isCurated ? "bundles.type_curated" : "bundles.type_build")}
-        </span>
-        {campaign.badgeText && !soldOut && (
-          <span className="absolute end-3 top-3 bg-perce-ink px-2.5 py-1 text-xs font-medium text-perce-ink-inverse">
-            {campaign.badgeText}
-          </span>
-        )}
-        {soldOut && (
-          <div className="absolute inset-0 flex items-center justify-center bg-perce-bg/55">
-            <span className="bg-perce-bg px-3 py-1.5 text-xs font-medium text-perce-ink">
-              {t("bundles.sold_out")}
-            </span>
-          </div>
-        )}
       </Link>
 
       <div className="mt-3 flex flex-1 flex-col">
+        {/* Type, admin badge text and sold-out state as one Micro line —
+            facts under the photo, not badges over it. */}
+        <p className="t-micro text-ink-2">
+          {t(isCurated ? "bundles.type_curated" : "bundles.type_build")}
+          {campaign.badgeText && !soldOut && <> · {campaign.badgeText}</>}
+          {soldOut && <> · {t("bundles.sold_out")}</>}
+        </p>
         <h3
-          className="text-[14px] font-medium leading-snug text-perce-ink"
+          className="mt-1 t-card-title text-ink"
           style={{ fontFamily: "var(--font-product-title)" }}>
-          <Link href={href} className="hover:text-perce-ink-secondary">
+          <Link href={href} className="hover:underline hover:decoration-1 hover:underline-offset-4">
             {campaign.title}
           </Link>
         </h3>
-        {campaign.subtitle && <p className="mt-0.5 text-[12px] text-perce-ink-muted">{campaign.subtitle}</p>}
+        {campaign.subtitle && <p className="mt-1 t-small text-ink-2">{campaign.subtitle}</p>}
 
-        <p className="mt-2 text-[15px] font-semibold text-perce-ink" style={{ fontFamily: "var(--font-price)" }}>
+        <p className="mt-2 t-card-price text-ink" style={{ fontFamily: "var(--font-price)" }}>
           {isCurated
             ? formatMoney(price, currency)
             : percentSummary
@@ -140,16 +131,16 @@ export function BundleCampaignCard({ campaign, className, eager = false }: Bundl
                 ? tierSummary.price
                 : fillTemplate(t("bundle.choose_any"), { count: campaign.requiredQuantity, price: formatMoney(price, currency) })}
         </p>
-        <p className="mt-0.5 text-[12px] text-perce-ink-muted">
+        <p className="mt-1 t-small text-ink-2">
           {isCurated
             ? piecesLabel(campaign.unitCount)
             : (percentSummary?.sizes ?? tierSummary?.sizes ??
               fillTemplate(t("bundles.pieces_to_choose"), { count: campaign.eligibleProductCount }))}
           {separatelyLine && <> · {separatelyLine}</>}
         </p>
-        {savingLine && <p className="mt-0.5 text-[12px] font-medium text-perce-success">{savingLine}</p>}
+        {savingLine && <p className="mt-1 t-small tabular-nums text-ink">{savingLine}</p>}
         {!isCurated && campaign.freeShipping && (
-          <p className="mt-0.5 text-[12px] font-medium text-perce-success">{t("bundle.free_shipping")}</p>
+          <p className="mt-1 t-small text-ink">{t("bundle.free_shipping")}</p>
         )}
 
         {/* A sold-out stack still links through: seeing what is in it (and
@@ -157,12 +148,12 @@ export function BundleCampaignCard({ campaign, className, eager = false }: Bundl
             aria-disabled — the link genuinely works. */}
         <Link
           href={href}
-          className={cn(
-            "mt-3 inline-flex min-h-11 w-full items-center justify-center border text-xs font-medium transition-colors",
-            soldOut
-              ? "border-perce-border text-perce-ink-muted"
-              : "border-perce-ink text-perce-ink hover:bg-perce-ink hover:text-perce-ink-inverse",
-          )}>
+          className={buttonClass({
+            variant: "secondary",
+            size: "md",
+            fullWidth: true,
+            className: cn("mt-4", soldOut && "border-line text-ink-2"),
+          })}>
           {soldOut ? t("bundles.sold_out") : t(isCurated ? "bundles.cta_shop" : "bundles.cta_build")}
         </Link>
       </div>

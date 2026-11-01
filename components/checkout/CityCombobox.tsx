@@ -92,9 +92,9 @@ export function CityCombobox({
                 setOpen(false);
               }}
               className={cn(
-                "w-full text-left px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors",
+                "w-full text-left px-3 py-2 text-sm  hover:bg-surface-2 transition-colors",
                 city.toLowerCase() === safeValue.trim().toLowerCase() &&
-                  "bg-muted font-medium",
+                  "bg-surface-2 font-medium",
               )}>
               {city}
             </button>

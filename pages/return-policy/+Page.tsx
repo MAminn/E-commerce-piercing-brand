@@ -16,7 +16,7 @@ function Page() {
   if (!isMinimal) {
     return (
       <div className='min-h-[60vh] flex items-center justify-center'>
-        <p className='text-gray-500'>Page not found</p>
+        <p className='text-ink-2'>Page not found</p>
       </div>
     );
   }
@@ -26,7 +26,7 @@ function Page() {
   if (!returnPolicy?.enabled) {
     return (
       <div className='min-h-[60vh] flex items-center justify-center'>
-        <p className='text-gray-500'>
+        <p className='text-ink-2'>
           {isAr ? "هذه الصفحة غير متاحة حالياً" : "This page is not available yet"}
         </p>
       </div>

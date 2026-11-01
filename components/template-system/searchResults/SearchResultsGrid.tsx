@@ -107,17 +107,17 @@ export function SearchResultsGrid({
   const resultCount = totalResults ?? products.length;
 
   return (
-    <div className={`search-results-grid bg-gray-50 min-h-screen ${className}`}>
+    <div className={`search-results-grid bg-surface-2 min-h-screen ${className}`}>
       <div className='container mx-auto py-6 px-4'>
         {/* Search Header */}
-        <div className='bg-white rounded-lg shadow-sm p-6 mb-6'>
+        <div className='bg-surface p-6 mb-6'>
           <div className='flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4'>
             <div className='flex-1'>
-              <h1 className='text-3xl lg:text-5xl font-light text-stone-900 leading-[1.15] tracking-tight mb-2'>
+              <h1 className='text-3xl lg:text-5xl font-normal text-ink leading-[1.15] tracking-tight mb-2'>
                 Search Results
               </h1>
               {searchQuery && (
-                <p className='text-sm text-stone-600 font-light leading-relaxed'>
+                <p className='text-sm text-ink-2 font-normal leading-relaxed'>
                   {resultCount} {resultCount === 1 ? "result" : "results"} for{" "}
                   <span className='font-normal italic'>"{searchQuery}"</span>
                 </p>
@@ -126,7 +126,7 @@ export function SearchResultsGrid({
 
             {/* Search Bar */}
             <div className='relative w-full lg:w-96'>
-              <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400' />
+              <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-ink-2' />
               <Input
                 type='text'
                 placeholder='Search products...'
@@ -142,9 +142,9 @@ export function SearchResultsGrid({
         <div className='flex flex-col lg:flex-row gap-6'>
           {/* Sidebar Filters */}
           <aside className='w-full lg:w-72 shrink-0'>
-            <div className='bg-white rounded-lg shadow-sm p-6 sticky top-6'>
+            <div className='bg-surface p-6 sticky top-6'>
               <div className='flex items-center justify-between mb-4'>
-                <h2 className='text-xl lg:text-2xl font-normal text-stone-900 leading-snug'>
+                <h2 className='text-xl lg:text-2xl font-normal text-ink leading-snug'>
                   Filters
                 </h2>
                 <Button
@@ -157,18 +157,18 @@ export function SearchResultsGrid({
               </div>
 
               {/* Filter Placeholder */}
-              <div className='space-y-4 text-sm text-gray-600'>
+              <div className='space-y-4 text-sm text-ink-2'>
                 <div className='pb-4 border-b'>
-                  <p className='font-medium text-gray-700 mb-2'>Categories</p>
+                  <p className='font-medium text-ink-2 mb-2'>Categories</p>
                   <p className='text-xs'>Filter options will appear here</p>
                 </div>
                 <div className='pb-4 border-b'>
-                  <p className='font-medium text-gray-700 mb-2'>Price Range</p>
+                  <p className='font-medium text-ink-2 mb-2'>Price Range</p>
                   <p className='text-xs'>Price filters will appear here</p>
                 </div>
 
                 <div>
-                  <p className='font-medium text-gray-700 mb-2'>Availability</p>
+                  <p className='font-medium text-ink-2 mb-2'>Availability</p>
                   <p className='text-xs'>Stock filters will appear here</p>
                 </div>
               </div>
@@ -178,9 +178,9 @@ export function SearchResultsGrid({
           {/* Main Content */}
           <main className='flex-1 min-w-0'>
             {/* Toolbar */}
-            <div className='bg-white rounded-lg shadow-sm p-4 mb-6'>
+            <div className='bg-surface p-4 mb-6'>
               <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
-                <div className='flex items-center gap-2 text-sm text-gray-600'>
+                <div className='flex items-center gap-2 text-sm text-ink-2'>
                   <Grid3x3 className='h-4 w-4' />
                   <span>
                     Showing {products.length} of {resultCount} results
@@ -188,7 +188,7 @@ export function SearchResultsGrid({
                 </div>
 
                 <div className='flex items-center gap-3'>
-                  <span className='text-sm text-gray-600 hidden sm:inline'>
+                  <span className='text-sm text-ink-2 hidden sm:inline'>
                     Sort by:
                   </span>
                   <Select value={sortBy} onValueChange={handleSortChange}>
@@ -224,17 +224,17 @@ export function SearchResultsGrid({
             {isLoading ? (
               <div className='flex items-center justify-center py-20'>
                 <div className='text-center'>
-                  <Loader2 className='h-12 w-12 animate-spin text-blue-600 mx-auto mb-4' />
-                  <p className='text-gray-600'>Searching products...</p>
+                  <Loader2 className='h-12 w-12 animate-spin text-ink mx-auto mb-4' />
+                  <p className='text-ink-2'>Searching products...</p>
                 </div>
               </div>
             ) : products.length === 0 ? (
-              <div className='bg-white rounded-lg shadow-sm p-12 text-center'>
-                <Search className='h-16 w-16 text-gray-300 mx-auto mb-4' />
-                <h3 className='text-xl font-semibold text-gray-900 mb-2'>
+              <div className='bg-surface p-12 text-center'>
+                <Search className='h-16 w-16 text-ink-3 mx-auto mb-4' />
+                <h3 className='text-xl font-medium text-ink mb-2'>
                   No results found
                 </h3>
-                <p className='text-gray-600 mb-6'>
+                <p className='text-ink-2 mb-6'>
                   {searchQuery
                     ? `We couldn't find any products matching "${searchQuery}"`
                     : "Try adjusting your search or filters"}
@@ -291,7 +291,7 @@ export function SearchResultsGrid({
                         .map((page, idx, arr) => (
                           <React.Fragment key={page}>
                             {idx > 0 && arr[idx - 1] !== page - 1 && (
-                              <span className='px-2 text-gray-400'>...</span>
+                              <span className='px-2 text-ink-2'>...</span>
                             )}
                             <Button
                               variant={

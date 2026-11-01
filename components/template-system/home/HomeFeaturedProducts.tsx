@@ -48,14 +48,14 @@ export function HomeFeaturedProducts({
 
   if (isLoading) {
     return (
-      <section className='py-16 bg-gray-50'>
+      <section className='py-16 bg-surface-2'>
         <div className='container mx-auto px-4'>
           <div className='text-center mb-12'>
-            <h2 className='text-3xl lg:text-5xl font-light text-stone-900 leading-[1.15] tracking-tight mb-4'>
+            <h2 className='text-3xl lg:text-5xl font-normal text-ink leading-[1.15] tracking-tight mb-4'>
               {title}
             </h2>
             {subtitle && (
-              <p className='text-base lg:text-lg text-stone-600 font-light leading-relaxed max-w-md mx-auto'>
+              <p className='text-base lg:text-lg text-ink-2 font-normal leading-relaxed max-w-md mx-auto'>
                 {subtitle}
               </p>
             )}
@@ -64,12 +64,12 @@ export function HomeFeaturedProducts({
             {[...Array(maxProducts)].map((_, index) => (
               <div
                 key={index}
-                className='bg-white rounded-lg border border-gray-200 animate-pulse'>
-                <div className='aspect-square bg-gray-200' />
+                className='bg-surface border border-line animate-pulse'>
+                <div className='aspect-square bg-surface-2' />
                 <div className='p-4 space-y-3'>
-                  <div className='h-4 bg-gray-200 rounded w-3/4' />
-                  <div className='h-4 bg-gray-200 rounded w-1/2' />
-                  <div className='h-4 bg-gray-200 rounded w-2/3' />
+                  <div className='h-4 bg-surface-2 w-3/4' />
+                  <div className='h-4 bg-surface-2 w-1/2' />
+                  <div className='h-4 bg-surface-2 w-2/3' />
                 </div>
               </div>
             ))}
@@ -81,24 +81,24 @@ export function HomeFeaturedProducts({
 
   if (!products || products.length === 0) {
     return (
-      <section className='py-16 bg-gray-50'>
+      <section className='py-16 bg-surface-2'>
         <div className='container mx-auto px-4'>
           <div className='text-center mb-12'>
-            <h2 className='text-3xl lg:text-5xl font-light text-stone-900 leading-[1.15] tracking-tight mb-4'>
+            <h2 className='text-3xl lg:text-5xl font-normal text-ink leading-[1.15] tracking-tight mb-4'>
               {title}
             </h2>
             {subtitle && (
-              <p className='text-base lg:text-lg text-stone-600 font-light leading-relaxed max-w-md mx-auto'>
+              <p className='text-base lg:text-lg text-ink-2 font-normal leading-relaxed max-w-md mx-auto'>
                 {subtitle}
               </p>
             )}
           </div>
-          <div className='max-w-md mx-auto text-center py-12 bg-white rounded-lg border border-gray-200'>
-            <ShoppingBag className='h-16 w-16 mx-auto text-gray-400 mb-4' />
-            <h3 className='text-xl lg:text-2xl font-normal text-stone-900 leading-snug mb-2'>
+          <div className='max-w-md mx-auto text-center py-12 bg-surface border border-line'>
+            <ShoppingBag className='h-16 w-16 mx-auto text-ink-2 mb-4' />
+            <h3 className='text-xl lg:text-2xl font-normal text-ink leading-snug mb-2'>
               {t("home.no_products_title")}
             </h3>
-            <p className='text-sm text-stone-600 font-light leading-relaxed mb-6'>
+            <p className='text-sm text-ink-2 font-normal leading-relaxed mb-6'>
               {t("home.no_products_body")}
             </p>
             {showViewAllButton && (
@@ -113,15 +113,15 @@ export function HomeFeaturedProducts({
   }
 
   return (
-    <section className='py-16 bg-gray-50'>
+    <section className='py-16 bg-surface-2'>
       <div className='container mx-auto px-4'>
         {/* Section Header */}
         <div className='text-center mb-12'>
-          <h2 className='text-3xl md:text-4xl font-bold text-gray-900 mb-3'>
+          <h2 className='text-3xl md:text-4xl font-medium text-ink mb-3'>
             {title}
           </h2>
           {subtitle && (
-            <p className='text-gray-600 text-lg max-w-2xl mx-auto'>
+            <p className='text-ink-2 text-lg max-w-2xl mx-auto'>
               {subtitle}
             </p>
           )}
@@ -136,7 +136,7 @@ export function HomeFeaturedProducts({
               showVendor={false}
               showImage={true}
               imageSize='medium'
-              className='h-full transition-all hover:shadow-lg'
+              className='h-full transition-all'
             />
           ))}
         </div>

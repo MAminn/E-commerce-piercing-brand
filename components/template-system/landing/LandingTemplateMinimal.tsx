@@ -9,6 +9,7 @@ import { MinimalBundleSection } from "#root/components/bundles/MinimalBundleSect
 import { PickYourSetSection } from "#root/components/bundles/PickYourSetSection";
 import type { BundleCardCampaign } from "#root/components/bundles/BundleCampaignCard";
 import { TrustStrip } from "#root/components/template-system/minimal/TrustStrip";
+import { OfferBlock } from "#root/components/storefront/promo/PromoLayer";
 import { distinctRails } from "./distinct-rails";
 import { QuickViewDialog } from "#root/components/template-system/minimal/QuickViewDialog";
 import { TestimonialsSection } from "#root/components/template-system/shared/TestimonialsSection";
@@ -320,6 +321,9 @@ export function LandingTemplateMinimal({
         video={heroVideo}
         onCtaClick={onCtaClick}
       />
+
+      {/* Promotional offer block (shared/config/promo-layer, off) */}
+      <OfferBlock />
 
       {/* ═══════════════════════════════════════════════
           PICK YOUR SET — the first selling block after the hero
