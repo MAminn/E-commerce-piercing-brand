@@ -33,6 +33,8 @@ export interface SearchResultProduct {
   imageUrl?: string;
   categoryName?: string;
   available: boolean;
+  /** The product has option groups: cards send it to its page to choose them. */
+  requiresOptions?: boolean;
 }
 
 /**
@@ -232,6 +234,7 @@ export function SearchResultsMinimal({
                         imageUrl: product.imageUrl,
                         categoryName: product.categoryName,
                         available: product.available,
+                        requiresOptions: product.requiresOptions,
                       } satisfies MinimalProduct
                     }
                   />

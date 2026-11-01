@@ -236,7 +236,8 @@ describe("cart after the saved cart is read", () => {
     seed({ items: [line()] });
     render(tree());
     // The sticky bar states the saving (offer names sit behind its toggle).
-    await waitFor(() => expect(screen.getByTestId("cart-sticky-checkout").textContent).toMatch(/Saving EGP\s?20\.00/));
+    // One money rule storefront-wide: whole amounts print without decimals.
+    await waitFor(() => expect(screen.getByTestId("cart-sticky-checkout").textContent).toMatch(/Saving EGP\s?20(?![.\d])/));
     expect(offerEvaluate).toHaveBeenCalled();
     expect(screen.queryByTestId("cart-loading")).toBeNull();
   });

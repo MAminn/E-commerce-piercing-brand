@@ -6,7 +6,9 @@ import {
   product,
   productImage,
   productCategory,
+  productVariant,
 } from "#root/shared/database/drizzle/schema";
+import { requiresOptionSelection } from "#root/shared/products/options";
 import { and, desc, asc, eq, inArray, count, exists, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import { z } from "zod";
@@ -173,6 +175,24 @@ export const searchProducts = (input: z.infer<typeof searchProductsSchema>) =>
           .where(inArray(productCategory.productId, productIds))
           .execute();
 
+        // Option groups per product (one query for the page). A product with
+        // any group must have its options chosen on the product page, so
+        // cards route it there instead of adding it with none chosen.
+        const optionGroupRows =
+          productIds.length === 0
+            ? []
+            : await db
+                .select({ productId: productVariant.productId })
+                .from(productVariant)
+                .where(inArray(productVariant.productId, productIds))
+                .execute();
+        const optionGroupsByProduct = new Map<string, { values: unknown[] }[]>();
+        for (const row of optionGroupRows) {
+          const list = optionGroupsByProduct.get(row.productId) ?? [];
+          list.push({ values: [] });
+          optionGroupsByProduct.set(row.productId, list);
+        }
+
         // Organize categories by product ID
         const productCategoriesMap = new Map<
           string,
@@ -214,6 +234,7 @@ export const searchProducts = (input: z.infer<typeof searchProductsSchema>) =>
                   ? [{ url: item.imageUrl, isPrimary: true }]
                   : [],
             categories: categories,
+            requiresOptions: requiresOptionSelection(optionGroupsByProduct.get(item.id) ?? []),
           };
         });
 

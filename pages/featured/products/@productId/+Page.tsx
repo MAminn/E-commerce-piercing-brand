@@ -112,6 +112,7 @@ export default function ProductDetailPage() {
           categoryName: item.categoryName || "",
           stock: item.stock || 0,
           available: (item.stock || 0) > 0,
+          requiresOptions: item.requiresOptions ?? false,
         }));
 
       // ── Fetch category groups (for inline carousels) ──

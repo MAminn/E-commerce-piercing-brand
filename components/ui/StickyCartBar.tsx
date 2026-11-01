@@ -175,6 +175,7 @@ export function StickyCartBar({
   const [visible, setVisible] = useState(false);
   const [offers, setOffers] = useState<ActiveOffer[]>([]);
   const [savingsExpanded, setSavingsExpanded] = useState(false);
+  const barRef = useRef<HTMLDivElement>(null);
   const prevItems = useRef(0);
   const currency = STORE_CURRENCY;
 
@@ -227,6 +228,33 @@ export function StickyCartBar({
     [offers, subtotal, totalItems, total, appliedOffers, currency, totalSavings],
   );
 
+  const shown = visible && !isHidden && totalItems > 0;
+
+  // Reserve the bar's height while it is on screen: the storefront <main>
+  // gets matching bottom padding (so the last product row and the footer can
+  // always scroll fully clear of it) and the document a matching
+  // scroll-padding (so focus and scroll-into-view never land under it). The
+  // measured height is 0 where the bar is display:none (desktopOnly below
+  // 1024px), so nothing is reserved there.
+  useEffect(() => {
+    const el = barRef.current;
+    const root = document.documentElement;
+    if (!shown || !el) {
+      root.style.removeProperty("--perce-sticky-bar-h");
+      return;
+    }
+    const update = () => root.style.setProperty("--perce-sticky-bar-h", `${Math.ceil(el.getBoundingClientRect().height)}px`);
+    update();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
+    ro?.observe(el);
+    window.addEventListener("resize", update, { passive: true });
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", update);
+      root.style.removeProperty("--perce-sticky-bar-h");
+    };
+  }, [shown]);
+
   if (isHidden || totalItems === 0) return null;
 
   const isUnlocked = strip.kind === "unlocked";
@@ -236,6 +264,8 @@ export function StickyCartBar({
 
   return (
     <div
+      ref={barRef}
+      data-sticky-bag-bar=''
       className={cn(
         "pointer-events-none fixed inset-x-0 bottom-0 px-4 pb-4 transition-opacity duration-[var(--perce-duration)]",
         desktopOnly && "hidden lg:block",

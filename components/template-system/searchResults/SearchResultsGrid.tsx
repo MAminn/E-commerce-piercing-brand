@@ -33,6 +33,8 @@ export interface SearchResultProduct {
   imageUrl?: string;
   categoryName?: string;
   available: boolean;
+  /** The product has option groups: cards send it to its page to choose them. */
+  requiresOptions?: boolean;
 }
 
 /**

@@ -59,6 +59,7 @@ export default function SearchPage() {
               imageUrl: p.imageUrl ?? p.images?.[0] ?? undefined,
               categoryName: p.categoryName ?? p.categories?.[0]?.name ?? undefined,
               available: p.available ?? (p.stock ?? 0) > 0,
+              requiresOptions: p.requiresOptions ?? false,
             }),
           );
           setProducts(mapped);

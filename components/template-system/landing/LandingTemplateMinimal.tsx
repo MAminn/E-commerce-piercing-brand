@@ -259,6 +259,7 @@ export function LandingTemplateMinimal({
     images: p.images,
     categoryName: p.categoryName ?? undefined,
     available: p.available,
+    requiresOptions: p.requiresOptions,
     categories: p.categories,
     isNew: true,
   }));
@@ -275,6 +276,7 @@ export function LandingTemplateMinimal({
     images: p.images,
     categoryName: p.categoryName ?? undefined,
     available: p.available,
+    requiresOptions: p.requiresOptions,
     categories: p.categories,
   }));
 
@@ -290,6 +292,7 @@ export function LandingTemplateMinimal({
     images: p.images,
     categoryName: p.categoryName ?? undefined,
     available: p.available,
+    requiresOptions: p.requiresOptions,
     categories: p.categories,
   }));
 

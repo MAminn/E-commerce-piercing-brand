@@ -16,6 +16,8 @@ export interface FeaturedProduct {
   images?: { url: string; isPrimary?: boolean }[];
   categoryName?: string | null;
   available: boolean;
+  /** The product has option groups: cards send it to its page to choose them. */
+  requiresOptions?: boolean;
   categories?: { id: string; name: string }[];
 }
 

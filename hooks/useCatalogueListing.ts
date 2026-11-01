@@ -49,6 +49,8 @@ export interface ListingProduct {
   images: { url: string; isPrimary: boolean }[];
   categoryName: string | null;
   available: boolean;
+  /** The product has option groups: cards send it to its page to choose them. */
+  requiresOptions?: boolean;
 }
 
 /** The route's own narrowing, before the shopper's filters. */
@@ -106,6 +108,7 @@ function toListingProduct(p: {
   imageUrl: string | null;
   images: { url: string; isPrimary: boolean }[];
   categoryName: string | null;
+  requiresOptions?: boolean;
 }): ListingProduct {
   return {
     id: p.id,
@@ -118,6 +121,7 @@ function toListingProduct(p: {
     images: p.images,
     categoryName: p.categoryName || null,
     available: p.stock > 0,
+    requiresOptions: p.requiresOptions ?? false,
   };
 }
 

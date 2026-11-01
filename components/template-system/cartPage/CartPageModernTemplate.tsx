@@ -210,7 +210,7 @@ export function CartPageModernTemplate({
   const [couponFeedback, setCouponFeedback] = useCouponFeedback(appliedCoupon?.code, couponNotice);
   const { t, locale } = useMinimalI18n();
   const money = (amount: number) =>
-    formatMoney(amount, { locale, currency, alwaysShowFraction: true });
+    formatMoney(amount, { locale, currency });
 
   const handleApplyCoupon = async () => {
     const code = couponCode.trim();

@@ -99,6 +99,7 @@ function Page() {
               categoryName: item.categoryName || "",
               categories: item.categories,
               available: item.stock > 0,
+              requiresOptions: item.requiresOptions ?? false,
             })),
           );
         }
@@ -215,6 +216,7 @@ function Page() {
               images: item.images,
               categoryName: item.categoryName || null,
               available: item.stock > 0,
+              requiresOptions: item.requiresOptions ?? false,
             })),
           );
         }
@@ -334,6 +336,7 @@ function Page() {
               categoryName: item.categoryName || "",
               categories: item.categories,
               available: item.stock > 0,
+              requiresOptions: item.requiresOptions ?? false,
             })),
           );
         }

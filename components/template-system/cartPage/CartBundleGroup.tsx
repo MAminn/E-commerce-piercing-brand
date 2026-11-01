@@ -49,7 +49,7 @@ interface CartBundleGroupProps {
 export function CartBundleGroup({ bundle, currency, onRemove, disabled }: CartBundleGroupProps) {
   const unitCount = bundle.items.reduce((s, i) => s + i.quantity, 0);
   const saving = bundle.regularTotal - bundle.bundlePrice;
-  const money = (amount: number) => formatMoney(amount, { currency, alwaysShowFraction: true });
+  const money = (amount: number) => formatMoney(amount, { currency });
   let index = 0;
 
   return (

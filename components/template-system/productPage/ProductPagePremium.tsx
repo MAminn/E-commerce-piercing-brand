@@ -484,6 +484,7 @@ export function ProductPagePremium({
     available: p.available,
     categoryName: p.categoryName,
     categories: p.categories,
+    requiresOptions: p.requiresOptions,
   }));
 
   return (

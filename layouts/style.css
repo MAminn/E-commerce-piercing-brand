@@ -775,6 +775,15 @@ html[data-page-transition="out"] body {
   }
 }
 
+/* Space for the desktop sticky bag bar while it is visible (StickyCartBar
+   sets --perce-sticky-bar-h to its measured height; unset = nothing). */
+html {
+  scroll-padding-bottom: var(--perce-sticky-bar-h, 0px);
+}
+main.storefront-shell {
+  padding-bottom: var(--perce-sticky-bar-h, 0px);
+}
+
 /* ── Storefront-only overrides of the shared shadcn variables ──────────────
    Keyed on the storefront <main> being on the page (not on the element
    itself) so Radix portals — dialogs, sheets, popovers, dropdowns, which

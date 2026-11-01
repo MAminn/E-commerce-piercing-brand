@@ -18,6 +18,8 @@ export interface NewArrivalProduct {
   images?: { url: string; isPrimary?: boolean }[];
   categoryName?: string | null;
   available: boolean;
+  /** The product has option groups: cards send it to its page to choose them. */
+  requiresOptions?: boolean;
 }
 
 export interface NewArrivalsProps {

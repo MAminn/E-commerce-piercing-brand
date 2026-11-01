@@ -26,6 +26,8 @@ export interface MinimalProduct {
   imageUrl?: string | null;
   images?: ProductImage[];
   available: boolean;
+  /** The product has option groups: cards send it to its page to choose them. */
+  requiresOptions?: boolean;
   categoryName?: string | null;
   categories?: { id: string; name: string }[];
   description?: string | null;
@@ -57,11 +59,15 @@ function resolveImageUrl(url?: string | null): string {
  * tabular data, with a compare-at price only when it is real. Desktop
  * crossfades to a second photo on hover when the product has one.
  *
- * Add to bag is a 36px square `+` inside the photo, bottom-end, 8px in, with
- * a 44px hit area — always visible on touch, on hover/focus from 1024px. It
- * adds exactly what the old full-width bar added (same cart call, same
- * tracking, same toast). Sold out: the photo dims to 70%, the `+` is gone
- * and a "Sold out" label sits under the price.
+ * The `+` is a 36px square inside the photo, bottom-end, 8px in, with a 44px
+ * hit area — always visible on touch, on hover/focus from 1024px.
+ *   - No option groups: it adds to the bag exactly as the old full-width bar
+ *     did (same cart call, same AddToCart tracking, same toast).
+ *   - Option groups (`requiresOptions`): it is a link to the product page,
+ *     where the options are chosen. Nothing is added and no AddToCart fires
+ *     from the card — a piece is never bagged with its options unchosen.
+ * Sold out: the photo dims to 70%, the `+` is gone and a "Sold out" label
+ * sits under the price.
  */
 export function MinimalProductCard({ product, className }: MinimalProductCardProps) {
   const { addItem } = useCart();
@@ -105,7 +111,7 @@ export function MinimalProductCard({ product, className }: MinimalProductCardPro
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      if (!product.available) return;
+      if (!product.available || product.requiresOptions) return;
       setIsAdding(true);
       try {
         flyToCart(addToCartBtnRef.current, displayImageUrl);
@@ -208,8 +214,22 @@ export function MinimalProductCard({ product, className }: MinimalProductCardPro
           <Heart size={20} strokeWidth={1.5} aria-hidden className={cn(wishlisted && "fill-current")} />
         </button>
 
+        {/* Options to choose: the same square, as a link to the product page. */}
+        {!soldOut && product.requiresOptions && (
+          <a
+            href={productUrl}
+            data-choose-options='true'
+            aria-label={`${t("product.choose_options")}: ${product.name}`}
+            className={cn(
+              "absolute bottom-2 end-2 flex h-9 w-9 items-center justify-center border border-line bg-surface text-ink transition-colors hover:bg-ink hover:text-bg before:absolute before:-inset-1 before:content-['']",
+              revealOnDesktop,
+            )}>
+            <Plus size={20} strokeWidth={1.5} aria-hidden />
+          </a>
+        )}
+
         {/* Add to bag: 36px square, 8px in, 44px hit area. */}
-        {!soldOut && (
+        {!soldOut && !product.requiresOptions && (
           <button
             ref={addToCartBtnRef}
             type='button'

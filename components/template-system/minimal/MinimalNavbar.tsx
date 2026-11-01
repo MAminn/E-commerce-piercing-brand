@@ -5,7 +5,7 @@ import { Link } from "#root/components/utils/Link";
 import { AuthContext } from "#root/context/AuthContext";
 import { useCart } from "#root/lib/context/CartContext";
 import { useLayoutSettings } from "#root/frontend/contexts/LayoutSettingsContext";
-import { HeaderLogo } from "#root/components/globals/HeaderLogo";
+import { BRAND_WORDMARK } from "#root/shared/config/branding";
 import { Marquee } from "#root/components/ui/marquee";
 import { navigate } from "vike/client/router";
 import { trpc } from "#root/shared/trpc/client";
@@ -283,10 +283,7 @@ export function MinimalNavbar() {
 
             {/* ── Wordmark: centred on phones, at the start from 1024px ── */}
             <div className='absolute inset-x-0 mx-auto flex w-max items-center lg:static lg:mx-0'>
-              <HeaderLogo
-                variant='responsive'
-                textClassName='perce-logo-text inline-flex min-h-11 items-center text-[1.375rem] text-ink lg:text-2xl'
-              />
+              <Wordmark className='text-[1.375rem] lg:text-2xl' />
             </div>
 
             {/* ── Desktop: primary links beside the wordmark ── */}
@@ -465,14 +462,7 @@ export function MinimalNavbar() {
           <SheetTitle className='sr-only'>{t("nav.menu")}</SheetTitle>
           <div className='flex h-full flex-col'>
             <div className='flex h-14 items-center justify-between border-b border-line px-4'>
-              <HeaderLogo
-                variant='mobile'
-                onClick={() => {
-                  handleCloseSheet();
-                  navigate("/");
-                }}
-                textClassName='perce-logo-text inline-flex min-h-11 items-center text-[1.375rem] text-ink'
-              />
+              <Wordmark className='text-[1.375rem]' onClick={handleCloseSheet} />
               <IconButton aria-label={t("nav.close_menu")} onClick={handleCloseSheet} className='-me-3'>
                 <X {...ICON_PROPS} />
               </IconButton>
@@ -565,6 +555,24 @@ export function MinimalNavbar() {
         </SheetContent>
       </Sheet>
     </>
+  );
+}
+
+/**
+ * The locked header mark: the lowercase "percé" wordmark in ink on stone,
+ * always. It deliberately does NOT render the CMS header logo image — an
+ * asset made for the old dark header can vanish on the stone bar. The stored
+ * logo settings are untouched (other shells and emails still read them).
+ */
+function Wordmark({ className, onClick }: { className?: string; onClick?: () => void }) {
+  return (
+    <a
+      href='/'
+      onClick={onClick}
+      data-testid='header-wordmark'
+      className={cn("perce-wordmark inline-flex min-h-11 items-center text-ink", className)}>
+      {BRAND_WORDMARK}
+    </a>
   );
 }
 
