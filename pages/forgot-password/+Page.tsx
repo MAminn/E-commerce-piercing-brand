@@ -57,36 +57,36 @@ export default function Page() {
   return (
     <section className='relative w-full h-screen flex justify-center items-center py-12 md:py-24 px-4 md:px-8 overflow-hidden'>
       {/* Background */}
-      <div className='absolute inset-0 bg-gradient-to-br from-[#1A1612] via-[#2B231D] to-[#1C1814]' />
+      <div className='absolute inset-0 bg-bg' />
       <div
         className='absolute inset-0 opacity-[0.015]'
         style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
         }}
       />
-      <div className='absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.5)_100%)]' />
+      <div className='absolute inset-0 hidden' />
 
       {/* Card */}
-      <div className='relative w-full max-w-[420px] h-auto bg-[#F8F6F3] flex flex-col gap-10 p-12 md:p-14 animate-in fade-in duration-700 ease-out'>
+      <div className='relative w-full max-w-[420px] h-auto bg-surface border border-line flex flex-col gap-10 p-12 md:p-14 animate-in fade-in duration-700 ease-out'>
         <div className='absolute inset-0' />
 
         {isSuccess ? (
           <div className='relative flex flex-col items-center gap-6 text-center'>
-            <div className='w-16 h-16 bg-[#E8F5E9] flex items-center justify-center'>
-              <CheckCircle className='w-8 h-8 text-[#4CAF50]' />
+            <div className='w-16 h-16 bg-surface-2 flex items-center justify-center'>
+              <CheckCircle className='w-8 h-8 text-success' />
             </div>
             <div className='space-y-3'>
-              <h1 className='text-[24px] md:text-[28px] font-medium tracking-[-0.02em] text-[#2B231D] leading-tight'>
+              <h1 className='text-[24px] md:text-[28px] font-medium tracking-[-0.02em] text-ink leading-tight'>
                 Check your email
               </h1>
-              <p className='text-[14px] text-[#8B7E74] leading-relaxed max-w-[300px]'>
+              <p className='text-[14px] text-ink-2 leading-relaxed max-w-[300px]'>
                 If an account exists with that email, we've sent a password
                 reset link. Please check your inbox and spam folder.
               </p>
             </div>
             <Link
               href='/login'
-              className='inline-flex items-center gap-2 text-[13px] text-[#2B231D] hover:text-[#C4A574] transition-all duration-500 font-normal mt-4'>
+              className='inline-flex items-center gap-2 text-[13px] text-ink hover:text-ink-2 transition-all duration-500 font-normal mt-4'>
               <ArrowLeft className='w-4 h-4' />
               Back to login
             </Link>
@@ -94,10 +94,10 @@ export default function Page() {
         ) : (
           <>
             <div className='relative space-y-3'>
-              <h1 className='text-[28px] md:text-[32px] text-center font-medium tracking-[-0.02em] text-[#2B231D] leading-tight'>
+              <h1 className='text-[28px] md:text-[32px] text-center font-medium tracking-[-0.02em] text-ink leading-tight'>
                 Forgot password?
               </h1>
-              <p className='text-center text-[13px] text-[#8B7E74] leading-relaxed'>
+              <p className='text-center text-[13px] text-ink-2 leading-relaxed'>
                 Enter your email and we'll send you a reset link
               </p>
             </div>
@@ -108,7 +108,7 @@ export default function Page() {
               <div className='relative'>
                 <label
                   htmlFor='email'
-                  className='block text-[10px] text-[#8B7E74] mb-3 font-medium'>
+                  className='block text-[10px] text-ink-2 mb-3 font-medium'>
                   Email
                 </label>
                 <Input
@@ -116,18 +116,18 @@ export default function Page() {
                   id='email'
                   type='email'
                   placeholder='your@email.com'
-                  className='border-0 border-b border-[#D9D3CC] bg-transparent px-0 py-3 w-full text-[15px] focus:outline-none focus:ring-0 focus:border-[#C4A574] transition-all duration-500 placeholder:text-[#BFB5AA] text-[#2B231D] font-normal'
+                  className='border-0 border-b border-line-input bg-transparent px-0 py-3 w-full text-[15px] focus:outline-none focus:ring-0 focus:border-ink transition-all duration-500 placeholder:text-ink-3 text-ink font-normal'
                   disabled={isSubmitting}
                 />
                 {form.formState.errors.email && (
-                  <p className='text-[#9D6B6B] text-[11px] mt-2.5'>
+                  <p className='text-error text-[11px] mt-2.5'>
                     {form.formState.errors.email.message}
                   </p>
                 )}
               </div>
 
               <Button
-                className='w-full bg-[#2B231D] hover:bg-[#3A3028] text-[#F8F6F3] font-normal text-[14px] mt-4 py-7 transition-all duration-500'
+                className='w-full bg-ink hover:bg-hover text-bg font-normal text-[14px] mt-4 py-7 transition-all duration-500'
                 type='submit'
                 disabled={isSubmitting}>
                 {isSubmitting ? "Sending..." : "Send Reset Link"}
@@ -135,7 +135,7 @@ export default function Page() {
 
               <Link
                 href='/login'
-                className='inline-flex items-center justify-center gap-2 text-[13px] text-[#2B231D] hover:text-[#C4A574] transition-all duration-500 font-normal mt-2'>
+                className='inline-flex items-center justify-center gap-2 text-[13px] text-ink hover:text-ink-2 transition-all duration-500 font-normal mt-2'>
                 <ArrowLeft className='w-4 h-4' />
                 Back to login
               </Link>

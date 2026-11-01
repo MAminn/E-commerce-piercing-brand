@@ -1,18 +1,15 @@
 "use client";
 
-import { Link } from "#root/components/utils/Link";
 import {
   CheckCircle,
   Package,
-  Home,
-  ShoppingBag,
   XCircle,
   Clock,
   AlertTriangle,
   Loader2,
   HelpCircle,
 } from "lucide-react";
-import { Button } from "#root/components/ui/button";
+import { ButtonLink } from "#root/components/storefront/Button";
 import { formatMoney } from "#root/shared/pricing/format-money";
 import type { ConfirmationView } from "./confirmation-state";
 
@@ -48,24 +45,25 @@ export function OrderConfirmationCard({
     <div className='perce-header-offset flex min-h-screen items-center justify-center bg-perce-bg px-4 py-12 sm:py-16'>
       <div className='flex w-full max-w-2xl flex-col border border-perce-line bg-perce-surface-raised px-6 pb-12 pt-8 text-center sm:px-8'>
         {/* Icon */}
-        <div className='mx-auto mb-6 flex h-14 w-14 items-center justify-center bg-perce-surface'>
+        {/* State glyph — 24px line icon, no tile */}
+        <div className='mx-auto mb-6 flex h-11 w-11 items-center justify-center'>
           {view.kind === "loading" && (
             <Loader2
               aria-hidden
-              className='h-7 w-7 animate-spin text-perce-ink-secondary'
+              className='h-6 w-6 animate-spin text-ink-2' strokeWidth={1.5}
             />
           )}
           {view.kind === "not-found" && (
-            <HelpCircle aria-hidden className='h-7 w-7 text-perce-ink-secondary' />
+            <HelpCircle aria-hidden strokeWidth={1.5} className='h-6 w-6 text-ink-2' />
           )}
           {view.kind === "placed" && (
-            <CheckCircle aria-hidden className='h-7 w-7 text-perce-success' />
+            <CheckCircle aria-hidden strokeWidth={1.5} className='h-6 w-6 text-ink' />
           )}
           {view.kind === "pending" && (
-            <Clock aria-hidden className='h-7 w-7 text-perce-ink-secondary' />
+            <Clock aria-hidden strokeWidth={1.5} className='h-6 w-6 text-ink-2' />
           )}
           {view.kind === "failed" && (
-            <XCircle aria-hidden className='h-7 w-7 text-perce-sale' />
+            <XCircle aria-hidden strokeWidth={1.5} className='h-6 w-6 text-error' />
           )}
         </div>
 
@@ -124,7 +122,7 @@ export function OrderConfirmationCard({
             {orderNumber && (
               <div className='flex justify-between items-center flex-wrap gap-2'>
                 <span className='text-sm text-perce-ink-muted'>Order number</span>
-                <span className='font-mono text-sm font-medium text-perce-ink'>
+                <span className='t-label tabular-nums text-ink'>
                   {orderNumber}
                 </span>
               </div>
@@ -198,18 +196,12 @@ export function OrderConfirmationCard({
         {/* Actions */}
         {view.kind !== "loading" && (
           <div className='mt-6 flex flex-col justify-center gap-3 sm:flex-row'>
-            <Button asChild variant='outline' className='min-h-11 gap-2'>
-              <Link href='/'>
-                <Home aria-hidden className='h-4 w-4' />
-                <span className='text-xs md:text-sm'>Back to home</span>
-              </Link>
-            </Button>
-            <Button asChild className='min-h-11 gap-2'>
-              <Link href='/shop'>
-                <ShoppingBag aria-hidden className='h-4 w-4' />
-                <span className='text-xs md:text-sm'>Continue shopping</span>
-              </Link>
-            </Button>
+            <ButtonLink href='/' variant='secondary' size='md'>
+              Back to home
+            </ButtonLink>
+            <ButtonLink href='/shop' variant='primary' size='md'>
+              Continue shopping
+            </ButtonLink>
           </div>
         )}
       </div>

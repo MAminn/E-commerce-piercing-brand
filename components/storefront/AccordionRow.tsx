@@ -13,17 +13,21 @@ export function AccordionRow({
   children,
   defaultOpen = false,
   className,
+  level = 3,
 }: {
   title: ReactNode;
+  /** Heading level of the row title, to fit the page's outline. */
+  level?: 2 | 3;
   children: ReactNode;
   defaultOpen?: boolean;
   className?: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const id = useId();
+  const Heading = level === 2 ? "h2" : "h3";
   return (
     <section className={cn("border-t border-line", className)}>
-      <h3>
+      <Heading>
         <button
           type='button'
           aria-expanded={open}
@@ -37,7 +41,7 @@ export function AccordionRow({
             <Plus aria-hidden size={16} strokeWidth={1.5} className='shrink-0' />
           )}
         </button>
-      </h3>
+      </Heading>
       <div id={id} hidden={!open} className='pb-6 t-body text-ink-2'>
         {children}
       </div>

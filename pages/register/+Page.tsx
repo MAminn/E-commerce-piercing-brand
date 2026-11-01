@@ -87,7 +87,7 @@ export default function Page() {
   return (
     <section className='relative w-full min-h-screen flex justify-center items-center py-12 md:py-24 px-4 md:px-8 overflow-hidden'>
       {/* Background — matches login page */}
-      <div className='absolute inset-0 bg-gradient-to-br from-[#1A1612] via-[#2B231D] to-[#1C1814]' />
+      <div className='absolute inset-0 bg-bg' />
 
       {/* Subtle grain texture */}
       <div
@@ -98,31 +98,31 @@ export default function Page() {
       />
 
       {/* Cinematic vignette */}
-      <div className='absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.5)_100%)]' />
+      <div className='absolute inset-0 hidden' />
 
       {/* Card */}
-      <div className='relative w-full max-w-[460px] h-auto bg-[#F8F6F3] flex flex-col gap-8 p-10 md:p-12 animate-in fade-in duration-700 ease-out'>
+      <div className='relative w-full max-w-[460px] h-auto bg-surface border border-line flex flex-col gap-8 p-10 md:p-12 animate-in fade-in duration-700 ease-out'>
         {/* Soft inner glow */}
         <div className='absolute inset-0' />
 
         {isRegistered ? (
           /* ── Success state ── */
           <div className='relative flex flex-col items-center gap-6 text-center'>
-            <div className='w-16 h-16 bg-[#E8F5E9] flex items-center justify-center'>
-              <CheckCircle className='w-8 h-8 text-[#4CAF50]' />
+            <div className='w-16 h-16 bg-surface-2 flex items-center justify-center'>
+              <CheckCircle className='w-8 h-8 text-success' />
             </div>
             <div className='space-y-3'>
-              <h1 className='text-[24px] md:text-[28px] font-medium tracking-[-0.02em] text-[#2B231D] leading-tight'>
+              <h1 className='text-[24px] md:text-[28px] font-medium tracking-[-0.02em] text-ink leading-tight'>
                 You're all set
               </h1>
-              <p className='text-[14px] text-[#8B7E74] leading-relaxed max-w-[320px]'>
+              <p className='text-[14px] text-ink-2 leading-relaxed max-w-[320px]'>
                 Please check your email to verify your account. Once verified,
                 you can log in to access all features.
               </p>
             </div>
             <Link
               href='/login'
-              className='inline-flex items-center gap-2 text-[13px] text-[#2B231D] hover:text-[#C4A574] transition-all duration-500 font-normal mt-4'>
+              className='inline-flex items-center gap-2 text-[13px] text-ink hover:text-ink-2 transition-all duration-500 font-normal mt-4'>
               <ArrowLeft className='w-4 h-4' />
               Go to login
             </Link>
@@ -131,10 +131,10 @@ export default function Page() {
           /* ── Registration form ── */
           <>
             <div className='relative space-y-3'>
-              <h1 className='text-[28px] md:text-[32px] text-center font-medium tracking-[-0.02em] text-[#2B231D] leading-tight'>
+              <h1 className='text-[28px] md:text-[32px] text-center font-medium tracking-[-0.02em] text-ink leading-tight'>
                 Create account
               </h1>
-              <p className='text-center text-[13px] text-[#8B7E74] leading-relaxed'>
+              <p className='text-center text-[13px] text-ink-2 leading-relaxed'>
                 Join us — it only takes a moment
               </p>
             </div>
@@ -148,7 +148,7 @@ export default function Page() {
                 <div className='relative'>
                   <label
                     htmlFor='name'
-                    className='block text-[10px] text-[#8B7E74] mb-3 font-medium'>
+                    className='block text-[10px] text-ink-2 mb-3 font-medium'>
                     Full name
                   </label>
                   <Input
@@ -156,11 +156,11 @@ export default function Page() {
                     id='name'
                     type='text'
                     placeholder='Jane Doe'
-                    className='border-0 border-b border-[#D9D3CC] bg-transparent px-0 py-3 w-full text-[15px] focus:outline-none focus:ring-0 focus:border-[#C4A574] transition-all duration-500 placeholder:text-[#BFB5AA] text-[#2B231D] font-normal'
+                    className='border-0 border-b border-line-input bg-transparent px-0 py-3 w-full text-[15px] focus:outline-none focus:ring-0 focus:border-ink transition-all duration-500 placeholder:text-ink-3 text-ink font-normal'
                     disabled={isSubmitting}
                   />
                   {form.formState.errors.name && (
-                    <p className='text-[#9D6B6B] text-[11px] mt-2.5'>
+                    <p className='text-error text-[11px] mt-2.5'>
                       {form.formState.errors.name.message}
                     </p>
                   )}
@@ -170,7 +170,7 @@ export default function Page() {
                 <div className='relative'>
                   <label
                     htmlFor='email'
-                    className='block text-[10px] text-[#8B7E74] mb-3 font-medium'>
+                    className='block text-[10px] text-ink-2 mb-3 font-medium'>
                     Email
                   </label>
                   <Input
@@ -178,11 +178,11 @@ export default function Page() {
                     id='email'
                     type='email'
                     placeholder='your@email.com'
-                    className='border-0 border-b border-[#D9D3CC] bg-transparent px-0 py-3 w-full text-[15px] focus:outline-none focus:ring-0 focus:border-[#C4A574] transition-all duration-500 placeholder:text-[#BFB5AA] text-[#2B231D] font-normal'
+                    className='border-0 border-b border-line-input bg-transparent px-0 py-3 w-full text-[15px] focus:outline-none focus:ring-0 focus:border-ink transition-all duration-500 placeholder:text-ink-3 text-ink font-normal'
                     disabled={isSubmitting}
                   />
                   {form.formState.errors.email && (
-                    <p className='text-[#9D6B6B] text-[11px] mt-2.5'>
+                    <p className='text-error text-[11px] mt-2.5'>
                       {form.formState.errors.email.message}
                     </p>
                   )}
@@ -193,7 +193,7 @@ export default function Page() {
               <div className='relative'>
                 <label
                   htmlFor='phone'
-                  className='block text-[10px] text-[#8B7E74] mb-3 font-medium'>
+                  className='block text-[10px] text-ink-2 mb-3 font-medium'>
                   Phone
                 </label>
                 <Input
@@ -201,11 +201,11 @@ export default function Page() {
                   id='phone'
                   type='tel'
                   placeholder='+201xxxxxxxxx'
-                  className='border-0 border-b border-[#D9D3CC] bg-transparent px-0 py-3 w-full text-[15px] focus:outline-none focus:ring-0 focus:border-[#C4A574] transition-all duration-500 placeholder:text-[#BFB5AA] text-[#2B231D] font-normal'
+                  className='border-0 border-b border-line-input bg-transparent px-0 py-3 w-full text-[15px] focus:outline-none focus:ring-0 focus:border-ink transition-all duration-500 placeholder:text-ink-3 text-ink font-normal'
                   disabled={isSubmitting}
                 />
                 {form.formState.errors.phone && (
-                  <p className='text-[#9D6B6B] text-[11px] mt-2.5'>
+                  <p className='text-error text-[11px] mt-2.5'>
                     {form.formState.errors.phone.message}
                   </p>
                 )}
@@ -217,7 +217,7 @@ export default function Page() {
                 <div className='relative'>
                   <label
                     htmlFor='password'
-                    className='block text-[10px] text-[#8B7E74] mb-3 font-medium'>
+                    className='block text-[10px] text-ink-2 mb-3 font-medium'>
                     Password
                   </label>
                   <div className='relative'>
@@ -226,13 +226,13 @@ export default function Page() {
                       id='password'
                       type={showPassword ? "text" : "password"}
                       placeholder='Min. 8 characters'
-                      className='border-0 border-b border-[#D9D3CC] bg-transparent px-0 py-3 w-full pr-10 text-[15px] focus:outline-none focus:ring-0 focus:border-[#C4A574] transition-all duration-500 placeholder:text-[#BFB5AA] text-[#2B231D] font-normal'
+                      className='border-0 border-b border-line-input bg-transparent px-0 py-3 w-full pr-10 text-[15px] focus:outline-none focus:ring-0 focus:border-ink transition-all duration-500 placeholder:text-ink-3 text-ink font-normal'
                       disabled={isSubmitting}
                     />
                     <button
                       type='button'
                       onClick={() => setShowPassword(!showPassword)}
-                      className='absolute right-0 top-1/2 transform -translate-y-1/2 text-[#9C918A] hover:text-[#C4A574] transition-colors duration-500 opacity-60 hover:opacity-100'
+                      className='absolute right-0 top-1/2 transform -translate-y-1/2 text-ink-2 hover:text-ink-2 transition-colors duration-500 opacity-60 hover:opacity-100'
                       disabled={isSubmitting}>
                       {showPassword ? (
                         <EyeOff className='h-[15px] w-[15px]' />
@@ -242,7 +242,7 @@ export default function Page() {
                     </button>
                   </div>
                   {form.formState.errors.password && (
-                    <p className='text-[#9D6B6B] text-[11px] mt-2.5'>
+                    <p className='text-error text-[11px] mt-2.5'>
                       {form.formState.errors.password.message}
                     </p>
                   )}
@@ -252,7 +252,7 @@ export default function Page() {
                 <div className='relative'>
                   <label
                     htmlFor='confirmPassword'
-                    className='block text-[10px] text-[#8B7E74] mb-3 font-medium'>
+                    className='block text-[10px] text-ink-2 mb-3 font-medium'>
                     Confirm password
                   </label>
                   <div className='relative'>
@@ -261,7 +261,7 @@ export default function Page() {
                       id='confirmPassword'
                       type={showConfirmPassword ? "text" : "password"}
                       placeholder='Repeat password'
-                      className='border-0 border-b border-[#D9D3CC] bg-transparent px-0 py-3 w-full pr-10 text-[15px] focus:outline-none focus:ring-0 focus:border-[#C4A574] transition-all duration-500 placeholder:text-[#BFB5AA] text-[#2B231D] font-normal'
+                      className='border-0 border-b border-line-input bg-transparent px-0 py-3 w-full pr-10 text-[15px] focus:outline-none focus:ring-0 focus:border-ink transition-all duration-500 placeholder:text-ink-3 text-ink font-normal'
                       disabled={isSubmitting}
                     />
                     <button
@@ -269,7 +269,7 @@ export default function Page() {
                       onClick={() =>
                         setShowConfirmPassword(!showConfirmPassword)
                       }
-                      className='absolute right-0 top-1/2 transform -translate-y-1/2 text-[#9C918A] hover:text-[#C4A574] transition-colors duration-500 opacity-60 hover:opacity-100'
+                      className='absolute right-0 top-1/2 transform -translate-y-1/2 text-ink-2 hover:text-ink-2 transition-colors duration-500 opacity-60 hover:opacity-100'
                       disabled={isSubmitting}>
                       {showConfirmPassword ? (
                         <EyeOff className='h-[15px] w-[15px]' />
@@ -279,7 +279,7 @@ export default function Page() {
                     </button>
                   </div>
                   {form.formState.errors.confirmPassword && (
-                    <p className='text-[#9D6B6B] text-[11px] mt-2.5'>
+                    <p className='text-error text-[11px] mt-2.5'>
                       {form.formState.errors.confirmPassword.message}
                     </p>
                   )}
@@ -288,7 +288,7 @@ export default function Page() {
 
               {/* Submit button */}
               <Button
-                className='w-full bg-[#2B231D] hover:bg-[#3A3028] text-[#F8F6F3] font-normal text-[14px] mt-4 py-7 transition-all duration-500'
+                className='w-full bg-ink hover:bg-hover text-bg font-normal text-[14px] mt-4 py-7 transition-all duration-500'
                 type='submit'
                 disabled={isSubmitting}>
                 {isSubmitting ? "Creating account..." : "Create account"}
@@ -296,16 +296,16 @@ export default function Page() {
 
               {/* Divider + login link */}
               <div className='flex items-center justify-center gap-2 mt-2'>
-                <div className='h-[1px] flex-1 bg-gradient-to-r from-transparent via-[#D9D3CC] to-transparent opacity-40' />
-                <p className='text-center text-[12px] text-[#9C918A] px-4'>
+                <div className='h-px flex-1 bg-line' />
+                <p className='text-center text-[12px] text-ink-2 px-4'>
                   Already have an account?
                 </p>
-                <div className='h-[1px] flex-1 bg-gradient-to-r from-transparent via-[#D9D3CC] to-transparent opacity-40' />
+                <div className='h-px flex-1 bg-line' />
               </div>
 
               <Link
                 href='/login'
-                className='text-center text-[13px] text-[#2B231D] hover:text-[#C4A574] transition-all duration-500 font-normal opacity-80 hover:opacity-100 -mt-2'>
+                className='text-center text-[13px] text-ink hover:text-ink-2 transition-all duration-500 font-normal opacity-80 hover:opacity-100 -mt-2'>
                 Sign in instead
               </Link>
             </form>

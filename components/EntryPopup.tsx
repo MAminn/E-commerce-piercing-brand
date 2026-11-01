@@ -216,6 +216,8 @@ export function EntryPopup() {
     <Dialog open={open && !suppressedHere} onOpenChange={handleOpenChange}>
       <DialogContent
         dir={dir}
+        // The visible description is part of the form copy, not a Radix Description.
+        aria-describedby={undefined}
         onOpenAutoFocus={(event) => {
           if (!isTouchPrimary()) return;
           event.preventDefault();

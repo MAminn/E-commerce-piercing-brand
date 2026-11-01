@@ -161,15 +161,15 @@ export function MinimalProductCard({ product, className }: MinimalProductCardPro
     <article className={cn("group flex flex-col", className)}>
       <div className='relative aspect-[4/5] overflow-hidden bg-surface-2'>
         {/* The title below is the card's one link in the tab order; the photo
-            repeats it for pointer users only. */}
-        <a href={productUrl} tabIndex={-1} aria-hidden='true' className='block h-full w-full'>
+            repeats it for pointer users (same href, tabIndex -1). */}
+        <a href={productUrl} tabIndex={-1} className='block h-full w-full'>
           <img
             ref={(node) => {
               cardImageRef.current = node;
               if (node?.complete) setImageLoaded(true);
             }}
             src={displayImageUrl}
-            alt=''
+            alt={product.name}
             className={cn(
               "h-full w-full object-cover transition-opacity duration-[var(--perce-duration)]",
               !imageLoaded ? "opacity-0" : soldOut ? "opacity-70" : "opacity-100",

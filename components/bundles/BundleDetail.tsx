@@ -57,7 +57,7 @@ export function BundleDetail({ slug }: { slug: string }) {
 
   if (state.status === "loading") {
     return (
-      <div role="status" aria-label="Loading" className="perce-header-offset flex min-h-[60vh] items-center justify-center bg-perce-bg">
+      <div role="status" aria-label="Loading" className="perce-header-offset flex min-h-screen items-center justify-center bg-bg">
         <div className="h-5 w-5 animate-spin border-2 border-perce-border-strong border-t-perce-ink" />
       </div>
     );

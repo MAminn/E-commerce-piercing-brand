@@ -70,34 +70,34 @@ export default function Page() {
 
   return (
     <section className='relative w-full min-h-screen flex justify-center items-center py-12 md:py-24 px-4 md:px-8 overflow-hidden'>
-      <div className='absolute inset-0 bg-gradient-to-br from-[#1A1612] via-[#2B231D] to-[#1C1814]' />
-      <div className='absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.5)_100%)]' />
+      <div className='absolute inset-0 bg-bg' />
+      <div className='absolute inset-0 hidden' />
 
-      <div className='relative w-full max-w-[440px] bg-[#F8F6F3] flex flex-col items-center gap-6 p-12 md:p-14 animate-in fade-in duration-700 ease-out text-center'>
+      <div className='relative w-full max-w-[440px] bg-surface border border-line flex flex-col items-center gap-6 p-12 md:p-14 animate-in fade-in duration-700 ease-out text-center'>
         {state.status === "loading" && (
           <>
-            <Loader2 className='w-8 h-8 text-[#8B7E74] animate-spin' />
-            <p className='text-[14px] text-[#8B7E74]'>Loading your preferences…</p>
+            <Loader2 className='w-8 h-8 text-ink-2 animate-spin' />
+            <p className='text-[14px] text-ink-2'>Loading your preferences…</p>
           </>
         )}
 
         {state.status === "invalid" && (
           <>
-            <div className='w-16 h-16 bg-[#FFF3E0] flex items-center justify-center'>
-              <AlertCircle className='w-8 h-8 text-[#E65100]' />
+            <div className='w-16 h-16 bg-surface-2 flex items-center justify-center'>
+              <AlertCircle className='w-8 h-8 text-error' />
             </div>
             <div className='space-y-3'>
-              <h1 className='text-[24px] font-medium tracking-[-0.02em] text-[#2B231D]'>
+              <h1 className='text-[24px] font-medium tracking-[-0.02em] text-ink'>
                 Invalid link
               </h1>
-              <p className='text-[14px] text-[#8B7E74] leading-relaxed'>
+              <p className='text-[14px] text-ink-2 leading-relaxed'>
                 This unsubscribe link is missing or no longer valid. If you'd
                 like to stop receiving emails, please contact us directly.
               </p>
             </div>
             <Link
               href='/'
-              className='text-[13px] text-[#2B231D] hover:text-[#C4A574] transition-all duration-500 font-normal'>
+              className='text-[13px] text-ink hover:text-ink-2 transition-all duration-500 font-normal'>
               Return home
             </Link>
           </>
@@ -105,14 +105,14 @@ export default function Page() {
 
         {state.status === "loaded" && state.unsubscribed && (
           <>
-            <div className='w-16 h-16 bg-[#E8F5E9] flex items-center justify-center'>
-              <CheckCircle className='w-8 h-8 text-[#4CAF50]' />
+            <div className='w-16 h-16 bg-surface-2 flex items-center justify-center'>
+              <CheckCircle className='w-8 h-8 text-success' />
             </div>
             <div className='space-y-3'>
-              <h1 className='text-[24px] md:text-[28px] font-medium tracking-[-0.02em] text-[#2B231D] leading-tight'>
+              <h1 className='text-[24px] md:text-[28px] font-medium tracking-[-0.02em] text-ink leading-tight'>
                 You're unsubscribed
               </h1>
-              <p className='text-[14px] text-[#8B7E74] leading-relaxed max-w-[320px]'>
+              <p className='text-[14px] text-ink-2 leading-relaxed max-w-[320px]'>
                 {state.email} will no longer receive marketing emails from
                 us. You'll still receive order confirmations and other
                 account-related emails.
@@ -120,7 +120,7 @@ export default function Page() {
             </div>
             <Button
               variant='outline'
-              className='w-full border-[#D9D3CC] text-[#2B231D] font-normal text-[14px] py-7'
+              className='w-full border-line-input text-ink font-normal text-[14px] py-7'
               onClick={handleResubscribe}
               disabled={isSubmitting}>
               {isSubmitting ? "Resubscribing…" : "Resubscribe"}
@@ -130,21 +130,21 @@ export default function Page() {
 
         {state.status === "loaded" && !state.unsubscribed && (
           <>
-            <div className='w-16 h-16 bg-[#F3EFE9] flex items-center justify-center'>
-              <MailX className='w-8 h-8 text-[#8B7E74]' />
+            <div className='w-16 h-16 bg-surface-2 flex items-center justify-center'>
+              <MailX className='w-8 h-8 text-ink-2' />
             </div>
             <div className='space-y-3'>
-              <h1 className='text-[24px] md:text-[28px] font-medium tracking-[-0.02em] text-[#2B231D] leading-tight'>
+              <h1 className='text-[24px] md:text-[28px] font-medium tracking-[-0.02em] text-ink leading-tight'>
                 Email preferences
               </h1>
-              <p className='text-[14px] text-[#8B7E74] leading-relaxed max-w-[320px]'>
+              <p className='text-[14px] text-ink-2 leading-relaxed max-w-[320px]'>
                 {state.email} is currently subscribed to our marketing
                 emails. You can unsubscribe at any time — order-related
                 emails will not be affected.
               </p>
             </div>
             <Button
-              className='w-full bg-[#2B231D] hover:bg-[#3A3028] text-[#F8F6F3] font-normal text-[14px] py-7 transition-all duration-500'
+              className='w-full bg-ink hover:bg-hover text-bg font-normal text-[14px] py-7 transition-all duration-500'
               onClick={handleUnsubscribe}
               disabled={isSubmitting}>
               {isSubmitting ? "Unsubscribing…" : "Unsubscribe"}

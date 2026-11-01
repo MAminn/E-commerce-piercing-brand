@@ -116,12 +116,12 @@ const Page = () => {
     <div>
       {categoryName && (
         <div className='container mx-auto px-4 sm:px-6 lg:px-8 pt-6'>
-          <div className='flex items-center gap-2 text-sm text-stone-600 mb-4'>
-            <a href='/shop' className='hover:text-stone-900 transition-colors'>
+          <div className='flex items-center gap-2 text-sm text-ink-2 mb-4'>
+            <a href='/shop' className='hover:text-ink transition-colors'>
               All Products
             </a>
             <span>/</span>
-            <span className='text-stone-900 font-medium'>{categoryName}</span>
+            <span className='text-ink font-medium'>{categoryName}</span>
           </div>
         </div>
       )}

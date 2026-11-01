@@ -57,7 +57,7 @@ export default function Page() {
         <div className='w-full max-w-md p-8 bg-surface'>
           {verificationStatus === "loading" && (
             <div className='flex flex-col items-center justify-center py-8'>
-              <Loader2 className='h-16 w-16 text-[#1B4571] animate-spin mb-4' />
+              <Loader2 className='h-16 w-16 text-ink animate-spin mb-4' />
               <h1 className='text-2xl font-medium text-center'>
                 Verifying Your Email
               </h1>
@@ -70,14 +70,14 @@ export default function Page() {
           {verificationStatus === "success" && (
             <div className='flex flex-col items-center justify-center py-8'>
               <CheckCircle className='h-16 w-16 text-success mb-4' />
-              <h1 className='text-2xl font-medium text-center text-[#1B4571]'>
+              <h1 className='text-2xl font-medium text-center text-ink'>
                 Email Verified Successfully!
               </h1>
               <p className='text-perce-ink-muted text-center mt-2 mb-6'>
                 Your email has been verified. You can now log in to your account
                 and access all features of {STORE_NAME}.
               </p>
-              <Button className='w-full bg-[#1B4571] hover:bg-[#1B4571]/90'>
+              <Button className='w-full bg-ink hover:bg-hover'>
                 <a href='/login'>Continue to Login</a>
               </Button>
             </div>
@@ -93,7 +93,7 @@ export default function Page() {
                 {errorMessage ||
                   "We couldn't verify your email. The verification link may be invalid or expired."}
               </p>
-              <Button className='w-full bg-[#1B4571] hover:bg-[#1B4571]/90'>
+              <Button className='w-full bg-ink hover:bg-hover'>
                 <a href='/login'>Return to Login</a>
               </Button>
             </div>

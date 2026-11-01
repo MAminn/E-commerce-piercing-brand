@@ -253,14 +253,14 @@ export default function Page() {
 
   if (loading) {
     return (
-      <div className='min-h-screen bg-perce-ground flex items-center justify-center'>
-        <div className='w-5 h-5 border border-white/20 border-t-white/60 rounded-full animate-spin' />
+      <div className='flex min-h-screen items-center justify-center bg-bg'>
+        <div className='h-5 w-5 animate-spin border border-line border-t-ink' />
       </div>
     );
   }
 
   return (
-    <div className='min-h-screen bg-perce-ground flex flex-col items-center justify-center px-6 py-16 selection:bg-white/20'>
+    <div className='flex min-h-screen flex-col items-center justify-center bg-bg px-6 py-16 text-ink'>
       {/* Content wrapper */}
       <div
         className={`w-full max-w-md flex flex-col items-center gap-10 transition-all duration-700 ease-out ${
@@ -268,11 +268,11 @@ export default function Page() {
         }`}>
         {/* Brand header */}
         <header className='flex flex-col items-center gap-3 text-center'>
-          <h1 className='perce-wordmark text-perce-frame-ink text-4xl sm:text-5xl'>
+          <h1 className='perce-wordmark text-4xl text-ink sm:text-5xl'>
             {brandName === STORE_NAME ? BRAND_WORDMARK : brandName}
           </h1>
-          <div className='w-8 h-px bg-white/30' aria-hidden='true' />
-          <p className='text-white/50 text-sm font-light'>
+          <div className='h-px w-8 bg-line' aria-hidden='true' />
+          <p className='t-small text-ink-2'>
             {subtitle}
           </p>
         </header>
@@ -287,17 +287,17 @@ export default function Page() {
                 href={link.href}
                 target='_blank'
                 rel='noopener noreferrer'
-                className='group relative flex items-center gap-4 w-full px-6 py-4 rounded-sm border border-white/8 bg-white/3 text-white/80 transition-all duration-300 ease-out hover:bg-white/7 hover:border-white/20 hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-perce-ground'
+                className='group relative flex min-h-13 w-full items-center gap-4 border border-line bg-surface px-6 py-4 text-ink transition-colors hover:border-ink'
                 style={{
                   transitionDelay: mounted ? `${i * 60}ms` : "0ms",
                   opacity: mounted ? 1 : 0,
                   transform: mounted ? "translateY(0)" : "translateY(12px)",
                 }}
                 aria-label={`${link.label} — opens in new tab`}>
-                <span className='shrink-0 w-5 h-5 text-white/40 transition-colors duration-300 group-hover:text-white/70'>
+                <span className='h-5 w-5 shrink-0 text-ink-2 transition-colors group-hover:text-ink'>
                   {IconFn({ width: 20, height: 20 })}
                 </span>
-                <span className='text-sm font-light'>
+                <span className='t-label'>
                   {link.label}
                 </span>
                 <svg
@@ -308,7 +308,7 @@ export default function Page() {
                   strokeWidth='1.5'
                   strokeLinecap='round'
                   strokeLinejoin='round'
-                  className='ml-auto w-4 h-4 text-white/20 transition-all duration-300 group-hover:text-white/50 group-hover:translate-x-0.5'
+                  className='ms-auto h-4 w-4 text-ink-2 transition-colors group-hover:text-ink rtl:rotate-180'
                   aria-hidden='true'>
                   <path d='M5 12h14' />
                   <path d='m12 5 7 7-7 7' />
@@ -320,7 +320,7 @@ export default function Page() {
 
         {/* Footer */}
         <footer className='pt-4 text-center'>
-          <p className='text-white/20 text-xs tracking-widest font-light'>
+          <p className='t-micro text-ink-2'>
             {footerText}
           </p>
         </footer>

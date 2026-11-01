@@ -46,14 +46,15 @@ export function OptionGroup({
 
   const move = (from: number, step: 1 | -1 | "first" | "last") => {
     if (enabled.length === 0) return;
-    let next: number;
-    if (step === "first") next = enabled[0]!;
-    else if (step === "last") next = enabled[enabled.length - 1]!;
+    let at: number;
+    if (step === "first") at = 0;
+    else if (step === "last") at = enabled.length - 1;
     else {
       const pos = enabled.indexOf(from);
-      const at = pos < 0 ? 0 : (pos + step + enabled.length) % enabled.length;
-      next = enabled[at]!;
+      at = pos < 0 ? 0 : (pos + step + enabled.length) % enabled.length;
     }
+    const next = enabled[at];
+    if (next === undefined) return;
     const option = options[next];
     if (!option) return;
     onChange(option.value);

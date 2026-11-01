@@ -228,14 +228,14 @@ function Lightbox({
 
 function Skeleton() {
   return (
-    <div className='bg-bg pb-16 pt-4 lg:pt-6'>
+    <div className='min-h-screen bg-bg pb-16 pt-4 lg:pt-6'>
       <div className='perce-container'>
         <div className='mb-4 h-5 w-48 bg-surface-2' />
-        <div className='grid grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-12'>
-          <div className='lg:col-span-7'>
-            <div className='-mx-[var(--perce-gutter)] aspect-[4/5] animate-pulse bg-surface-2 lg:mx-0' />
+        <div className='grid grid-cols-1 gap-6 md:grid-cols-12 md:gap-8 lg:gap-12'>
+          <div className='md:col-span-7'>
+            <div className='-mx-[var(--perce-gutter)] aspect-[4/5] animate-pulse bg-surface-2 md:mx-0' />
           </div>
-          <div className='space-y-4 lg:col-span-5'>
+          <div className='space-y-4 md:col-span-5'>
             <div className='h-8 w-3/4 animate-pulse bg-surface-2' />
             <div className='h-6 w-28 animate-pulse bg-surface-2' />
             <div className='h-px bg-line' />
@@ -250,7 +250,7 @@ function Skeleton() {
 
 // ─── Galleries ──────────────────────────────────────────────────────────────
 
-/** Phones and tablets: a 4:5 swipe gallery with a "1 / 5" index — no dots, no thumbnails. */
+/** Phones: a 4:5 swipe gallery with a "1 / 5" index — no dots, no thumbnails. */
 function SwipeGallery({
   images,
   productName,
@@ -272,7 +272,7 @@ function SwipeGallery({
   }, []);
 
   return (
-    <div className='-mx-[var(--perce-gutter)] lg:hidden'>
+    <div className='-mx-[var(--perce-gutter)] md:hidden'>
       <div
         ref={scrollRef}
         onScroll={handleScroll}
@@ -312,7 +312,7 @@ function SwipeGallery({
   );
 }
 
-/** From 1024px: every photo, 4:5, the first full width and the rest two-up. */
+/** From 768px: every photo, 4:5, the first full width and the rest two-up. */
 function DesktopGallery({
   images,
   productName,
@@ -324,7 +324,7 @@ function DesktopGallery({
 }) {
   const { t } = useMinimalI18n();
   return (
-    <div className='hidden grid-cols-2 gap-2 lg:grid'>
+    <div className='hidden grid-cols-2 gap-2 md:grid'>
       {images.map((img, i) => (
         <button
           key={`${img.url}-${i}`}
@@ -352,7 +352,7 @@ function DesktopGallery({
 /**
  * Product page — Object Index (template id `product-perce`).
  *
- * Desktop: the photographs take 7/12; the information index takes 5/12 and
+ * From 768px: the photographs take 7/12; the information index takes 5/12 and
  * stays in view while they scroll. Phones: a 4:5 swipe gallery, then the
  * index. The index reads, in order: name → price → product facts → options →
  * quantity → Add to bag → service facts → information rows (Description,
@@ -414,7 +414,7 @@ export function ProductPagePremium({
     };
   }, [locale]);
 
-  // ── Sticky Add to bag (below 1024px): shown whenever the main button
+  // ── Sticky Add to bag (below 768px): shown whenever the main button
   // cannot actually be tapped — below the fold, cut off, or scrolled away —
   // and hidden while it is fully usable, so there is always exactly one
   // usable Add to bag and never two at once.
@@ -518,21 +518,21 @@ export function ProductPagePremium({
       {/* ────────────────── Product ────────────────── */}
       <section className='pb-16 lg:pb-24'>
         <div className='perce-container'>
-          <div className='grid grid-cols-1 items-start gap-6 lg:grid-cols-12 lg:gap-12'>
+          <div className='grid grid-cols-1 items-start gap-6 md:grid-cols-12 md:gap-8 lg:gap-12'>
             {/* ── Photographs (7/12) ── */}
-            <div className='lg:col-span-7'>
+            <div className='md:col-span-7'>
               {images.length > 0 ? (
                 <>
                   <SwipeGallery images={images} productName={product.name} onOpen={openImage} />
                   <DesktopGallery images={images} productName={product.name} onOpen={openImage} />
                 </>
               ) : (
-                <div className='-mx-[var(--perce-gutter)] aspect-[4/5] bg-surface-2 lg:mx-0' />
+                <div className='-mx-[var(--perce-gutter)] aspect-[4/5] bg-surface-2 md:mx-0' />
               )}
             </div>
 
             {/* ── Information index (5/12), sticky from 1024px ── */}
-            <div className='flex flex-col lg:sticky lg:top-[calc(var(--perce-header-offset)+2rem)] lg:col-span-5'>
+            <div className='flex flex-col md:sticky md:top-[calc(var(--perce-header-offset)+2rem)] md:col-span-5'>
               {/* 1. Name */}
               <h1 className='t-pdp-title text-ink'>{product.name}</h1>
 
@@ -636,7 +636,7 @@ export function ProductPagePremium({
               {/* 7. Information rows, after the purchase decision */}
               <div className='mt-8 border-b border-line' data-testid='product-details'>
                 {(shortCopy || longCopy) && (
-                  <AccordionRow title={t("product.description")} defaultOpen>
+                  <AccordionRow level={2} title={t("product.description")} defaultOpen>
                     <div className='space-y-3 whitespace-pre-line'>
                       {shortCopy && <p>{shortCopy}</p>}
                       {longCopy && longCopy !== shortCopy && <p>{longCopy}</p>}
@@ -646,7 +646,7 @@ export function ProductPagePremium({
 
                 {product.specifications &&
                   product.specifications.length > 0 && (
-                    <AccordionRow title={t("product.specifications")}>
+                    <AccordionRow level={2} title={t("product.specifications")}>
                       <dl className='divide-y divide-line'>
                         {product.specifications.map((spec, i) => (
                           <div key={i} className='flex justify-between gap-4 py-2 t-small'>
@@ -662,7 +662,7 @@ export function ProductPagePremium({
                     renders only what an admin wrote in Dashboard > Settings >
                     Product page content, and disappears when that is empty. */}
                 {(shippingText || returnsText) && (
-                  <AccordionRow title={t("product.shipping_returns")}>
+                  <AccordionRow level={2} title={t("product.shipping_returns")}>
                     <div className='space-y-3 whitespace-pre-line'>
                       {shippingText && <p>{shippingText}</p>}
                       {returnsText && <p>{returnsText}</p>}
@@ -672,7 +672,7 @@ export function ProductPagePremium({
 
                 {/* Care — generic handling advice that makes no claim about
                     this store's products, materials or durability. */}
-                <AccordionRow title={t("product.care_guide")}>
+                <AccordionRow level={2} title={t("product.care_guide")}>
                   <div className='space-y-3'>
                     <p>{t("product.care_1")}</p>
                     <p>{t("product.care_2")}</p>
@@ -694,7 +694,7 @@ export function ProductPagePremium({
                 {t("home.view_all_products")}
               </a>
             </div>
-            <div className='grid grid-cols-2 gap-x-3 gap-y-8 md:grid-cols-3 md:gap-x-6 md:gap-y-12 min-[1200px]:grid-cols-4'>
+            <div className='grid grid-cols-2 gap-x-3 gap-y-8 md:grid-cols-3 md:gap-x-6 md:gap-y-12 min-[75rem]:grid-cols-4'>
               {related.map((p) => (
                 <MinimalProductCard key={p.id} product={p} />
               ))}
@@ -713,7 +713,7 @@ export function ProductPagePremium({
         />
       )}
 
-      {/* ── Sticky Add to bag (below 1024px) ──
+      {/* ── Sticky Add to bag (below 768px) ──
           Appears whenever the main button is not fully usable (see
           useFullyUsable above). A `surface` panel with a top hairline on the
           viewport's bottom edge, its content padded above the device's
@@ -728,7 +728,7 @@ export function ProductPagePremium({
           aria-hidden={!showSticky}
           data-testid='sticky-add-to-bag'
           className={cn(
-            "fixed inset-x-0 border-t border-line bg-surface px-4 pt-3 transition-transform duration-[var(--perce-duration)] lg:hidden",
+            "fixed inset-x-0 border-t border-line bg-surface px-4 pt-3 transition-transform duration-[var(--perce-duration)] md:hidden",
             showSticky ? "translate-y-0" : "pointer-events-none translate-y-[200%]",
           )}>
           <div className='flex items-center gap-3'>

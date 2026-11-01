@@ -16,6 +16,7 @@ import {
 } from "#root/components/template-system/minimal/MinimalProductCard";
 import { QuickViewDialog } from "#root/components/template-system/minimal/QuickViewDialog";
 import { cn } from "#root/lib/utils";
+import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { buttonClass } from "#root/components/storefront/Button";
 import { BundleEntryTile } from "#root/components/storefront/promo/PromoLayer";
 import {
@@ -96,7 +97,7 @@ const PRODUCTS_PER_PAGE = 12; // 3 rows × 4 cols
 
 /** Listing grid: 2 / 12 / 32 on phones, 3 / 24 / 48 from 768px, 4 from 1200px. */
 const GRID_CLASS =
-  "grid grid-cols-2 gap-x-3 gap-y-8 md:grid-cols-3 md:gap-x-6 md:gap-y-12 min-[1200px]:grid-cols-4";
+  "grid grid-cols-2 gap-x-3 gap-y-8 md:grid-cols-3 md:gap-x-6 md:gap-y-12 min-[75rem]:grid-cols-4";
 
 /* ── Sort options ───────────────────────────────────────────────────── */
 
@@ -416,6 +417,7 @@ export function MinimalCategoryPage({
   onQuickView,
 }: MinimalCategoryPageProps) {
   const ct = useCategoryT();
+  const { t } = useMinimalI18n();
   const sortOptions = useSortOptions();
   const [quickViewProduct, setQuickViewProduct] = useState<MinimalProduct | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -672,6 +674,8 @@ export function MinimalCategoryPage({
               </div>
             ) : (
               <>
+                {/* Names the grid so the card titles (h3) sit under an h2. */}
+                <h2 className="sr-only">{t("nav.search_products")}</h2>
                 <div
                   aria-busy={isRefreshing || undefined}
                   data-testid="product-grid"

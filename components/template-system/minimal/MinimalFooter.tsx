@@ -167,9 +167,9 @@ export function MinimalFooter() {
                 {/* Heading only. The subtitle used to promise "offers" —
                     there is no offers/pricing programme yet, so no marketing
                     line ships by default. */}
-                <h4 className='t-label text-ink'>
+                <h2 className='t-label text-ink'>
                   {locale === "ar" ? "اشتركي في النشرة" : "Join the list"}
-                </h4>
+                </h2>
               </div>
               <form
                 onSubmit={handleNewsletterSubmit}
@@ -260,9 +260,9 @@ export function MinimalFooter() {
             <div
               key={group.id}
               className='md:col-span-2 flex flex-col items-start'>
-              <h4 className='mb-2 t-label text-ink'>
+              <h2 className='mb-2 t-label text-ink'>
                 {locale === "ar" && group.titleAr ? group.titleAr : group.title}
-              </h4>
+              </h2>
               <ul>
                 {group.links.map((link) => (
                   <li key={link.id}>
@@ -280,9 +280,9 @@ export function MinimalFooter() {
           {/* ── Contact us column ── */}
           {(footer.contactPhone || footer.contactEmail) && (
             <div className='md:col-span-2 flex flex-col items-start'>
-              <h4 className='mb-2 t-label text-ink'>
+              <h2 className='mb-2 t-label text-ink'>
                 {t("footer.contact")}
-              </h4>
+              </h2>
               <ul>
                 {footer.contactPhone && (
                   <li>

@@ -881,7 +881,7 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
                       aria-pressed={isSelected}
                       aria-label={`${isSelected ? t("bundle.remove") : t("bundle.add")}: ${p.name}`}
                       className={cn(
-                        "relative block aspect-[4/5] w-full overflow-hidden bg-perce-surface text-start outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-perce-ink",
+                        "relative block aspect-[4/5] w-full overflow-hidden bg-perce-surface text-start outline-none transition-colors focus-visible:ring-2 focus-visible:ring-perce-ink",
                         isSelected && "ring-2 ring-perce-ink",
                         !soldOut && !isSelected && !canIncrement && "cursor-not-allowed",
                       )}>

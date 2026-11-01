@@ -78,7 +78,7 @@ export default function Page() {
   return (
     <section className='relative w-full h-screen flex justify-center items-center py-12 md:py-24 px-4 md:px-8 overflow-hidden'>
       {/* DARK IDENTITY: Ritual / Night - Cinematic gradient background */}
-      <div className='absolute inset-0 bg-gradient-to-br from-[#1A1612] via-[#2B231D] to-[#1C1814]' />
+      <div className='absolute inset-0 bg-bg' />
 
       {/* Subtle grain texture for tactile, non-digital feeling */}
       <div
@@ -89,18 +89,18 @@ export default function Page() {
       />
 
       {/* Deep vignette for cinematic depth */}
-      <div className='absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.5)_100%)]' />
+      <div className='absolute inset-0 hidden' />
 
       {/* LIGHT IDENTITY: Atelier / Day - Floating login card with gentle fade-in */}
-      <div className='relative w-full max-w-[420px] h-auto bg-[#F8F6F3] flex flex-col gap-10 p-12 md:p-14 animate-in fade-in duration-700 ease-out'>
+      <div className='relative w-full max-w-[420px] h-auto bg-surface border border-line flex flex-col gap-10 p-12 md:p-14 animate-in fade-in duration-700 ease-out'>
         {/* Soft inner glow for depth */}
         <div className='absolute inset-0' />
 
         <div className='relative space-y-3'>
-          <h1 className='text-[28px] md:text-[32px] text-center font-medium tracking-[-0.02em] text-[#2B231D] leading-tight'>
+          <h1 className='text-[28px] md:text-[32px] text-center font-medium tracking-[-0.02em] text-ink leading-tight'>
             Enter {STORE_NAME}
           </h1>
-          <p className='text-center text-[13px] text-[#8B7E74] leading-relaxed'>
+          <p className='text-center text-[13px] text-ink-2 leading-relaxed'>
             Access your private atelier
           </p>
         </div>
@@ -113,7 +113,7 @@ export default function Page() {
           <div className='relative'>
             <label
               htmlFor='email'
-              className='block text-[10px] text-[#8B7E74] mb-3 font-medium'>
+              className='block text-[10px] text-ink-2 mb-3 font-medium'>
               Email
             </label>
             <div className='relative'>
@@ -123,12 +123,12 @@ export default function Page() {
                 type='email'
                 autoComplete='email'
                 placeholder='your@email.com'
-                className='border-0 border-b border-[#D9D3CC] bg-transparent px-0 py-3 w-full text-[15px] focus:outline-none focus:ring-0 focus:border-[#C4A574] transition-all duration-500 placeholder:text-[#BFB5AA] text-[#2B231D] font-normal'
+                className='border-0 border-b border-line-input bg-transparent px-0 py-3 w-full text-[15px] focus:outline-none focus:ring-0 focus:border-ink transition-all duration-500 placeholder:text-ink-3 text-ink font-normal'
                 disabled={isSubmitting}
               />
             </div>
             {form.formState.errors.email && (
-              <p className='text-[#9D6B6B] text-[11px] mt-2.5'>
+              <p className='text-error text-[11px] mt-2.5'>
                 {form.formState.errors.email.message}
               </p>
             )}
@@ -138,7 +138,7 @@ export default function Page() {
           <div className='relative'>
             <label
               htmlFor='password'
-              className='block text-[10px] text-[#8B7E74] mb-3 font-medium'>
+              className='block text-[10px] text-ink-2 mb-3 font-medium'>
               Password
             </label>
             <div className='relative'>
@@ -148,13 +148,13 @@ export default function Page() {
                 type={showPassword ? "text" : "password"}
                 autoComplete='current-password'
                 placeholder='Enter password'
-                className='border-0 border-b border-[#D9D3CC] bg-transparent px-0 py-3 w-full pr-10 text-[15px] focus:outline-none focus:ring-0 focus:border-[#C4A574] transition-all duration-500 placeholder:text-[#BFB5AA] text-[#2B231D] font-normal'
+                className='border-0 border-b border-line-input bg-transparent px-0 py-3 w-full pr-10 text-[15px] focus:outline-none focus:ring-0 focus:border-ink transition-all duration-500 placeholder:text-ink-3 text-ink font-normal'
                 disabled={isSubmitting}
               />
               <button
                 type='button'
                 onClick={() => setShowPassword(!showPassword)}
-                className='absolute right-0 top-1/2 transform -translate-y-1/2 text-[#9C918A] hover:text-[#C4A574] transition-colors duration-500 opacity-60 hover:opacity-100'
+                className='absolute right-0 top-1/2 transform -translate-y-1/2 text-ink-2 hover:text-ink-2 transition-colors duration-500 opacity-60 hover:opacity-100'
                 disabled={isSubmitting}>
                 {showPassword ? (
                   <EyeOff className='h-[15px] w-[15px]' />
@@ -164,7 +164,7 @@ export default function Page() {
               </button>
             </div>
             {form.formState.errors.password && (
-              <p className='text-[#9D6B6B] text-[11px] mt-2.5'>
+              <p className='text-error text-[11px] mt-2.5'>
                 {form.formState.errors.password.message}
               </p>
             )}
@@ -172,7 +172,7 @@ export default function Page() {
 
           {/* Primary CTA - Calm, confident, not attention-seeking */}
           <Button
-            className='w-full bg-[#2B231D] hover:bg-[#3A3028] text-[#F8F6F3] font-normal text-[14px] mt-4 py-7 transition-all duration-500'
+            className='w-full bg-ink hover:bg-hover text-bg font-normal text-[14px] mt-4 py-7 transition-all duration-500'
             type='submit'
             disabled={isSubmitting}>
             {isSubmitting ? "Entering..." : "Login"}
@@ -181,22 +181,22 @@ export default function Page() {
           {/* Forgot password link */}
           <Link
             href='/forgot-password'
-            className='text-center text-[12px] text-[#9C918A] hover:text-[#C4A574] transition-all duration-500 font-normal'>
+            className='text-center text-[12px] text-ink-2 hover:text-ink-2 transition-all duration-500 font-normal'>
             Forgot password?
           </Link>
 
           {/* Secondary action - understated and elegant */}
           <div className='flex items-center justify-center gap-2 mt-4'>
-            <div className='h-[1px] flex-1 bg-gradient-to-r from-transparent via-[#D9D3CC] to-transparent opacity-40' />
-            <p className='text-center text-[12px] text-[#9C918A] px-4'>
+            <div className='h-px flex-1 bg-line' />
+            <p className='text-center text-[12px] text-ink-2 px-4'>
               New to {STORE_NAME}?
             </p>
-            <div className='h-[1px] flex-1 bg-gradient-to-r from-transparent via-[#D9D3CC] to-transparent opacity-40' />
+            <div className='h-px flex-1 bg-line' />
           </div>
 
           <Link
             href='/register'
-            className='text-center text-[13px] text-[#2B231D] hover:text-[#C4A574] transition-all duration-500 font-normal opacity-80 hover:opacity-100 -mt-4'>
+            className='text-center text-[13px] text-ink hover:text-ink-2 transition-all duration-500 font-normal opacity-80 hover:opacity-100 -mt-4'>
             Create an account
           </Link>
         </form>

@@ -100,10 +100,10 @@ export function BundleEntryTile({ config = PROMO_LAYER }: { config?: PromoLayerC
   const href = bundleHref(campaign.slug);
   return (
     <article className='group flex flex-col' data-bundle-entry-tile={campaign.slug}>
-      <a href={href} tabIndex={-1} aria-hidden='true' className='relative block aspect-[4/5] overflow-hidden bg-surface-2'>
+      <a href={href} tabIndex={-1} className='relative block aspect-[4/5] overflow-hidden bg-surface-2'>
         <img
           src={resolveBundleImage(campaign.heroImageUrl)}
-          alt=''
+          alt={campaign.title}
           className='h-full w-full object-cover'
           loading='lazy'
           decoding='async'
