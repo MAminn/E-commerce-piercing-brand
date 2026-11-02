@@ -15,6 +15,7 @@ import { useWishlist } from "#root/lib/hooks/useWishlist";
 import { formatMoney } from "#root/shared/pricing/format-money";
 import { fillTemplate as fill } from "#root/components/bundles/bundle-ui";
 import { cn } from "#root/lib/utils";
+import { formatShippingFeeRange } from "#root/shared/config/storefront";
 import { ProductDecisionSummary } from "./ProductDecisionSummary";
 import { STICKY_BAR_BOTTOM, STICKY_BAR_PADDING_BOTTOM, useFullyUsable } from "../minimal/sticky-bar";
 import { Button, ICON_PROPS, IconButton, buttonClass } from "#root/components/storefront/Button";
@@ -547,12 +548,7 @@ export function ProductPagePremium({
 
               {/* 2. Price + availability */}
               <div className='mt-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1' style={{ fontFamily: "var(--font-price)" }}>
-                <Price
-                  amount={displayPrice}
-                  compareAt={hasDiscount ? product.price : null}
-                  locale={moneyLocale}
-                  size='pdp'
-                />
+                <Price amount={displayPrice} locale={moneyLocale} size='pdp' />
                 <p className='t-small text-ink-2'>{inStock ? t("in_stock") : t("out_of_stock")}</p>
               </div>
 
@@ -561,8 +557,9 @@ export function ProductPagePremium({
                   Shipping policy copy lives in the admin-authored Shipping &
                   Returns row below. */}
 
-              {/* Product facts — real data only */}
-              <ProductDecisionSummary product={product} className='mt-6 border-y border-line py-4' />
+              {/* Product facts — real data only. No Category row: the
+                  breadcrumb already places the piece. */}
+              <ProductDecisionSummary product={product} showCategory={false} className='mt-6 border-y border-line py-4' />
 
               {/* 3. Options */}
               {product.variants && product.variants.length > 0 && (
@@ -576,9 +573,11 @@ export function ProductPagePremium({
                 />
               )}
 
-              {/* 4. Quantity */}
-              <div className='mt-6'>
-                <p className='mb-2 t-label text-ink'>{t("product.quantity")}</p>
+              {/* 4–5. Quantity, then Add to bag (+ wishlist, secondary).
+                  Phones: one row, the stepper stretched to the button's
+                  height. From 768px: the stepper sits above the button row.
+                  The stepper's group label names it, so no visible label. */}
+              <div className='mt-6 flex items-stretch gap-2 md:flex-col md:gap-4'>
                 <Stepper
                   value={quantity}
                   onDecrement={() => setQuantity(Math.max(1, quantity - 1))}
@@ -588,42 +587,42 @@ export function ProductPagePremium({
                   label={t("product.quantity")}
                   decrementLabel={t("product.decrease")}
                   incrementLabel={t("product.increase")}
+                  className='shrink-0 md:self-start'
                 />
-              </div>
 
-              {/* 5. Add to bag (+ wishlist, secondary) */}
-              <div className='mt-4 flex items-stretch gap-2'>
-                <Button
-                  ref={addToBagRef}
-                  variant='primary'
-                  size='lg'
-                  onClick={handleAddToCart}
-                  disabled={!canAdd}
-                  data-add-to-cart='true'
-                  className='min-w-0 flex-1'>
-                  {inStock ? t("product.add_to_bag") : t("out_of_stock")}
-                </Button>
-
-                {showWishlist && (
-                  <IconButton
+                <div className='flex min-w-0 flex-1 items-stretch gap-2'>
+                  <Button
+                    ref={addToBagRef}
+                    variant='primary'
                     size='lg'
-                    onClick={handleWishlist}
-                    aria-pressed={wishlisted}
-                    aria-label={t("product.wishlist")}
-                    className='shrink-0 border border-line-input'>
-                    <Heart {...ICON_PROPS} className={cn(wishlisted && "fill-current")} />
-                  </IconButton>
-                )}
+                    onClick={handleAddToCart}
+                    disabled={!canAdd}
+                    data-add-to-cart='true'
+                    className='min-w-0 flex-1'>
+                    {inStock ? t("product.add_to_bag") : t("out_of_stock")}
+                  </Button>
+
+                  {showWishlist && (
+                    <IconButton
+                      size='lg'
+                      onClick={handleWishlist}
+                      aria-pressed={wishlisted}
+                      aria-label={t("product.wishlist")}
+                      className='shrink-0 border border-line-input'>
+                      <Heart {...ICON_PROPS} className={cn(wishlisted && "fill-current")} />
+                    </IconButton>
+                  )}
+                </div>
               </div>
 
               {/* 6. Service facts — store facts only: cash on delivery is
-                  always offered (shared/config/payment.ts) and every shipping
-                  destination is an Egyptian governorate. No invented free
-                  shipping or return windows. */}
+                  always offered (shared/config/payment.ts) and the delivery
+                  fee is priced per governorate (SHIPPING_FEE_RANGE_EGP). No
+                  invented free shipping or return windows. */}
               <ul className='mt-4 flex flex-wrap gap-x-4 gap-y-1 t-small text-ink-2' data-testid='purchase-reassurance'>
                 <li>{t("product.reassure_cod")}</li>
                 <li aria-hidden='true'>·</li>
-                <li>{t("product.reassure_delivery")}</li>
+                <li>{fill(t("product.delivery_fee_range"), { range: formatShippingFeeRange(moneyLocale) })}</li>
               </ul>
 
               {/* Promotional set link (shared/config/promo-layer, off) —

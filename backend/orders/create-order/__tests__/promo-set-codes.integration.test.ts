@@ -212,6 +212,25 @@ describeIfDb("promo set codes + percentage Pick Your Set (integration)", () => {
     return row;
   };
 
+  // ─── Optional email ─────────────────────────────────────────────────────
+
+  it("per-customer limit: a guest with no email is counted by phone, not lumped with every email-less order", async () => {
+    const code = await createSetCode("ONCE", { percent: 10, exact: null, freeShipping: false, allProducts: true });
+    await db.update(schema.promoCode).set({ usageLimitPerUser: 1 }).where(eq(schema.promoCode.id, code.id));
+    const guest = (customerPhone: string) => ({ customerEmail: "", customerPhone, items: [line(ring)], promoCodeId: code.id });
+    try {
+      const first = await place(guest("+201000000101"));
+      expect((await loadOrder(first.id)).customerEmail).toBe("");
+      // A different email-less guest is a different customer.
+      await place(guest("+201000000102"));
+      // The same guest (same phone) has used it.
+      expect(await refuse(guest("+201000000101"))).toBe("You've already used this promo code.");
+    } finally {
+      // These orders carry no tagged email, so the suite's cleanup cannot find them.
+      await db.delete(schema.order).where(eq(schema.order.promoCodeId, code.id));
+    }
+  });
+
   // ─── PICK6 ──────────────────────────────────────────────────────────────
 
   it("PICK6: exactly 6 eligible + an unrelated ring → 15% of 1,075 only, free Cairo shipping, totals persisted exactly", async () => {

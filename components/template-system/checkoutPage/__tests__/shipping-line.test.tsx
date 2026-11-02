@@ -149,13 +149,15 @@ describe("cart page shipping line before a destination is known", () => {
     expect(zero).not.toMatch(/>Shipping</);
   });
 
-  it("Modern cart shows the pending copy too", () => {
-    const html = renderToStaticMarkup(
-      createElement(CartPageModernTemplate, {
-        items: cartItems,
-        totals: { subtotal: 300, grandTotal: 300, shippingStatus: "pending" },
-      }),
-    );
-    expect(html).toContain("Calculated at checkout");
+  it("Modern cart always states the governorate fee range", () => {
+    for (const totals of [
+      { subtotal: 300, grandTotal: 300, shippingStatus: "pending" as const },
+      { subtotal: 300, grandTotal: 300 },
+      { subtotal: 300, shipping: 70, grandTotal: 370, shippingStatus: "quoted" as const },
+    ]) {
+      const html = renderToStaticMarkup(createElement(CartPageModernTemplate, { items: cartItems, totals }));
+      expect(html).toContain("EGP 70–150, set at checkout");
+      expect(html).not.toContain("Calculated at checkout");
+    }
   });
 });

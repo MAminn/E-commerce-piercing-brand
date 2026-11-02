@@ -30,9 +30,12 @@ import { useCategoryT } from "./useCategoryT";
  *
  * A group only appears when the data behind it can actually narrow the
  * listing: no Price slider over a single price, no "In stock" when nothing
- * is out of stock, no "On sale" with no discounts. A filter that filters
- * nothing is worse than no filter. Active values always stay visible so a
- * shopper can undo them.
+ * is out of stock. A filter that filters nothing is worse than no filter.
+ * Active values always stay visible so a shopper can undo them.
+ *
+ * There is no "On sale" group: Percé shows one price, the price paid, and
+ * does not merchandise discounts. The `onSale` URL flag still parses, so an
+ * old link that carries it gets an active-filter chip to remove it.
  */
 
 export interface FilterModel {
@@ -53,7 +56,6 @@ interface VisibleGroups {
   category: boolean;
   price: boolean;
   inStock: boolean;
-  onSale: boolean;
 }
 
 export function visibleFilterGroups(model: FilterModel, filters = model.filters): VisibleGroups {
@@ -62,7 +64,6 @@ export function visibleFilterGroups(model: FilterModel, filters = model.filters)
     category: model.categoryOptions.length > 0,
     price: !!f?.price && f.price.max > f.price.min,
     inStock: (!!f && f.inStock.count < f.inStock.of) || filters.inStock,
-    onSale: (!!f && f.onSale.count > 0) || filters.onSale,
   };
 }
 
@@ -474,13 +475,6 @@ export function DesktopFilterBar({ model }: { model: FilterModel }) {
           onToggle={() => onChange({ ...filters, inStock: !filters.inStock })}
         />
       )}
-      {groups.onSale && (
-        <ToggleFilter
-          pressed={filters.onSale}
-          label={ct("filter.on_sale")}
-          onToggle={() => onChange({ ...filters, onSale: !filters.onSale })}
-        />
-      )}
     </fieldset>
   );
 }
@@ -627,17 +621,6 @@ export function MobileFilterDrawer({
                   count={f?.inStock.count}
                   checked={draft.inStock}
                   onChange={() => setDraft((d) => ({ ...d, inStock: !d.inStock }))}
-                />
-              </DrawerGroup>
-            )}
-            {groups.onSale && (
-              <DrawerGroup title={ct("filter.offers")}>
-                <FacetCheckbox
-                  id="drawer-on-sale"
-                  label={ct("filter.on_sale")}
-                  count={f?.onSale.count}
-                  checked={draft.onSale}
-                  onChange={() => setDraft((d) => ({ ...d, onSale: !d.onSale }))}
                 />
               </DrawerGroup>
             )}

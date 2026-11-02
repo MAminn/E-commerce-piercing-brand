@@ -46,6 +46,18 @@ describe("queueOrderPlacedEmails", () => {
     expect(d.logEvent).not.toHaveBeenCalled();
   });
 
+  it("with no customer email (optional at checkout) only the store is notified", async () => {
+    const d = deps();
+    await queueOrderPlacedEmails({ orderId: ORDER_ID, customerEmail: "", orderNumber: 10042 }, d);
+
+    const types = d.enqueue.mock.calls.map(([p]) => p.automationType);
+    expect(types).not.toContain("order_confirmation");
+    expect(types.filter((t) => t === "order_admin_notification")).toHaveLength(2);
+    // Not a failure: there was nothing to send.
+    expect(d.logEvent).not.toHaveBeenCalled();
+    expect(d.kickWorker).toHaveBeenCalledTimes(1);
+  });
+
   it("queues one separate store notification per admin", async () => {
     const d = deps();
     await queueOrderPlacedEmails({ orderId: ORDER_ID, customerEmail: "nour@example.com" }, d);

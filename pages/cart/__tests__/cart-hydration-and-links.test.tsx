@@ -134,18 +134,20 @@ describe("cart before the saved cart is read", () => {
     const html = renderToString(tree());
     expect(html).toContain('data-testid="cart-loading"');
     expect(html).toContain('aria-busy="true"');
-    expect(html).not.toMatch(/Your cart is empty/i);
+    expect(html).not.toMatch(/Your bag is empty/i);
     expect(html).not.toMatch(/Continue shopping/i);
     // The page heading is real on the first paint; only the count waits.
-    expect(html).toContain("Your cart");
+    expect(html).toMatch(/<h1[^>]*>Bag</);
   });
 });
 
 describe("cart after the saved cart is read", () => {
   it("a really empty cart says so", async () => {
     render(tree());
-    await waitFor(() => expect(screen.getByText(/Your cart is empty/i)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Your bag is empty.")).toBeTruthy());
     expect(screen.queryByTestId("cart-loading")).toBeNull();
+    // One way on: a "Shop all" text link, not a primary button.
+    expect(screen.getByRole("link", { name: "Shop all" }).getAttribute("href")).toBe("/shop");
   });
 
   it("a populated cart replaces the skeleton with its lines", async () => {
@@ -153,11 +155,11 @@ describe("cart after the saved cart is read", () => {
     render(tree());
     await waitFor(() => expect(screen.getAllByText("Star Helix Stud").length).toBeGreaterThan(0));
     expect(screen.queryByTestId("cart-loading")).toBeNull();
-    expect(screen.queryByText(/Your cart is empty/i)).toBeNull();
+    expect(screen.queryByText(/Your bag is empty/i)).toBeNull();
     expect(screen.getByRole("heading", { level: 1 }).textContent).toMatch(/\(2 items\)/i);
   });
 
-  it("image and name link to the product page by product id, not the line key", async () => {
+  it("a line saved without a slug links by product id, not the line key", async () => {
     seed({ items: [line()] });
     const { container } = render(tree());
     await waitFor(() => expect(screen.getAllByText("Star Helix Stud").length).toBeGreaterThan(0));
@@ -181,6 +183,15 @@ describe("cart after the saved cart is read", () => {
     for (const a of Array.from(container.querySelectorAll("a[href]"))) {
       expect(a.getAttribute("href")).not.toContain("|");
       expect(a.getAttribute("href")).not.toContain("Gauge");
+    }
+  });
+
+  it("a line saved with its slug links to /shop/<slug>", async () => {
+    seed({ items: [line({ slug: "star-helix-stud" })] });
+    render(tree());
+    await waitFor(() => expect(screen.getAllByText("Star Helix Stud").length).toBeGreaterThan(0));
+    for (const a of screen.getAllByRole("link", { name: "Star Helix Stud" })) {
+      expect(a.getAttribute("href")).toBe("/shop/star-helix-stud");
     }
   });
 

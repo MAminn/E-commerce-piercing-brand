@@ -45,6 +45,21 @@ import type { ShippingMode } from "#root/shared/shipping/rules";
  */
 export const EXPECTED_SHIPPING_MODE: ShippingMode = "zones";
 
+/**
+ * The span of Percé's per-governorate delivery fees, stated on the product
+ * page and in the bag before a governorate is known. This is copy, not a
+ * price source: the fee charged is always checkout's live quote from
+ * `store_settings.shipping_rules`. Keep it in step with the governorate rates
+ * in Dashboard > Settings > Shipping.
+ */
+export const SHIPPING_FEE_RANGE_EGP = { min: 70, max: 150 } as const;
+
+/** "EGP 70–150" / "70–150 ج.م", in the same money style as formatMoney. */
+export function formatShippingFeeRange(locale: "en" | "ar" = "en"): string {
+  const { min, max } = SHIPPING_FEE_RANGE_EGP;
+  return locale === "ar" ? `${min}–${max} ج.م` : `EGP ${min}–${max}`;
+}
+
 /** Global shell used when `layoutSettings.header.navbarStyle` is unset. */
 export const DEFAULT_NAVBAR_STYLE: NavbarStyle = "minimal";
 

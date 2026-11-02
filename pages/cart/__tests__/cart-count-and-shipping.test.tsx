@@ -188,6 +188,9 @@ describe.each(["cart-minimal", "cart-modern"])("cart item count (%s)", (template
 });
 
 describe.each(["cart-minimal", "cart-modern"])("cart shipping row (%s)", (template) => {
+  // Before a governorate is chosen: cart-minimal says "Calculated at
+  // checkout"; the Object Index cart states the governorate fee range.
+  const pendingCopy = template === "cart-modern" ? /EGP 70–150, set at checkout/ : /Calculated at checkout/;
   beforeEach(() => {
     templateId = template;
   });
@@ -196,7 +199,7 @@ describe.each(["cart-minimal", "cart-modern"])("cart shipping row (%s)", (templa
     seed({ bundles: [PICK6()] });
     renderCart();
     await waitFor(() => expect(shippingRow()).toMatch(/Free/));
-    expect(shippingRow()).not.toMatch(/Calculated at checkout/);
+    expect(shippingRow()).not.toMatch(pendingCopy);
   });
 
   it("Arabic → مجاني", async () => {
@@ -211,7 +214,7 @@ describe.each(["cart-minimal", "cart-modern"])("cart shipping row (%s)", (templa
     seed({ bundles: [broken] });
     renderCart();
     await waitFor(() => expect(evaluateSelection).toHaveBeenCalled());
-    await waitFor(() => expect(shippingRow()).toMatch(/Calculated at checkout/));
+    await waitFor(() => expect(shippingRow()).toMatch(pendingCopy));
     expect(shippingRow()).not.toMatch(/Free/);
   });
 
@@ -219,12 +222,12 @@ describe.each(["cart-minimal", "cart-modern"])("cart shipping row (%s)", (templa
     seed({ bundles: [PICK3()] });
     renderCart();
     await waitFor(() => expect(evaluateSelection).toHaveBeenCalled());
-    await waitFor(() => expect(shippingRow()).toMatch(/Calculated at checkout/));
+    await waitFor(() => expect(shippingRow()).toMatch(pendingCopy));
   });
 
-  it("a normal cart → Calculated at checkout (unchanged)", async () => {
+  it("a normal cart → the not-yet-priced copy (unchanged)", async () => {
     seed({ items: [loose(2)] });
     renderCart();
-    await waitFor(() => expect(shippingRow()).toMatch(/Calculated at checkout/));
+    await waitFor(() => expect(shippingRow()).toMatch(pendingCopy));
   });
 });

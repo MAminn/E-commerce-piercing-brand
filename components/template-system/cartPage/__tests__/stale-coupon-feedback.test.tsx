@@ -72,6 +72,9 @@ describe.each(templates)("%s — promo message follows the code", (_name, Templa
   it("drops the success message when the code is invalidated, shows the reason, never re-applies", async () => {
     const user = userEvent.setup();
     render(createElement(Harness, { Template }));
+    // The Modern cart keeps its promo field collapsed behind "Have a code?".
+    const toggle = screen.queryByRole("button", { name: "Have a code?" });
+    if (toggle) await user.click(toggle);
 
     const [input] = screen.getAllByPlaceholderText(/code/i);
     const [apply] = screen.getAllByRole("button", { name: /apply/i });

@@ -96,8 +96,11 @@ export const translations: Record<Locale, Record<string, string>> = {
     "currency": "EGP",
 
     // Cart page
-    "cart.title": "Your cart",
-    "cart.empty": "Your cart is empty",
+    "cart.title": "Bag",
+    "cart.empty": "Your bag is empty.",
+    "cart.have_code": "Have a code?",
+    // {range} is SHIPPING_FEE_RANGE_EGP, e.g. "EGP 70–150".
+    "cart.shipping_range": "{range}, set at checkout",
     "cart.empty_cta": "Add some items to get started!",
     "cart.continue_shopping": "Continue shopping",
     "cart.loading": "Loading cart...",
@@ -175,6 +178,7 @@ export const translations: Record<Locale, Record<string, string>> = {
     // Validation
     "validation.name_required": "Full name is required",
     "validation.email_required": "Email is required",
+    "validation.email_required_card": "Email is needed for card payments",
     "validation.email_invalid": "Please enter a valid email address",
     "validation.phone_required": "Phone number is required",
     "validation.phone_invalid": "Please enter a valid phone number",
@@ -325,10 +329,11 @@ export const translations: Record<Locale, Record<string, string>> = {
     "product.no_piercing_needed": "No piercing needed",
     "product.reassure_cod": "Cash on delivery",
     "product.reassure_delivery": "Delivery across Egypt",
+    "product.delivery_fee_range": "Delivery {range} by governorate",
     "product.description": "Description",
     "product.specifications": "Specifications",
     "product.shipping_returns": "Shipping & Returns",
-    "product.care_guide": "Care Guide",
+    "product.care_guide": "Care",
     "product.care_1": "Store in a cool, dry place away from direct sunlight. Clean gently with a soft, lint-free cloth.",
     "product.care_2": "Avoid contact with perfumes, lotions, and chemicals. Remove before swimming or exercising.",
     "product.save_pct": "Save {percent}%",
@@ -466,8 +471,10 @@ export const translations: Record<Locale, Record<string, string>> = {
     "currency": "ج.م",
 
     // Cart page
-    "cart.title": "سلة التسوق",
-    "cart.empty": "سلة التسوق فارغة",
+    "cart.title": "الحقيبة",
+    "cart.empty": "حقيبتك فارغة.",
+    "cart.have_code": "لديك كود؟",
+    "cart.shipping_range": "{range}، يُحدَّد عند إتمام الطلب",
     "cart.empty_cta": "أضف بعض المنتجات للبدء!",
     "cart.continue_shopping": "متابعة التسوق",
     "cart.loading": "جاري تحميل السلة...",
@@ -539,6 +546,7 @@ export const translations: Record<Locale, Record<string, string>> = {
     // Validation
     "validation.name_required": "الاسم الكامل مطلوب",
     "validation.email_required": "البريد الإلكتروني مطلوب",
+    "validation.email_required_card": "البريد الإلكتروني مطلوب للدفع بالبطاقة",
     "validation.email_invalid": "يرجى إدخال بريد إلكتروني صحيح",
     "validation.phone_required": "رقم الهاتف مطلوب",
     "validation.phone_invalid": "يرجى إدخال رقم هاتف صحيح",
@@ -687,10 +695,11 @@ export const translations: Record<Locale, Record<string, string>> = {
     "product.no_piercing_needed": "لا يحتاج إلى ثقب",
     "product.reassure_cod": "الدفع عند الاستلام",
     "product.reassure_delivery": "توصيل لجميع أنحاء مصر",
+    "product.delivery_fee_range": "التوصيل {range} حسب المحافظة",
     "product.description": "الوصف",
     "product.specifications": "المواصفات",
     "product.shipping_returns": "الشحن والإرجاع",
-    "product.care_guide": "دليل العناية",
+    "product.care_guide": "العناية",
     "product.care_1": "احفظيها في مكان بارد وجاف بعيداً عن أشعة الشمس المباشرة، ونظّفيها بلطف بقطعة قماش ناعمة.",
     "product.care_2": "تجنّبي ملامستها للعطور والكريمات والمواد الكيميائية، وانزعيها قبل السباحة أو التمرين.",
     "product.save_pct": "وفّري {percent}%",

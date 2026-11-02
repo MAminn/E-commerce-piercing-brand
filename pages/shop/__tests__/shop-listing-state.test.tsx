@@ -205,11 +205,13 @@ describe("shop browsing state survives product navigation", () => {
     go("/shop?page=3&sort=price-desc");
     renderShop();
     await screen.findByText("Product 25");
-    fireEvent.click(screen.getByRole("button", { name: "On sale", exact: true } as never));
+    // No "On sale" group, even though the facets report discounted pieces.
+    expect(screen.queryByRole("button", { name: "On sale", exact: true } as never)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "In stock", exact: true } as never));
     await screen.findByText("Product 1");
-    expect(window.location.search).toBe("?onSale=1&sort=price-desc");
+    expect(window.location.search).toBe("?inStock=1&sort=price-desc");
     const link = within(screen.getByRole("navigation", { name: "Pagination" })).getByText("2").closest("a");
-    expect(link?.getAttribute("href")).toBe("/shop?onSale=1&sort=price-desc&page=2");
+    expect(link?.getAttribute("href")).toBe("/shop?inStock=1&sort=price-desc&page=2");
     expect(link?.getAttribute("data-vike")).toBe("false");
   });
 

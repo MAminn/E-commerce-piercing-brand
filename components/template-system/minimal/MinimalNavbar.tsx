@@ -633,12 +633,7 @@ function SearchResults({
                       </span>
                       <span className='min-w-0 flex-1'>
                         <span className='block truncate t-small text-ink'>{p.name}</span>
-                        <Price
-                          amount={p.discountPrice ?? p.price}
-                          compareAt={p.discountPrice != null ? p.price : null}
-                          locale={locale}
-                          size='line'
-                        />
+                        <Price amount={p.discountPrice ?? p.price} locale={locale} size='line' />
                       </span>
                     </a>
                   </li>

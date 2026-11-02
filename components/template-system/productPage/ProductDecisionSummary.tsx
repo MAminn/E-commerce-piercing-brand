@@ -24,13 +24,19 @@ const KEY_SPEC = /material|metal|gauge|size|length|diameter|sold as/i;
  * Options are NOT repeated here — the option selector sits right below.
  * Nothing is inferred from the title or description.
  */
-export function decisionSummaryRows(product: DecisionSummaryProduct, t: (key: string) => string): DecisionSummaryRow[] {
+export function decisionSummaryRows(
+  product: DecisionSummaryProduct,
+  t: (key: string) => string,
+  { showCategory = true }: { showCategory?: boolean } = {},
+): DecisionSummaryRow[] {
   const rows: DecisionSummaryRow[] = [];
   const names = [product.categoryName, ...(product.categories ?? []).map((c) => c.name)]
     .map((n) => n?.trim())
     .filter((n): n is string => Boolean(n));
   const unique = [...new Map(names.map((n) => [n.toLowerCase(), n])).values()];
-  if (unique.length > 0) rows.push({ key: "category", label: t("product.summary_category"), value: unique.join(" · ") });
+  if (showCategory && unique.length > 0) {
+    rows.push({ key: "category", label: t("product.summary_category"), value: unique.join(" · ") });
+  }
   if (needsNoPiercing(product)) {
     rows.push({ key: "piercing", label: t("product.summary_piercing"), value: t("product.no_piercing_needed") });
   }
@@ -40,9 +46,18 @@ export function decisionSummaryRows(product: DecisionSummaryProduct, t: (key: st
   return rows;
 }
 
-export function ProductDecisionSummary({ product, className }: { product: DecisionSummaryProduct; className?: string }) {
+export function ProductDecisionSummary({
+  product,
+  showCategory,
+  className,
+}: {
+  product: DecisionSummaryProduct;
+  /** False drops the Category row (the Object Index PDP's breadcrumb carries it). */
+  showCategory?: boolean;
+  className?: string;
+}) {
   const { t } = useMinimalI18n();
-  const rows = decisionSummaryRows(product, t);
+  const rows = decisionSummaryRows(product, t, { showCategory });
   if (rows.length === 0) return null;
   return (
     <dl

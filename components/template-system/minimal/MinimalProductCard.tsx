@@ -56,7 +56,7 @@ function resolveImageUrl(url?: string | null): string {
  *
  * The photograph is the card: a 4:5 frame on `surface-2` with no border,
  * radius or shadow, then the title (14/400, two lines) and the price as
- * tabular data, with a compare-at price only when it is real. Desktop
+ * tabular data — one number, the price paid. Desktop
  * crossfades to a second photo on hover when the product has one.
  *
  * The `+` is a 36px square inside the photo, bottom-end, 8px in, with a 44px
@@ -105,7 +105,6 @@ export function MinimalProductCard({ product, className }: MinimalProductCardPro
     Number(product.discountPrice) < product.price;
 
   const displayPrice = hasDiscount ? Number(product.discountPrice) : product.price;
-  const originalPrice = hasDiscount ? product.price : null;
 
   const handleAddToCart = useCallback(
     (e: React.MouseEvent) => {
@@ -118,6 +117,7 @@ export function MinimalProductCard({ product, className }: MinimalProductCardPro
         const success = addItem(
           {
             id: product.id,
+            slug: product.slug,
             name: product.name,
             price: displayPrice,
             imageUrl: displayImageUrl,
@@ -152,7 +152,7 @@ export function MinimalProductCard({ product, className }: MinimalProductCardPro
 
   // One short line of product fact, from real data only: an explicit tag,
   // else "No piercing needed" when the product's category says so. No New /
-  // Sale badges — the struck-through price already says it is reduced.
+  // Sale badges and no struck-through price — the card shows what you pay.
   const factText = product.tag || (needsNoPiercing(product) ? t("product.no_piercing_needed") : null);
 
   const wishlisted = isWishlisted(product.id);
@@ -255,7 +255,7 @@ export function MinimalProductCard({ product, className }: MinimalProductCardPro
           </h3>
         </a>
         <div className='mt-1 flex flex-wrap items-baseline gap-x-2' style={{ fontFamily: "var(--font-price)" }}>
-          <Price amount={displayPrice} compareAt={originalPrice} locale={locale} size='card' />
+          <Price amount={displayPrice} locale={locale} size='card' />
         </div>
         {soldOut && <p className="mt-1 t-micro text-ink-2">{t("sold_out")}</p>}
         {!soldOut && factText && <p className='mt-1 t-micro text-ink-2'>{factText}</p>}

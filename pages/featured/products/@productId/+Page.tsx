@@ -298,6 +298,7 @@ export default function ProductDetailPage() {
         const success = addItem(
           {
             id: product.id,
+            slug: product.slug,
             name: product.name,
             price: linePrice,
             stock: product.stock,

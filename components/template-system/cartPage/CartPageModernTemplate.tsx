@@ -5,7 +5,7 @@ import {
   AppliedOffersSavings,
   computeOfferSavingsTotal,
 } from "./AppliedOffersSavings";
-import { Button, ButtonLink, buttonClass } from "#root/components/storefront/Button";
+import { Button, buttonClass } from "#root/components/storefront/Button";
 import { Input } from "#root/components/storefront/Field";
 import { Stepper } from "#root/components/storefront/Stepper";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
@@ -16,7 +16,11 @@ import { useCouponFeedback } from "#root/components/template-system/useCouponFee
 import {
   STICKY_BAR_BOTTOM,
   STICKY_BAR_PADDING_BOTTOM,
+  useFullyUsable,
 } from "#root/components/template-system/minimal/sticky-bar";
+import { fillTemplate as fill } from "#root/components/bundles/bundle-ui";
+import { formatShippingFeeRange } from "#root/shared/config/storefront";
+import { cn } from "#root/lib/utils";
 
 /** `bottom` of the mobile sticky checkout bar: the viewport edge (no bottom nav). */
 const CART_STICKY_BAR_BOTTOM = STICKY_BAR_BOTTOM;
@@ -59,7 +63,7 @@ function LineLink({
 function CartPageModernSkeleton({ title, label }: { title: string; label: string }) {
   const bar = "animate-pulse bg-surface-2";
   return (
-    <div aria-busy='true' data-testid='cart-loading' className='min-h-screen bg-bg pb-48 lg:pb-0'>
+    <div aria-busy='true' data-testid='cart-loading' className='min-h-screen bg-bg'>
       <output className='sr-only'>{label}</output>
       <div className='perce-container py-8 lg:py-12'>
         <h1 className='mb-6 t-h1 text-ink lg:mb-8'>
@@ -86,7 +90,7 @@ function CartPageModernSkeleton({ title, label }: { title: string; label: string
               <div className={`h-4 w-full ${bar}`} />
               <div className={`h-4 w-full ${bar}`} />
               <div className={`h-6 w-full ${bar}`} />
-              <div className={`hidden h-13 w-full lg:block ${bar}`} />
+              <div className={`h-13 w-full ${bar}`} />
             </div>
           </div>
         </div>
@@ -180,12 +184,18 @@ export interface CartPageModernTemplateProps {
  * Lines on the left (7/12), totals on the right (5/12, sticky) from 1024px;
  * one column below. A line is an 80×100 photo, the title, the option, a
  * tabular price, a square stepper and a text "Remove". Sets render as one
- * indexed block (CartBundleGroup). Totals sit on hairlines. Below 1024px the
- * checkout action lives in a `surface` panel fixed to the bottom edge, its
- * content padded above the home indicator.
+ * indexed block (CartBundleGroup). Totals sit on hairlines, with one black
+ * checkout button under them. Below 1024px a `surface` panel fixed to the
+ * bottom edge repeats Total + checkout only while that button is not fully on
+ * screen, so there is always exactly one usable checkout button.
  *
- * Presentation only: quantities, removal, sets, promo codes, offers,
- * shipping and every total come from the cart page exactly as before.
+ * The Shipping row is always there and reads as the governorate range
+ * (SHIPPING_FEE_RANGE_EGP) — the fee is set at checkout once a governorate is
+ * chosen — or "Free" when a set, code or offer has already waived it. The
+ * promo field sits behind "Have a code?".
+ *
+ * Presentation only: quantities, removal, sets, promo codes, offers and
+ * every total come from the cart page exactly as before.
  */
 export function CartPageModernTemplate({
   items = [],
@@ -211,6 +221,21 @@ export function CartPageModernTemplate({
   const { t, locale } = useMinimalI18n();
   const money = (amount: number) =>
     formatMoney(amount, { locale, currency });
+
+  // Collapsed behind "Have a code?" until asked for; opening it moves focus
+  // into the field.
+  const [promoOpen, setPromoOpen] = React.useState(false);
+  const promoInputRef = React.useRef<HTMLInputElement>(null);
+  React.useEffect(() => {
+    if (promoOpen) promoInputRef.current?.focus();
+  }, [promoOpen]);
+
+  // The sticky bar shows only while the summary's checkout button is not
+  // fully on screen (same rule as the PDP's sticky Add to bag). Re-observed
+  // when that button mounts — after the skeleton, or after an empty bag.
+  const isEmpty = items.length === 0 && bundles.length === 0;
+  const summaryCheckoutRef = React.useRef<HTMLButtonElement>(null);
+  const showSticky = !useFullyUsable(summaryCheckoutRef, [isLoading, isEmpty]);
 
   const handleApplyCoupon = async () => {
     const code = couponCode.trim();
@@ -243,14 +268,13 @@ export function CartPageModernTemplate({
     return <CartPageModernSkeleton title={t("cart.title") || "Shopping Cart"} label={t("cart.loading")} />;
   }
 
-  if (items.length === 0 && bundles.length === 0) {
+  if (isEmpty) {
     return (
       <div className='perce-container flex min-h-[60vh] flex-col items-start justify-center gap-4 py-16'>
         <h1 className='t-h1 text-ink'>{t("cart.empty")}</h1>
-        <p className='t-body text-ink-2'>{t("cart.empty_cta")}</p>
-        <ButtonLink href='/shop' variant='primary' size='md' className='mt-4'>
-          {t("cart.continue_shopping")}
-        </ButtonLink>
+        <a href='/shop' className={buttonClass({ variant: "text", size: "md" })}>
+          {t("home.shop_all")}
+        </a>
       </div>
     );
   }
@@ -263,12 +287,12 @@ export function CartPageModernTemplate({
   const appliedOffers = totals.appliedOffers ?? [];
   const hasDiscount = (line: CartPageCartItem) =>
     line.originalPrice != null && line.originalPrice > line.price;
-  const checkoutDisabled = isUpdating || (items.length === 0 && bundles.length === 0);
+  const checkoutDisabled = isUpdating || isEmpty;
   const promoInvalid = couponFeedback?.success === false;
 
   return (
     <>
-    <div className='min-h-screen bg-bg pb-48 lg:pb-0'>
+    <div className='min-h-screen bg-bg'>
       <div className='perce-container py-8 lg:py-12'>
 
         {/* ── Page heading ───────────────────────────────── */}
@@ -388,41 +412,57 @@ export function CartPageModernTemplate({
               })}
             </ul>
 
-            {/* ── Promo code ──────────────────────────────── */}
+            {/* ── Promo code — behind "Have a code?" ─────────── */}
             <div className='py-6'>
-              <label htmlFor='cart-promo-code' className='mb-2 block t-label text-ink'>
-                {t("cart.promo_code") || "Promo code"}
-              </label>
-              <div className='flex gap-2'>
-                <Input
-                  id='cart-promo-code'
-                  placeholder={t("cart.enter_code") || "Enter coupon code"}
-                  value={couponCode}
-                  onChange={(e) => {
-                    setCouponCode(e.target.value);
-                    if (couponFeedback) setCouponFeedback(null);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleApplyCoupon();
-                  }}
-                  disabled={isUpdating || isApplyingCoupon}
-                  aria-invalid={promoInvalid || undefined}
-                  aria-describedby='promo-code-feedback'
-                  autoCapitalize='characters'
-                  className='min-w-0 flex-1'
-                />
-                <Button
-                  variant='secondary'
-                  size='lg'
-                  onClick={handleApplyCoupon}
-                  disabled={isUpdating || isApplyingCoupon || !couponCode.trim()}
-                  className='h-12 shrink-0'>
-                  {isApplyingCoupon
-                    ? t("cart.checking") || "Checking…"
-                    : t("cart.apply") || "Apply"}
-                </Button>
-              </div>
+              {!promoOpen ? (
+                <button
+                  type='button'
+                  onClick={() => setPromoOpen(true)}
+                  aria-expanded={false}
+                  data-testid='cart-promo-toggle'
+                  className={buttonClass({ variant: "text", size: "sm" })}>
+                  {t("cart.have_code")}
+                </button>
+              ) : (
+                <div id='cart-promo-field'>
+                  <label htmlFor='cart-promo-code' className='mb-2 block t-label text-ink'>
+                    {t("cart.promo_code") || "Promo code"}
+                  </label>
+                  <div className='flex gap-2'>
+                    <Input
+                      ref={promoInputRef}
+                      id='cart-promo-code'
+                      placeholder={t("cart.enter_code") || "Enter coupon code"}
+                      value={couponCode}
+                      onChange={(e) => {
+                        setCouponCode(e.target.value);
+                        if (couponFeedback) setCouponFeedback(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleApplyCoupon();
+                      }}
+                      disabled={isUpdating || isApplyingCoupon}
+                      aria-invalid={promoInvalid || undefined}
+                      aria-describedby='promo-code-feedback'
+                      autoCapitalize='characters'
+                      className='min-w-0 flex-1'
+                    />
+                    <Button
+                      variant='secondary'
+                      size='lg'
+                      onClick={handleApplyCoupon}
+                      disabled={isUpdating || isApplyingCoupon || !couponCode.trim()}
+                      className='h-12 shrink-0'>
+                      {isApplyingCoupon
+                        ? t("cart.checking") || "Checking…"
+                        : t("cart.apply") || "Apply"}
+                    </Button>
+                  </div>
+                </div>
+              )}
 
+              {/* Outside the collapse: a notice, a result or an applied code
+                  is always shown, whether or not the field is open. */}
               <div id='promo-code-feedback' aria-live='polite'>
                 {/* A code that stopped being valid on its own (cart edited,
                     code expired between visits, etc.) */}
@@ -498,22 +538,20 @@ export function CartPageModernTemplate({
                   </div>
                 )}
 
-                {/* Shipping */}
-                {totals.shippingStatus === "pending" ? (
-                  <div className='flex justify-between gap-4 border-b border-line py-3' data-testid='shipping-line'>
-                    <dt className='text-ink-2'>{t("cart.shipping") || "Shipping"}</dt>
-                    <dd className='text-end text-ink-2'>
-                      {t("cart.shipping_calculated_at_checkout") || "Calculated at checkout"}
-                    </dd>
-                  </div>
-                ) : totals.shipping !== undefined ? (
-                  <div className='flex justify-between border-b border-line py-3' data-testid='shipping-line'>
-                    <dt className='text-ink-2'>{t("cart.shipping") || "Shipping"}</dt>
-                    <dd className='tabular-nums text-ink'>
-                      {totals.shipping === 0 ? t("cart.free") || "Free" : money(totals.shipping)}
-                    </dd>
-                  </div>
-                ) : null}
+                {/* Shipping — always present: the governorate range, since
+                    the exact fee is set at checkout once a governorate is
+                    chosen. The one exception is a fee already known to be
+                    0 — waived for every destination by a free-shipping set,
+                    code or offer: quoting a range there would state a charge
+                    that will not be made, so it reads "Free". */}
+                <div className='flex justify-between gap-4 border-b border-line py-3' data-testid='shipping-line'>
+                  <dt className='text-ink-2'>{t("cart.shipping") || "Shipping"}</dt>
+                  <dd className='text-end tabular-nums text-ink-2'>
+                    {totals.shippingStatus !== "pending" && totals.shipping === 0
+                      ? t("cart.free") || "Free"
+                      : fill(t("cart.shipping_range"), { range: formatShippingFeeRange(locale === "ar" ? "ar" : "en") })}
+                  </dd>
+                </div>
 
                 {/* Total */}
                 <div className='flex items-baseline justify-between py-4'>
@@ -525,12 +563,14 @@ export function CartPageModernTemplate({
               {/* No trust badges, payment logos or delivery promises: none of
                   them is a claim this store has made (see git history). */}
 
-              {/* Checkout — from 1024px; the sticky panel carries it below. */}
+              {/* Checkout — the one black button; the sticky panel below
+                  stands in for it only while it is off screen. */}
               <Button
+                ref={summaryCheckoutRef}
                 variant='primary'
                 size='lg'
                 fullWidth
-                className='hidden lg:inline-flex'
+                data-testid='cart-summary-checkout'
                 onClick={onProceedToCheckout}
                 disabled={checkoutDisabled}>
                 {t("cart.proceed_to_checkout") || "Proceed to Checkout"}
@@ -548,16 +588,22 @@ export function CartPageModernTemplate({
     </div>
 
     {/* ── Sticky checkout (below 1024px) ─────────────────────────────────────
-        A `surface` panel on the viewport's bottom edge with a top hairline;
+        A `surface` panel on the viewport's bottom edge with a top hairline,
+        shown only while the summary's checkout button is not fully on screen.
+        Side padding is the page gutter, so it lines up with the container;
         its content is padded above the device's home indicator. */}
     <div
       data-testid='cart-sticky-checkout'
+      aria-hidden={!showSticky}
       style={{
         bottom: CART_STICKY_BAR_BOTTOM,
         paddingBottom: CART_STICKY_BAR_PADDING_BOTTOM,
         zIndex: "var(--perce-z-sticky)",
       }}
-      className='fixed inset-x-0 border-t border-line bg-surface px-4 pt-3 lg:hidden'>
+      className={cn(
+        "fixed inset-x-0 border-t border-line bg-surface px-[var(--perce-gutter)] pt-3 transition-transform duration-[var(--perce-duration)] lg:hidden",
+        showSticky ? "translate-y-0" : "pointer-events-none translate-y-[200%]",
+      )}>
       <div className='mb-3 flex items-baseline justify-between gap-4'>
         <span className='t-label text-ink'>{t("cart.total") || "Total"}</span>
         <div className='text-end'>
@@ -571,6 +617,7 @@ export function CartPageModernTemplate({
         variant='primary'
         size='lg'
         fullWidth
+        tabIndex={showSticky ? 0 : -1}
         onClick={onProceedToCheckout}
         disabled={checkoutDisabled}>
         {t("cart.proceed_to_checkout") || "Proceed to Checkout"}

@@ -193,10 +193,11 @@ function scrollBehavior(): ScrollBehavior {
  * `checkout-modern`), in the Object Index language.
  *
  * Desktop: the form takes 7/12 and the order summary 5/12, sticky. Phones:
- * one column, with a collapsible summary above Place order. Sections are
- * numbered — 1 Contact, 2 Delivery, 3 Payment. Presentation only: fields,
- * validation, shipping quotes, governorates, COD, promo codes and order
- * submission are exactly as before.
+ * one column, the order collapsed to a bar at the top (item count + total),
+ * and promo code, total and Place order at the end. Sections are numbered —
+ * 1 Contact, 2 Delivery, 3 Payment. Email is optional for cash on delivery
+ * and required for card payments. Shipping quotes, governorates, COD, promo
+ * codes and order submission are otherwise exactly as before.
  */
 export function CheckoutPageModernTemplate({
   customer,
@@ -281,6 +282,7 @@ export function CheckoutPageModernTemplate({
   });
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const emailRequired = form.paymentMethod !== "cod";
   const [notesOpen, setNotesOpen] = useState(false);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
 
@@ -300,9 +302,12 @@ export function CheckoutPageModernTemplate({
     const errors: Record<string, string> = {};
 
     if (!form.fullName.trim()) errors.fullName = t("validation.name_required");
-    if (!form.email.trim()) {
-      errors.email = t("validation.email_required");
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+    // Optional for cash on delivery. A card payment needs one: the gateway
+    // sends its receipt there (the server enforces the same rule).
+    const email = form.email.trim();
+    if (!email) {
+      if (emailRequired) errors.email = t("validation.email_required_card");
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       errors.email = t("validation.email_invalid");
     }
     if (!form.phoneNumber.trim()) {
@@ -339,7 +344,7 @@ export function CheckoutPageModernTemplate({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
-    onSubmit?.(form);
+    onSubmit?.({ ...form, email: form.email.trim() });
   };
 
   // Resolved payment methods (with COD fallback when none provided)
@@ -370,12 +375,6 @@ export function CheckoutPageModernTemplate({
   const appliedOffers = totals.appliedOffers ?? [];
   const cartSubtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
   const cartQuantity = items.reduce((s, i) => s + i.quantity, 0);
-  const originalCartTotal = items.reduce(
-    (s, i) => s + (i.originalPrice ?? i.price) * i.quantity,
-    0,
-  );
-  const originalTotal = originalCartTotal + (totals.shipping ?? 0);
-  const hasDiscount = originalTotal > totals.grandTotal + 0.001;
   // Ordering is blocked while the destination cannot be served or a fresh
   // quote is still in flight — never on "pending", so the shopper can press
   // the button and be pointed at the governorate field by validation.
@@ -571,6 +570,36 @@ export function CheckoutPageModernTemplate({
         {t("checkout.title") || "Checkout"}
       </h1>
 
+      {/* Phones: the order, collapsed to one bar at the top — item count and
+          total — that opens to the lines and the breakdown. */}
+      <div className='mb-6 border-y border-line lg:hidden' data-testid='checkout-mobile-summary'>
+        <button
+          type='button'
+          onClick={() => setSummaryExpanded((v) => !v)}
+          className='flex min-h-14 w-full items-center gap-3 text-start'
+          aria-expanded={summaryExpanded}
+          aria-controls='checkout-summary-panel'>
+          <span className='min-w-0 flex-1'>
+            <span className='block t-label text-ink'>{t("checkout.order_summary") || "Order Summary"}</span>
+            <span className='block t-small text-ink-2'>
+              {formatItemCount(itemCount ?? cartQuantity, locale, t)}
+            </span>
+          </span>
+          <span className='shrink-0 t-label tabular-nums text-ink'>{money(totals.grandTotal)}</span>
+          <ChevronDown
+            aria-hidden
+            size={16}
+            strokeWidth={1.5}
+            className={cn("shrink-0 text-ink-2 transition-transform", summaryExpanded && "rotate-180")}
+          />
+        </button>
+
+        <div id='checkout-summary-panel' hidden={!summaryExpanded} className='border-t border-line'>
+          {renderItemsList()}
+          <div className='border-t border-line'>{renderTotalsBreakdown()}</div>
+        </div>
+      </div>
+
       {errorMessage && (
         <div role='alert' className='mb-6 border border-error px-4 py-3 t-small text-error'>
           {errorMessage}
@@ -615,7 +644,7 @@ export function CheckoutPageModernTemplate({
                     <FieldError id='fullName-error' message={fieldErrors.fullName} />
                   </div>
                   <div>
-                    <FieldLabel htmlFor='email'>
+                    <FieldLabel htmlFor='email' optional={!emailRequired}>
                       {t("checkout.email") || "Email Address"}
                     </FieldLabel>
                     <Input
@@ -624,7 +653,7 @@ export function CheckoutPageModernTemplate({
                       type='email'
                       inputMode='email'
                       autoComplete='email'
-                      required
+                      required={emailRequired}
                       aria-invalid={!!fieldErrors.email || undefined}
                       aria-describedby='email-error'
                       value={form.email}
@@ -878,43 +907,10 @@ export function CheckoutPageModernTemplate({
               <div className='mt-6'>{placeOrder}</div>
             </div>
 
-            {/* Phones: collapsible summary, then Place order */}
+            {/* Phones: promo code, total, Place order (the summary bar sits
+                at the top of the page). */}
             <div className='border-t border-ink lg:hidden'>
-              <button
-                type='button'
-                onClick={() => setSummaryExpanded((v) => !v)}
-                className='flex min-h-14 w-full items-center gap-3 text-start'
-                aria-expanded={summaryExpanded}
-                aria-controls='checkout-summary-panel'>
-                <span className='min-w-0 flex-1'>
-                  <span className='block t-label text-ink'>{t("checkout.order_summary") || "Order Summary"}</span>
-                  <span className='block t-small text-ink-2'>
-                    {formatItemCount(itemCount ?? cartQuantity, locale, t)}
-                  </span>
-                </span>
-                <span className='shrink-0 text-end'>
-                  {hasDiscount && (
-                    <span className='block t-micro font-normal tabular-nums text-ink-2'>
-                      <s>{money(originalTotal)}</s>
-                    </span>
-                  )}
-                  <span className='block t-label tabular-nums text-ink'>{money(totals.grandTotal)}</span>
-                </span>
-                <ChevronDown
-                  aria-hidden
-                  size={16}
-                  strokeWidth={1.5}
-                  className={cn("shrink-0 text-ink-2 transition-transform", summaryExpanded && "rotate-180")}
-                />
-              </button>
-
-              <div id='checkout-summary-panel' hidden={!summaryExpanded} className='border-t border-line'>
-                {renderItemsList()}
-                <div className='border-t border-line'>{renderTotalsBreakdown()}</div>
-              </div>
-
-              {/* Always visible on phones, not tucked behind the toggle */}
-              <div className='border-t border-line py-6'>{renderCouponBlock("mobile")}</div>
+              <div className='py-6'>{renderCouponBlock("mobile")}</div>
 
               <div className='flex items-baseline justify-between border-t border-line py-4'>
                 <span className='t-h3 text-ink'>{t("cart.total") || "Total"}</span>

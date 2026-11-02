@@ -89,7 +89,14 @@ describe.each([
 
   it("the decision summary states only real data", () => {
     const html = ssr(Template);
-    expect(html).toContain("Fake Piercings · Ear");
+    // product-perce drops the Category row (its breadcrumb places the piece);
+    // product-minimal keeps it.
+    if (Template === ProductPagePremium) {
+      expect(html).not.toContain("Fake Piercings · Ear");
+      expect(html).not.toMatch(/<dt[^>]*>Category</);
+    } else {
+      expect(html).toContain("Fake Piercings · Ear");
+    }
     expect(html).toContain("No piercing needed");
     expect(html).not.toMatch(/hypoallergenic|lifetime|premium materials/i);
   });

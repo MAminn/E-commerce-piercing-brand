@@ -61,9 +61,10 @@ export default function CartPage() {
   const cartItems: CartPageCartItem[] = useMemo(() => {
     return items.map((item, index) => ({
       id: getCartItemKey(item),
-      // The line's product page — from the product id, never the composite
-      // line key (which carries the selected options).
-      href: getProductUrl({ id: item.id }),
+      // The line's product page — /shop/<slug>, falling back to the product
+      // id for lines saved before slugs were kept. Never the composite line
+      // key (which carries the selected options).
+      href: getProductUrl({ id: item.id, slug: item.slug }),
       name: item.name,
       price: item.price,
       originalPrice: item.originalPrice ?? undefined,

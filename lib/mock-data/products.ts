@@ -1,5 +1,7 @@
 export interface Product {
   id: string;
+  /** URL slug, kept on cart lines so the bag links to /shop/<slug>. Absent on older saved carts. */
+  slug?: string | null;
   name: string;
   vendor?: string;
   vendorId?: string;

@@ -124,13 +124,17 @@ export async function queueOrderPlacedEmails(
   const d = { ...defaultDeps(), ...deps };
   const label = formatOrderNumber(params.orderNumber) || params.orderId;
   try {
-    const queued = await d.enqueue({
-      automationType: ORDER_CONFIRMATION,
-      recipientEmail: params.customerEmail,
-      payload: { orderId: params.orderId },
-      scheduledFor: new Date(),
-      dedupeKey: confirmationDedupeKey(params.orderId),
-    });
+    // Email is optional at checkout (cash on delivery): with no address
+    // there is no customer confirmation to send. The store is still told.
+    const queued = !params.customerEmail
+      ? true
+      : await d.enqueue({
+          automationType: ORDER_CONFIRMATION,
+          recipientEmail: params.customerEmail,
+          payload: { orderId: params.orderId },
+          scheduledFor: new Date(),
+          dedupeKey: confirmationDedupeKey(params.orderId),
+        });
     if (!queued) {
       await d.logEvent({
         orderId: params.orderId,

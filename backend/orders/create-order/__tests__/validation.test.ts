@@ -173,6 +173,21 @@ describe("createOrderSchema — address fields backed by NOT NULL columns", () =
       );
     });
 
+    it("email is optional for cash on delivery — empty or absent is stored as \"\"", () => {
+      const empty = createOrderSchema.safeParse(checkoutPayload({ customerEmail: "" }));
+      expect(empty.success && empty.data.customerEmail).toBe("");
+      const { customerEmail: _e, ...noEmail } = checkoutPayload();
+      const absent = createOrderSchema.safeParse(noEmail);
+      expect(absent.success && absent.data.customerEmail).toBe("");
+    });
+
+    it("a card payment still needs an email", () => {
+      for (const paymentMethod of ["stripe", "paymob"] as const) {
+        expect(errorPaths(checkoutPayload({ customerEmail: "", paymentMethod }))).toContain("customerEmail");
+        expect(createOrderSchema.safeParse(checkoutPayload({ paymentMethod })).success).toBe(true);
+      }
+    });
+
     it("reports every missing address field at once", () => {
       const { shippingState: _s, shippingPostalCode: _p, shippingCountry: _c, ...bare } =
         checkoutPayload();

@@ -115,7 +115,12 @@ export type CreateOrderBundleInput = z.infer<typeof OrderBundleSchema>;
 
 export const createOrderSchema = z.object({
   customerName: z.string().min(1),
-  customerEmail: z.string().email(),
+  /**
+   * Optional for cash on delivery: "" (or absent) means the shopper gave
+   * none. `order.customer_email` is NOT NULL, so "" is what is stored. Card
+   * payments still need one — see the refine below.
+   */
+  customerEmail: z.union([z.literal(""), z.string().trim().email()]).default(""),
   customerPhone: z.string().min(1),
   shippingAddress: z.string().min(1),
   shippingCity: z.string().min(1),
@@ -169,6 +174,10 @@ export const createOrderSchema = z.object({
 }).refine((data) => data.items.length + data.bundles.length > 0, {
   message: "An order needs at least one item",
   path: ["items"],
+}).refine((data) => data.paymentMethod === "cod" || data.customerEmail !== "", {
+  // Stripe and Paymob both send the payment receipt to this address.
+  message: "Email is needed for card payments",
+  path: ["customerEmail"],
 });
 
 // Manually define the insert type matching the schema's nullability
@@ -828,7 +837,8 @@ export const createOrder = (
             }
 
             // Per-user usage limit — signed-in shoppers by user id, guests by
-            // the email they're checking out with.
+            // the email they're checking out with, or by phone when they gave
+            // no email ("" would match every email-less guest order).
             if (code.usageLimitPerUser !== null) {
               const previousUses = await tx
                 .select({ id: order.id })
@@ -838,7 +848,9 @@ export const createOrder = (
                     eq(order.promoCodeId, code.id),
                     userId
                       ? eq(order.userId, userId)
-                      : eq(order.customerEmail, input.customerEmail),
+                      : input.customerEmail
+                        ? eq(order.customerEmail, input.customerEmail)
+                        : eq(order.customerPhone, input.customerPhone),
                   ),
                 )
                 .execute();

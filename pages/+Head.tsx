@@ -247,8 +247,10 @@ export default function HeadDefault() {
       <style>{`
         body { margin: 0; }
         img { display: block; max-width: 100%; }
-        /* Never let a single wide child scroll the whole page sideways. */
-        html, body { overflow-x: hidden; }
+        /* Never let a single wide child scroll the whole page sideways.
+           clip, not hidden: hidden makes body a scroll container, which
+           silently disables every position: sticky below it. */
+        html, body { overflow-x: clip; }
         .hero-section { position: relative; height: 90vh; overflow: hidden; }
         .hero-content { position: relative; z-index: 9; }
         .hero-bg {
