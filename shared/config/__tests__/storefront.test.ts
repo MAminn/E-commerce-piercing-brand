@@ -10,6 +10,10 @@ import {
 } from "../storefront";
 import { DEFAULT_LAYOUT_SETTINGS } from "#root/shared/types/layout-settings";
 import { templateConfig } from "#root/components/template-system/templateConfig";
+import { ProductPagePremium } from "#root/components/template-system/productPage/ProductPagePremium";
+import { CartPageModernTemplate } from "#root/components/template-system/cartPage/CartPageModernTemplate";
+import { CategoryMinimal } from "#root/components/template-system/categoryPage/CategoryMinimal";
+import { SearchResultsMinimal } from "#root/components/template-system/searchResults/SearchResultsMinimal";
 
 describe("storefront shell defaults", () => {
   it("keeps the layout-settings fallback in sync with DEFAULT_NAVBAR_STYLE", () => {
@@ -72,6 +76,60 @@ describe("Percé production template preset", () => {
       expect(PERCE_TEMPLATE_PRESET[category]).not.toMatch(/-editorial$/);
     }
   });
+});
+
+describe("Object Index routing", () => {
+  // The Object Index restyle lives in these components. If the preset points
+  // anywhere else, an unconfigured store renders the legacy PDP / cart and
+  // the restyle ships invisible — which is what localhost was doing.
+  const OBJECT_INDEX = {
+    productPage: { id: "product-perce", component: ProductPagePremium },
+    cartPage: { id: "cart-modern", component: CartPageModernTemplate },
+    categoryPage: { id: "category-minimal", component: CategoryMinimal },
+    searchResults: {
+      id: "search-results-minimal",
+      component: SearchResultsMinimal,
+    },
+  } as const;
+
+  const LEGACY_IDS = [
+    "product-minimal",
+    "product-classic",
+    "product-editorial",
+    "product-technical",
+    "product-modern-split",
+    "product-noir",
+    "cart-minimal",
+    "cart-editorial",
+    "category-grid-classic",
+    "category-hero-split",
+    "category-showcase",
+    "category-grid-with-filters",
+    "search-results-grid",
+    "search-results-editorial",
+  ];
+
+  it.each(Object.entries(OBJECT_INDEX))(
+    "routes %s to its Object Index template",
+    (category, expected) => {
+      const preset =
+        PERCE_TEMPLATE_PRESET[category as StorefrontTemplateCategory];
+      expect(preset).toBe(expected.id);
+      expect(LEGACY_IDS).not.toContain(preset);
+      expect(resolveTemplateId(category as StorefrontTemplateCategory, null))
+        .toBe(expected.id);
+    },
+  );
+
+  it.each(Object.entries(OBJECT_INDEX))(
+    "keeps the %s id wired to the restyled component",
+    (category, expected) => {
+      const entry = templateConfig[
+        category as StorefrontTemplateCategory
+      ].find((t) => t.id === expected.id);
+      expect(entry?.component).toBe(expected.component);
+    },
+  );
 });
 
 describe("resolveTemplateId", () => {

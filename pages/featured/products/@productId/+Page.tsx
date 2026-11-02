@@ -239,7 +239,7 @@ export default function ProductDetailPage() {
     fetchProductData();
   }, [fetchProductData]);
 
-  // The DB selection wins, and the Percé preset (product-minimal) is what an
+  // The DB selection wins, and the Percé preset (product-perce) is what an
   // unconfigured store gets. This used to hard-override to "product-minimal"
   // whenever the shell was minimal, which silently ignored the admin's own
   // choice in Dashboard > Templates > Product Page — the picker saved a value

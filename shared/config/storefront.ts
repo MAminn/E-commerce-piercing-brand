@@ -52,7 +52,7 @@ export const DEFAULT_NAVBAR_STYLE: NavbarStyle = "minimal";
 export const DEFAULT_LANDING_TEMPLATE_ID = "landing-minimal";
 
 /** Product page template used when `templateSelection.productPage` is unset. */
-export const DEFAULT_PRODUCT_TEMPLATE_ID = "product-minimal";
+export const DEFAULT_PRODUCT_TEMPLATE_ID = "product-perce";
 
 /**
  * Resolves the active landing template id from a template-selection map.
@@ -123,10 +123,11 @@ export function isUsableHref(href: string | undefined | null): href is string {
      visual family from the Percé shell. sorting-minimal took the Phase 2 token
      pass (its hero band is a Percé surface, not the old clothing stock photo).
 
-   productPage → product-minimal
-     Phase 2 selection. Image-first, guards every fabricated claim behind
-     admin-authored content, and is the only product template with the
-     Percé-token gallery and mobile sticky bar.
+   productPage → product-perce
+     The Object Index PDP (ProductPagePremium): 7/5 split with sticky info,
+     4:5 swipe gallery, square radiogroup options and the viewport-edge
+     sticky Add to bag. `product-minimal` was the Phase 2 selection and is
+     the legacy look now; it stays available to admins.
 
    categoryPage → category-minimal
      The only category template with no fabricated defaults.
@@ -137,14 +138,14 @@ export function isUsableHref(href: string | undefined | null): href is string {
      defaults are now empty arrays, but category-minimal is still the one that
      never had them.
 
-   cartPage → cart-minimal
-     The only cart template that implements the full working prop surface:
-     OfferProgressBanner, AppliedOffersSavings, per-line free quantities, the
-     promo-code apply/remove/notice cycle and a mobile sticky checkout CTA.
-     `cart-editorial` types `onApplyCoupon` as fire-and-forget, drops the
-     coupon feedback props entirely, renders no offer UI, and brings the
-     double-footer EditorialChrome problem with it. `cart-modern` is complete
-     but is a boxed marketplace layout.
+   cartPage → cart-modern
+     The Object Index cart (CartPageModernTemplate): 80x100 lines, square
+     stepper, indexed set block, hairline totals and the surface sticky
+     checkout, with the same offer / promo-code prop surface `cart-minimal`
+     has (pages/cart/__tests__ runs both). `cart-minimal` is the legacy look
+     now. `cart-editorial` types `onApplyCoupon` as fire-and-forget, drops
+     the coupon feedback props entirely, renders no offer UI, and brings the
+     double-footer EditorialChrome problem with it.
 
    checkoutPage → checkout-modern
      The only checkout wired to the real backend contract: server-driven
@@ -189,7 +190,7 @@ export const PERCE_TEMPLATE_PRESET: Record<
   sorting: "sorting-minimal",
   productPage: DEFAULT_PRODUCT_TEMPLATE_ID,
   categoryPage: "category-minimal",
-  cartPage: "cart-minimal",
+  cartPage: "cart-modern",
   checkoutPage: "checkout-modern",
   searchResults: "search-results-minimal",
 };
