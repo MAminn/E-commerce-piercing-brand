@@ -12,6 +12,7 @@ import { Effect } from "effect";
 import { normalizeProductCategoryIds } from "#root/backend/categories/hierarchy";
 import { z } from "zod";
 import { validateProductRules, fragranceInfoSchema } from "../shared";
+import { assertCatalogueNoAvailable, catalogueNoConflict, catalogueNoInputSchema } from "../catalogue-no";
 import {
   costPriceInputSchema,
   costPriceToColumn,
@@ -77,6 +78,11 @@ export const editProductSchema = z.object({
    * the key leaves the stored value untouched.
    */
   costPrice: costPriceInputSchema,
+  /**
+   * Customer-facing, 1–999. `null` clears it; omitting the key leaves the
+   * stored number untouched.
+   */
+  catalogueNo: catalogueNoInputSchema,
 });
 
 export const editProduct = (
@@ -116,6 +122,7 @@ export const editProduct = (
         if (internalCode !== undefined) {
           await assertInternalCodeAvailable(db, internalCode, data.id);
         }
+        await assertCatalogueNoAvailable(db, data.catalogueNo, data.id);
 
         const existingProduct = await db
           .select()
@@ -166,6 +173,7 @@ export const editProduct = (
               ...(data.costPrice !== undefined
                 ? { costPrice: costPriceToColumn(data.costPrice) }
                 : {}),
+              ...(data.catalogueNo !== undefined ? { catalogueNo: data.catalogueNo } : {}),
               updatedAt: new Date(),
             })
             .where(eq(product.id, data.id))
@@ -283,7 +291,7 @@ export const editProduct = (
 
           return updatedProduct;
         }).catch((error) =>
-          rethrowInternalCodeConflict(error, internalCode ?? null),
+          rethrowInternalCodeConflict(catalogueNoConflict(error, data.catalogueNo), internalCode ?? null),
         );
 
         return updatedProduct;

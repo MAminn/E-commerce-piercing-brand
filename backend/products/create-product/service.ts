@@ -22,6 +22,7 @@ import {
   rethrowInternalCodeConflict,
 } from "../internal-code";
 import { getStoreOwnerId } from "#root/shared/config/store";
+import { assertCatalogueNoAvailable, catalogueNoConflict, catalogueNoInputSchema } from "../catalogue-no";
 import { generateUniqueProductSlug } from "../slug";
 import { eq } from "drizzle-orm";
 
@@ -70,6 +71,8 @@ export const createProductSchema = z.object({
   internalCode: internalCodeInputSchema,
   /** Merchant-only, EGP. Blank stores NULL — never 0. */
   costPrice: costPriceInputSchema,
+  /** Customer-facing, 1–999. Absent or null stores NULL (not numbered yet). */
+  catalogueNo: catalogueNoInputSchema,
 });
 
 export const createProduct = (
@@ -108,6 +111,7 @@ export const createProduct = (
         // is what settles a race between two concurrent saves — hence the
         // catch below.
         await assertInternalCodeAvailable(db, internalCode);
+        await assertCatalogueNoAvailable(db, data.catalogueNo);
 
         const newProduct = await db.transaction(async (tx) => {
           const newProduct = await tx
@@ -131,6 +135,7 @@ export const createProduct = (
               internalCode,
               // NULL when the admin left it blank; deliberately not 0.
               costPrice: costPriceToColumn(data.costPrice),
+              catalogueNo: data.catalogueNo ?? null,
             })
             .returning()
             .then((data) => data[0]);
@@ -217,7 +222,7 @@ export const createProduct = (
 
           return newProduct;
         }).catch((error) =>
-          rethrowInternalCodeConflict(error, internalCode),
+          rethrowInternalCodeConflict(catalogueNoConflict(error, data.catalogueNo), internalCode),
         );
 
         return newProduct;

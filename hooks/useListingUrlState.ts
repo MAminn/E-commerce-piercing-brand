@@ -11,8 +11,8 @@ import {
  * The shop / category listing state, read from and written to the URL.
  *
  * Why not Vike's `navigate()`: every navigate() — even to the same page —
- * runs the page-transition hooks, which fade the full-screen overlay and emit
- * a `page_viewed` tracking event. A filter click is neither a new page nor a
+ * runs the page-transition hooks, which emit a `page_viewed` tracking
+ * event. A filter click is neither a new page nor a
  * page view. So changes go through `history.pushState()` (Vike patches it and
  * leaves same-page entries to us) and this hook re-reads `location.search`
  * on its own events and on `popstate`.

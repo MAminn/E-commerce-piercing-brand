@@ -55,6 +55,7 @@ const product = {
 };
 const related = [
   { id: "r1", slug: "r1", name: "Opal Daith Ring", price: 160, stock: 3, available: true, imageUrl: "/a.webp" },
+  { id: "r2", slug: "r2", name: "Opal Helix Stud", price: 140, stock: 2, available: true, imageUrl: "/b.webp" },
 ];
 
 /** Visible text + labels, minus catalogue content and money. */
@@ -63,7 +64,7 @@ const systemText = (root: ParentNode) => {
   for (const el of root.querySelectorAll("[aria-label],[placeholder]")) {
     all += ` ${el.getAttribute("aria-label") ?? ""} ${el.getAttribute("placeholder") ?? ""}`;
   }
-  for (const content of [product.name, product.description, "Fake Piercings", "Opal Daith Ring"]) {
+  for (const content of [product.name, product.description, "Fake Piercings", "Opal Daith Ring", "Opal Helix Stud"]) {
     all = all.split(content).join(" ");
   }
   return all.replace(/EGP|ج\.م\.?/g, " ");
@@ -110,7 +111,7 @@ describe("Arabic product page — system CTAs", () => {
     );
     const host = document.createElement("div");
     host.innerHTML = html;
-    expect(host.textContent).toContain("إضافة للسلة");
+    expect(host.textContent).toContain("إضافة إلى الحقيبة");
     expect(systemText(host)).not.toMatch(/[A-Za-z]{3,}/);
   });
 

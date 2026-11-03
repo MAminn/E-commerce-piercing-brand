@@ -29,6 +29,7 @@ export default {
     "templateSelection",
     "layoutSettingsData",
     "legalPages",
+    "storefrontCategories",
     "brandName",
     "ssrLocale",
     "typographySettings",

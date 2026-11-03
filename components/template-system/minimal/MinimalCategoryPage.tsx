@@ -38,24 +38,11 @@ import type {
   CategoryNodeLike,
   StorefrontCategoryNav,
 } from "#root/shared/categories/tree";
+import type { PlacementChip } from "#root/shared/categories/placements";
 
 /* ── Types ──────────────────────────────────────────────────────────── */
 
 export interface MinimalCategoryProduct extends MinimalProduct {}
-
-export interface SubcategoryNavItem {
-  id: string;
-  name: string;
-  href: string;
-}
-
-export interface SubcategoryNav {
-  /** Link back to the whole main category ("All"). */
-  allHref: string;
-  /** The subcategory being viewed; omitted on the main category itself. */
-  activeId?: string;
-  items: SubcategoryNavItem[];
-}
 
 export interface MinimalCategoryPageProps {
   products: MinimalCategoryProduct[];
@@ -64,8 +51,12 @@ export interface MinimalCategoryPageProps {
   categoryDescription?: string | null;
   /** The main category, when the page shows one of its subcategories. */
   parentCategory?: { name: string; href: string };
-  /** Subcategory tabs. Nothing renders unless there is at least one item. */
-  subcategoryNav?: SubcategoryNav;
+  /**
+   * The placement chip row under the title and count (see
+   * shared/categories/placements#placementChips). Nothing renders without
+   * at least two chips.
+   */
+  placementChips?: PlacementChip[];
   /** When known, live bundle campaigns placed on this category render below the grid. */
   categoryId?: string;
   /** Nothing to show yet (first load of this listing). */
@@ -166,46 +157,36 @@ function CategoryBreadcrumbs({
   );
 }
 
-/* ── Subcategory tabs ────────────────────────────────────────────────── */
+/* ── Placement chips ─────────────────────────────────────────────────── */
 
 /**
- * "All · Lobe · Helix · Daith" — a quiet text tab row under the heading.
- * Real links (shareable, crawlable, back-button friendly), not filter state.
- * Scrolls sideways on a phone instead of wrapping into a block of pills; the
- * active tab carries the 1px ink rule the rest of the site uses for links.
+ * "All · Ear · Nose" on /shop; "All · Daith · Rook · Flat back" inside a
+ * placement — the browsing spine, right under the title and count. Square
+ * chips on a hairline border, the current one ink-filled. Real links
+ * (shareable, crawlable, back-button friendly), not filter state. Scrolls
+ * sideways on a phone instead of wrapping.
  */
-function SubcategoryTabs({ nav }: { nav: SubcategoryNav }) {
+function PlacementChipRow({ chips }: { chips: PlacementChip[] }) {
   const ct = useCategoryT();
-  if (nav.items.length === 0) return null;
-
-  const tabs = [
-    { id: "__all", name: ct("subnav.all"), href: nav.allHref, active: !nav.activeId },
-    ...nav.items.map((item) => ({ ...item, active: item.id === nav.activeId })),
-  ];
-
+  if (chips.length < 2) return null;
   return (
     <nav
       aria-label={ct("subnav.label")}
-      // The hairline is an inset shadow, not a border: the row scrolls
-      // (overflow-x), which would clip a tab border overlapping a real one,
-      // and children paint over an inset shadow — so the active tab's rule
-      // sits exactly on the hairline.
-      className="-mx-[var(--perce-gutter)] mb-6 overflow-x-auto scrollbar-hide shadow-[inset_0_-1px_0_var(--perce-border)] sm:mx-0 sm:mb-8">
-      <ul className="flex w-max gap-6 px-[var(--perce-gutter)] sm:gap-8 sm:px-0">
-        {tabs.map((tab) => (
-          <li key={tab.id}>
+      data-testid="placement-chips"
+      className="-mx-[var(--perce-gutter)] mb-6 overflow-x-auto scrollbar-hide sm:mx-0 sm:mb-8">
+      <ul className="flex w-max gap-2 px-[var(--perce-gutter)] sm:px-0">
+        {chips.map((chip) => (
+          <li key={chip.id}>
             {/* A plain <a>: the shared Link component drops aria-current, and
                 Vike routes plain links client-side anyway. */}
             <a
-              href={tab.href}
-              aria-current={tab.active ? "page" : undefined}
+              href={chip.href}
+              aria-current={chip.active ? "page" : undefined}
               className={cn(
-                "inline-flex min-h-11 items-center whitespace-nowrap border-b t-label transition-colors",
-                tab.active
-                  ? "border-ink text-ink"
-                  : "border-transparent text-ink-2 hover:text-ink",
+                "inline-flex h-9 items-center whitespace-nowrap border px-4 t-label transition-colors duration-[var(--perce-duration-fast)]",
+                chip.active ? "border-ink bg-ink text-bg" : "border-line text-ink hover:border-ink",
               )}>
-              {tab.name}
+              {chip.label}
             </a>
           </li>
         ))}
@@ -398,7 +379,7 @@ export function MinimalCategoryPage({
   categoryName,
   categoryDescription,
   parentCategory,
-  subcategoryNav,
+  placementChips,
   categoryId,
   isLoading,
   isRefreshing,
@@ -544,7 +525,7 @@ export function MinimalCategoryPage({
             </p>
           </div>
 
-          {subcategoryNav && <SubcategoryTabs nav={subcategoryNav} />}
+          {placementChips && <PlacementChipRow chips={placementChips} />}
 
           <div
             ref={resultsRef}
@@ -730,24 +711,18 @@ export function MinimalCategoryPage({
 }
 
 /**
- * Heading, breadcrumb and tab props for a resolved category (see
- * storefrontCategoryNav). Tabs always link to /categories/<slug>, whichever
- * route the shopper arrived on.
+ * Heading and breadcrumb props for a resolved category (see
+ * storefrontCategoryNav). The placement chips come from placementChips.
  */
 export function categoryNavProps(
   nav: StorefrontCategoryNav<CategoryNodeLike & { description?: string | null }> | undefined,
-): Pick<MinimalCategoryPageProps, "categoryDescription" | "parentCategory" | "subcategoryNav"> {
+): Pick<MinimalCategoryPageProps, "categoryDescription" | "parentCategory"> {
   if (!nav) return {};
   const href = (slug: string) => `/categories/${encodeURIComponent(slug)}`;
   const isSub = nav.current.id !== nav.main.id;
   return {
     categoryDescription: nav.current.description,
     parentCategory: isSub ? { name: nav.main.name, href: href(nav.main.slug) } : undefined,
-    subcategoryNav: {
-      allHref: href(nav.main.slug),
-      activeId: isSub ? nav.current.id : undefined,
-      items: nav.tabs.map((t) => ({ id: t.id, name: t.name, href: href(t.slug) })),
-    },
   };
 }
 

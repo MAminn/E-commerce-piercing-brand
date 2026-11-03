@@ -9,7 +9,7 @@ import { getProductUrl } from "#root/lib/utils/route-helpers";
 import { cn } from "#root/lib/utils";
 import { showCartToast, flyToCart } from "#root/components/ui/cart-toast";
 import { needsNoPiercing } from "#root/shared/products/no-piercing";
-import { Price } from "#root/components/storefront/Price";
+import { IndexLine } from "#root/components/storefront/IndexLine";
 
 interface ProductImage {
   url: string;
@@ -33,6 +33,8 @@ export interface MinimalProduct {
   description?: string | null;
   isNew?: boolean;
   tag?: string;
+  /** Catalogue number, shown as "014"; null until the owner numbers the product. */
+  catalogueNo?: number | null;
 }
 
 interface MinimalProductCardProps {
@@ -55,8 +57,9 @@ function resolveImageUrl(url?: string | null): string {
  * Product card — Object Index.
  *
  * The photograph is the card: a 4:5 frame on `surface-2` with no border,
- * radius or shadow, then the title (14/400, two lines) and the price as
- * tabular data — one number, the price paid. Desktop
+ * radius or shadow, then the short index line — "014 · Clicker" over
+ * "10 mm · EGP 210" — with the catalogue number and measure only when the
+ * product has them, and one price, the price paid. Desktop
  * crossfades to a second photo on hover when the product has one.
  *
  * The `+` is a 36px square inside the photo, bottom-end, 8px in, with a 44px
@@ -247,16 +250,15 @@ export function MinimalProductCard({ product, className }: MinimalProductCardPro
       </div>
 
       <div className='pt-3 text-start'>
-        <a href={productUrl} className='block hover:underline hover:decoration-1 hover:underline-offset-4'>
-          <h3
-            style={{ fontFamily: "var(--font-product-title)" }}
-            className='line-clamp-2 t-card-title text-ink'>
-            {product.name}
-          </h3>
-        </a>
-        <div className='mt-1 flex flex-wrap items-baseline gap-x-2' style={{ fontFamily: "var(--font-price)" }}>
-          <Price amount={displayPrice} locale={locale} size='card' />
-        </div>
+        {/* The short index line: "014 · Clicker" / "10 mm · EGP 210". The
+            catalogue number and measure appear only when the product has
+            them; the price is always the price paid. */}
+        <IndexLine
+          variant='short'
+          href={productUrl}
+          locale={locale}
+          product={{ name: product.name, catalogueNo: product.catalogueNo, price: displayPrice }}
+        />
         {soldOut && <p className="mt-1 t-micro text-ink-2">{t("sold_out")}</p>}
         {!soldOut && factText && <p className='mt-1 t-micro text-ink-2'>{factText}</p>}
       </div>

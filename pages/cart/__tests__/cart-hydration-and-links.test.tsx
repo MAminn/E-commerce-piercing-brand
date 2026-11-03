@@ -246,9 +246,10 @@ describe("cart after the saved cart is read", () => {
     });
     seed({ items: [line()] });
     render(tree());
-    // The sticky bar states the saving (offer names sit behind its toggle).
-    // One money rule storefront-wide: whole amounts print without decimals.
-    await waitFor(() => expect(screen.getByTestId("cart-sticky-checkout").textContent).toMatch(/Saving EGP\s?20(?![.\d])/));
+    // The summary states the offer as one row (names behind its toggle) —
+    // no "Saving" line. One money rule: whole amounts print without decimals.
+    await waitFor(() => expect(screen.getByRole("button", { name: /Offers/ }).textContent).toMatch(/−EGP\s?20(?![.\d])/));
+    expect(screen.getByTestId("cart-sticky-checkout").textContent).not.toMatch(/Sav/);
     expect(offerEvaluate).toHaveBeenCalled();
     expect(screen.queryByTestId("cart-loading")).toBeNull();
   });

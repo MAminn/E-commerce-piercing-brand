@@ -1,4 +1,4 @@
-import { useContext, useState, useRef, useEffect, useId } from "react";
+import { useContext, useState, useRef, useEffect, useId, useMemo } from "react";
 import { Search, User, X, Menu, ChevronDown } from "lucide-react";
 import { usePageContext } from "vike-react/usePageContext";
 import { Link } from "#root/components/utils/Link";
@@ -21,6 +21,8 @@ import {
   DropdownMenuTrigger,
 } from "#root/components/ui/dropdown-menu";
 import { visibleToShoppers } from "#root/shared/categories/tree";
+import { placementTree, type Placement } from "#root/shared/categories/placements";
+import { useStorefrontCategories } from "#root/hooks/useStorefrontCategories";
 import { ICON_PROPS, IconButton, buttonClass } from "#root/components/storefront/Button";
 import { Price } from "#root/components/storefront/Price";
 import { cn } from "#root/lib/utils";
@@ -90,18 +92,18 @@ export function MinimalNavbar() {
   const searchPanelRef = useRef<HTMLDivElement>(null);
   const searchToggleRef = useRef<HTMLButtonElement>(null);
   const searchPanelId = useId();
-  const [categories, setCategories] = useState<{ id: string; name: string; slug?: string }[]>([]);
+  const { categories: categoryRows } = useStorefrontCategories();
+  const categories = useMemo(
+    () => visibleToShoppers(categoryRows ?? []).map((c) => ({ id: c.id, name: c.name, slug: c.slug })),
+    [categoryRows],
+  );
+  // Ear, Nose… — the browsing spine, ahead of Shop all / New in / Sets.
+  const placements = useMemo(() => placementTree(categoryRows ?? []), [categoryRows]);
+  const placementActive = (p: Placement) =>
+    [p, ...p.children].some((x) => urlPathname === x.href || urlPathname === decodeURIComponent(x.href));
 
   const [liveResults, setLiveResults] = useState<LiveResults>(EMPTY_RESULTS);
   const [isSearching, setIsSearching] = useState(false);
-
-  useEffect(() => {
-    trpc.category.view.query().then((res) => {
-      if (res.success && res.result) {
-        setCategories(visibleToShoppers(res.result).map((c: { id: string; name: string; slug?: string }) => ({ id: c.id, name: c.name, slug: c.slug })));
-      }
-    }).catch(() => {});
-  }, []);
 
   // Bundles & Stacks becomes a nav destination on its own once at least one
   // campaign is live — no CMS step needed, and nothing to click into while
@@ -288,6 +290,23 @@ export function MinimalNavbar() {
 
             {/* ── Desktop: primary links beside the wordmark ── */}
             <ul className='ms-8 hidden items-center gap-6 lg:flex'>
+              {placements.map((p) => {
+                const active = placementActive(p);
+                return (
+                  <li key={p.id}>
+                    <a
+                      href={p.href}
+                      aria-current={active ? "page" : undefined}
+                      data-nav-placement
+                      className={navLinkClass(active)}>
+                      {p.label}
+                    </a>
+                  </li>
+                );
+              })}
+              {placements.length > 0 && (
+                <li aria-hidden='true' className='h-4 w-px bg-line' />
+              )}
               {links.map((link) => {
                 if (link.isDropdown && link.categoryIds.length > 0) {
                   // Desktop: hover/focus dropdown listing the categories.
@@ -469,6 +488,42 @@ export function MinimalNavbar() {
             </div>
 
             <div className='flex-1 overflow-y-auto px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]'>
+              {placements.length > 0 && (
+                <ul className='border-b border-line py-2' data-testid='menu-placements'>
+                  {placements.map((p, i) => (
+                    <li key={p.id} className='py-1'>
+                      <a
+                        href={p.href}
+                        onClick={handleCloseSheet}
+                        aria-current={urlPathname === p.href ? "page" : undefined}
+                        className='flex min-h-13 items-baseline gap-3 t-h3 text-ink'>
+                        <span aria-hidden='true' className='t-label tabular-nums text-ink-2'>
+                          {String(i + 1).padStart(2, "0")}
+                        </span>
+                        {p.label}
+                      </a>
+                      {p.children.length > 0 && (
+                        <ul className='pb-2 ps-8'>
+                          {p.children.map((c) => (
+                            <li key={c.id}>
+                              <a
+                                href={c.href}
+                                onClick={handleCloseSheet}
+                                aria-current={urlPathname === c.href ? "page" : undefined}
+                                className='flex min-h-11 items-center justify-between gap-4 t-body text-ink-2 transition-colors hover:text-ink'>
+                                {c.label}
+                                {c.count !== null && (
+                                  <span className='t-small tabular-nums text-ink-2'>{c.count}</span>
+                                )}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
               <ul className='py-2'>
                 {links.flatMap((link) => {
                   if (link.isDropdown && link.categoryIds.length > 0) {

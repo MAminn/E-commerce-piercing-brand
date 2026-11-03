@@ -282,7 +282,7 @@ export default function CheckoutPage() {
       // Validate cart has items
       if (items.length === 0 && bundles.length === 0) {
         throw new Error(
-          "Your cart is empty. Please add items before placing an order.",
+          "Your bag is empty. Add a piece before placing an order.",
         );
       }
 

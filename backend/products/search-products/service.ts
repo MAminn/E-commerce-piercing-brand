@@ -108,6 +108,8 @@ export const searchProducts = (input: z.infer<typeof searchProductsSchema>) =>
             categoryId: product.categoryId,
             categoryName: category.name,
             sortOrder: product.sortOrder,
+            // Customer-facing ("014 · Clicker"); NULL until the owner numbers it.
+            catalogueNo: product.catalogueNo,
           })
           .from(product)
           .leftJoin(file, eq(product.imageId, file.id))

@@ -116,7 +116,7 @@ export function CartToastContainer() {
         <div className="mb-3 flex items-center justify-between gap-2">
           <p className="flex items-center gap-2 t-label">
             <Check size={16} strokeWidth={1.5} aria-hidden />
-            {t("product.added_to_cart") || "Added to cart"}
+            {t("product.added_to_cart") || "Added to bag"}
           </p>
           <button
             type="button"
@@ -141,7 +141,7 @@ export function CartToastContainer() {
         </div>
         <div className="mt-4 grid grid-cols-2 gap-2">
           <a href="/cart" className={buttonClass({ variant: "secondary", size: "sm" })}>
-            {t("product.view_cart") || "View Cart"}
+            {t("product.view_cart") || "View bag"}
           </a>
           <a href="/checkout" className={buttonClass({ variant: "primary", size: "sm" })}>
             {t("product.checkout") || "Checkout"}

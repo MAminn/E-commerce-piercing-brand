@@ -20,6 +20,8 @@ export interface NewArrivalProduct {
   available: boolean;
   /** The product has option groups: cards send it to its page to choose them. */
   requiresOptions?: boolean;
+  /** Catalogue number, shown as "014"; null until the owner numbers the product. */
+  catalogueNo?: number | null;
 }
 
 export interface NewArrivalsProps {

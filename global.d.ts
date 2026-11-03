@@ -16,6 +16,8 @@ declare global {
       layoutSettingsData?: LayoutSettings;
       /** Legal pages that are live — drives the footer's policy links. */
       legalPages?: PublishedLegalPage[];
+      /** Storefront categories (tree order, hidden rows included) — see useStorefrontCategories. */
+      storefrontCategories?: import("./hooks/useStorefrontCategories").StorefrontCategory[];
       brandName?: string;
       ssrLocale?: "en" | "ar";
       typographySettings?: TypographySettings;

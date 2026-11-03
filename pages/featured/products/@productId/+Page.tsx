@@ -96,6 +96,7 @@ export default function ProductDetailPage() {
           categoryName: rp.category?.name || "",
           stock: rp.product.stock || 0,
           available: (rp.product.stock || 0) > 0,
+          catalogueNo: rp.product.catalogueNo ?? null,
         }));
 
       const mapSearchToFeatured = (items: any[]): FeaturedProduct[] =>
@@ -113,6 +114,7 @@ export default function ProductDetailPage() {
           stock: item.stock || 0,
           available: (item.stock || 0) > 0,
           requiresOptions: item.requiresOptions ?? false,
+          catalogueNo: item.catalogueNo ?? null,
         }));
 
       // ── Fetch category groups (for inline carousels) ──
@@ -177,6 +179,7 @@ export default function ProductDetailPage() {
       const mappedProduct: ProductPageProduct = {
         id: product.id,
         slug: product.slug,
+        catalogueNo: product.catalogueNo ?? null,
         name: product.name,
         price: Number(product.price),
         discountPrice: product.discountPrice

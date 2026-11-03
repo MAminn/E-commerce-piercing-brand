@@ -21,6 +21,7 @@ import { getTemplateSelectionRaw } from "#root/backend/settings/get-template-sel
 import { getStorefrontLayoutSettingsRaw } from "#root/backend/layout/get-layout-settings-raw.js";
 import { getLinkTreeConfigRaw } from "#root/backend/settings/get-link-tree-config.js";
 import { getPublishedLegalPagesRaw } from "#root/backend/homepage/legal-pages.js";
+import { listStorefrontCategoriesRaw } from "#root/backend/categories/view-categories/service.js";
 import {
   getTypographySettingsRaw,
   listCustomFontsRaw,
@@ -437,6 +438,10 @@ async function buildServer() {
         request.db,
         templateSelection,
       );
+      // Categories for the navbar placements, the homepage placement index
+      // and the listing chips — in the first paint, not after hydration.
+      // An enhancement: a failure renders the page without them.
+      const storefrontCategories = await listStorefrontCategoriesRaw(request.db).catch(() => undefined);
       // Fetch brand name from link-tree config for dynamic page titles
       const linkTreeConfig = await getLinkTreeConfigRaw(request.db);
       const brandName = linkTreeConfig.brandName || undefined;
@@ -464,6 +469,7 @@ async function buildServer() {
         templateSelection,
         layoutSettingsData,
         legalPages,
+        storefrontCategories,
         brandName,
         ssrLocale,
         typographySettings,

@@ -411,12 +411,22 @@ export const product = pgTable("product", {
     precision: 10,
     scale: 2,
   }),
+  /**
+   * Customer-facing catalogue number (the "014" in "014 · Clicker"), shown
+   * zero-padded to three digits. Stable per product: entered by the owner,
+   * never derived from sort order or rank. NULL means "not numbered yet" —
+   * nothing is generated, and the storefront omits it cleanly. Unique when
+   * present (NULLs are exempt from the index).
+   */
+  catalogueNo: integer("catalogue_no"),
 }, (table) => ({
   slugUnique: uniqueIndex("product_slug_idx").on(table.slug),
   /** Enforces "no duplicate non-empty internal codes"; NULLs are exempt. */
   internalCodeUnique: uniqueIndex("product_internal_code_idx").on(
     table.internalCode,
   ),
+  /** One product per catalogue number; NULLs (not numbered yet) are exempt. */
+  catalogueNoUnique: uniqueIndex("product_catalogue_no_idx").on(table.catalogueNo),
   /** Backs category browsing and the Phase 4 dynamic bundle-eligibility scan. */
   categoryIdx: index("product_category_idx").on(table.categoryId),
 }));

@@ -48,7 +48,6 @@ interface CartBundleGroupProps {
  */
 export function CartBundleGroup({ bundle, currency, onRemove, disabled }: CartBundleGroupProps) {
   const unitCount = bundle.items.reduce((s, i) => s + i.quantity, 0);
-  const saving = bundle.regularTotal - bundle.bundlePrice;
   const money = (amount: number) => formatMoney(amount, { currency });
   let index = 0;
 
@@ -106,10 +105,11 @@ export function CartBundleGroup({ bundle, currency, onRemove, disabled }: CartBu
                   </p>
                   {item.variant && <p className="t-micro font-normal text-ink-2">{item.variant}</p>}
                 </div>
-                <p className="shrink-0 text-end t-small tabular-nums text-ink-2">
-                  {item.quantity > 1 && <span>× {item.quantity} · </span>}
-                  <s>{money(item.unitPrice * item.quantity)}</s>
-                </p>
+                {/* A piece in a set has no price of its own here — the set
+                    price below is what is paid. */}
+                {item.quantity > 1 && (
+                  <p className="shrink-0 text-end t-small tabular-nums text-ink-2">× {item.quantity}</p>
+                )}
               </li>
             );
           })}
@@ -117,19 +117,6 @@ export function CartBundleGroup({ bundle, currency, onRemove, disabled }: CartBu
 
         {/* Set maths */}
         <dl className="border-t border-line px-4 py-3 t-small">
-          <div className="flex justify-between py-1 text-ink-2">
-            <dt>Bought separately</dt>
-            <dd className="tabular-nums">{money(bundle.regularTotal)}</dd>
-          </div>
-          {saving !== 0 && (
-            <div className="flex justify-between py-1 text-ink-2">
-              <dt>Set saving</dt>
-              <dd className="tabular-nums">
-                {saving > 0 ? "−" : "+"}
-                {money(Math.abs(saving))}
-              </dd>
-            </div>
-          )}
           <div className="flex justify-between py-1 t-label text-ink">
             <dt>Set price</dt>
             <dd className="tabular-nums">{money(bundle.bundlePrice)}</dd>

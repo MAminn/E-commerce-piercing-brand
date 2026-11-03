@@ -174,11 +174,14 @@ function CategoryFacetList({
   const ct = useCategoryT();
   const selected = new Set(filters.categories.map(refToId).filter(Boolean));
   const countOf = (o: CategoryFacetOption) => (counts ? (counts[o.id] ?? 0) : o.count);
+  // One flat list in placement order — "Ear Piercings, Daith, Rook, Flat
+  // Back, Nose Piercings" — with no indented tree or rule. The placement
+  // chips above the grid carry the hierarchy; this is just "narrow by".
   return (
     <ul>
-      {options.map((main) => {
+      {options.flatMap((main) => {
         const mainOn = selected.has(main.id);
-        return (
+        return [
           <li key={main.id}>
             <FacetCheckbox
               id={`${idPrefix}-${main.id}`}
@@ -187,27 +190,23 @@ function CategoryFacetList({
               checked={mainOn}
               onChange={() => onChange(toggleCategory(filters, main, refToId))}
             />
-            {main.children.length > 0 && (
-              <ul className="ms-2 border-s border-line ps-4">
-                {main.children.map((child) => (
-                  <li key={child.id}>
-                    <FacetCheckbox
-                      id={`${idPrefix}-${child.id}`}
-                      label={child.name}
-                      count={countOf(child)}
-                      // A selected main category already includes every
-                      // subcategory: shown ticked, not separately toggleable.
-                      checked={mainOn || selected.has(child.id)}
-                      disabled={mainOn}
-                      hint={mainOn ? ct("filter.includes_all", { name: main.name }) : undefined}
-                      onChange={() => onChange(toggleCategory(filters, child, refToId))}
-                    />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </li>
-        );
+          </li>,
+          ...main.children.map((child) => (
+            <li key={child.id}>
+              <FacetCheckbox
+                id={`${idPrefix}-${child.id}`}
+                label={child.name}
+                count={countOf(child)}
+                // A selected main category already includes every
+                // subcategory: shown ticked, not separately toggleable.
+                checked={mainOn || selected.has(child.id)}
+                disabled={mainOn}
+                hint={mainOn ? ct("filter.includes_all", { name: main.name }) : undefined}
+                onChange={() => onChange(toggleCategory(filters, child, refToId))}
+              />
+            </li>
+          )),
+        ];
       })}
     </ul>
   );

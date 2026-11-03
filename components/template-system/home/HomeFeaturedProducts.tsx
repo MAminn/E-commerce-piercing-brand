@@ -19,6 +19,8 @@ export interface FeaturedProduct {
   /** The product has option groups: cards send it to its page to choose them. */
   requiresOptions?: boolean;
   categories?: { id: string; name: string }[];
+  /** Catalogue number, shown as "014"; null until the owner numbers the product. */
+  catalogueNo?: number | null;
 }
 
 export interface HomeFeaturedProductsProps {

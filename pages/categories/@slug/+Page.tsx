@@ -13,6 +13,8 @@ import {
 import { useStorefrontCategories } from "#root/hooks/useStorefrontCategories";
 import { storefrontCategoryNav } from "#root/shared/categories/tree";
 import { useCatalogueListing } from "#root/hooks/useCatalogueListing";
+import { placementChips } from "#root/shared/categories/placements";
+import { useCategoryT } from "#root/components/template-system/minimal/listing/useCategoryT";
 
 /**
  * /categories/@slug – Generic dynamic category page.
@@ -32,6 +34,7 @@ export default function CategoryPage() {
   const slug = pageContext.routeParams?.slug as string;
   const { getTemplateId } = useTemplate();
   const layoutSettings = useLayoutSettings();
+  const ct = useCategoryT();
 
   const isMinimal = layoutSettings.header.navbarStyle === "minimal";
 
@@ -81,20 +84,19 @@ export default function CategoryPage() {
   /* ── Minimal template path ────────────────────────────────────────── */
   if (isMinimal) {
     const navProps = categoryNavProps(nav);
-    // Moving between sibling subcategories keeps the shopper's sort, search
-    // and filters; only the page starts over.
-    const tabs = navProps.subcategoryNav;
-    const subcategoryNav = tabs && {
-      ...tabs,
-      allHref: listing.carryHref(tabs.allHref),
-      items: tabs.items.map((item) => ({ ...item, href: listing.carryHref(item.href) })),
-    };
+    // Chips keep the shopper's sort and filters (carryHref), like the old tabs.
+    const chips = categories
+      ? placementChips(categories, nav?.current.id, ct("subnav.all")).map((c) => ({
+          ...c,
+          href: c.href === "/shop" ? c.href : listing.carryHref(c.href),
+        }))
+      : undefined;
     return (
       <MinimalCategoryPage
         products={listing.products}
         categoryName={categoryName}
         {...navProps}
-        subcategoryNav={subcategoryNav}
+        placementChips={chips}
         categoryId={categoryId}
         isLoading={listing.isLoading}
         isRefreshing={listing.isRefreshing}

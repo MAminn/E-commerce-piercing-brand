@@ -5,6 +5,7 @@ import { getTemplateSelectionRaw } from "#root/backend/settings/get-template-sel
 import { getStorefrontLayoutSettingsRaw } from "#root/backend/layout/get-layout-settings-raw.js";
 import { getLinkTreeConfigRaw } from "#root/backend/settings/get-link-tree-config.js";
 import { getPublishedLegalPagesRaw } from "#root/backend/homepage/legal-pages.js";
+import { listStorefrontCategoriesRaw } from "#root/backend/categories/view-categories/service.js";
 import { getStoreOwnerId } from "#root/shared/config/store.js";
 import {
   getTypographySettingsRaw,
@@ -27,6 +28,9 @@ export const vikeHonoMiddleware = createMiddleware(
     );
     // Legal pages that are live, so the footer links only to published ones.
     const legalPages = await getPublishedLegalPagesRaw(c.var.db, templateSelection);
+    // Categories for the navbar placements, the homepage placement index
+    // and the listing chips — in the first paint, not after hydration.
+    const storefrontCategories = await listStorefrontCategoriesRaw(c.var.db).catch(() => undefined);
     // Fetch brand name from link-tree config for dynamic page titles
     const linkTreeConfig = await getLinkTreeConfigRaw(c.var.db);
     const brandName = linkTreeConfig.brandName || undefined;
@@ -54,6 +58,7 @@ export const vikeHonoMiddleware = createMiddleware(
       templateSelection,
       layoutSettingsData,
       legalPages,
+      storefrontCategories,
       brandName,
       ssrLocale,
       typographySettings,

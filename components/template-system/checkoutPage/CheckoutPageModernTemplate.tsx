@@ -405,11 +405,6 @@ export function CheckoutPageModernTemplate({
               <p className='t-micro font-normal tabular-nums text-ink-2'>Qty: {item.quantity}</p>
             </div>
             <div className='shrink-0 text-end'>
-              {item.originalPrice != null && item.originalPrice > item.price && (
-                <p className='t-micro font-normal tabular-nums text-ink-2'>
-                  <s>{money(item.originalPrice * item.quantity)}</s>
-                </p>
-              )}
               <p className='t-label tabular-nums text-ink'>{money(item.price * item.quantity)}</p>
             </div>
           </li>
@@ -420,7 +415,7 @@ export function CheckoutPageModernTemplate({
           type='button'
           onClick={onEditCart}
           className={buttonClass({ variant: "text", size: "sm" })}>
-          {t("checkout.edit_cart") || "Edit cart"}
+          {t("checkout.edit_cart") || "Edit bag"}
         </button>
       )}
     </div>

@@ -51,6 +51,8 @@ export interface ListingProduct {
   available: boolean;
   /** The product has option groups: cards send it to its page to choose them. */
   requiresOptions?: boolean;
+  /** Catalogue number, shown as "014"; null until the owner numbers the product. */
+  catalogueNo?: number | null;
 }
 
 /** The route's own narrowing, before the shopper's filters. */
@@ -109,6 +111,7 @@ function toListingProduct(p: {
   images: { url: string; isPrimary: boolean }[];
   categoryName: string | null;
   requiresOptions?: boolean;
+  catalogueNo?: number | null;
 }): ListingProduct {
   return {
     id: p.id,
@@ -122,6 +125,7 @@ function toListingProduct(p: {
     categoryName: p.categoryName || null,
     available: p.stock > 0,
     requiresOptions: p.requiresOptions ?? false,
+    catalogueNo: p.catalogueNo ?? null,
   };
 }
 

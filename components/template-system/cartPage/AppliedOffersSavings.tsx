@@ -79,7 +79,7 @@ export function AppliedOffersSavings({
           aria-expanded={expanded}
         >
           <span className="t-small">
-            <span className="t-label tabular-nums">Saving {formatMoney(totalSavings, { currency })}</span>
+            <span className="t-label tabular-nums">Offers −{formatMoney(totalSavings, { currency })}</span>
             {!expanded && <span className="text-ink-2"> — details</span>}
           </span>
           <ChevronDown
@@ -109,7 +109,7 @@ export function AppliedOffersSavings({
         aria-expanded={expanded}
       >
         <span className="flex min-w-0 items-center gap-1 text-ink-2">
-          Offer savings
+          Offers
           <ChevronDown
             aria-hidden
             size={16}

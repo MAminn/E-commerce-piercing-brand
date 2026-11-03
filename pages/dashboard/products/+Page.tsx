@@ -418,6 +418,7 @@ export default function Products() {
                 sortOrder: selectedProductData.product.sortOrder ?? undefined,
                 hidden: selectedProductData.product.hidden ?? false,
                 internalCode: selectedProductData.product.internalCode ?? "",
+                catalogueNo: selectedProductData.product.catalogueNo ?? null,
                 // Kept as null (not 0) when unset — the form renders an empty
                 // cost input rather than a cost the admin never entered.
                 costPrice:

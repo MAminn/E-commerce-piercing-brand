@@ -3,15 +3,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render } from "@testing-library/react";
 
 /**
- * Arabic homepage: the section headings and CTAs the CMS stores in English
- * only ("Shop all", "Shop by placement", "Featured", "New in", "View all",
- * "Offers") and the Pick Your Set block render in Arabic, with the page in
- * RTL. A merchant's Arabic field wins; custom English copy without one is
- * preserved, never machine-translated; English is unchanged.
+ * Arabic homepage (Object Index): the numbered section names, "Shop all" /
+ * "View all" / "View piece" and the set rows render in Arabic, with the page
+ * in RTL. English is unchanged.
  */
+const categories = [
+  { id: "ear", name: "Ear Piercings", slug: "ear-piercings", parentId: null, sortOrder: 1, hidden: false, showOnLanding: true, description: null, filename: null, productCount: 9 },
+  { id: "daith", name: "Daith", slug: "daith", parentId: "ear", sortOrder: 1, hidden: false, showOnLanding: true, description: null, filename: null, productCount: 4 },
+  { id: "nose", name: "Nose Piercings", slug: "nose-piercings", parentId: null, sortOrder: 2, hidden: false, showOnLanding: true, description: null, filename: null, productCount: 3 },
+];
 vi.mock("#root/lib/context/CartContext", () => ({ useCart: () => ({ addItem: () => true, items: [] }) }));
 vi.mock("#root/frontend/contexts/TrackingContext", () => ({ useTracking: () => ({ trackEvent: () => {} }) }));
-vi.mock("vike-react/usePageContext", () => ({ usePageContext: () => ({ urlPathname: "/" }) }));
+vi.mock("vike-react/usePageContext", () => ({
+  usePageContext: () => ({ urlPathname: "/", storefrontCategories: categories }),
+}));
 vi.mock("#root/shared/trpc/client", () => ({ trpc: {} }));
 
 import { LandingTemplateMinimal } from "../LandingTemplateMinimal";
@@ -69,7 +74,12 @@ const renderHome = (locale: "en" | "ar", content: HomepageContent = DEFAULT_HOME
         bundleCampaigns={[]}
         categories={[{ id: "c1", name: "Ear Piercings", slug: "ear", imageUrl: null }] as never}
         featuredProducts={[product("p1", "Crystal L-Shape Stud")] as never}
-        newArrivals={[product("p2", "Mini Flower Stud")] as never}
+        newArrivals={[
+          product("p2", "Mini Flower Stud"),
+          product("p4", "Pearl Flat Back"),
+          product("p5", "Gold Helix Hoop"),
+          product("p6", "Silver Nose Ring"),
+        ] as never}
         discountedProducts={[product("p3", "Opal Daith Ring")] as never}
       />
     </MinimalI18nProvider>,
@@ -81,8 +91,13 @@ const interfaceText = () => {
   for (const content of [
     "Crystal L-Shape Stud",
     "Mini Flower Stud",
+    "Pearl Flat Back",
+    "Gold Helix Hoop",
+    "Silver Nose Ring",
     "Opal Daith Ring",
-    "Ear Piercings",
+    "Daith",
+    "Ear",
+    "Nose",
     "Pick Your 3",
     "Pick Your 6",
     DEFAULT_HOMEPAGE_CONTENT.hero.title,
@@ -114,31 +129,25 @@ afterEach(() => {
 });
 
 describe("Arabic homepage core UI", () => {
-  it("section headings and CTAs are Arabic", () => {
+  it("section names and CTAs are Arabic", () => {
     const { container } = renderHome("ar");
     const text = container.textContent ?? "";
-    expect(text).toContain("تسوّقي الكل"); // hero CTA "Shop all"
-    expect(text).toContain("تسوّقي حسب مكان الثقب"); // "Shop by placement"
-    expect(text).toContain("مميز"); // "Featured"
-    expect(text).toContain("جديد"); // "New in"
+    expect(text).toContain("01 · مكان الثقب"); // "01 · Placement"
+    expect(text).toContain("02 · جديد"); // "02 · New in"
+    expect(text).toContain("03 · الأطقم"); // "03 · Sets"
+    expect(text).toContain("تسوّقي الكل"); // "Shop all"
     expect(text).toContain("عرض الكل"); // "View all"
-    expect(text).toContain("عروض"); // "Offers"
-    for (const english of ["Shop all", "Shop by placement", "Featured", "New in", "View all", "Offers"]) {
+    expect(text).toContain("عرض القطعة"); // "View piece"
+    for (const english of ["Placement", "New in", "Sets", "Shop all", "View all", "View piece"]) {
       expect(text).not.toContain(english);
     }
   });
 
-  it("the Pick Your Set block is Arabic: eyebrow, title, terms, free shipping and CTAs", () => {
+  it("set rows count pieces in Arabic", () => {
     const { container } = renderHome("ar");
-    const block = container.querySelector("[data-pick-your-set]")!;
-    const text = block.textContent ?? "";
-    expect(text).toContain("اختاري طقمك");
-    expect(text).toContain("قطع أكثر. سعر أفضل.");
-    expect(text).toContain("كل الأطقم");
-    expect(text).toContain("+ شحن مجاني");
-    expect(block.querySelector('a[href="/bundles/pick-your-3"]:last-of-type')).toBeTruthy();
-    expect(text).toContain("تسوّقي 3 قطع");
-    expect(text).toContain("تسوّقي 6 قطع");
+    const text = container.querySelector('[data-testid="sets-index"]')?.textContent ?? "";
+    expect(text).toContain("Pick Your 3 · 3 قطع");
+    expect(text).toContain("Pick Your 6 · 6 قطع");
   });
 
   it("no English interface text is left — only catalogue content and the brand's hero copy", () => {
@@ -152,21 +161,10 @@ describe("Arabic homepage core UI", () => {
     expect(document.documentElement.getAttribute("lang")).toBe("ar");
   });
 
-  it("a merchant's Arabic field wins; custom English without one is preserved, not translated", () => {
-    const content: HomepageContent = {
-      ...DEFAULT_HOMEPAGE_CONTENT,
-      categories: { ...DEFAULT_HOMEPAGE_CONTENT.categories, title: "Shop by placement", titleAr: "حسب المكان" },
-      featuredProducts: { ...DEFAULT_HOMEPAGE_CONTENT.featuredProducts, title: "Trending now" },
-    };
-    const { container } = renderHome("ar", content);
-    expect(container.textContent).toContain("حسب المكان");
-    expect(container.textContent).toContain("Trending now");
-  });
-
   it("English is unchanged", () => {
     const { container } = renderHome("en");
     const text = container.textContent ?? "";
-    for (const english of ["Shop all", "Shop by placement", "Featured", "New in", "View all", "Offers"]) {
+    for (const english of ["01 · Placement", "02 · New in", "03 · Sets", "Shop all", "View all", "View piece", "3 pieces"]) {
       expect(text).toContain(english);
     }
   });

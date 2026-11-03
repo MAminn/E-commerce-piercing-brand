@@ -12,6 +12,8 @@ import {
 } from "#root/components/template-system/minimal/MinimalCategoryPage";
 import { getStoreOwnerId } from "#root/shared/config/store";
 import { useStorefrontCategories } from "#root/hooks/useStorefrontCategories";
+import { placementChips } from "#root/shared/categories/placements";
+import { useCategoryT } from "#root/components/template-system/minimal/listing/useCategoryT";
 import { storefrontCategoryNav } from "#root/shared/categories/tree";
 import type { HomepageContent } from "#root/shared/types/homepage-content";
 import { type ListingScope, useCatalogueListing } from "#root/hooks/useCatalogueListing";
@@ -85,6 +87,7 @@ export default function ShopPage() {
   const { getTemplateId } = useTemplate();
   const layoutSettings = useLayoutSettings();
   const isMinimal = layoutSettings.header.navbarStyle === "minimal";
+  const ct = useCategoryT();
 
   const { search } = useLocationSearch();
   const sectionParam = useMemo(() => new URLSearchParams(search).get("section"), [search]);
@@ -117,13 +120,16 @@ export default function ShopPage() {
 
   /* ── Minimal template path ────────────────────────────────────────── */
   if (isMinimal) {
-    // The Category filter replaces the subcategory tabs here.
-    const { subcategoryNav: _tabs, ...navProps } = categoryNavProps(nav);
+    const navProps = categoryNavProps(nav);
+    // Placement chips: All · Ear · Nose (or a placement's own row when one
+    // is picked). Each chip opens that placement's page.
+    const chips = categories ? placementChips(categories, nav?.current.id, ct("subnav.all")) : undefined;
     return (
       <MinimalCategoryPage
         products={listing.products}
         categoryName={categoryName}
         {...navProps}
+        placementChips={chips}
         categoryId={nav?.current.id}
         isLoading={listing.isLoading}
         isRefreshing={listing.isRefreshing}

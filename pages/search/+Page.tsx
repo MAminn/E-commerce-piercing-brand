@@ -60,6 +60,7 @@ export default function SearchPage() {
               categoryName: p.categoryName ?? p.categories?.[0]?.name ?? undefined,
               available: p.available ?? (p.stock ?? 0) > 0,
               requiresOptions: p.requiresOptions ?? false,
+              catalogueNo: p.catalogueNo ?? null,
             }),
           );
           setProducts(mapped);

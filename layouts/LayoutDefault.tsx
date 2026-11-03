@@ -329,12 +329,6 @@ function LayoutShell({
                 PDP and cart sticky bars at the bottom of a phone screen. */}
             <Toaster position={isMinimal ? "top-center" : undefined} />
             <ShadcnToaster />
-            {/* Phase 3 — page-transition overlay (CSS-only, SSR-inert) */}
-            <div
-              id='page-transition-overlay'
-              aria-hidden='true'
-              className='page-transition-overlay'
-            />
           </main>
         </TrackingProvider>
       </NavbarModeContext.Provider>

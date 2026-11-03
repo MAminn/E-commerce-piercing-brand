@@ -1,16 +1,14 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { isSamePageNavigation } from "../page-transition-guard";
-import { onPageTransitionStart } from "../+onPageTransitionStart";
+import { onPageTransitionEnd } from "../+onPageTransitionEnd";
 
 const ctx = (to: string, from?: string) =>
   ({ urlOriginal: to, previousPageContext: from ? { urlOriginal: from } : null }) as never;
 
-afterEach(() => {
-  delete document.documentElement.dataset.pageTransition;
-});
-
-describe("page-transition overlay", () => {
+describe("same-page navigation guard", () => {
   it("treats a query-only change as the same page", () => {
     expect(isSamePageNavigation(ctx("/shop?page=2", "/shop?page=3"))).toBe(true);
     expect(isSamePageNavigation(ctx("/shop", "/shop?category=nose-piercings"))).toBe(true);
@@ -21,15 +19,23 @@ describe("page-transition overlay", () => {
     expect(isSamePageNavigation(ctx("/shop?page=3", "/shop/crystal-hoop"))).toBe(false);
     expect(isSamePageNavigation(ctx("/shop"))).toBe(false);
   });
+});
 
-  it("never covers the page for a same-page Back/Forward (Vike skips the end hook there)", async () => {
-    await onPageTransitionStart(ctx("/shop?page=2", "/shop?page=3"));
-    expect(document.documentElement.dataset.pageTransition).toBeUndefined();
+describe("no page-transition overlay", () => {
+  const root = resolve(__dirname, "../..");
+
+  it("has no transition-start hook and no overlay markup or styles", () => {
+    expect(existsSync(resolve(root, "pages/+onPageTransitionStart.ts"))).toBe(false);
+    expect(readFileSync(resolve(root, "layouts/LayoutDefault.tsx"), "utf8")).not.toContain("page-transition-overlay");
+    expect(readFileSync(resolve(root, "layouts/style.css"), "utf8")).not.toContain("page-transition-overlay");
   });
 
-  it("still covers a real page change", async () => {
-    window.matchMedia = ((q: string) => ({ matches: true, media: q })) as never; // reduced motion: no wait
-    await onPageTransitionStart(ctx("/shop/crystal-hoop", "/shop?page=3"));
-    expect(document.documentElement.dataset.pageTransition).toBe("out");
+  it("the end hook never marks the document as transitioning", async () => {
+    await onPageTransitionEnd({
+      urlOriginal: "/shop/crystal-hoop",
+      urlPathname: "/shop/crystal-hoop",
+      previousPageContext: { urlOriginal: "/shop" },
+    } as never);
+    expect(document.documentElement.dataset.pageTransition).toBeUndefined();
   });
 });

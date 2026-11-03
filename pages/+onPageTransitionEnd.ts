@@ -6,37 +6,13 @@ import { v7 } from "uuid";
 import { isSamePageNavigation } from "./page-transition-guard";
 
 /**
- * Phase 3 — CSS-overlay page transition (end).
- *
- * Flips `data-page-transition` to `"in"`, causing the overlay to
- * fade back to opacity 0 via CSS.  After the animation completes
- * the dataset attribute is removed entirely so the overlay is fully
- * inert until the next navigation.
- *
- * Respects `prefers-reduced-motion`: removes the attribute immediately.
+ * After a client-side navigation: the PageView event (real page changes
+ * only) and the dashboard's forced reload. There is no page-transition
+ * overlay — navigation swaps the page in place.
  */
-
-function prefersReducedMotion(): boolean {
-  return (
-    window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true
-  );
-}
-
 export async function onPageTransitionEnd(
   pageContext: PageContextClient,
 ): Promise<void> {
-  // --- Phase 3: fade overlay out ---
-  document.documentElement.dataset.pageTransition = "in";
-
-  if (prefersReducedMotion()) {
-    delete document.documentElement.dataset.pageTransition;
-  } else {
-    await new Promise<void>((r) => setTimeout(r, 220));
-    delete document.documentElement.dataset.pageTransition;
-  }
-
-  // --- Existing behaviour preserved below ---
-
   // Force refresh dashboard page when navigating to it
   if (pageContext.urlPathname === "/dashboard") {
     setTimeout(() => {

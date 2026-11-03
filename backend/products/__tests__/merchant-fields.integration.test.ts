@@ -445,6 +445,68 @@ describeIfDb("product merchant-only fields (integration)", () => {
 
   // ─── Admin visibility ─────────────────────────────────────────────────────
 
+  // ─── Catalogue number (customer-facing) ───────────────────────────────────
+
+  describe("catalogue number", () => {
+    const either = <A, E>(effect: Effect.Effect<A, E, import("#root/shared/database/drizzle/db").DatabaseClientService>) =>
+      Effect.runPromise(effect.pipe(provideDatabase({ db: db as never })).pipe(Effect.either));
+    const catalogueNo = async (id: string) =>
+      (await db.select({ no: schema.product.catalogueNo }).from(schema.product).where(eq(schema.product.id, id)))[0]?.no;
+    const editPayload = (id: string, overrides: Record<string, unknown>) =>
+      ({
+        id,
+        name: `${TAG}Titanium Labret`,
+        description: "still titanium",
+        imageId: fileId,
+        categoryId,
+        categoryIds: [categoryId],
+        price: 450,
+        stock: 10,
+        hidden: false,
+        ...overrides,
+      }) as never;
+
+    it("is stored when given and NULL when not — never generated", async () => {
+      const numbered = await run(createProduct(baseProduct({ catalogueNo: 901 }), adminSession));
+      const blank = await run(createProduct(baseProduct({ name: `${TAG}Unnumbered` }), adminSession));
+      expect(await catalogueNo(numbered.id)).toBe(901);
+      expect(await catalogueNo(blank.id)).toBeNull();
+    });
+
+    it("rejects a number another product already has, naming it", async () => {
+      await run(createProduct(baseProduct({ name: `${TAG}First 902`, catalogueNo: 902 }), adminSession));
+      const result = await either(createProduct(baseProduct({ name: `${TAG}Clash 902`, catalogueNo: 902 }), adminSession));
+      expect(result._tag).toBe("Left");
+      if (result._tag === "Left") {
+        const msg = (result.left as { clientMessage?: string }).clientMessage ?? "";
+        expect(msg).toContain("902");
+        expect(msg).toContain("First 902");
+      }
+    });
+
+    it("keeps its own number on re-save, can be changed, and can be cleared", async () => {
+      const created = await run(createProduct(baseProduct({ catalogueNo: 903 }), adminSession));
+      await run(editProduct(editPayload(created.id, { catalogueNo: 903 }), adminSession));
+      expect(await catalogueNo(created.id)).toBe(903);
+      // An edit that does not send the field leaves it alone.
+      await run(editProduct(editPayload(created.id, {}), adminSession));
+      expect(await catalogueNo(created.id)).toBe(903);
+      await run(editProduct(editPayload(created.id, { catalogueNo: 904 }), adminSession));
+      expect(await catalogueNo(created.id)).toBe(904);
+      await run(editProduct(editPayload(created.id, { catalogueNo: null }), adminSession));
+      expect(await catalogueNo(created.id)).toBeNull();
+    });
+
+    it("reaches the storefront: product detail and search carry it", async () => {
+      const created = await run(createProduct(baseProduct({ name: `${TAG}Numbered Piece`, catalogueNo: 905 }), adminSession));
+      const detail = await run(getProductById({ productId: created.id }));
+      expect((detail as { catalogueNo?: number | null }).catalogueNo).toBe(905);
+      const results = await run(searchProducts({ limit: 50, offset: 0, includeOutOfStock: true, search: "Numbered Piece" } as never));
+      const hit = results.items.find((p) => p.id === created.id);
+      expect(hit?.catalogueNo).toBe(905);
+    });
+  });
+
   describe("admin access", () => {
     it("gets both fields back from the product list", async () => {
       const created = await run(

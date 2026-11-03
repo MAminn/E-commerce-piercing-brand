@@ -6,6 +6,7 @@ import { storefrontVisibleInCategory } from "../category-products";
 import { buildCategoryTree } from "#root/shared/categories/tree";
 
 import { Effect } from "effect";
+import type { DatabaseClient } from "#root/shared/database/drizzle/db";
 
 /**
  * Public category list (navbar, homepage, /shop, /categories/[slug]) with the
@@ -40,46 +41,51 @@ import { Effect } from "effect";
  */
 export const viewCategories = () =>
   Effect.gen(function* ($) {
-    return yield* $(
-      query(async (db) => {
-        const results = await db
-          .select({
-            id: category.id,
-            name: category.name,
-            slug: category.slug,
-            imageId: category.imageId,
-            filename: file.diskname,
-            type: category.type,
-            showOnLanding: category.showOnLanding,
-            parentId: category.parentId,
-            sortOrder: category.sortOrder,
-            hidden: category.hidden,
-            description: category.description,
-            createdAt: category.createdAt,
-            // Correlated against `category.id` on the row being selected.
-            productCount: sql<number>`(select count(*)::int from ${product} where ${storefrontVisibleInCategory(category.id)})`,
-          })
-          .from(category)
-          .leftJoin(file, eq(category.imageId, file.id))
-          .where(eq(category.deleted, false));
-
-        // Tree order — each main category followed by its subcategories,
-        // as the admin arranged them — so every consumer lists categories
-        // the same way. `hidden` rows are included (admin screens need
-        // them); shopper-facing callers filter with shared/categories/tree.
-        const ordered = buildCategoryTree(results).flatMap(
-          ({ children, ...main }) => [main, ...children],
-        );
-
-        // Format the category names
-        return ordered.map((result) => ({
-          ...result,
-          name: result.name,
-          displayName: formatCategoryName(result.name), // Add formatted name without prefix
-        }));
-      }),
-    );
+    return yield* $(query((db) => listStorefrontCategoriesRaw(db)));
   });
+
+/**
+ * The same list, straight from a database client — for the SSR page context
+ * (server/server.ts), so the navbar's placements and the homepage placement
+ * index are in the first paint instead of arriving after hydration.
+ */
+export async function listStorefrontCategoriesRaw(db: DatabaseClient) {
+  const results = await db
+    .select({
+      id: category.id,
+      name: category.name,
+      slug: category.slug,
+      imageId: category.imageId,
+      filename: file.diskname,
+      type: category.type,
+      showOnLanding: category.showOnLanding,
+      parentId: category.parentId,
+      sortOrder: category.sortOrder,
+      hidden: category.hidden,
+      description: category.description,
+      createdAt: category.createdAt,
+      // Correlated against `category.id` on the row being selected.
+      productCount: sql<number>`(select count(*)::int from ${product} where ${storefrontVisibleInCategory(category.id)})`,
+    })
+    .from(category)
+    .leftJoin(file, eq(category.imageId, file.id))
+    .where(eq(category.deleted, false));
+
+  // Tree order — each main category followed by its subcategories,
+  // as the admin arranged them — so every consumer lists categories
+  // the same way. `hidden` rows are included (admin screens need
+  // them); shopper-facing callers filter with shared/categories/tree.
+  const ordered = buildCategoryTree(results).flatMap(
+    ({ children, ...main }) => [main, ...children],
+  );
+
+  // Format the category names
+  return ordered.map((result) => ({
+    ...result,
+    name: result.name,
+    displayName: formatCategoryName(result.name), // Add formatted name without prefix
+  }));
+}
 
 export type ViewCategoriesResult = Effect.Effect.Success<
   Awaited<ReturnType<typeof viewCategories>>

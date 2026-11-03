@@ -139,12 +139,6 @@ export function QuickViewDialog({ product, open, onClose }: QuickViewDialogProps
               </>
             )}
 
-            {/* Tag */}
-            {product.tag || product.isNew ? (
-              <span className='absolute top-3 start-3 bg-perce-cta text-perce-ink-inverse text-[10px] font-medium px-2.5 py-1'>
-                {product.tag || t("new")}
-              </span>
-            ) : null}
           </div>
 
           {/* Product details */}
@@ -182,12 +176,8 @@ export function QuickViewDialog({ product, open, onClose }: QuickViewDialogProps
 
             {/* Price */}
             <div className='flex items-center gap-2 mb-4'>
-              {hasDiscount && (
-                <span className='text-base text-perce-ink-subtle line-through'>
-                  {formatMoney(product.price, { locale })}
-                </span>
-              )}
-              <span className={cn("text-base font-medium", hasDiscount ? "text-perce-sale" : "text-perce-ink")}>
+              {/* One price, the price paid: no struck compare-at price, no sale colour. */}
+              <span className='text-base font-medium text-perce-ink'>
                 {formatMoney(displayPrice, { locale })}
               </span>
             </div>

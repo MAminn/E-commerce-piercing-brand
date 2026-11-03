@@ -16,6 +16,10 @@ import { formatMoney } from "#root/shared/pricing/format-money";
 import { fillTemplate as fill } from "#root/components/bundles/bundle-ui";
 import { cn } from "#root/lib/utils";
 import { formatShippingFeeRange } from "#root/shared/config/storefront";
+import { productPlacement } from "#root/shared/categories/placements";
+import { useStorefrontCategories } from "#root/hooks/useStorefrontCategories";
+import { IndexLine } from "#root/components/storefront/IndexLine";
+import { FeaturedObject } from "#root/components/storefront/FeaturedObject";
 import { ProductDecisionSummary } from "./ProductDecisionSummary";
 import { STICKY_BAR_BOTTOM, STICKY_BAR_PADDING_BOTTOM, useFullyUsable } from "../minimal/sticky-bar";
 import { Button, ICON_PROPS, IconButton, buttonClass } from "#root/components/storefront/Button";
@@ -374,6 +378,7 @@ export function ProductPagePremium({
   className = "",
 }: ProductPagePremiumProps) {
   const { t, locale } = useMinimalI18n();
+  const { categories: categoryRows } = useStorefrontCategories();
   const { toggle: toggleWishlist, isWishlisted } = useWishlist();
   // ── Image state
   const images: ProductImage[] = product.images?.length
@@ -486,6 +491,7 @@ export function ProductPagePremium({
     categoryName: p.categoryName,
     categories: p.categories,
     requiresOptions: p.requiresOptions,
+    catalogueNo: p.catalogueNo ?? null,
   }));
 
   return (
@@ -535,6 +541,19 @@ export function ProductPagePremium({
 
             {/* ── Information index (5/12), sticky from 1024px ── */}
             <div className='flex flex-col md:sticky md:top-[calc(var(--perce-header-offset)+2rem)] md:col-span-5'>
+              {/* 0. The full index line — catalogue number, measures and
+                  placement, each only when the product has it. Name and
+                  price are the h1 and the price row right below. */}
+              <IndexLine
+                variant='full'
+                className='mb-3'
+                product={{
+                  name: product.name,
+                  catalogueNo: product.catalogueNo,
+                  placement: productPlacement(product, categoryRows),
+                }}
+              />
+
               {/* 1. Name */}
               <h1 className='t-pdp-title text-ink'>{product.name}</h1>
 
@@ -694,11 +713,17 @@ export function ProductPagePremium({
                 {t("home.view_all_products")}
               </a>
             </div>
-            <div className='grid grid-cols-2 gap-x-3 gap-y-8 md:grid-cols-3 md:gap-x-6 md:gap-y-12 min-[75rem]:grid-cols-4'>
-              {related.map((p) => (
-                <MinimalProductCard key={p.id} product={p} />
-              ))}
-            </div>
+            {/* One related piece is a feature, not a card alone in a
+                four-column grid. */}
+            {related.length === 1 && related[0] ? (
+              <FeaturedObject product={related[0]} headingAs='h3' />
+            ) : (
+              <div className='grid grid-cols-2 gap-x-3 gap-y-8 md:grid-cols-3 md:gap-x-6 md:gap-y-12 min-[75rem]:grid-cols-4'>
+                {related.map((p) => (
+                  <MinimalProductCard key={p.id} product={p} />
+                ))}
+              </div>
+            )}
           </div>
         </section>
       )}

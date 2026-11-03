@@ -140,43 +140,6 @@ label[for] {
   cursor: pointer;
 }
 
-/* ── Phase 3 — CSS-overlay page transitions ─────────────────────── */
-
-/* Base: invisible, non-interactive overlay covering the viewport */
-.page-transition-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  opacity: 0;
-  background: color-mix(in srgb, var(--color-bg) 96%, transparent);
-  pointer-events: none;
-  transition: opacity 240ms cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: opacity;
-}
-
-/* Navigation START → fade overlay IN (covers page while Vike swaps content) */
-html[data-page-transition="out"] .page-transition-overlay {
-  opacity: 1;
-  pointer-events: auto; /* block clicks while transitioning */
-}
-
-/* Navigation END → fade overlay OUT (reveal new page) */
-html[data-page-transition="in"] .page-transition-overlay {
-  opacity: 0;
-}
-
-/* Cursor feedback while the overlay is opaque */
-html[data-page-transition="out"] body {
-  cursor: progress;
-}
-
-/* Reduced motion: kill the transition duration so state flips are instant */
-@media (prefers-reduced-motion: reduce) {
-  .page-transition-overlay {
-    transition-duration: 0ms;
-  }
-}
-
 /* ════════════════════════════════════════════════════════════════════════
    PERCÉ — OBJECT INDEX. The single visual source of truth for the
    customer-facing storefront.
@@ -289,10 +252,10 @@ html[data-page-transition="out"] body {
   --perce-leading-heading: 1.1;
   --perce-leading-body: 1.5;
 
-  /* ── Spacing: page gutter 16 / 24 (768px) / 32 (1024px) ── */
+  /* ── Spacing: page gutter 16 / 24 (from 768px) ── */
   --perce-gutter: 1rem;
   --perce-gutter-sm: 1.5rem;
-  --perce-gutter-lg: 2rem;
+  --perce-gutter-lg: 1.5rem;
 
   /* ── Spacing: section rhythm 64 / 96 (1024px) ── */
   --perce-section-y: 4rem;
@@ -306,8 +269,8 @@ html[data-page-transition="out"] body {
   --perce-gap-lg: 1.5rem;
   --perce-gap-xl: 3rem;
 
-  /* ── Layout widths ── */
-  --perce-content-max: 1440px;
+  /* ── Layout widths: one 1280px frame (12 columns, 24px gutters) ── */
+  --perce-content-max: 1280px;
   --perce-content-narrow: 768px;
   --perce-content-prose: 65ch;
 
@@ -619,8 +582,8 @@ html[data-page-transition="out"] body {
     min-height: 20rem;
   }
 
-  /* Tablet/desktop: a wide frame ending well inside the viewport, so the
-     headline below it is on screen without scrolling. */
+  /* Tablet: a wide frame ending well inside the viewport, so the headline
+     below it is on screen without scrolling. */
   @media (min-width: 768px) {
     .perce-hero-frame {
       aspect-ratio: auto;
@@ -630,18 +593,30 @@ html[data-page-transition="out"] body {
     }
   }
 
+  /* Desktop: a 16:7 frame, never taller than 78% of the viewport. */
+  @media (min-width: 1024px) {
+    .perce-hero-frame {
+      aspect-ratio: 16 / 7;
+      height: auto;
+      max-height: 78vh;
+      max-height: 78svh;
+    }
+  }
+
   /* Where the cover crop lands, shared by the hero video and its poster
      image so the fade from one to the other never jumps. Tuned for the
      9:16 launch reel ("Reel One"): 75% down on phones keeps the ear stack
-     in frame; from 768px a wide frame shows only a band of the reel, and
-     35% down keeps the eyes, the crescent, the cuff and the lobe hoops. */
+     in frame. A wide frame shows only a band of the reel (a quarter of its
+     height at 16:7); 44% down centres that band on the stack — helix stud,
+     crescent and cuff, mid stud, lobe hoop and charm — with the whole eye
+     inside it rather than cut through. */
   .perce-hero-media {
     object-position: 50% 75%;
   }
 
   @media (min-width: 768px) {
     .perce-hero-media {
-      object-position: 50% 35%;
+      object-position: 50% 44%;
     }
   }
 }

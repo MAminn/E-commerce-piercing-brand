@@ -192,6 +192,8 @@ export function ProductForm({
     sortOrder?: number;
     hidden?: boolean;
     bestLayeredWithIds?: string[] | null;
+    /** Customer-facing catalogue number, 1–999 ("014"). `null` = not numbered yet. */
+    catalogueNo?: number | null;
     /** Merchant-only internal reference code, e.g. FB001. */
     internalCode?: string | null;
     /** Merchant-only unit cost in EGP. `null` = not entered yet. */
@@ -258,6 +260,20 @@ export function ProductForm({
       .optional()
       .default(""),
     /**
+     * Customer-facing catalogue number. A cleared input (`""` or `NaN`)
+     * means "not numbered yet" and becomes `null` — never 0, and nothing is
+     * generated for the admin.
+     */
+    catalogueNo: z.preprocess(
+      (v) => (v === "" || v === null || v === undefined || (typeof v === "number" && Number.isNaN(v)) ? null : Number(v)),
+      z
+        .number()
+        .int("Catalogue number must be a whole number")
+        .min(1, "Catalogue number must be 1 or more")
+        .max(999, "Catalogue number must be 999 or less")
+        .nullable(),
+    ),
+    /**
      * Merchant-only unit cost in EGP.
      *
      * A cleared number input reads back as `NaN` (`valueAsNumber` on an empty
@@ -318,6 +334,7 @@ export function ProductForm({
         ? initialValues.bestLayeredWithIds
         : [],
       internalCode: initialValues?.internalCode ?? "",
+      catalogueNo: initialValues?.catalogueNo ?? null,
       // A stored NULL cost stays null in the form so the input renders empty
       // rather than showing a 0 the admin never entered.
       costPrice:
@@ -453,6 +470,8 @@ export function ProductForm({
           // fields. Blank cost stays null, never 0.
           internalCode: values.internalCode ?? "",
           costPrice: values.costPrice ?? null,
+          // Sent on every save so clearing it clears it.
+          catalogueNo: values.catalogueNo ?? null,
         };
         result = await trpc.product.edit.mutate(payload);
       } else {
@@ -464,6 +483,7 @@ export function ProductForm({
           discountPrice: values.discountPrice ?? undefined,
           internalCode: values.internalCode ?? "",
           costPrice: values.costPrice ?? null,
+          catalogueNo: values.catalogueNo ?? null,
         });
       }
 
@@ -616,6 +636,33 @@ export function ProductForm({
               )}
             />
           </div>
+
+          <FormField
+            control={form.control}
+            name='catalogueNo'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Catalogue number</FormLabel>
+                <FormControl>
+                  <Input
+                    type='number'
+                    min='1'
+                    max='999'
+                    step='1'
+                    inputMode='numeric'
+                    placeholder='e.g. 14'
+                    value={field.value ?? ""}
+                    onChange={(e) => field.onChange(e.target.value === "" ? null : e.target.valueAsNumber)}
+                    onBlur={field.onBlur}
+                  />
+                </FormControl>
+                <p className='text-xs text-muted-foreground'>
+                  Shown to customers as three digits (14 → 014). Must be unique. Leave blank until assigned.
+                </p>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
           {/*
             Merchant-only fields. Neither is ever sent to a storefront client

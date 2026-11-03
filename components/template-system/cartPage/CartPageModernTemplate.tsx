@@ -3,7 +3,6 @@ import type { CartShippingStatus } from "#root/shared/shipping/checkout-shipping
 import { CartBundleGroup, type CartPageBundleGroup } from "./CartBundleGroup";
 import {
   AppliedOffersSavings,
-  computeOfferSavingsTotal,
 } from "./AppliedOffersSavings";
 import { Button, buttonClass } from "#root/components/storefront/Button";
 import { Input } from "#root/components/storefront/Field";
@@ -265,7 +264,7 @@ export function CartPageModernTemplate({
   };
 
   if (isLoading) {
-    return <CartPageModernSkeleton title={t("cart.title") || "Shopping Cart"} label={t("cart.loading")} />;
+    return <CartPageModernSkeleton title={t("cart.title") || "Bag"} label={t("cart.loading")} />;
   }
 
   if (isEmpty) {
@@ -279,14 +278,7 @@ export function CartPageModernTemplate({
     );
   }
 
-  const totalSavings = computeOfferSavingsTotal(
-    totals.appliedOffers,
-    totals.discount ?? 0,
-  );
-
   const appliedOffers = totals.appliedOffers ?? [];
-  const hasDiscount = (line: CartPageCartItem) =>
-    line.originalPrice != null && line.originalPrice > line.price;
   const checkoutDisabled = isUpdating || isEmpty;
   const promoInvalid = couponFeedback?.success === false;
 
@@ -297,7 +289,7 @@ export function CartPageModernTemplate({
 
         {/* ── Page heading ───────────────────────────────── */}
         <h1 className='mb-6 t-h1 text-ink lg:mb-8'>
-          {t("cart.title") || "Shopping Cart"}
+          {t("cart.title") || "Bag"}
           <span className='ms-3 t-small tabular-nums text-ink-2'>
             ({formatItemCount(cartUnitCount(items, bundles), locale, t)})
           </span>
@@ -348,21 +340,17 @@ export function CartPageModernTemplate({
                           {item.variant && (
                             <p className='mt-1 t-small text-ink-2'>{item.variant}</p>
                           )}
-                          <p className='mt-1 flex flex-wrap gap-x-2 t-small tabular-nums text-ink-2'>
-                            <span>
-                              {money(item.price)} {t("checkout.each") || "each"}
-                            </span>
-                            {hasDiscount(item) && <s>{money(item.originalPrice as number)}</s>}
+                          <p className='mt-1 t-small tabular-nums text-ink-2'>
+                            {money(item.price)} {t("checkout.each") || "each"}
                           </p>
                         </div>
 
                         {/* Line total */}
                         <div className='shrink-0 text-end' style={{ fontFamily: "var(--font-price)" }}>
+                          {/* One figure: what this line costs. An offer's free
+                              units are named, never shown as a struck price. */}
                           {free > 0 ? (
                             <>
-                              <p className='t-small tabular-nums text-ink-2'>
-                                <s>{money(item.price * item.quantity)}</s>
-                              </p>
                               <p className='t-label tabular-nums text-ink'>
                                 {free >= item.quantity ? t("cart.free") || "Free" : money(item.price * paidUnits)}
                               </p>
@@ -373,14 +361,7 @@ export function CartPageModernTemplate({
                               )}
                             </>
                           ) : (
-                            <>
-                              {hasDiscount(item) && (
-                                <p className='t-small tabular-nums text-ink-2'>
-                                  <s>{money((item.originalPrice as number) * item.quantity)}</s>
-                                </p>
-                              )}
-                              <p className='t-label tabular-nums text-ink'>{money(item.price * item.quantity)}</p>
-                            </>
+                            <p className='t-label tabular-nums text-ink'>{money(item.price * item.quantity)}</p>
                           )}
                         </div>
                       </div>
@@ -488,7 +469,7 @@ export function CartPageModernTemplate({
                       ? ` — ${appliedCoupon.discountLabel}`
                       : ""}
                     {totals.discount != null && totals.discount > 0
-                      ? ` · saving ${money(totals.discount)}`
+                      ? ` · −${money(totals.discount)}`
                       : ""}
                   </p>
                   {onRemoveCoupon && (
@@ -519,7 +500,7 @@ export function CartPageModernTemplate({
 
                 {totals.bundleSavings !== undefined && totals.bundleSavings > 0 && (
                   <div className='flex justify-between border-b border-line py-3'>
-                    <dt className='text-ink-2'>Set savings</dt>
+                    <dt className='text-ink-2'>Set discount</dt>
                     <dd className='tabular-nums text-ink'>−{money(totals.bundleSavings)}</dd>
                   </div>
                 )}
@@ -607,9 +588,6 @@ export function CartPageModernTemplate({
       <div className='mb-3 flex items-baseline justify-between gap-4'>
         <span className='t-label text-ink'>{t("cart.total") || "Total"}</span>
         <div className='text-end'>
-          {totalSavings > 0 && (
-            <p className='t-micro tabular-nums text-ink-2'>Saving {money(totalSavings)}</p>
-          )}
           <p className='t-h3 tabular-nums text-ink'>{money(totals.grandTotal)}</p>
         </div>
       </div>
