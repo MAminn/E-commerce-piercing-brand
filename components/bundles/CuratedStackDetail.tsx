@@ -13,6 +13,7 @@ import { getProductUrl } from "#root/lib/utils/route-helpers";
 import { cn } from "#root/lib/utils";
 import { fillTemplate, formatMoney, resolveBundleImage } from "./bundle-ui";
 import { formatSelectedOptions } from "#root/shared/products/options";
+import { usePublishSetBarHeight, useSetPanelInView } from "./set-bar";
 
 export interface CuratedStackDetailProps {
   /** A live curated campaign with its composition, loaded by the detail page. */
@@ -22,10 +23,10 @@ export interface CuratedStackDetailProps {
 
 /**
  * Curated stack page: the merchant fixed the composition, so there is nothing
- * to select — the shopper sees exactly what is in the stack at today's
- * prices and adds the whole thing. Pricing shown here is the server's
- * (`regularValue` / `savings` computed from current product prices); the
- * add-to-bag call re-validates everything again before the cart trusts it.
+ * to select — the shopper sees exactly what is in the set and adds the whole
+ * thing at one price, the server's. A piece in a set has no price of its own
+ * here, as in the bag. The add-to-bag call re-validates everything again
+ * before the cart trusts it.
  */
 export function CuratedStackDetail({ campaign, reload }: CuratedStackDetailProps) {
   const { t } = useMinimalI18n();
@@ -37,6 +38,12 @@ export function CuratedStackDetail({ campaign, reload }: CuratedStackDetailProps
   const [notice, setNotice] = useState<{ tone: "error" | "success"; text: string } | null>(null);
   const [addedInstanceId, setAddedInstanceId] = useState<string | null>(null);
   const ctaRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Phones: a fixed bar, reserved like the builder's. From sm: an inline panel,
+  // and the bag bar steps aside while it is on screen.
+  usePublishSetBarHeight(panelRef);
+  useSetPanelInView(panelRef);
 
   useEffect(() => {
     setNotice(null);
@@ -45,7 +52,7 @@ export function CuratedStackDetail({ campaign, reload }: CuratedStackDetailProps
 
   const price = campaign.fixedBundlePrice ?? 0;
   const regularValue = campaign.regularValue ?? 0;
-  const savings = campaign.savings ?? regularValue - price;
+  const costsMore = (campaign.savings ?? regularValue - price) < 0;
   const soldOut = campaign.availability !== "available";
   const unitCount = campaign.unitCount;
   const pieces = campaign.eligibleProducts;
@@ -125,19 +132,8 @@ export function CuratedStackDetail({ campaign, reload }: CuratedStackDetailProps
     }
   };
 
-  const savingLine =
-    savings > 0 ? (
-      <p className="font-medium text-perce-success">
-        {t("curated.you_save")} {formatMoney(savings, currency)}
-      </p>
-    ) : savings === 0 ? (
-      <p className="text-perce-ink-muted">{t("curated.no_saving")}</p>
-    ) : (
-      <p className="text-perce-sale">{t("curated.costs_more")}</p>
-    );
-
   return (
-    <div className="perce-header-offset min-h-screen bg-perce-bg pb-40 sm:pb-16">
+    <div className="perce-header-offset min-h-screen bg-perce-bg pb-12 sm:pb-16">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <section className="grid gap-6 py-6 sm:py-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start">
@@ -170,9 +166,6 @@ export function CuratedStackDetail({ campaign, reload }: CuratedStackDetailProps
             <h2 className="perce-eyebrow mt-8">{t("curated.includes")}</h2>
             <ul className="mt-3 divide-y divide-perce-line border-y border-perce-line">
               {pieces.map((p) => {
-                // The line's regular unit price as the server priced it: the
-                // effective price plus the fixed variant's modifiers.
-                const unit = p.unitPrice;
                 // Any reason this line can't be fulfilled right now — the
                 // whole stack is sold out when one of them applies. Phase 7:
                 // `purchasable` is false when the merchant-fixed variant no
@@ -194,14 +187,13 @@ export function CuratedStackDetail({ campaign, reload }: CuratedStackDetailProps
                       </p>
                       {/* The exact variant the merchant fixed — the shopper does not choose here. */}
                       {variantLabel && <p className="text-[12px] text-perce-ink-secondary">{variantLabel}</p>}
-                      <p className="text-[12px] text-perce-ink-muted">
-                        {fillTemplate(t("curated.unit_x"), { count: p.quantity })} · {formatMoney(unit, currency)}
-                        {pieceSoldOut && <span className="ms-2 text-perce-sale">{t("bundles.sold_out")}</span>}
-                      </p>
+                      {pieceSoldOut && <p className="text-[12px] text-perce-sale">{t("bundles.sold_out")}</p>}
                     </div>
-                    <p className="shrink-0 text-[13px] text-perce-ink-secondary" style={{ fontFamily: "var(--font-price)" }}>
-                      {formatMoney(unit * p.quantity, currency)}
-                    </p>
+                    {p.quantity > 1 && (
+                      <p className="shrink-0 text-[13px] tabular-nums text-perce-ink-secondary">
+                        {fillTemplate(t("curated.unit_x"), { count: p.quantity })}
+                      </p>
+                    )}
                   </li>
                 );
               })}
@@ -238,24 +230,21 @@ export function CuratedStackDetail({ campaign, reload }: CuratedStackDetailProps
 
       {/* ── Price + CTA (sticky bottom on mobile, inline card on desktop) ───── */}
       <div
-        className="fixed inset-x-0 border-t border-perce-border bg-perce-bg sm:static sm:border-0 sm:bg-transparent"
-        style={{ bottom: "calc(4rem + env(safe-area-inset-bottom))", zIndex: "var(--perce-z-sticky)" }}>
+        ref={panelRef}
+        className="fixed inset-x-0 bottom-0 border-t border-perce-border bg-perce-bg pb-[env(safe-area-inset-bottom)] sm:static sm:border-0 sm:bg-transparent sm:pb-0"
+        style={{ zIndex: "var(--perce-z-sticky)" }}
+        data-testid="curated-price-panel">
         <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6 sm:py-0 lg:px-8">
           <div className="sm:ms-auto sm:max-w-md sm:border sm:border-perce-border sm:bg-perce-surface sm:p-6">
-            <div className="flex items-end justify-between gap-3 text-[12px] text-perce-ink-secondary">
-              <div className="min-w-0 space-y-0.5">
-                <p>
-                  {t("curated.current_value")}: <span className={cn(savings > 0 && "line-through")}>{formatMoney(regularValue, currency)}</span>
-                </p>
-                {savingLine}
-              </div>
-              <div className="text-end">
-                <p className="text-xs text-perce-ink-muted">{t("curated.stack_price")}</p>
-                <p className="text-[18px] font-medium text-perce-ink" style={{ fontFamily: "var(--font-price)" }}>
-                  {formatMoney(price, currency)}
-                </p>
-              </div>
+            {/* One price. The only comparison ever stated is a warning that a
+                set costs more than its pieces — never a saving. */}
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="text-[13px] text-perce-ink-secondary">{t("curated.stack_price")}</p>
+              <p className="text-[18px] font-medium tabular-nums text-perce-ink" style={{ fontFamily: "var(--font-price)" }}>
+                {formatMoney(price, currency)}
+              </p>
             </div>
+            {costsMore && <p className="mt-1 text-[12px] text-perce-sale">{t("curated.costs_more")}</p>}
             <button
               ref={ctaRef}
               type="button"

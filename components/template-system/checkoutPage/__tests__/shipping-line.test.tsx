@@ -33,9 +33,10 @@ const submitDisabled = (html: string): boolean[] =>
     .map((m) => /<button[^>]*\bdisabled=""/.test(m[0]));
 
 describe("checkout shipping line — Modern template", () => {
-  it("shows 'Calculated at checkout' with the goods total before a destination is chosen", () => {
+  it("asks for the governorate, never 'Calculated at checkout', before a destination is chosen", () => {
     const html = render({ subtotal: 300, grandTotal: 300, shippingStatus: "pending" }, { governorateRequired: true });
-    expect(html).toContain("Calculated at checkout");
+    expect(html).not.toContain("Calculated at checkout");
+    expect(html).toMatch(/data-testid="shipping-line"[\s\S]*?Select governorate/);
     expect(html).toContain("Select your governorate to see the shipping fee.");
     expect(html).not.toContain("Not available for this destination");
     // Pending never disables the button: validation points at the field instead.

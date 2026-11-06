@@ -209,7 +209,9 @@ export function MinimalProductCard({ product, className }: MinimalProductCardPro
             toggle(product.id);
           }}
           className={cn(
-            "absolute end-1 top-1 flex h-11 w-11 items-center justify-center text-ink",
+            // The same stone square as the "+": a bare ink heart disappears on a
+            // real photo's dark hair. 36px, 8px in, 44px hit area.
+            "absolute end-2 top-2 flex h-9 w-9 items-center justify-center border border-line bg-surface text-ink transition-colors hover:bg-ink hover:text-bg before:absolute before:-inset-1 before:content-['']",
             !wishlisted && revealOnDesktop,
           )}
           aria-pressed={wishlisted}

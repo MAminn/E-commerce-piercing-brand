@@ -20,6 +20,9 @@ import { buttonClass } from "#root/components/storefront/Button";
 import { useStorefrontCategories } from "#root/hooks/useStorefrontCategories";
 import { placementTree, type Placement } from "#root/shared/categories/placements";
 import { formatMoney } from "#root/shared/pricing/format-money";
+import { STORE_CURRENCY } from "#root/shared/config/branding";
+import { fillTemplate } from "#root/components/bundles/bundle-ui";
+import { describeSetOffer } from "#root/components/bundles/set-offer";
 
 /**
  * Props for the LandingTemplateMinimal component
@@ -146,20 +149,33 @@ function PlacementIndex({ placements }: { placements: Placement[] }) {
 // ─── 03 · Sets ───────────────────────────────────────────
 
 /**
- * Sets as index rows — "Pick your set · 3 pieces · EGP 270". The price is
- * shown only when the set has one fixed total; a percentage set states its
- * pieces and nothing it would "save". Sold-out sets are left out.
+ * Sets as index rows, each ending in what the set actually costs:
+ *   "Ready set — ear · 2 pieces"     EGP 230      (one fixed total)
+ *   "Pick your set · 3–6 pieces"     From EGP 270 (several sized totals)
+ *   "Pick Your 6 · 6 pieces"         20% off      (a percentage set)
+ * Every figure is the campaign's own, via describeSetOffer — the same words
+ * as the /offers card — and never a saving. Sold-out sets are left out.
  */
 function SetsIndex({ campaigns }: { campaigns: BundleCardCampaign[] }) {
   const { t, locale } = useMinimalI18n();
   return (
     <ol className='border-t border-line' data-testid='sets-index'>
       {campaigns.map((c) => {
-        const pieces = c.type === "curated_stack" ? c.unitCount : c.requiredQuantity;
-        const price =
-          c.pricingType === "fixed_total" && typeof c.fixedBundlePrice === "number"
-            ? formatMoney(c.fixedBundlePrice, { locale })
+        const curated = c.type === "curated_stack";
+        const offer = describeSetOffer(c, t, STORE_CURRENCY, (amount) => formatMoney(amount, { locale }));
+        const sizes = [...(c.tiers ?? [])].map((tier) => tier.quantity).sort((a, b) => a - b);
+        const pieces = curated ? c.unitCount : (offer.pieces ?? c.requiredQuantity);
+        const range =
+          !curated && offer.pieces === null && sizes.length > 1
+            ? fillTemplate(t("bundles.tier_range"), { min: sizes[0] ?? 0, max: sizes[sizes.length - 1] ?? 0 })
             : null;
+        // One size at a fixed total is just its price: the row already says how
+        // many pieces. Anything else reads as the offer states it.
+        const fixedSingle = c.pricingType === "fixed_total" && offer.pieces !== null;
+        const price =
+          (curated || fixedSingle) && typeof c.fixedBundlePrice === "number"
+            ? formatMoney(c.fixedBundlePrice, { locale })
+            : offer.headline;
         return (
           <li key={c.id}>
             <a
@@ -170,14 +186,19 @@ function SetsIndex({ campaigns }: { campaigns: BundleCardCampaign[] }) {
                 <span className='text-ink group-hover:underline group-hover:decoration-1 group-hover:underline-offset-4'>
                   {c.title}
                 </span>
-                {pieces > 0 && (
+                {(range || pieces > 0) && (
                   <span className='tabular-nums text-ink-2'>
                     {" · "}
-                    {formatItemCount(pieces, locale, t, "home.pieces")}
+                    {range ?? formatItemCount(pieces, locale, t, "home.pieces")}
                   </span>
                 )}
               </span>
-              {price && <span className='shrink-0 t-body tabular-nums text-ink'>{price}</span>}
+              <span className='shrink-0 text-end t-body tabular-nums text-ink' data-set-offer-text>
+                {price}
+                {offer.freeShipping && (
+                  <span className='block t-small text-ink-2'>{t("sets.plus_free_shipping")}</span>
+                )}
+              </span>
             </a>
           </li>
         );
@@ -229,7 +250,7 @@ export function LandingTemplateMinimal({
         imageUrl: resolveImageUrl(content.hero.backgroundImage) || "",
         mobileImageUrl: resolveImageUrl(content.hero.mobileBackgroundImage),
         linkUrl: content.hero.ctaLink,
-        alt: content.hero.title,
+        alt: label(content.hero.title),
       });
     }
     return slides;
@@ -295,7 +316,12 @@ export function LandingTemplateMinimal({
   return (
     <div className={`landing-template-minimal bg-bg pb-8 lg:pb-12 ${className}`}>
       <PerceHero
-        hero={{ ...content.hero, ctaText: label(content.hero.ctaText) }}
+        hero={{
+          ...content.hero,
+          title: label(content.hero.title),
+          subtitle: label(content.hero.subtitle),
+          ctaText: label(content.hero.ctaText),
+        }}
         slides={heroSlides}
         video={heroVideo}
         onCtaClick={onCtaClick}

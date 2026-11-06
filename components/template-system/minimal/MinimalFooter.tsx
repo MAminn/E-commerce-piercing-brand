@@ -3,6 +3,7 @@ import { usePageContext } from "vike-react/usePageContext";
 import { Link } from "#root/components/utils/Link";
 import { useLayoutSettings } from "#root/frontend/contexts/LayoutSettingsContext";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
+import { localizeCmsLabel } from "#root/lib/i18n/cms-copy";
 import {
   BRAND_LINE,
   BRAND_WORDMARK,
@@ -124,9 +125,7 @@ export function MinimalFooter() {
   const copyright = locale === "ar" && footer.copyrightAr
     ? footer.copyrightAr
     : (footer.copyright || `${STORE_NAME} ${new Date().getFullYear()}`);
-  const description = locale === "ar" && footer.descriptionAr
-    ? footer.descriptionAr
-    : footer.description;
+  const description = localizeCmsLabel(locale, t, { en: footer.description, ar: footer.descriptionAr });
 
   const [newsletterEmail, setNewsletterEmail] = useState("");
   const [isSubscribing, setIsSubscribing] = useState(false);
@@ -237,7 +236,7 @@ export function MinimalFooter() {
               </span>
             )}
             {/* The brand line, once. Not repeated anywhere else on the page. */}
-            <p className='mb-3 t-small text-ink'>{BRAND_LINE}</p>
+            <p className='mb-3 t-small text-ink'>{localizeCmsLabel(locale, t, { en: BRAND_LINE })}</p>
             {footer.description && (
               <p className='max-w-xs text-start t-small text-ink-2'>
                 {description}

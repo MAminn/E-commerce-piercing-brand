@@ -110,8 +110,10 @@ export function PerceHero({
   const copy = (hasCopy || hasCta) && (
     <div className='perce-container pb-8 pt-8 lg:pb-12 lg:pt-12'>
       <div className='max-w-2xl'>
-        {title && <h1 className='t-display text-balance text-ink'>{title}</h1>}
-        {subtitle && <p className='mt-4 max-w-prose t-body text-ink-2'>{subtitle}</p>}
+        {/* dir='auto': copy the owner wrote in English on the Arabic store keeps
+            its own direction, so its full stop stays at the end of the sentence. */}
+        {title && <h1 dir='auto' className='t-display text-balance text-ink'>{title}</h1>}
+        {subtitle && <p dir='auto' className='mt-4 max-w-prose t-body text-ink-2'>{subtitle}</p>}
         {hasCta && <HeroCta text={ctaText} href={ctaLink} onClick={handleCta} />}
       </div>
     </div>

@@ -63,32 +63,15 @@ export function BundleCampaignCard({ campaign, className, eager = false }: Bundl
   // campaign query), so this costs no extra request.
   const isPercentage = !isCurated && campaign.pricingType === "percentage_discount";
   // Percentage-priced Pick Your Set: the discount IS the offer — there is no
-  // fixed price to quote or to compare a "separately" value against.
+  // fixed price to quote.
   const percentSummary = isPercentage ? summarizePercentageTiers(campaign.tiers ?? [], t) : null;
   const tierSummary = isCurated || isPercentage ? null : summarizeBundleTiers(campaign.tiers ?? [], currency, t);
-  // The figure a "from X separately" line is measured against: the cheapest
-  // price the shopper could actually pay.
+  // The cheapest price the shopper could actually pay.
   const price = tierSummary
     ? Math.min(...(campaign.tiers ?? []).flatMap((tier) => (tier.price === null ? [] : [tier.price])))
     : (campaign.fixedBundlePrice ?? 0);
 
   const piecesLabel = (count: number) => fillTemplate(t(count === 1 ? "bundles.piece" : "bundles.pieces"), { count });
-
-  // Only real numbers make it onto the card: a curated saving is shown when
-  // positive; a build-your-stack "from X separately" only when the pool can
-  // actually complete a stack right now.
-  const savingLine = isCurated && campaign.savings !== null && campaign.savings > 0
-    ? fillTemplate(t("bundles.save"), { price: formatMoney(campaign.savings, currency) })
-    : null;
-  const separatelyLine = isCurated
-    ? campaign.regularValue !== null && campaign.regularValue > price
-      ? fillTemplate(t("bundles.separately"), { price: formatMoney(campaign.regularValue, currency) })
-      : null
-    : isPercentage
-      ? null
-      : campaign.valueRange && campaign.valueRange.min > price
-      ? fillTemplate(t("bundles.from_separately"), { price: formatMoney(campaign.valueRange.min, currency) })
-      : null;
 
   return (
     <article className={cn("group flex flex-col", className)} data-bundle-card={campaign.slug}>
@@ -136,9 +119,7 @@ export function BundleCampaignCard({ campaign, className, eager = false }: Bundl
             ? piecesLabel(campaign.unitCount)
             : (percentSummary?.sizes ?? tierSummary?.sizes ??
               fillTemplate(t("bundles.pieces_to_choose"), { count: campaign.eligibleProductCount }))}
-          {separatelyLine && <> · {separatelyLine}</>}
         </p>
-        {savingLine && <p className="mt-1 t-small tabular-nums text-ink">{savingLine}</p>}
         {!isCurated && campaign.freeShipping && (
           <p className="mt-1 t-small text-ink">{t("bundle.free_shipping")}</p>
         )}

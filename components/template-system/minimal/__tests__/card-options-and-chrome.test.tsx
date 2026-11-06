@@ -81,6 +81,15 @@ describe("product card +", () => {
   });
 });
 
+describe("product card wishlist", () => {
+  it("sits on the same stone square as the +, so it stays legible on any photo", () => {
+    render(<MinimalProductCard product={{ ...product, requiresOptions: false }} />);
+    const heart = screen.getByRole("button", { name: `Wishlist: ${product.name}` });
+    expect(heart.className).toContain("bg-surface");
+    expect(heart.className).toContain("border-line");
+  });
+});
+
 describe("header wordmark", () => {
   it("renders the lowercase percé wordmark even when the CMS holds a logo image", () => {
     const settings = {

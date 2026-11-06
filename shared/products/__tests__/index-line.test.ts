@@ -23,14 +23,53 @@ describe("splitMeasures", () => {
     expect(splitMeasures("Ring 18 gauge")).toEqual({ title: "Ring", measures: ["18G"] });
   });
 
-  it("leaves names without a trailing measure alone", () => {
-    for (const name of ["Nose stud L-bend", "QA Piece 01 Titanium Stud", "8mm crystal hoop", "Ring 3"]) {
+  it("finds a measure wherever a real name puts it, and leaves the name reading properly", () => {
+    expect(splitMeasures("Clicker 10mm – Gold")).toEqual({ title: "Clicker – Gold", measures: ["10 mm"] });
+    expect(splitMeasures("Crystal Hoop – 8mm – Gold")).toEqual({ title: "Crystal Hoop – Gold", measures: ["8 mm"] });
+    expect(splitMeasures("Crystal Hoop – Gold 8mm")).toEqual({ title: "Crystal Hoop – Gold", measures: ["8 mm"] });
+    expect(splitMeasures("Crystal Hoop – 8mm")).toEqual({ title: "Crystal Hoop", measures: ["8 mm"] });
+    expect(splitMeasures("8mm Crystal Hoop – Gold")).toEqual({ title: "Crystal Hoop – Gold", measures: ["8 mm"] });
+    expect(splitMeasures("Labret 16g 8mm – Silver")).toEqual({ title: "Labret – Silver", measures: ["16G", "8 mm"] });
+    expect(splitMeasures("Nose Stud (1.2mm) – Gold")).toEqual({ title: "Nose Stud – Gold", measures: ["1.2 mm"] });
+    expect(splitMeasures("Labret (16g, 8mm)")).toEqual({ title: "Labret", measures: ["16G", "8 mm"] });
+    expect(splitMeasures("Ring, 18 gauge – Gold")).toEqual({ title: "Ring – Gold", measures: ["18G"] });
+    expect(splitMeasures("Hoop 8MM")).toEqual({ title: "Hoop", measures: ["8 mm"] });
+  });
+
+  it("leaves real names with no measure exactly as stored", () => {
+    for (const name of [
+      "Nose stud L-bend",
+      "QA Piece 01 Titanium Stud",
+      "Ring 3",
+      // From the real catalogue:
+      "Emerald Snake Piercing – Gold",
+      "Crystal Crown Arc Piercing – Gold",
+      "Four-Prong Crystal Solitaire Labret Piercing – Gold",
+      "Crystal Chain-Link Fake Ear Cuff – Gold Plated",
+      "Blue Crystal Chain Huggie Earring Set – Gold (3 Pieces)",
+      "Butterfly & Bow Charm Huggie Earring Set – Gold (3 Pieces)",
+    ]) {
+      expect(splitMeasures(name)).toEqual({ title: name, measures: [] });
+    }
+  });
+
+  it("does not mistake other numbers for measures — nothing is invented", () => {
+    for (const name of [
+      "Ring 3g", // a weight, not a gauge
+      "18k Gold Hoop",
+      "925 Silver Stud",
+      "Plate 10 x 8 mm",
+      "Plate 10x8mm",
+      "Hoop 8-10mm",
+      "Model 8mmX",
+    ]) {
       expect(splitMeasures(name)).toEqual({ title: name, measures: [] });
     }
   });
 
   it("never empties a name that is only a measure", () => {
     expect(splitMeasures("10mm")).toEqual({ title: "10mm", measures: [] });
+    expect(splitMeasures("– 10mm –")).toEqual({ title: "– 10mm –", measures: [] });
   });
 });
 
@@ -40,6 +79,12 @@ describe("placementLabel", () => {
     expect(placementLabel("Nose piercing")).toBe("Nose");
     expect(placementLabel("Daith")).toBe("Daith");
     expect(placementLabel("Piercings")).toBe("Piercings");
+    expect(placementLabel("Ear piercings")).toBe("Ear");
+    expect(placementLabel("Lip Piercing")).toBe("Lip");
+  });
+
+  it('keeps "Fake Piercings" whole: "Fake" is not a place on the body', () => {
+    expect(placementLabel("Fake Piercings")).toBe("Fake Piercings");
   });
 });
 

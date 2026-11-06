@@ -29,6 +29,11 @@ const STANDARD_LABELS: Record<string, string> = {
   "shop now": "shop_now",
   sets: "bundles.section_default_title",
   "view all sets": "bundles.view_all",
+  // The brand's standard hero and footer lines. An owner's own wording is not
+  // in this list, and stays as written (rule 3).
+  "small pieces. made to mix.": "home.hero_title",
+  "piercing jewellery, delivered across egypt.": "home.hero_subtitle",
+  "made to mix.": "home.brand_line",
 };
 
 export function standardLabelKey(text: string | null | undefined): string | null {

@@ -177,17 +177,35 @@ describe("Object Index homepage", () => {
     expect(sections(render({ featuredProducts: [] }))).not.toContain("home-object");
   });
 
-  it("03 · Sets: index rows with pieces and a fixed price only; no sold-out set, no saving", () => {
+  it("03 · Sets: every row ends in the set's own price or offer; no sold-out set, no saving", () => {
     const html = plain(render());
     const block = html.slice(html.indexOf('data-testid="sets-index"'));
     const rows = [...block.matchAll(/data-set-row="([^"]+)"/g)].map((m) => m[1]);
     expect(rows).toEqual(["pick-your-3", "pick-your-set", "ready-set-ear"]);
     const text = block.replace(/<[^>]+>/g, "");
-    expect(text).toContain("Pick Your 3 · 3 pieces");
+    // A percentage set has no total until it is built: the discount IS its offer.
+    expect(text).toContain("Pick Your 3 · 3 pieces20% off");
     // The price sits at the row's end, on its own.
     expect(text).toContain("Pick your set · 3 piecesEGP 270");
     expect(text).toContain("Ready set — ear · 2 piecesEGP 230");
-    expect(text).not.toMatch(/sav|%|Sold out set/i);
+    expect(text).not.toMatch(/sav|separately|Sold out set/i);
+    expect(block).not.toMatch(/<s[ >]|line-through/);
+  });
+
+  it("03 · Sets: a set of several sizes states its range and its offer as /offers does", () => {
+    const upTo = campaign("pick-your-set", "Pick your set", "build_your_stack", {
+      tiers: [tier(3, 10), tier(6, 20)],
+      freeShipping: true,
+    });
+    const from = campaign("build-it", "Build it", "build_your_stack", {
+      pricingType: "fixed_total",
+      fixedBundlePrice: 270,
+      tiers: [tier(3, null, 270), tier(6, null, 480)],
+    });
+    const html = plain(render({ setCampaigns: [upTo, from] }));
+    const text = html.slice(html.indexOf('data-testid="sets-index"')).replace(/<[^>]+>/g, "");
+    expect(text).toContain("Pick your set · 3–6 piecesUp to 20% off+ free shipping");
+    expect(text).toContain("Build it · 3–6 piecesFrom EGP 270");
   });
 
   it("CMS switches still apply", () => {

@@ -30,6 +30,8 @@ export function describeSetOffer(
   campaign: Pick<BundleCardCampaign, "tiers" | "pricingType" | "freeShipping" | "requiredQuantity" | "fixedBundlePrice" | "availability">,
   t: Translate,
   currency: string,
+  /** The page's own money style, e.g. Arabic "270 ج.م" on the Arabic homepage. */
+  money: (amount: number) => string = (amount) => formatMoney(amount, currency),
 ): SetOfferSummary {
   const tiers = [...(campaign.tiers ?? [])].sort((a, b) => a.quantity - b.quantity);
   const smallest = tiers[0];
@@ -46,11 +48,11 @@ export function describeSetOffer(
   } else if (single) {
     headline = fillTemplate(t("sets.count_for_price"), {
       count: pieces ?? 0,
-      price: formatMoney(smallest?.price ?? campaign.fixedBundlePrice ?? 0, currency),
+      price: money(smallest?.price ?? campaign.fixedBundlePrice ?? 0),
     });
   } else {
     const prices = tiers.flatMap((tier) => (tier.price === null ? [] : [tier.price]));
-    headline = fillTemplate(t("bundles.from_price"), { price: formatMoney(Math.min(...prices), currency) });
+    headline = fillTemplate(t("bundles.from_price"), { price: money(Math.min(...prices)) });
   }
 
   const rule = single

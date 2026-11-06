@@ -144,6 +144,6 @@ describe("Offers page — account stays optional", () => {
     renderAs(null, "ar");
     const sets = await screen.findByTestId("offers-sets");
     expect(within(sets).getAllByText("كوّني هذا الطقم").length).toBe(2);
-    expect(screen.getByText("كوّني طقمك ووفّري أكثر.")).toBeTruthy();
+    expect(screen.getByText("كوّني طقمك.")).toBeTruthy();
   });
 });

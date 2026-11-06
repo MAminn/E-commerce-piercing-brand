@@ -94,10 +94,10 @@ function buildStripState(
     const matched = offers.find((o) => o.name === latestApplied.name);
     const rewardText =
       totalSavings > 0
-        ? `Saving ${formatMoney(totalSavings, { currency })}`
+        ? `Offers −${formatMoney(totalSavings, { currency })}`
         : latestApplied.freeShipping && latestApplied.discountAmount === 0
           ? "Applied at checkout"
-          : `Saving ${formatMoney(latestApplied.discountAmount, { currency })}`;
+          : `Offers −${formatMoney(latestApplied.discountAmount, { currency })}`;
 
     return {
       kind: "unlocked",
@@ -236,6 +236,10 @@ export function StickyCartBar({
   // scroll-padding (so focus and scroll-into-view never land under it). The
   // measured height is 0 where the bar is display:none (desktopOnly below
   // 1024px), so nothing is reserved there.
+  //
+  // On a set page this bar never covers the set's own controls: it stacks above
+  // Pick Your Set's fixed action bar (--perce-set-bar-h, set by set-bar.ts) and
+  // steps aside while Ready Set's inline price panel is on screen (style.css).
   useEffect(() => {
     const el = barRef.current;
     const root = document.documentElement;
@@ -271,13 +275,13 @@ export function StickyCartBar({
         desktopOnly && "hidden lg:block",
         visible ? "opacity-100" : "translate-y-full opacity-0",
       )}
-      style={{ zIndex: "var(--perce-z-sticky)" }}
+      style={{ zIndex: "var(--perce-z-sticky)", bottom: "var(--perce-set-bar-h, 0px)" }}
       aria-label="Bag and offers"
     >
       <div className="pointer-events-auto relative mx-auto w-full max-w-3xl">
         {isUnlocked && savingsExpanded && hasSavingsBreakdown && (
           <div className="mb-2 border border-line bg-surface px-4 py-3">
-            <p className="mb-2 t-micro text-ink-2">Savings breakdown</p>
+            <p className="mb-2 t-micro text-ink-2">Offers</p>
             <ul className="space-y-2">
               {appliedOffers.map((offer) => (
                 <li

@@ -33,6 +33,7 @@ import {
   resolveBundleImage as imageSrc,
 } from "./bundle-ui";
 import { builderFilterCategories, filterBuilderPool } from "./builder-filters";
+import { usePublishSetBarHeight } from "./set-bar";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -105,6 +106,7 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
   const [notice, setNotice] = useState<{ tone: "error" | "success" | "info"; text: string } | null>(null);
   const [addedInstanceId, setAddedInstanceId] = useState<string | null>(null);
   const ctaRef = useRef<HTMLButtonElement>(null);
+  const actionBarRef = useRef<HTMLDivElement>(null);
   /** Browse helpers only — they never change what is selected or how it is priced. */
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
@@ -431,6 +433,10 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
     }
   };
 
+  // Hands the bottom of the screen to this bar: the bag bar stacks above it and
+  // the page reserves its height (see set-bar.ts).
+  usePublishSetBarHeight(actionBarRef, Boolean(config && evaluation));
+
   if (!config || !evaluation) return null;
 
   const multiTier = tiers.length > 1;
@@ -468,9 +474,6 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
         });
   const remaining = Math.max(0, required - selectedCount);
   const regularTotal = evaluation.regularTotal;
-  // Truthful: only a matched tier has a price to compare against, and a
-  // negative result is never relabelled as a saving.
-  const savings = price === null ? null : regularTotal - price;
   /** The matched percentage tier's figures — what the live breakdown shows. */
   const percentBreakdown =
     isPercentage && evaluation.qualifies && price !== null && evaluation.discountAmount !== null
@@ -489,13 +492,6 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
       ? fill(t("bundle.benefit_pct"), { percent: tierPercent(tier) ?? "" })
       : fill(t("bundle.benefit_price"), { size: tier.quantity, price: money(tier.price ?? 0, currency) })) +
     (campaign.freeShipping ? t("bundle.benefit_free_shipping") : "");
-  /** What the shopper saves on a qualifying set — from the evaluator, never re-derived. */
-  const youSave =
-    !evaluation.qualifies || price === null
-      ? null
-      : isPercentage
-        ? (evaluation.discountAmount ?? null)
-        : savings;
   /** Slots in the selection tray: the size being built toward (or matched). */
   const slotCount = Math.min(12, Math.max(required, selectedCount));
   /** One tray thumbnail per selected unit, in pick order. */
@@ -551,7 +547,7 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
       : null;
 
   return (
-    <div className="perce-header-offset min-h-screen bg-perce-bg pb-44 lg:pb-28">
+    <div className="perce-header-offset min-h-screen bg-perce-bg pb-12">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         {/* ── Campaign header ────────────────────────────────────────────── */}
         <section className="grid gap-6 py-6 sm:py-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-center">
@@ -704,13 +700,11 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
             <div className="flex justify-between gap-3">
               <dt className="text-perce-ink-secondary">{t("bundle.selected_subtotal")}</dt>
               <dd className="text-perce-ink" data-testid="bundle-selected-subtotal">
-                <span className={cn(!isPercentage && evaluation.qualifies && "line-through text-perce-ink-muted")}>
-                  {money(regularTotal, currency)}
-                </span>
+                {money(regularTotal, currency)}
               </dd>
             </div>
             {percentBreakdown && percentBreakdown.discount > 0 && (
-              <div className="flex justify-between gap-3 font-medium text-perce-success" data-testid="bundle-percent-discount">
+              <div className="flex justify-between gap-3 text-perce-ink" data-testid="bundle-percent-discount">
                 <dt>{fill(t("bundle.discount_pct"), { percent: percentBreakdown.percent ?? "" })}</dt>
                 <dd>−{money(percentBreakdown.discount, currency)}</dd>
               </div>
@@ -732,11 +726,6 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
                 {price === null ? "—" : money(price, currency)}
               </dd>
             </div>
-            {youSave !== null && youSave > 0 && (
-              <p className="mt-2 bg-perce-bg px-3 py-2 text-center font-medium text-perce-success" data-testid="bundle-you-save">
-                {fill(t("bundle.you_save_amount"), { amount: money(youSave, currency) })}
-              </p>
-            )}
           </dl>
         </section>
 
@@ -852,7 +841,6 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
                 const pendingPrice = hasOptions ? linePrice(p, pendingOptions) : effectivePrice(p);
                 const pendingResolution = hasOptions ? resolveSelectedOptions(p.optionGroups, pendingOptions) : null;
                 const unit = pendingPrice ?? effectivePrice(p);
-                const hasDiscount = p.discountPrice !== null && p.discountPrice < p.price;
                 const canIncrement = !soldOut && !atCap && !stackFull;
                 const isSelected = qty > 0;
                 const productLines = selection.filter((l) => l.productId === p.productId);
@@ -917,15 +905,9 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
                         style={{ fontFamily: "var(--font-product-title)" }}>
                         {p.name}
                       </p>
-                      <p className="mt-1 flex items-baseline gap-1.5 text-[14px]" style={{ fontFamily: "var(--font-price)" }}>
-                        <span className={hasDiscount ? "text-perce-sale font-medium" : "font-medium text-perce-ink"}>
-                          {money(unit, currency)}
-                        </span>
-                        {hasDiscount && (
-                          <span className="text-perce-ink-muted line-through">
-                            {money(hasOptions && pendingResolution?.ok ? resolvePurchasableLinePrice(p.price, pendingResolution.priceModifier) : p.price, currency)}
-                          </span>
-                        )}
+                      {/* One price: what this piece costs today. */}
+                      <p className="mt-1 text-[14px] font-medium text-perce-ink" style={{ fontFamily: "var(--font-price)" }}>
+                        {money(unit, currency)}
                       </p>
                     </div>
 
@@ -1084,12 +1066,13 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
       </div>
 
       {/* ── Sticky action bar ──────────────────────────────────────────────
-          Always in reach: above the mobile bottom nav below lg, at the bottom
-          of the window from lg. X of Y, the saving once earned (or what is
-          still needed), and the CTA — disabled until the campaign's own rule
-          (exact tier count, stock, duplicates) is met. */}
+          Always in reach, on the bottom edge of the window at every width. X
+          of Y, the set's price once it qualifies (or what is still needed),
+          and the CTA — disabled until the campaign's own rule (exact tier
+          count, stock, duplicates) is met. Solid, so nothing shows through. */}
       <div
-        className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] border-t border-perce-border bg-perce-bg/95 backdrop-blur lg:bottom-0"
+        ref={actionBarRef}
+        className="fixed inset-x-0 bottom-0 border-t border-perce-border bg-perce-bg pb-[env(safe-area-inset-bottom)]"
         style={{ zIndex: "var(--perce-z-sticky)" }}
         data-testid="bundle-action-bar">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
@@ -1097,12 +1080,10 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
             <p className="text-[14px] font-medium text-perce-ink">
               {fill(t("bundle.selected"), { selected: selectedCount, required })}
             </p>
-            <p className={cn("truncate text-[12px]", youSave ? "font-medium text-perce-success" : "text-perce-ink-muted")}>
-              {youSave
-                ? fill(t("bundle.you_save_amount"), { amount: money(youSave, currency) })
-                : evaluation.qualifies && price !== null
-                  ? money(price, currency)
-                  : progressLabel}
+            <p
+              className={cn("truncate text-[12px]", evaluation.qualifies && price !== null ? "font-medium text-perce-ink" : "text-perce-ink-muted")}
+              data-testid="bundle-action-status">
+              {evaluation.qualifies && price !== null ? money(price, currency) : progressLabel}
             </p>
           </div>
           <button

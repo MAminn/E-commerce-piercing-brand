@@ -152,6 +152,13 @@ beforeEach(() => {
 });
 
 describe("Pick Your Set builder", () => {
+  it("the action bar is solid and on the window's bottom edge, with no room left for a bottom nav", () => {
+    renderBuilder();
+    const bar = screen.getByTestId("bundle-action-bar");
+    expect(bar.className).toContain("bottom-0");
+    expect(bar.className).not.toMatch(/4rem|backdrop-blur|\/95/);
+  });
+
   it("starts at 0 of 6 with the unlock promise, nothing shown as earned, CTA disabled", () => {
     renderBuilder();
     expect(text("bundle-progress-count")).toBe("0 of 6 selected");
@@ -180,7 +187,7 @@ describe("Pick Your Set builder", () => {
     expect(isDisabled(screen.getByTestId("bundle-add-to-bag"))).toBe(true);
   });
 
-  it("exactly 6: the shared engine's discount, total and saving, free shipping, CTA enabled", async () => {
+  it("exactly 6: the shared engine's discount and total, one price, free shipping, CTA enabled", async () => {
     const user = userEvent.setup();
     renderBuilder();
     for (const name of SIX) await user.click(addButton(name));
@@ -190,7 +197,10 @@ describe("Pick Your Set builder", () => {
     expect(text("bundle-percent-discount")).toContain(`−${formatMoney(expected.discountAmount!)}`);
     expect(text("bundle-percent-discount")).toContain("Discount (15%)");
     expect(text("bundle-final-total")).toBe(formatMoney(expected.bundleTotal!));
-    expect(text("bundle-you-save")).toBe(`You save ${formatMoney(expected.discountAmount!)}`);
+    expect(text("bundle-action-status")).toBe(formatMoney(expected.bundleTotal!));
+    expect(text("bundle-action-status")).not.toMatch(/save/i);
+    expect(screen.queryByTestId("bundle-you-save")).toBeNull();
+    expect(document.body.innerHTML).not.toContain("line-through");
     expect(text("bundle-shipping")).toBe("Free");
     expect(isDisabled(screen.getByTestId("bundle-add-to-bag"))).toBe(false);
   });
@@ -316,7 +326,7 @@ describe("Pick Your Set builder — Arabic core UI", () => {
     return all.replace(/EGP|ج\.م\.?/g, " ");
   };
 
-  it("intro, filters, search, progress, pricing breakdown, saving and the sticky CTA are all Arabic", async () => {
+  it("intro, filters, search, progress, pricing breakdown and the sticky CTA are all Arabic", async () => {
     const user = userEvent.setup();
     renderBuilder("ar");
     expect(screen.getByText("كوّني طقمك")).toBeTruthy();
@@ -334,7 +344,7 @@ describe("Pick Your Set builder — Arabic core UI", () => {
     expect(text("bundle-shipping")).toBe("مجاني");
     expect(breakdown).toContain("إجمالي الطقم");
     expect(text("bundle-final-total")).toBe(formatMoney(expected.bundleTotal!));
-    expect(text("bundle-you-save")).toBe(`وفّرتِ ${formatMoney(expected.discountAmount!)}`);
+    expect(text("bundle-action-status")).toBe(formatMoney(expected.bundleTotal!));
     expect(text("bundle-progress-count")).toBe("تم اختيار 6 من 6");
     expect(within(screen.getByTestId("bundle-action-bar")).getByTestId("bundle-add-to-bag").textContent).toBe(
       "أضيفي الطقم إلى الحقيبة",

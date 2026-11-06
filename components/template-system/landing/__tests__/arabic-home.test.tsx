@@ -85,7 +85,7 @@ const renderHome = (locale: "en" | "ar", content: HomepageContent = DEFAULT_HOME
     </MinimalI18nProvider>,
   );
 
-/** Visible text with catalogue content and the brand's hero copy removed. */
+/** Visible text with catalogue content removed. */
 const interfaceText = () => {
   let all = document.body.textContent ?? "";
   for (const content of [
@@ -100,8 +100,6 @@ const interfaceText = () => {
     "Nose",
     "Pick Your 3",
     "Pick Your 6",
-    DEFAULT_HOMEPAGE_CONTENT.hero.title,
-    DEFAULT_HOMEPAGE_CONTENT.hero.subtitle,
   ]) {
     all = all.split(content).join(" ");
   }
@@ -150,9 +148,30 @@ describe("Arabic homepage core UI", () => {
     expect(text).toContain("Pick Your 6 · 6 قطع");
   });
 
-  it("no English interface text is left — only catalogue content and the brand's hero copy", () => {
+  it("no English interface text is left — only catalogue content", () => {
     renderHome("ar");
     expect(interfaceText()).not.toMatch(/[A-Za-z]{2,}/);
+  });
+
+  it("the brand's standard hero copy is Arabic", () => {
+    const { container } = renderHome("ar");
+    const h1 = container.querySelector("h1");
+    expect(h1?.textContent).toBe("قطع صغيرة. صُمّمت لتتناسق معًا.");
+    expect(container.textContent).toContain("مجوهرات بيرسينج، توصيل لجميع أنحاء مصر.");
+    expect(container.textContent).not.toContain(DEFAULT_HOMEPAGE_CONTENT.hero.title);
+    expect(container.textContent).not.toContain(DEFAULT_HOMEPAGE_CONTENT.hero.subtitle);
+  });
+
+  it("the owner's own hero wording is not translated, and keeps its own direction so its punctuation stays put", () => {
+    const custom = {
+      ...DEFAULT_HOMEPAGE_CONTENT,
+      hero: { ...DEFAULT_HOMEPAGE_CONTENT.hero, title: "Black Friday. Made to mix.", subtitle: "All week." },
+    };
+    const { container } = renderHome("ar", custom);
+    const h1 = container.querySelector("h1");
+    expect(h1?.textContent).toBe("Black Friday. Made to mix.");
+    expect(h1?.getAttribute("dir")).toBe("auto");
+    expect(container.querySelector("h1 + p")?.getAttribute("dir")).toBe("auto");
   });
 
   it("RTL stays intact", () => {

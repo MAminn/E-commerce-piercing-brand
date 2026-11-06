@@ -57,8 +57,9 @@ export interface CheckoutTotals {
   discount?: number;
   shipping?: number;
   /**
-   * "pending" — no governorate chosen yet under zone shipping; the line reads
-   * "Calculated at checkout". "quoted" — `shipping` is the exact fee.
+   * "pending" — no governorate chosen yet under zone shipping; the line says
+   * to select one (the shopper is already at checkout, and the governorate is
+   * what sets the fee). "quoted" — `shipping` is the exact fee.
    * "unavailable" — the store does not deliver there; ordering is blocked.
    * Absent = legacy caller; treated as "quoted".
    */
@@ -443,7 +444,7 @@ export function CheckoutPageModernTemplate({
         <div className='flex justify-between gap-4 border-b border-line py-3' data-testid='shipping-line'>
           <dt className='text-ink-2'>{t("cart.shipping") || "Shipping"}</dt>
           <dd className='text-end text-ink-2'>
-            {t("cart.shipping_calculated_at_checkout") || "Calculated at checkout"}
+            {t("checkout.select_governorate") || "Select governorate"}
           </dd>
         </div>
       ) : totals.shippingStatus === "unavailable" ? (

@@ -750,13 +750,21 @@ label[for] {
   }
 }
 
-/* Space for the desktop sticky bag bar while it is visible (StickyCartBar
-   sets --perce-sticky-bar-h to its measured height; unset = nothing). */
+/* Space for the bars fixed to the bottom of the window, so the page and the
+   footer always scroll clear of them: the desktop bag bar (StickyCartBar sets
+   --perce-sticky-bar-h) and a set page's own bar (set-bar.ts sets
+   --perce-set-bar-h). Unset = nothing. */
 html {
-  scroll-padding-bottom: var(--perce-sticky-bar-h, 0px);
+  scroll-padding-bottom: calc(var(--perce-sticky-bar-h, 0px) + var(--perce-set-bar-h, 0px));
 }
 main.storefront-shell {
-  padding-bottom: var(--perce-sticky-bar-h, 0px);
+  padding-bottom: calc(var(--perce-sticky-bar-h, 0px) + var(--perce-set-bar-h, 0px));
+}
+/* The bag bar steps aside while a Ready Set's inline price panel is on screen;
+   the header still states the bag. */
+html[data-set-panel-in-view] [data-sticky-bag-bar] {
+  visibility: hidden;
+  opacity: 0;
 }
 
 /* ── Storefront-only overrides of the shared shadcn variables ──────────────
