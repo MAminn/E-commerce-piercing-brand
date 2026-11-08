@@ -82,11 +82,20 @@ describe("product card +", () => {
 });
 
 describe("product card wishlist", () => {
-  it("sits on the same stone square as the +, so it stays legible on any photo", () => {
+  it("sits on a stone square like the +, so it stays legible on any photo", () => {
     render(<MinimalProductCard product={{ ...product, requiresOptions: false }} />);
     const heart = screen.getByRole("button", { name: `Wishlist: ${product.name}` });
     expect(heart.className).toContain("bg-surface");
-    expect(heart.className).toContain("border-line");
+  });
+
+  it("the first scan is the name and one price: no catalogue number or measure line", () => {
+    const { container } = render(<MinimalProductCard product={{ ...product, catalogueNo: 14, requiresOptions: false }} />);
+    const text = container.textContent ?? "";
+    expect(text).toContain("Seamless ring 8mm");
+    expect(text).not.toContain("014");
+    expect(text).not.toContain("8 mm");
+    expect(container.querySelector("[data-index-line]")).toBeNull();
+    expect(container.querySelector("a[href='/shop/seamless-ring-8mm'] img")).toBeTruthy();
   });
 });
 

@@ -1,17 +1,12 @@
 import type { PublicBundleCampaignDto } from "#root/backend/bundles/service";
 import { STORE_CURRENCY } from "#root/shared/config/branding";
+import { formatMoney } from "#root/shared/pricing/format-money";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { Link } from "#root/components/utils/Link";
 import { cn } from "#root/lib/utils";
 import { buttonClass } from "#root/components/storefront/Button";
-import {
-  bundleHref,
-  fillTemplate,
-  formatMoney,
-  resolveBundleImage,
-  summarizeBundleTiers,
-  summarizePercentageTiers,
-} from "./bundle-ui";
+import { bundleHref, fillTemplate, resolveBundleImage } from "./bundle-ui";
+import { describeSetOffer } from "./set-offer";
 
 /**
  * The slice of a campaign a card needs — the summary fields `listLive`
@@ -41,101 +36,92 @@ export type BundleCardCampaign = Pick<
 
 interface BundleCampaignCardProps {
   campaign: BundleCardCampaign;
+  /** Added to the card: a shape other than 4:5 where a row calls for one. */
   className?: string;
   /** Image priority for the first above-the-fold card. */
   eager?: boolean;
 }
 
 /**
- * One campaign, either type, in the minimal storefront's image-first card
- * language. The purchase model is stated up front ("Build your stack" /
- * "Curated stack") because these are not products and the shopper should
- * know before tapping what kind of page they are going to.
+ * One campaign, either type, as a large photo card: the kind of set, its name,
+ * its offer and one clear way in, set over the campaign's own image.
+ *
+ * The offer is the campaign's own, from describeSetOffer (the same words as the
+ * /offers card): "20% off", "From EGP 270", or a Ready Set's fixed price. A
+ * campaign with no image is a solid ink card, never a grey hole.
  */
 export function BundleCampaignCard({ campaign, className, eager = false }: BundleCampaignCardProps) {
-  const { t } = useMinimalI18n();
-  const currency = STORE_CURRENCY;
+  const { t, locale } = useMinimalI18n();
   const isCurated = campaign.type === "curated_stack";
   const soldOut = campaign.availability !== "available";
   const href = bundleHref(campaign.slug);
-  // Multi-tier summary, or null when one concrete price still describes the
-  // whole campaign. `tiers` arrives on the card DTO already (batched with the
-  // campaign query), so this costs no extra request.
-  const isPercentage = !isCurated && campaign.pricingType === "percentage_discount";
-  // Percentage-priced Pick Your Set: the discount IS the offer — there is no
-  // fixed price to quote.
-  const percentSummary = isPercentage ? summarizePercentageTiers(campaign.tiers ?? [], t) : null;
-  const tierSummary = isCurated || isPercentage ? null : summarizeBundleTiers(campaign.tiers ?? [], currency, t);
-  // The cheapest price the shopper could actually pay.
-  const price = tierSummary
-    ? Math.min(...(campaign.tiers ?? []).flatMap((tier) => (tier.price === null ? [] : [tier.price])))
-    : (campaign.fixedBundlePrice ?? 0);
+  const money = (amount: number) => formatMoney(amount, { locale });
+  const offer = describeSetOffer(campaign, t, STORE_CURRENCY, money);
 
-  const piecesLabel = (count: number) => fillTemplate(t(count === 1 ? "bundles.piece" : "bundles.pieces"), { count });
+  const headline = isCurated ? money(campaign.fixedBundlePrice ?? 0) : offer.headline;
+  const detail = isCurated
+    ? fillTemplate(t(campaign.unitCount === 1 ? "bundles.piece" : "bundles.pieces"), { count: campaign.unitCount })
+    : offer.rule;
 
   return (
-    <article className={cn("group flex flex-col", className)} data-bundle-card={campaign.slug}>
-      <Link href={href} className="relative block aspect-[4/5] w-full overflow-hidden bg-surface-2">
-        <img
-          src={resolveBundleImage(campaign.heroImageUrl)}
-          alt={campaign.title}
-          loading={eager ? "eager" : "lazy"}
-          decoding="async"
-          className={cn(
-            "h-full w-full object-cover",
-            soldOut && "opacity-70",
-          )}
-        />
-      </Link>
+    <article
+      className={cn("group relative aspect-[4/5] w-full overflow-hidden bg-ink", className)}
+      data-bundle-card={campaign.slug}>
+      {campaign.heroImageUrl && (
+        <>
+          <img
+            src={resolveBundleImage(campaign.heroImageUrl)}
+            alt=''
+            loading={eager ? "eager" : "lazy"}
+            decoding='async'
+            className={cn(
+              "absolute inset-0 h-full w-full object-cover transition-transform duration-[var(--perce-duration-slow)] ease-out motion-reduce:transition-none lg:group-hover:scale-[1.03]",
+              soldOut && "opacity-70",
+            )}
+          />
+          <div
+            aria-hidden
+            className='pointer-events-none absolute inset-x-0 bottom-0 h-3/4 bg-gradient-to-t from-ink/85 via-ink/40 to-transparent'
+          />
+        </>
+      )}
 
-      <div className="mt-3 flex flex-1 flex-col">
-        {/* Type, admin badge text and sold-out state as one Micro line —
-            facts under the photo, not badges over it. */}
-        <p className="t-micro text-ink-2">
-          {t(isCurated ? "bundles.type_curated" : "bundles.type_build")}
-          {campaign.badgeText && !soldOut && <> · {campaign.badgeText}</>}
-          {soldOut && <> · {t("bundles.sold_out")}</>}
+      {/* The photo repeats the title's link for pointer users (same href, out of
+          the tab order), as on the product card. */}
+      <a href={href} tabIndex={-1} className='absolute inset-0'>
+        <span className='sr-only'>{campaign.title}</span>
+      </a>
+
+      {(campaign.badgeText || soldOut) && (
+        <p className='pointer-events-none absolute start-3 top-3 bg-bg px-2 py-1 t-micro text-ink lg:start-4 lg:top-4'>
+          {soldOut ? t("bundles.sold_out") : campaign.badgeText}
         </p>
-        <h3
-          className="mt-1 t-card-title text-ink"
-          style={{ fontFamily: "var(--font-product-title)" }}>
-          <Link href={href} className="hover:underline hover:decoration-1 hover:underline-offset-4">
+      )}
+
+      <div className='pointer-events-none absolute inset-x-0 bottom-0 flex flex-col p-4 text-bg lg:p-5'>
+        <p className='t-small text-bg/80'>{t(isCurated ? "bundles.type_curated" : "bundles.type_build")}</p>
+        <h3 className='mt-1 t-h2 text-bg' style={{ fontFamily: "var(--font-product-title)" }}>
+          <Link href={href} className='pointer-events-auto hover:underline hover:decoration-1 hover:underline-offset-4'>
             {campaign.title}
           </Link>
         </h3>
-        {campaign.subtitle && <p className="mt-1 t-small text-ink-2">{campaign.subtitle}</p>}
-
-        <p className="mt-2 t-card-price text-ink" style={{ fontFamily: "var(--font-price)" }}>
-          {isCurated
-            ? formatMoney(price, currency)
-            : percentSummary
-              ? percentSummary.price
-              : tierSummary
-                ? tierSummary.price
-                : fillTemplate(t("bundle.choose_any"), { count: campaign.requiredQuantity, price: formatMoney(price, currency) })}
+        <p className='mt-2 t-h3 tabular-nums text-bg' style={{ fontFamily: "var(--font-price)" }}>
+          {headline}
+          {!isCurated && campaign.freeShipping && <span className='ms-1.5'>{t("sets.plus_free_shipping")}</span>}
         </p>
-        <p className="mt-1 t-small text-ink-2">
-          {isCurated
-            ? piecesLabel(campaign.unitCount)
-            : (percentSummary?.sizes ?? tierSummary?.sizes ??
-              fillTemplate(t("bundles.pieces_to_choose"), { count: campaign.eligibleProductCount }))}
-        </p>
-        {!isCurated && campaign.freeShipping && (
-          <p className="mt-1 t-small text-ink">{t("bundle.free_shipping")}</p>
-        )}
+        <p className='mt-1 t-small text-bg/80'>{detail}</p>
 
-        {/* A sold-out stack still links through: seeing what is in it (and
-            that it is sold out) is more useful than a dead control. No
-            aria-disabled — the link genuinely works. */}
+        {/* A sold-out set still links through: seeing what is in it (and that it
+            is sold out) is more useful than a dead control. */}
         <Link
           href={href}
           className={buttonClass({
-            variant: "secondary",
+            variant: "primary",
             size: "md",
             fullWidth: true,
-            className: cn("mt-4", soldOut && "border-line text-ink-2"),
+            className: cn("pointer-events-auto mt-4 bg-bg text-ink hover:bg-surface", soldOut && "bg-bg/70"),
           })}>
-          {soldOut ? t("bundles.sold_out") : t(isCurated ? "bundles.cta_shop" : "bundles.cta_build")}
+          {soldOut ? t("bundles.sold_out") : t(isCurated ? "bundles.cta_shop" : "sets.cta_build")}
         </Link>
       </div>
     </article>

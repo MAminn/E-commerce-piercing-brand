@@ -57,7 +57,7 @@ export function BundleDetail({ slug }: { slug: string }) {
 
   if (state.status === "loading") {
     return (
-      <div role="status" aria-label="Loading" className="perce-header-offset flex min-h-screen items-center justify-center bg-bg">
+      <div role="status" aria-label="Loading" className="flex min-h-screen items-center justify-center bg-bg">
         <div className="h-5 w-5 animate-spin border-2 border-perce-border-strong border-t-perce-ink" />
       </div>
     );
@@ -65,7 +65,7 @@ export function BundleDetail({ slug }: { slug: string }) {
 
   if (state.status === "not_found") {
     return (
-      <div className="perce-header-offset flex min-h-[60vh] items-center justify-center bg-perce-bg px-4">
+      <div className="flex min-h-[60vh] items-center justify-center bg-perce-bg px-4">
         <div className="max-w-md text-center">
           <h1 className="perce-section-title">{t("bundle.not_found")}</h1>
           <p className="mt-2 text-[length:var(--perce-text-body)] text-perce-ink-muted">{t("bundle.not_found_body")}</p>

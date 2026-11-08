@@ -270,7 +270,7 @@ label[for] {
   --perce-gap-xl: 3rem;
 
   /* ── Layout widths: one 1280px frame (12 columns, 24px gutters) ── */
-  --perce-content-max: 1280px;
+  --perce-content-max: 1560px;
   --perce-content-narrow: 768px;
   --perce-content-prose: 65ch;
 
@@ -468,12 +468,18 @@ label[for] {
   line-height: 1.3;
   font-weight: 400;
   letter-spacing: 0;
+  @media (width >= 1024px) {
+    font-size: 0.9375rem;
+  }
 }
 @utility t-card-price {
   font-size: 0.875rem;
   line-height: 1.3;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
+  @media (width >= 1024px) {
+    font-size: 0.9375rem;
+  }
 }
 @utility t-pdp-price {
   font-size: 1.25rem;
@@ -567,39 +573,23 @@ label[for] {
     color: var(--color-ink);
   }
 
-  /* Homepage hero (PerceHero): the campaign media as one clean frame, with
-     the copy set below it on stone — no scrim, no overlaid type. The height
-     is fixed by CSS, never by the media, so nothing shifts while the image
-     decodes or the video starts.
+  /* Homepage hero (PerceHero): the campaign media, full width, with the copy
+     set over it. The height is fixed by CSS, never by the media, so nothing
+     shifts while the image decodes or the video starts.
 
-     Phones: the 4:5 product ratio, but never so tall that the headline
-     under it falls off a short screen. */
+     Phones: tall, stopping short of the fold so the next section shows. */
   .perce-hero-frame {
     width: 100%;
-    aspect-ratio: 4 / 5;
-    max-height: calc(100vh - var(--perce-header-h) - 12rem);
-    max-height: calc(100svh - var(--perce-header-h) - 12rem);
-    min-height: 20rem;
+    height: min(calc(100vh - var(--perce-header-h) - 5rem), 150vw);
+    height: min(calc(100svh - var(--perce-header-h) - 5rem), 150vw);
+    min-height: 24rem;
   }
 
-  /* Tablet: a wide frame ending well inside the viewport, so the headline
-     below it is on screen without scrolling. */
+  /* Wider screens: the viewport's height under the header, up to a wide frame. */
   @media (min-width: 768px) {
     .perce-hero-frame {
-      aspect-ratio: auto;
-      height: clamp(24rem, calc(100vh - var(--perce-header-h-desktop) - 14rem), 52rem);
-      height: clamp(24rem, calc(100svh - var(--perce-header-h-desktop) - 14rem), 52rem);
-      max-height: none;
-    }
-  }
-
-  /* Desktop: a 16:7 frame, never taller than 78% of the viewport. */
-  @media (min-width: 1024px) {
-    .perce-hero-frame {
-      aspect-ratio: 16 / 7;
-      height: auto;
-      max-height: 78vh;
-      max-height: 78svh;
+      height: min(calc(100vh - var(--perce-header-h-desktop) - 3rem), 56vw);
+      height: min(calc(100svh - var(--perce-header-h-desktop) - 3rem), 56vw);
     }
   }
 

@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
 /**
- * The Object Index homepage: Hero → 01 · Placement → 02 · New in → one large
- * object → 03 · Sets. Every block reads existing data and disappears when
- * that data is not there; nothing is padded, invented or discounted.
+ * The homepage: Hero → Shop by placement → Sets → New in → one large piece →
+ * more pieces. Every block reads existing data and disappears when that data
+ * is not there; nothing is padded, invented or discounted.
  */
 const categories = [
   { id: "ear", name: "Ear Piercings", slug: "ear-piercings", parentId: null, sortOrder: 1, hidden: false, showOnLanding: true, description: null, filename: null, productCount: 28 },
@@ -118,81 +118,142 @@ const render = (overrides: Record<string, unknown> = {}, c: unknown = content) =
 const plain = (html: string) => html.replace(/ /g, " ");
 const sections = (html: string) => [...html.matchAll(/data-home-section="([^"]+)"/g)].map((m) => m[1]);
 
-describe("Object Index homepage", () => {
-  it("orders the page: hero → 01 · Placement → 02 · New in → one object → 03 · Sets", () => {
+describe("Homepage", () => {
+  it("orders the page: hero → placement → sets → new in → one large piece", () => {
     const html = render();
     expect(html.indexOf("<h1")).toBeLessThan(html.indexOf('data-home-section="home-placement"'));
-    expect(sections(html)).toEqual(["home-placement", "home-new-in", "home-object", "home-sets"]);
+    expect(sections(html)).toEqual(["home-placement", "home-sets", "home-new-in", "home-object"]);
     const text = html.replace(/<[^>]+>/g, "");
-    expect(text).toMatch(/01 · Placement[\s\S]*02 · New in[\s\S]*03 · Sets/);
+    expect(text).toMatch(/Shop by placement[\s\S]*Sets[\s\S]*New in/);
   });
 
-  it("drops the old shelves: no trust strip, sale rail, editorial, testimonials or floating button", () => {
+  it("is not an index: no numbered sections, no catalogue numbers on cards", () => {
+    const html = plain(render());
+    const text = html.replace(/<[^>]+>/g, "");
+    expect(text).not.toMatch(/\b0\d · /);
+    expect(html).not.toContain('data-index-line="section"');
+    expect(html).not.toContain('data-index-line="short"');
+  });
+
+  it("drops the old shelves: no trust strip, sale rail, testimonials or floating button", () => {
     const html = render();
     expect(html).not.toContain("Sale Only Piece");
-    expect(html).not.toMatch(/data-testid="trust-strip"|data-pick-your-set|data-bundle-card/);
+    expect(html).not.toMatch(/data-testid="trust-strip"|data-pick-your-set/);
     expect(html).not.toMatch(/testimonial/i);
     expect(html).not.toMatch(/Back to products|scroll-to-products/i);
   });
 
-  it("placement index: Ear's sub-placements numbered with real counts, Nose with its own count", () => {
+  it("placements are photo blocks: each one a link, sub-placements on the first, no counts", () => {
     const html = plain(render());
-    const index = html.slice(html.indexOf('data-testid="placement-index"'), html.indexOf('data-home-section="home-new-in"'));
-    const text = index.replace(/<[^>]+>/g, "");
-    expect(index).toContain('href="/categories/ear-piercings"');
-    expect(text).toMatch(/Ear\s*01Daith · 7\s*02Rook · 8/);
-    expect(text).toMatch(/Nose8/);
+    const block = html.slice(html.indexOf('data-testid="placement-tiles"'), html.indexOf('data-home-section="home-sets"'));
+    const text = block.replace(/<[^>]+>/g, " ");
+    expect([...block.matchAll(/data-placement-tile="([^"]+)"/g)].map((m) => m[1])).toEqual(["ear-piercings", "nose-piercings"]);
+    expect(block).toContain('href="/categories/ear-piercings"');
+    expect(block).toContain('href="/categories/daith"');
+    expect(block).toContain('href="/categories/rook"');
     // Empty, hidden and generic subcategories are not placements.
     for (const gone of ["Flat Back", "Conch", "Ear piercing"]) expect(text).not.toContain(gone);
-    // A placement with sub-placements states no count of its own.
-    expect(text).not.toContain("Ear28");
+    expect(text).not.toMatch(/\b(28|7|8)\b/);
   });
 
-  it("02 · New in: exactly four in-stock pieces, as short index lines, one price each", () => {
+  it("a placement's photo: its own image, else a piece on the page from that placement, each used once", () => {
+    const html = plain(render({ newArrivals: [...newIn, product("nose1", "Nose Hoop", { categoryName: "Nose Piercings" })] }));
+    const tile = (slug: string) => {
+      const start = html.indexOf(`data-placement-tile="${slug}"`);
+      return html.slice(start, html.indexOf("</li>", start));
+    };
+    expect(tile("ear-piercings")).toContain('src="/uploads/n1.webp"');
+    expect(tile("nose-piercings")).toContain('src="/uploads/nose1.webp"');
+  });
+
+  it("a placement with no photo at all is a solid ink block, never a grey hole", () => {
+    const html = plain(render({ newArrivals: [], featuredProducts: [] }));
+    const start = html.indexOf('data-placement-tile="nose-piercings"');
+    const tile = html.slice(html.lastIndexOf("<li", start), html.indexOf("</li>", start));
+    expect(tile).toContain("bg-ink");
+    expect(tile).not.toContain("<img");
+    expect(tile).toContain("Nose");
+  });
+
+  it("New in: whole rows of in-stock pieces, the photo then the name and one price", () => {
     const html = plain(render());
     const block = html.slice(html.indexOf('data-home-section="home-new-in"'), html.indexOf('data-home-section="home-object"'));
-    expect(block.match(/data-index-line="short"/g)).toHaveLength(4);
+    expect(block.match(/<article/g)).toHaveLength(4);
     expect(block).not.toContain("Fifth New Piece");
-    expect(block.replace(/<[^>]+>/g, "")).toContain("014 · Clicker10 mm · EGP 210");
+    const text = block.replace(/<[^>]+>/g, " ");
+    expect(text).toContain("Clicker 10mm");
+    expect(text).toContain("EGP 210");
+    expect(text).not.toContain("014");
     expect(block).not.toContain("EGP 240");
     expect(block).not.toMatch(/<s[ >]|line-through/);
   });
 
-  it("hides New in rather than show fewer than four in-stock pieces, and renumbers", () => {
-    const soldOut = newIn.map((p, i) => (i < 2 ? { ...p, stock: 0, available: false } : p));
-    const html = render({ newArrivals: soldOut });
-    expect(sections(html)).toEqual(["home-placement", "home-object", "home-sets"]);
-    expect(html.replace(/<[^>]+>/g, "")).toContain("02 · Sets");
+  it("New in runs to two full rows at most", () => {
+    const many = Array.from({ length: 11 }, (_, i) => product(`m${i}`, `Piece ${i}`));
+    const html = render({ newArrivals: many, featuredProducts: [] });
+    const block = html.slice(html.indexOf('data-home-section="home-new-in"'), html.indexOf('data-home-section="home-object"'));
+    expect(block.match(/<article/g)).toHaveLength(8);
   });
 
-  it("the large object is the first featured piece not already in New in, with its full index line", () => {
+  it("hides New in rather than show less than a full row", () => {
+    const soldOut = newIn.map((p, i) => (i < 2 ? { ...p, stock: 0, available: false } : p));
+    expect(sections(render({ newArrivals: soldOut }))).not.toContain("home-new-in");
+  });
+
+  it("the large piece is the first featured one not in New in, stated with its price and one way to it", () => {
     const html = plain(render());
-    const block = html.slice(html.indexOf('data-home-section="home-object"'), html.indexOf('data-home-section="home-sets"'));
+    const block = html.slice(html.indexOf('data-home-section="home-object"'));
     expect(block).toContain("data-featured-object");
     expect(block).toContain('href="/shop/f1"');
-    expect(block.replace(/<[^>]+>/g, "")).toMatch(/Crescent Conch Hoop007 · 8 mm · Ear · EGP 100View piece/);
+    const text = block.replace(/<[^>]+>/g, " ");
+    expect(text).toContain("Crescent Conch Hoop 8mm");
+    expect(text).toContain("EGP 100");
+    expect(text).toContain("View piece");
   });
 
-  it("no featured piece → no large object", () => {
-    expect(sections(render({ featuredProducts: [] }))).not.toContain("home-object");
+  it("no featured piece left → the next new piece takes the large block; nothing appears twice", () => {
+    const html = render({ featuredProducts: [] });
+    const block = html.slice(html.indexOf('data-home-section="home-object"'));
+    expect(block).toContain("Fifth New Piece");
+    // The large block's section is labelled with the piece, so stop before its tag.
+    const newBlock = html.slice(html.indexOf('data-home-section="home-new-in"'), html.indexOf('aria-label="Fifth New Piece"'));
+    expect(newBlock).not.toContain("Fifth New Piece");
   });
 
-  it("03 · Sets: every row ends in the set's own price or offer; no sold-out set, no saving", () => {
+  it("nothing left to feature → no large block", () => {
+    expect(sections(render({ featuredProducts: [], newArrivals: newIn.slice(0, 4) }))).not.toContain("home-object");
+  });
+
+  it("a second product grid needs a full row, and repeats nothing", () => {
+    const featured = ["a", "b", "c", "d", "e"].map((id) => product(id, `Featured ${id}`));
+    const html = render({ featuredProducts: featured });
+    expect(sections(html)).toContain("home-more");
+    const more = html.slice(html.indexOf('data-home-section="home-more"'));
+    expect(more.match(/<article/g)).toHaveLength(4);
+    expect(more).not.toContain("Featured a");
+    expect(sections(render({ featuredProducts: featured.slice(0, 2) }))).not.toContain("home-more");
+  });
+
+  it("Sets: photo cards with the campaign's own offer and a clear way in; no sold-out set, no saving", () => {
     const html = plain(render());
-    const block = html.slice(html.indexOf('data-testid="sets-index"'));
-    const rows = [...block.matchAll(/data-set-row="([^"]+)"/g)].map((m) => m[1]);
-    expect(rows).toEqual(["pick-your-3", "pick-your-set", "ready-set-ear"]);
-    const text = block.replace(/<[^>]+>/g, "");
-    // A percentage set has no total until it is built: the discount IS its offer.
-    expect(text).toContain("Pick Your 3 · 3 pieces20% off");
-    // The price sits at the row's end, on its own.
-    expect(text).toContain("Pick your set · 3 piecesEGP 270");
-    expect(text).toContain("Ready set — ear · 2 piecesEGP 230");
+    const block = html.slice(html.indexOf('data-testid="sets-merch"'), html.indexOf('data-home-section="home-new-in"'));
+    expect([...block.matchAll(/data-bundle-card="([^"]+)"/g)].map((m) => m[1])).toEqual([
+      "pick-your-3",
+      "pick-your-set",
+      "ready-set-ear",
+    ]);
+    const text = block.replace(/<[^>]+>/g, " ");
+    expect(text).toContain("20% off");
+    expect(text).toContain("EGP 270");
+    expect(text).toContain("EGP 230");
+    expect(text).toContain("Build your set");
+    expect(text).toContain("Shop the set");
     expect(text).not.toMatch(/sav|separately|Sold out set/i);
     expect(block).not.toMatch(/<s[ >]|line-through/);
+    expect(block).toContain('href="/bundles/pick-your-3"');
   });
 
-  it("03 · Sets: a set of several sizes states its range and its offer as /offers does", () => {
+  it("Sets: several sizes state their offer as /offers does; at most four cards", () => {
     const upTo = campaign("pick-your-set", "Pick your set", "build_your_stack", {
       tiers: [tier(3, 10), tier(6, 20)],
       freeShipping: true,
@@ -202,10 +263,22 @@ describe("Object Index homepage", () => {
       fixedBundlePrice: 270,
       tiers: [tier(3, null, 270), tier(6, null, 480)],
     });
-    const html = plain(render({ setCampaigns: [upTo, from] }));
-    const text = html.slice(html.indexOf('data-testid="sets-index"')).replace(/<[^>]+>/g, "");
-    expect(text).toContain("Pick your set · 3–6 piecesUp to 20% off+ free shipping");
-    expect(text).toContain("Build it · 3–6 piecesFrom EGP 270");
+    const extra = ["x", "y", "z"].map((s) => campaign(s, `Set ${s}`, "build_your_stack"));
+    const html = plain(render({ setCampaigns: [upTo, from, ...extra] }));
+    const block = html.slice(html.indexOf('data-testid="sets-merch"'), html.indexOf('data-home-section="home-new-in"'));
+    const text = block.replace(/<[^>]+>/g, " ");
+    expect(text).toContain("Up to 20% off");
+    expect(text).toContain("+ free shipping");
+    expect(text).toContain("From EGP 270");
+    expect(block.match(/data-bundle-card=/g)).toHaveLength(4);
+  });
+
+  it("a set with no image is a solid ink card", () => {
+    const html = plain(render());
+    const start = html.indexOf('data-bundle-card="pick-your-3"');
+    const card = html.slice(html.lastIndexOf("<article", start), html.indexOf("</article>", start));
+    expect(card).toContain("bg-ink");
+    expect(card).not.toContain("<img");
   });
 
   it("CMS switches still apply", () => {

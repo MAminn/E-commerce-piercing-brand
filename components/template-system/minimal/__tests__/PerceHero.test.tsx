@@ -43,20 +43,30 @@ describe("PerceHero media", () => {
     expect(render({ slides: [slide], video })).toContain("perce-hero-frame");
   });
 
-  it("sets the copy below a clean media frame inside one section — nothing drawn over the photo", () => {
+  it("sets the copy over the media's lower edge, in one section, with one way in", () => {
     const html = render({ slides: [slide], video });
-    // One section: the media frame first, then the copy on stone.
     expect(html.match(/<section/g)).toHaveLength(1);
-    expect(html).not.toContain("md:grid-cols-12");
+    const frame = html.indexOf("perce-hero-frame");
     const media = html.indexOf("hero-a.webp");
-    const frameEnd = html.indexOf("perce-hero-frame");
     const heading = html.indexOf("<h1");
-    expect(media).toBeGreaterThan(frameEnd);
+    expect(media).toBeGreaterThan(frame);
     expect(heading).toBeGreaterThan(media);
-    // Object Index: no scrim, no gradient, no text shadow over the media.
-    expect(html).not.toContain("perce-hero-scrim");
-    expect(html).not.toContain("perce-hero-copy");
-    expect(html).not.toContain("gradient");
+    // A soft fade behind the type, and stone type on it.
+    expect(html).toContain("bg-gradient-to-t");
+    expect(html).toMatch(/<h1[^>]*text-bg/);
+    expect(html.match(/>Shop all<\/a>/g)).toHaveLength(1);
+  });
+
+  it("the slide's own link still works under the copy: only the CTA takes the pointer", () => {
+    const html = render({ slides: [slide] });
+    expect(html).toMatch(/<a[^>]*pointer-events-auto[^>]*>Shop all<\/a>/);
+    expect(html).toContain("pointer-events-none absolute inset-x-0 bottom-0 z-40");
+  });
+
+  it("a hero with copy and no media is plain type on stone", () => {
+    const html = render({ slides: [] });
+    expect(html).toMatch(/<h1[^>]*text-ink/);
+    expect(html).not.toContain("bg-gradient-to-t");
   });
 
   it("bare media with no copy renders no heading", () => {

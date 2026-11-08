@@ -9,7 +9,7 @@ import { getProductUrl } from "#root/lib/utils/route-helpers";
 import { cn } from "#root/lib/utils";
 import { showCartToast, flyToCart } from "#root/components/ui/cart-toast";
 import { needsNoPiercing } from "#root/shared/products/no-piercing";
-import { IndexLine } from "#root/components/storefront/IndexLine";
+import { formatMoney } from "#root/shared/pricing/format-money";
 
 interface ProductImage {
   url: string;
@@ -54,15 +54,14 @@ function resolveImageUrl(url?: string | null): string {
 }
 
 /**
- * Product card — Object Index.
+ * Product card.
  *
- * The photograph is the card: a 4:5 frame on `surface-2` with no border,
- * radius or shadow, then the short index line — "014 · Clicker" over
- * "10 mm · EGP 210" — with the catalogue number and measure only when the
- * product has them, and one price, the price paid. Desktop
- * crossfades to a second photo on hover when the product has one.
+ * The photograph sells the piece: a 4:5 frame on `surface-2` with no border,
+ * radius or shadow, then the name and one price, the price paid. Nothing else
+ * competes in the first scan. Desktop crossfades to a second photo on hover
+ * when the product has one.
  *
- * The `+` is a 36px square inside the photo, bottom-end, 8px in, with a 44px
+ * The `+` is a small square inside the photo, bottom-end, 8px in, with a 44px
  * hit area — always visible on touch, on hover/focus from 1024px.
  *   - No option groups: it adds to the bag exactly as the old full-width bar
  *     did (same cart call, same AddToCart tracking, same toast).
@@ -200,7 +199,8 @@ export function MinimalProductCard({ product, className }: MinimalProductCardPro
           )}
         </a>
 
-        {/* Wishlist — quiet, top-end; stays shown once saved. */}
+        {/* Wishlist — quiet, top-end; stays shown once saved. On a stone square,
+            because a bare ink heart disappears on a real photo's dark hair. */}
         <button
           type='button'
           onClick={(e) => {
@@ -209,14 +209,12 @@ export function MinimalProductCard({ product, className }: MinimalProductCardPro
             toggle(product.id);
           }}
           className={cn(
-            // The same stone square as the "+": a bare ink heart disappears on a
-            // real photo's dark hair. 36px, 8px in, 44px hit area.
-            "absolute end-2 top-2 flex h-9 w-9 items-center justify-center border border-line bg-surface text-ink transition-colors hover:bg-ink hover:text-bg before:absolute before:-inset-1 before:content-['']",
+            "absolute end-2 top-2 flex h-8 w-8 items-center justify-center bg-surface/85 text-ink transition-colors hover:bg-ink hover:text-bg before:absolute before:-inset-1.5 before:content-[''] lg:h-9 lg:w-9 lg:before:-inset-1",
             !wishlisted && revealOnDesktop,
           )}
           aria-pressed={wishlisted}
           aria-label={`${t("nav.wishlist")}: ${product.name}`}>
-          <Heart size={20} strokeWidth={1.5} aria-hidden className={cn(wishlisted && "fill-current")} />
+          <Heart size={18} strokeWidth={1.5} aria-hidden className={cn(wishlisted && "fill-current")} />
         </button>
 
         {/* Options to choose: the same square, as a link to the product page. */}
@@ -226,14 +224,14 @@ export function MinimalProductCard({ product, className }: MinimalProductCardPro
             data-choose-options='true'
             aria-label={`${t("product.choose_options")}: ${product.name}`}
             className={cn(
-              "absolute bottom-2 end-2 flex h-9 w-9 items-center justify-center border border-line bg-surface text-ink transition-colors hover:bg-ink hover:text-bg before:absolute before:-inset-1 before:content-['']",
+              "absolute bottom-2 end-2 flex h-8 w-8 items-center justify-center bg-surface text-ink transition-colors hover:bg-ink hover:text-bg before:absolute before:-inset-1.5 before:content-[''] lg:h-9 lg:w-9 lg:before:-inset-1",
               revealOnDesktop,
             )}>
-            <Plus size={20} strokeWidth={1.5} aria-hidden />
+            <Plus size={18} strokeWidth={1.5} aria-hidden />
           </a>
         )}
 
-        {/* Add to bag: 36px square, 8px in, 44px hit area. */}
+        {/* Add to bag: a square 8px in, 44px hit area. */}
         {!soldOut && !product.requiresOptions && (
           <button
             ref={addToCartBtnRef}
@@ -243,24 +241,23 @@ export function MinimalProductCard({ product, className }: MinimalProductCardPro
             data-add-to-cart='true'
             aria-label={`${t("product.add_to_bag")}: ${product.name}`}
             className={cn(
-              "absolute bottom-2 end-2 flex h-9 w-9 items-center justify-center border border-line bg-surface text-ink transition-colors hover:bg-ink hover:text-bg before:absolute before:-inset-1 before:content-[''] disabled:cursor-wait",
+              "absolute bottom-2 end-2 flex h-8 w-8 items-center justify-center bg-surface text-ink transition-colors hover:bg-ink hover:text-bg before:absolute before:-inset-1.5 before:content-[''] disabled:cursor-wait lg:h-9 lg:w-9 lg:before:-inset-1",
               revealOnDesktop,
             )}>
-            <Plus size={20} strokeWidth={1.5} aria-hidden />
+            <Plus size={18} strokeWidth={1.5} aria-hidden />
           </button>
         )}
       </div>
 
-      <div className='pt-3 text-start'>
-        {/* The short index line: "014 · Clicker" / "10 mm · EGP 210". The
-            catalogue number and measure appear only when the product has
-            them; the price is always the price paid. */}
-        <IndexLine
-          variant='short'
-          href={productUrl}
-          locale={locale}
-          product={{ name: product.name, catalogueNo: product.catalogueNo, price: displayPrice }}
-        />
+      <div className='px-2 pt-2 text-start lg:px-0 lg:pt-3'>
+        <h3 className='line-clamp-2 t-card-title text-ink' style={{ fontFamily: "var(--font-product-title)" }}>
+          <a href={productUrl} className='hover:underline hover:decoration-1 hover:underline-offset-4'>
+            {product.name}
+          </a>
+        </h3>
+        <p className='mt-1 t-card-price text-ink' style={{ fontFamily: "var(--font-price)" }}>
+          {formatMoney(displayPrice, { locale })}
+        </p>
         {soldOut && <p className="mt-1 t-micro text-ink-2">{t("sold_out")}</p>}
         {!soldOut && factText && <p className='mt-1 t-micro text-ink-2'>{factText}</p>}
       </div>

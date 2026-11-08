@@ -32,22 +32,21 @@ export interface PerceHeroProps {
 /**
  * Percé hero — Object Index.
  *
- * The campaign media is one clean frame (image, or background video with
- * the image as its poster/fallback): no scrim, no overlaid type, nothing
- * drawn over the jewellery. The headline, subtitle and CTA are set below it
- * on stone, as the first lines of the index. Headline is the H1 from the
- * Brand Source of Truth by default ("Small pieces. Made to mix."), editable
- * in Dashboard > Homepage.
+ * The campaign media runs full width (image, or background video with the
+ * image as its poster/fallback), with the headline, subtitle and one CTA set
+ * over its lower edge on a soft fade, so the jewellery above stays clear.
+ * Headline is the H1 from the Brand Source of Truth by default ("Small pieces.
+ * Made to mix."), editable in Dashboard > Homepage.
  *
  * - **Sized by CSS, not by the media** (`.perce-hero-frame` in
- *   layouts/style.css): 4:5 on phones, capped so the headline under it stays
- *   on screen; a wide frame from 768px. Nothing shifts while media loads.
+ *   layouts/style.css): tall on phones, stopping short of the fold; a wide
+ *   frame from 768px. Nothing shifts while media loads.
  * - **Separate mobile and desktop media.** `mobileImageUrl` / the mobile video
  *   below 768px, the desktop ones above — different crops for different
  *   frame shapes, not one asset squeezed.
  * - **LCP-correct**: the first slide is eager + high fetch priority and is
  *   never lazy-loaded; later slides are lazy.
- * - Several slides: a numbered index under the frame (01 02 03), not dots.
+ * - Several slides: a numbered index in the frame (01 02 03), not dots.
  *
  * It degrades in both directions: media with no copy runs clean; copy with
  * no media renders as a typographic hero. No placeholder imagery and no
@@ -107,23 +106,32 @@ export function PerceHero({
     onCtaClick(ctaLink);
   };
 
-  const copy = (hasCopy || hasCta) && (
-    <div className='perce-container pb-8 pt-8 lg:pb-12 lg:pt-12'>
-      <div className='max-w-2xl'>
-        {/* dir='auto': copy the owner wrote in English on the Arabic store keeps
-            its own direction, so its full stop stays at the end of the sentence. */}
-        {title && <h1 dir='auto' className='t-display text-balance text-ink'>{title}</h1>}
-        {subtitle && <p dir='auto' className='mt-4 max-w-prose t-body text-ink-2'>{subtitle}</p>}
-        {hasCta && <HeroCta text={ctaText} href={ctaLink} onClick={handleCta} />}
+  /* dir='auto': copy the owner wrote in English on the Arabic store keeps its
+     own direction, so its full stop stays at the end of the sentence. */
+  const copy = (overMedia: boolean) =>
+    (hasCopy || hasCta) && (
+      <div className={cn("perce-container", overMedia ? "pb-6 lg:pb-12" : "pb-8 pt-8 lg:pb-12 lg:pt-12")}>
+        <div className='max-w-3xl'>
+          {title && (
+            <h1 dir='auto' className={cn("t-display text-balance lg:text-[4.5rem]", overMedia ? "text-bg" : "text-ink")}>
+              {title}
+            </h1>
+          )}
+          {subtitle && (
+            <p dir='auto' className={cn("mt-3 max-w-prose t-body lg:mt-4", overMedia ? "text-bg/85" : "text-ink-2")}>
+              {subtitle}
+            </p>
+          )}
+          {hasCta && <HeroCta text={ctaText} href={ctaLink} onClick={handleCta} overMedia={overMedia} />}
+        </div>
       </div>
-    </div>
-  );
+    );
 
   // ── Typographic hero: no imagery uploaded yet ──
   if (!hasMedia) {
     return (
       <section className={cn("bg-bg", className)} aria-label='Highlight'>
-        <div className='pt-8 lg:pt-16'>{copy}</div>
+        <div className='pt-8 lg:pt-16'>{copy(false)}</div>
       </section>
     );
   }
@@ -192,11 +200,21 @@ export function PerceHero({
         })}
 
         {video?.src && <PerceHeroVideo src={video.src} mobileSrc={video.mobileSrc} />}
-      </div>
 
-      {total > 1 && (
-        <div className='perce-container'>
-          <div className='flex justify-end gap-1 border-b border-line'>
+        {(hasCopy || hasCta) && (
+          <>
+            <div
+              aria-hidden
+              className='pointer-events-none absolute inset-x-0 bottom-0 z-30 h-2/3 bg-gradient-to-t from-ink/75 via-ink/30 to-transparent'
+            />
+            {/* Above the media; only the CTA takes the pointer, so the slide's own
+                link still works everywhere else. */}
+            <div className='pointer-events-none absolute inset-x-0 bottom-0 z-40'>{copy(true)}</div>
+          </>
+        )}
+
+        {total > 1 && (
+          <div className='absolute end-[var(--perce-gutter)] top-3 z-40 flex gap-1 bg-bg/90'>
             {slides.map((slide, i) => (
               <button
                 key={`index-${slide.imageUrl}-${i}`}
@@ -214,10 +232,8 @@ export function PerceHero({
               </button>
             ))}
           </div>
-        </div>
-      )}
-
-      {copy}
+        )}
+      </div>
     </section>
   );
 }
@@ -226,16 +242,25 @@ function HeroCta({
   text,
   href,
   onClick,
+  overMedia,
 }: {
   text: string;
   href: string;
   onClick: (e: React.MouseEvent) => void;
+  overMedia: boolean;
 }) {
   // A plain anchor rather than the shared <Link>: this needs the click event
   // to suppress navigation inside the admin template preview, and <Link>'s
   // onClick takes no arguments.
   return (
-    <a href={href} onClick={onClick} className={buttonClass({ variant: "primary", size: "lg", className: "mt-8" })}>
+    <a
+      href={href}
+      onClick={onClick}
+      className={buttonClass({
+        variant: "primary",
+        size: "lg",
+        className: cn("mt-5 lg:mt-8", overMedia && "pointer-events-auto bg-bg text-ink hover:bg-surface"),
+      })}>
       {text}
     </a>
   );

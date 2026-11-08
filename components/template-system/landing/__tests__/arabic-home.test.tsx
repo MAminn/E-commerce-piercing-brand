@@ -130,22 +130,25 @@ describe("Arabic homepage core UI", () => {
   it("section names and CTAs are Arabic", () => {
     const { container } = renderHome("ar");
     const text = container.textContent ?? "";
-    expect(text).toContain("01 · مكان الثقب"); // "01 · Placement"
-    expect(text).toContain("02 · جديد"); // "02 · New in"
-    expect(text).toContain("03 · الأطقم"); // "03 · Sets"
+    expect(text).toContain("تسوّقي حسب مكان الثقب"); // "Shop by placement"
+    expect(text).toContain("جديد"); // "New in"
+    expect(text).toContain("الأطقم"); // "Sets"
+    expect(text).toContain("كوّني طقمك"); // "Build your set"
     expect(text).toContain("تسوّقي الكل"); // "Shop all"
     expect(text).toContain("عرض الكل"); // "View all"
     expect(text).toContain("عرض القطعة"); // "View piece"
-    for (const english of ["Placement", "New in", "Sets", "Shop all", "View all", "View piece"]) {
+    for (const english of ["placement", "New in", "Sets", "Shop all", "View all", "View piece", "Build your set"]) {
       expect(text).not.toContain(english);
     }
   });
 
-  it("set rows count pieces in Arabic", () => {
+  it("set cards state their offer in Arabic", () => {
     const { container } = renderHome("ar");
-    const text = container.querySelector('[data-testid="sets-index"]')?.textContent ?? "";
-    expect(text).toContain("Pick Your 3 · 3 قطع");
-    expect(text).toContain("Pick Your 6 · 6 قطع");
+    const text = container.querySelector('[data-testid="sets-merch"]')?.textContent ?? "";
+    expect(text).toContain("Pick Your 3");
+    expect(text).toContain("Pick Your 6");
+    expect(text).toContain("خصم");
+    expect(text).not.toMatch(/\boff\b/);
   });
 
   it("no English interface text is left — only catalogue content", () => {
@@ -183,7 +186,7 @@ describe("Arabic homepage core UI", () => {
   it("English is unchanged", () => {
     const { container } = renderHome("en");
     const text = container.textContent ?? "";
-    for (const english of ["01 · Placement", "02 · New in", "03 · Sets", "Shop all", "View all", "View piece", "3 pieces"]) {
+    for (const english of ["Shop by placement", "New in", "Sets", "Shop all", "View all", "View piece", "Build your set", "20% off"]) {
       expect(text).toContain(english);
     }
   });

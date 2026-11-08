@@ -1,7 +1,7 @@
 import { useMemo, type ReactNode } from "react";
 import { PerceHero } from "#root/components/template-system/minimal/PerceHero";
 import type { HeroSlide } from "#root/components/ui/hero-carousel";
-import type { BundleCardCampaign } from "#root/components/bundles/BundleCampaignCard";
+import { BundleCampaignCard, type BundleCardCampaign } from "#root/components/bundles/BundleCampaignCard";
 import { OfferBlock } from "#root/components/storefront/promo/PromoLayer";
 import {
   MinimalProductCard,
@@ -13,16 +13,11 @@ import type { NewArrivalProduct } from "#root/components/shop/NewArrivals";
 import type { HomepageContent } from "#root/shared/types/homepage-content";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { localizeCmsLabel } from "#root/lib/i18n/cms-copy";
-import { formatItemCount } from "#root/lib/i18n/item-count";
-import { IndexLine } from "#root/components/storefront/IndexLine";
+import { cn } from "#root/lib/utils";
 import { FeaturedObject } from "#root/components/storefront/FeaturedObject";
 import { buttonClass } from "#root/components/storefront/Button";
 import { useStorefrontCategories } from "#root/hooks/useStorefrontCategories";
 import { placementTree, type Placement } from "#root/shared/categories/placements";
-import { formatMoney } from "#root/shared/pricing/format-money";
-import { STORE_CURRENCY } from "#root/shared/config/branding";
-import { fillTemplate } from "#root/components/bundles/bundle-ui";
-import { describeSetOffer } from "#root/components/bundles/set-offer";
 
 /**
  * Props for the LandingTemplateMinimal component
@@ -30,7 +25,7 @@ import { describeSetOffer } from "#root/components/bundles/set-offer";
 export interface LandingTemplateMinimalProps {
   content: HomepageContent;
   featuredProducts?: FeaturedProduct[];
-  /** Accepted for the page contract; the Object Index homepage has no sale rail. */
+  /** Accepted for the page contract; the homepage has no sale rail. */
   discountedProducts?: FeaturedProduct[];
   /** Accepted for the page contract; placements come from the category tree. */
   categories?: CategoryStripItem[];
@@ -55,169 +50,184 @@ function resolveImageUrl(url?: string | null): string | undefined {
   return `/uploads/${url}`;
 }
 
-/** "New in" shows exactly this many in-stock pieces, or nothing. */
-export const NEW_IN_COUNT = 4;
+/** "New in" fills whole desktop rows of four, up to this many pieces. */
+export const NEW_IN_MAX = 8;
+/** Fewer in-stock pieces than one full row and the section stays away. */
+export const NEW_IN_MIN = 4;
+/** The sets merchandised on the homepage; the rest are one tap away on /bundles. */
+const SETS_MAX = 4;
+/** The second product grid needs at least one full row. */
+const MORE_COUNT = 4;
 
-const pad2 = (n: number) => String(n).padStart(2, "0");
-
-/**
- * A numbered homepage section: the "01 · Placement" index line on a hairline,
- * an optional text link at the end, then the content. 48px above and below,
- * so neighbouring sections sit 96px apart on desktop (64px on phones).
- */
-function IndexSection({
-  index,
-  label,
+/** A homepage section's heading row: one title, one optional text link. */
+function SectionHead({
   id,
+  title,
+  intro,
   action,
-  children,
+  dark = false,
 }: {
-  index: number;
-  label: string;
   id: string;
+  title: string;
+  intro?: string;
   action?: { href: string; text: string };
-  children: ReactNode;
+  dark?: boolean;
 }) {
   return (
-    <section aria-labelledby={id} data-home-section={id} className='py-8 lg:py-12'>
-      <div className='perce-container'>
-        <div className='mb-6 flex items-baseline justify-between gap-4 border-b border-ink pb-3 lg:mb-8'>
-          <IndexLine variant='section' index={index} label={label} id={id} />
-          {action && (
-            <a href={action.href} className={buttonClass({ variant: "text", size: "sm" })}>
-              {action.text}
-            </a>
-          )}
-        </div>
-        {children}
+    <div className='mb-4 flex items-end justify-between gap-4 lg:mb-6'>
+      <div className='min-w-0'>
+        <h2 id={id} className={cn("t-h1", dark ? "text-bg" : "text-ink")}>
+          {title}
+        </h2>
+        {intro && <p className={cn("mt-2 max-w-prose t-body", dark ? "text-bg/75" : "text-ink-2")}>{intro}</p>}
       </div>
-    </section>
-  );
-}
-
-// ─── 01 · Placement ──────────────────────────────────────
-
-/**
- * The placement index: each placement (Ear, Nose) as a column headed by its
- * name, its sub-placements as numbered rows — "01 Daith · 7". Counts are the
- * stored storefront counts; a placement with sub-placements shows none of its
- * own (see placementTree). Typography only: no tiles, no imagery.
- */
-function PlacementIndex({ placements }: { placements: Placement[] }) {
-  return (
-    <div className='grid grid-cols-1 gap-x-6 gap-y-8 md:grid-cols-2' data-testid='placement-index'>
-      {placements.map((p) => (
-        <div key={p.id}>
-          <a
-            href={p.href}
-            className='group flex min-h-12 items-baseline justify-between gap-4 border-b border-line py-3'>
-            <span className='t-h3 text-ink group-hover:underline group-hover:decoration-1 group-hover:underline-offset-4'>
-              {p.label}
-            </span>
-            {p.count !== null && <span className='t-small tabular-nums text-ink-2'>{p.count}</span>}
-          </a>
-          {p.children.length > 0 && (
-            <ol>
-              {p.children.map((c, i) => (
-                <li key={c.id}>
-                  <a
-                    href={c.href}
-                    className='group grid min-h-11 grid-cols-[2.5rem_1fr] items-baseline border-b border-line py-3 t-body'>
-                    <span className='tabular-nums text-ink-2'>{pad2(i + 1)}</span>
-                    <span>
-                      <span className='text-ink group-hover:underline group-hover:decoration-1 group-hover:underline-offset-4'>
-                        {c.label}
-                      </span>
-                      {c.count !== null && (
-                        <span className='tabular-nums text-ink-2'>
-                          {" · "}
-                          {c.count}
-                        </span>
-                      )}
-                    </span>
-                  </a>
-                </li>
-              ))}
-            </ol>
-          )}
-        </div>
-      ))}
+      {action && (
+        <a
+          href={action.href}
+          className={buttonClass({
+            variant: "text",
+            size: "sm",
+            className: cn("shrink-0", dark && "text-bg hover:text-bg/75"),
+          })}>
+          {action.text}
+        </a>
+      )}
     </div>
   );
 }
 
-// ─── 03 · Sets ───────────────────────────────────────────
+// ─── Shop by placement ───────────────────────────────────
+
+/** A placement and the photo that represents it, when there is one. */
+type PlacementTile = { placement: Placement; image: string | undefined };
 
 /**
- * Sets as index rows, each ending in what the set actually costs:
- *   "Ready set — ear · 2 pieces"     EGP 230      (one fixed total)
- *   "Pick your set · 3–6 pieces"     From EGP 270 (several sized totals)
- *   "Pick Your 6 · 6 pieces"         20% off      (a percentage set)
- * Every figure is the campaign's own, via describeSetOffer — the same words
- * as the /offers card — and never a saving. Sold-out sets are left out.
+ * Photo blocks for browsing by placement: the first large, the rest around it.
+ *
+ *   Desktop  one 2×2 block with four single blocks beside it. Other counts
+ *            stretch the last blocks, so the mosaic never leaves a hole.
+ *   Phones   the first full width, the rest two-up, an odd last one full width.
+ *
+ * A placement with sub-placements carries them as links on its large block. A
+ * placement with no photo at all is a solid ink block, never a grey hole.
  */
-function SetsIndex({ campaigns }: { campaigns: BundleCardCampaign[] }) {
-  const { t, locale } = useMinimalI18n();
+function PlacementMosaic({ tiles }: { tiles: PlacementTile[] }) {
+  const rest = tiles.length - 1;
+
+  const tileClass = (i: number): string => {
+    if (tiles.length === 1) return "col-span-2 aspect-[4/3] lg:col-span-4 lg:aspect-[21/9]";
+    if (i === 0) {
+      return rest === 1
+        ? "col-span-2 aspect-[4/3] lg:aspect-square"
+        : "col-span-2 aspect-[4/3] lg:row-span-2 lg:aspect-auto";
+    }
+    if (rest === 1) return "col-span-2 aspect-[4/3] lg:aspect-square";
+    const isLast = i === rest;
+    // Two beside the large block: each a wide block filling its half.
+    if (rest === 2) return "aspect-[4/5] lg:col-span-2 lg:aspect-[2/1]";
+    // Three: two single blocks, then a wide one under them.
+    if (rest === 3) return isLast ? "col-span-2 aspect-[2/1]" : "aspect-[4/5]";
+    // An odd count leaves a phone's last block alone on its row.
+    return cn("aspect-[4/5]", isLast && rest % 2 === 1 && "col-span-2 aspect-[2/1] lg:col-span-1 lg:aspect-[4/5]");
+  };
+
   return (
-    <ol className='border-t border-line' data-testid='sets-index'>
-      {campaigns.map((c) => {
-        const curated = c.type === "curated_stack";
-        const offer = describeSetOffer(c, t, STORE_CURRENCY, (amount) => formatMoney(amount, { locale }));
-        const sizes = [...(c.tiers ?? [])].map((tier) => tier.quantity).sort((a, b) => a - b);
-        const pieces = curated ? c.unitCount : (offer.pieces ?? c.requiredQuantity);
-        const range =
-          !curated && offer.pieces === null && sizes.length > 1
-            ? fillTemplate(t("bundles.tier_range"), { min: sizes[0] ?? 0, max: sizes[sizes.length - 1] ?? 0 })
-            : null;
-        // One size at a fixed total is just its price: the row already says how
-        // many pieces. Anything else reads as the offer states it.
-        const fixedSingle = c.pricingType === "fixed_total" && offer.pieces !== null;
-        const price =
-          (curated || fixedSingle) && typeof c.fixedBundlePrice === "number"
-            ? formatMoney(c.fixedBundlePrice, { locale })
-            : offer.headline;
-        return (
-          <li key={c.id}>
-            <a
-              href={`/bundles/${encodeURIComponent(c.slug)}`}
-              data-set-row={c.slug}
-              className='group flex min-h-13 items-baseline justify-between gap-4 border-b border-line py-4'>
-              <span className='t-body'>
-                <span className='text-ink group-hover:underline group-hover:decoration-1 group-hover:underline-offset-4'>
-                  {c.title}
-                </span>
-                {(range || pieces > 0) && (
-                  <span className='tabular-nums text-ink-2'>
-                    {" · "}
-                    {range ?? formatItemCount(pieces, locale, t, "home.pieces")}
-                  </span>
-                )}
-              </span>
-              <span className='shrink-0 text-end t-body tabular-nums text-ink' data-set-offer-text>
-                {price}
-                {offer.freeShipping && (
-                  <span className='block t-small text-ink-2'>{t("sets.plus_free_shipping")}</span>
-                )}
-              </span>
-            </a>
-          </li>
-        );
-      })}
-    </ol>
+    <ul className='grid grid-cols-2 gap-2 lg:grid-cols-4 lg:gap-3' data-testid='placement-tiles'>
+      {tiles.map(({ placement: p, image }, i) => (
+        <li
+          key={p.id}
+          data-placement-tile={p.slug}
+          className={cn("group relative overflow-hidden", image ? "bg-surface-2" : "bg-ink", tileClass(i))}>
+          {image && (
+            <img
+              src={image}
+              alt=''
+              loading={i < 3 ? "eager" : "lazy"}
+              decoding='async'
+              className='absolute inset-0 h-full w-full object-cover transition-transform duration-[var(--perce-duration-slow)] ease-out motion-reduce:transition-none lg:group-hover:scale-[1.03]'
+            />
+          )}
+          {image && (
+            <div
+              aria-hidden
+              className='pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-ink/65 to-transparent'
+            />
+          )}
+          {/* The whole block is the link; sub-placements sit above it as links of their own. */}
+          <a href={p.href} className='absolute inset-0 flex items-end p-3 lg:p-5'>
+            <span
+              className={cn(
+                "text-bg",
+                i === 0 ? "t-h1" : "t-h2",
+                i === 0 && p.children.length > 0 && "mb-12 lg:mb-14",
+              )}>
+              {p.label}
+            </span>
+          </a>
+          {i === 0 && p.children.length > 0 && (
+            <ul className='absolute inset-x-3 bottom-3 flex flex-wrap gap-1.5 lg:inset-x-5 lg:bottom-5 lg:gap-2'>
+              {p.children.map((c) => (
+                <li key={c.id}>
+                  <a
+                    href={c.href}
+                    className='inline-flex h-9 items-center bg-bg px-3 t-label text-ink transition-colors hover:bg-ink hover:text-bg'>
+                    {c.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// ─── Sets ────────────────────────────────────────────────
+
+/**
+ * The sets as large photo cards, on a black band that sets them apart from the
+ * products. Phones swipe through them, each card nearly the screen's width,
+ * with the next one showing at the edge. From 1024px they fill the row. Every
+ * figure on a card is the campaign's own (see BundleCampaignCard).
+ */
+function SetsMerch({ campaigns }: { campaigns: BundleCardCampaign[] }) {
+  const count = campaigns.length;
+  const single = count === 1;
+  return (
+    <ul
+      data-testid='sets-merch'
+      className={cn(
+        "-mx-[var(--perce-gutter)] flex snap-x snap-mandatory scroll-px-[var(--perce-gutter)] gap-2 overflow-x-auto px-[var(--perce-gutter)] scrollbar-hide",
+        "lg:mx-0 lg:grid lg:gap-3 lg:overflow-visible lg:px-0",
+        count === 1 && "lg:grid-cols-1",
+        count === 2 && "lg:grid-cols-2",
+        count === 3 && "lg:grid-cols-3",
+        count >= 4 && "lg:grid-cols-4",
+      )}>
+      {campaigns.map((campaign, index) => (
+        <li
+          key={campaign.id}
+          className={cn("shrink-0 snap-start lg:w-auto lg:max-w-none", single ? "w-full" : "w-[82vw] max-w-[24rem]")}>
+          <BundleCampaignCard
+            campaign={campaign}
+            eager={index < 2}
+            className={cn(single && "lg:aspect-[21/9]", count === 2 && "lg:aspect-[5/4]")}
+          />
+        </li>
+      ))}
+    </ul>
   );
 }
 
 /**
- * Minimal Landing Page — Object Index.
+ * Homepage — the shop window.
  *
- * One clear rhythm instead of five same-structure shelves:
- *   Hero → 01 · Placement → 02 · New in → one large object → 03 · Sets
- * (then the global footer). Each block reads its data from the existing
- * sources and disappears when that data is not there: no placeholder
- * placements, no "New in" padded with sold-out pieces, no invented object.
- * The CMS section switches still apply (categories, new arrivals, featured
- * products, bundles). Trust strip, editorial block, sale rail, stack
- * inspiration and testimonials are no longer part of the homepage.
+ * Image first, in one clear order:
+ *   Hero → Shop by placement → Sets → New in → one large piece → more pieces
+ * (then the global footer). Each block reads its data from the existing sources
+ * and disappears when that data is not there. The CMS section switches still
+ * apply (categories, new arrivals, featured products, bundles).
  */
 export function LandingTemplateMinimal({
   content,
@@ -265,56 +275,92 @@ export function LandingTemplateMinimal({
       }
     : undefined;
 
-  // 01 · Placement — the category tree (server-rendered with the page).
-  const placements = useMemo(() => placementTree(categoryRows ?? []), [categoryRows]);
-  const showPlacements = content.categories.enabled && placements.length > 0;
-
-  // 02 · New in — exactly four in-stock pieces, newest first, or nothing.
+  // New in — whole rows of in-stock pieces, newest first, or nothing.
+  const inStockNew = newArrivals.filter((p) => p.available && p.stock > 0);
+  const newInCount = Math.min(NEW_IN_MAX, Math.floor(inStockNew.length / NEW_IN_MIN) * NEW_IN_MIN);
   const newIn: MinimalProduct[] =
-    content.newArrivals?.enabled === false
+    content.newArrivals?.enabled === false || newInCount < NEW_IN_MIN
       ? []
-      : newArrivals
-          .filter((p) => p.available && p.stock > 0)
-          .slice(0, NEW_IN_COUNT)
-          .map((p) => ({
-            id: p.id,
-            slug: p.slug,
-            name: p.name,
-            price: p.price,
-            discountPrice: p.discountPrice,
-            stock: p.stock,
-            imageUrl: p.imageUrl,
-            images: p.images,
-            categoryName: p.categoryName ?? undefined,
-            available: p.available,
-            requiresOptions: p.requiresOptions,
-            categories: p.categories,
-            catalogueNo: p.catalogueNo ?? null,
-          }));
-  const showNewIn = newIn.length === NEW_IN_COUNT;
+      : inStockNew.slice(0, newInCount).map((p) => ({
+          id: p.id,
+          slug: p.slug,
+          name: p.name,
+          price: p.price,
+          discountPrice: p.discountPrice,
+          stock: p.stock,
+          imageUrl: p.imageUrl,
+          images: p.images,
+          categoryName: p.categoryName ?? undefined,
+          available: p.available,
+          requiresOptions: p.requiresOptions,
+          categories: p.categories,
+          catalogueNo: p.catalogueNo ?? null,
+        }));
   const newInLink = content.newArrivals?.viewAllLink || "/shop";
   const newInHref = `${newInLink}${newInLink.includes("?") ? "&" : "?"}section=newarrivals`;
 
-  // The large object — the merchant's first featured pick that is in stock
-  // and not already in New in.
-  const shownIds = new Set(showNewIn ? newIn.map((p) => p.id) : []);
-  const featured = content.featuredProducts.enabled
-    ? featuredProducts.find((p) => p.available && p.stock > 0 && !shownIds.has(p.id))
-    : undefined;
+  // The large piece — the merchant's first featured pick that is in stock and
+  // not already in New in, else the next new piece. Then a second grid of what
+  // is left, if a full row is. No product appears twice.
+  const shownIds = new Set(newIn.map((p) => p.id));
+  const candidates = content.featuredProducts.enabled
+    ? [...featuredProducts.filter((p) => p.available && p.stock > 0), ...inStockNew.map((p) => ({ ...p, categoryName: p.categoryName ?? "" }))].filter(
+        (p, i, all) => !shownIds.has(p.id) && all.findIndex((x) => x.id === p.id) === i,
+      )
+    : [];
+  const featured = candidates[0];
+  const moreLeft = candidates.slice(1);
+  const more = moreLeft.length >= MORE_COUNT ? moreLeft.slice(0, MORE_COUNT) : [];
 
-  // 03 · Sets — Pick Your Set first, then Ready Sets; buyable ones only.
+  // Placement photos: the category's own image, else a photo of a piece that is
+  // already on this page and sits in that placement. Each photo is used once.
+  const tiles = useMemo<PlacementTile[]>(() => {
+    const rows = categoryRows ?? [];
+    const placements = placementTree(rows);
+    const realImage = (url: string | null | undefined) =>
+      url && !/placeholder/i.test(url) ? resolveImageUrl(url) : undefined;
+    const productPhoto = (p: {
+      imageUrl?: string | null;
+      images?: { url: string; isPrimary?: boolean }[];
+    }) => realImage((p.images?.find((i) => i.isPrimary) ?? p.images?.[0])?.url ?? p.imageUrl);
+    const pool = [...newArrivals, ...featuredProducts];
+    const used = new Set<string>();
+    return placements.map((placement) => {
+      const family = [placement, ...placement.children];
+      const ids = new Set(family.map((x) => x.id));
+      const names = new Set(
+        rows.filter((r) => ids.has(r.id)).map((r) => r.name.trim().toLowerCase()),
+      );
+      const own = realImage(rows.find((r) => r.id === placement.id)?.filename);
+      let image = own;
+      if (!image) {
+        for (const product of pool) {
+          const inFamily =
+            product.categories?.some((c) => ids.has(c.id)) ||
+            names.has((product.categoryName ?? "").trim().toLowerCase());
+          const photo = inFamily ? productPhoto(product) : undefined;
+          if (photo && !used.has(photo)) {
+            image = photo;
+            break;
+          }
+        }
+      }
+      if (image) used.add(image);
+      return { placement, image };
+    });
+  }, [categoryRows, newArrivals, featuredProducts]);
+  const showPlacements = content.categories.enabled && tiles.length > 0;
+
+  // Sets — Pick Your Set first, then Ready Sets; buyable ones only.
   const sets =
     content.bundles?.enabled === false
       ? []
-      : [...setCampaigns, ...bundleCampaigns.filter((c) => c.type === "curated_stack")].filter(
-          (c, i, all) => c.availability === "available" && all.findIndex((x) => x.id === c.id) === i,
-        );
-
-  // Section numbers follow what is actually on the page.
-  let n = 0;
+      : [...setCampaigns, ...bundleCampaigns.filter((c) => c.type === "curated_stack")]
+          .filter((c, i, all) => c.availability === "available" && all.findIndex((x) => x.id === c.id) === i)
+          .slice(0, SETS_MAX);
 
   return (
-    <div className={`landing-template-minimal bg-bg pb-8 lg:pb-12 ${className}`}>
+    <div className={`landing-template-minimal bg-bg ${className}`}>
       <PerceHero
         hero={{
           ...content.hero,
@@ -331,47 +377,87 @@ export function LandingTemplateMinimal({
       <OfferBlock />
 
       {showPlacements && (
-        <IndexSection
-          index={++n}
-          id='home-placement'
-          label={t("home.index_placement")}
-          action={{ href: "/shop", text: t("home.shop_all") }}>
-          <PlacementIndex placements={placements} />
-        </IndexSection>
+        <HomeSection id='home-placement'>
+          <SectionHead
+            id='home-placement-title'
+            title={label(content.categories.title, content.categories.titleAr, "home.shop_by_placement")}
+            action={{ href: "/shop", text: t("home.shop_all") }}
+          />
+          <PlacementMosaic tiles={tiles} />
+        </HomeSection>
       )}
 
-      {showNewIn && (
-        <IndexSection
-          index={++n}
-          id='home-new-in'
-          label={t("home.index_new_in")}
-          action={{ href: newInHref, text: t("view_all") }}>
-          <div className='grid grid-cols-2 gap-x-3 gap-y-8 lg:grid-cols-4 lg:gap-x-6'>
-            {newIn.map((p) => (
-              <MinimalProductCard key={p.id} product={p} />
-            ))}
-          </div>
-        </IndexSection>
-      )}
-
-      {featured && (
-        <section aria-label={featured.name} data-home-section='home-object' className='py-8 lg:py-12'>
+      {sets.length > 0 && (
+        <section aria-labelledby='home-sets-title' data-home-section='home-sets' className='bg-ink py-8 lg:py-12'>
           <div className='perce-container'>
-            <FeaturedObject product={featured} />
+            <SectionHead
+              dark
+              id='home-sets-title'
+              title={label(content.bundles?.title, content.bundles?.titleAr, "bundles.section_default_title")}
+              intro={t("bundles.page_intro")}
+              action={{ href: content.bundles?.viewAllLink || "/bundles", text: t("view_all") }}
+            />
+            <SetsMerch campaigns={sets} />
           </div>
         </section>
       )}
 
-      {sets.length > 0 && (
-        <IndexSection
-          index={++n}
-          id='home-sets'
-          label={t("home.index_sets")}
-          action={{ href: content.bundles?.viewAllLink || "/bundles", text: t("view_all") }}>
-          <SetsIndex campaigns={sets} />
-        </IndexSection>
+      {newIn.length > 0 && (
+        <HomeSection id='home-new-in'>
+          <SectionHead
+            id='home-new-in-title'
+            title={label(content.newArrivals?.title, content.newArrivals?.titleAr, "new_arrivals")}
+            action={{ href: newInHref, text: t("view_all") }}
+          />
+          {/* Phones: one large piece, then two-up. An even count would leave the
+              last piece alone on its row, so it waits for a wider screen. */}
+          <div className='-mx-2 grid grid-cols-2 gap-x-2 gap-y-6 lg:mx-0 lg:grid-cols-4 lg:gap-x-3 lg:gap-y-10'>
+            {newIn.map((p, i) => (
+              <MinimalProductCard
+                key={p.id}
+                product={p}
+                className={cn(i === 0 && "max-lg:col-span-2", i === newIn.length - 1 && "max-lg:hidden")}
+              />
+            ))}
+          </div>
+        </HomeSection>
+      )}
+
+      {featured && (
+        <section aria-label={featured.name} data-home-section='home-object' className='py-2 lg:py-4'>
+          <div className='lg:perce-container'>
+            <FeaturedObject product={featured} variant='editorial' />
+          </div>
+        </section>
+      )}
+
+      {more.length > 0 && (
+        <HomeSection id='home-more'>
+          <SectionHead
+            id='home-more-title'
+            title={label(content.featuredProducts.title, content.featuredProducts.titleAr, "featured")}
+            action={{
+              href: content.featuredProducts.viewAllLink || "/shop",
+              text: label(content.featuredProducts.viewAllText, content.featuredProducts.viewAllTextAr, "view_all"),
+            }}
+          />
+          <div className='-mx-2 grid grid-cols-2 gap-x-2 gap-y-6 lg:mx-0 lg:grid-cols-4 lg:gap-x-3'>
+            {more.map((p) => (
+              <MinimalProductCard key={p.id} product={p} />
+            ))}
+          </div>
+        </HomeSection>
       )}
     </div>
+  );
+}
+
+/** A section on the stone ground. */
+function HomeSection({ id, children }: { id: string; children: ReactNode }) {
+  return (
+    <section aria-labelledby={`${id}-title`} data-home-section={id} className='py-8 lg:py-12'>
+      <div className='perce-container'>{children}</div>
+    </section>
   );
 }
 

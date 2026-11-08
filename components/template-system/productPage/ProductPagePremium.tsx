@@ -718,7 +718,7 @@ export function ProductPagePremium({
             {related.length === 1 && related[0] ? (
               <FeaturedObject product={related[0]} headingAs='h3' />
             ) : (
-              <div className='grid grid-cols-2 gap-x-3 gap-y-8 md:grid-cols-3 md:gap-x-6 md:gap-y-12 min-[75rem]:grid-cols-4'>
+              <div className='-mx-2 grid grid-cols-2 gap-x-2 gap-y-6 md:mx-0 md:grid-cols-3 md:gap-x-3 md:gap-y-10 min-[75rem]:grid-cols-4'>
                 {related.map((p) => (
                   <MinimalProductCard key={p.id} product={p} />
                 ))}

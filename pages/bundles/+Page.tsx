@@ -4,8 +4,39 @@ import type { PublicBundleCampaignDto } from "#root/backend/bundles/service";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { BundleCampaignCard } from "#root/components/bundles/BundleCampaignCard";
 import { Link } from "#root/components/utils/Link";
+import { cn } from "#root/lib/utils";
 
 type LoadState = { status: "loading" } | { status: "ready"; campaigns: PublicBundleCampaignDto[] };
+
+/** One kind of set as large photo cards. Two fill the row; more run three-up. */
+function SetGroup({
+  title,
+  campaigns,
+  eager = false,
+}: {
+  title: string;
+  campaigns: PublicBundleCampaignDto[];
+  eager?: boolean;
+}) {
+  if (campaigns.length === 0) return null;
+  const few = campaigns.length <= 2;
+  return (
+    <section className="mt-6 lg:mt-10" data-set-group>
+      <h2 className="mb-3 t-h1 text-ink lg:mb-4">{title}</h2>
+      <ul className={cn("grid grid-cols-1 gap-2 md:grid-cols-2 lg:gap-3", !few && "lg:grid-cols-3")}>
+        {campaigns.map((campaign, index) => (
+          <li key={campaign.id}>
+            <BundleCampaignCard
+              campaign={campaign}
+              eager={eager && index < 2}
+              className={few ? "lg:aspect-[5/4]" : undefined}
+            />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 /**
  * /bundles — the Bundles & Stacks landing page. Lists every LIVE campaign
@@ -35,14 +66,11 @@ export default function BundlesPage() {
   }, []);
 
   return (
-    <div className="perce-header-offset min-h-screen bg-perce-bg">
-      <div className="mx-auto max-w-[var(--perce-content-max)] px-[var(--perce-gutter)] py-8 sm:py-12">
+    <div className="min-h-screen bg-perce-bg">
+      <div className="mx-auto max-w-[var(--perce-content-max)] px-[var(--perce-gutter)] pb-12 pt-4 lg:pb-16 lg:pt-6">
         <header className="max-w-2xl">
-          <p className="perce-eyebrow">{t("nav.bundles")}</p>
-          <h1 className="perce-section-title mt-2">{t("bundles.page_title")}</h1>
-          <p className="mt-3 text-[length:var(--perce-text-body)] leading-[var(--perce-leading-body)] text-perce-ink-muted">
-            {t("bundles.page_intro")}
-          </p>
+          <h1 className="t-display text-ink">{t("bundles.page_title")}</h1>
+          <p className="mt-2 t-body text-ink-2">{t("bundles.page_intro")}</p>
         </header>
 
         {state.status === "loading" ? (
@@ -59,13 +87,10 @@ export default function BundlesPage() {
             </Link>
           </div>
         ) : (
-          <ul className="mt-8 grid grid-cols-2 gap-x-3 gap-y-8 sm:mt-10 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-4">
-            {state.campaigns.map((campaign, index) => (
-              <li key={campaign.id}>
-                <BundleCampaignCard campaign={campaign} className="h-full" eager={index < 2} />
-              </li>
-            ))}
-          </ul>
+          <>
+            <SetGroup title={t("sets.cta_build")} campaigns={state.campaigns.filter((c) => c.type !== "curated_stack")} eager />
+            <SetGroup title={t("bundles.section_ready")} campaigns={state.campaigns.filter((c) => c.type === "curated_stack")} />
+          </>
         )}
       </div>
     </div>

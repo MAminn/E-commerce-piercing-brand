@@ -133,11 +133,11 @@ export function CuratedStackDetail({ campaign, reload }: CuratedStackDetailProps
   };
 
   return (
-    <div className="perce-header-offset min-h-screen bg-perce-bg pb-12 sm:pb-16">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-perce-bg pb-12 sm:pb-16">
+      <div className="mx-auto max-w-[var(--perce-content-max)] px-[var(--perce-gutter)]">
         {/* ── Header ─────────────────────────────────────────────────────── */}
-        <section className="grid gap-6 py-6 sm:py-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start">
-          <div className="aspect-[4/5] w-full overflow-hidden bg-perce-surface lg:sticky lg:top-[var(--perce-header-offset)]">
+        <section className="grid gap-4 py-4 sm:py-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-start lg:gap-8">
+          <div className="aspect-[4/5] w-full overflow-hidden bg-perce-surface lg:sticky lg:top-[calc(var(--perce-header-offset)+1rem)]">
             <img src={resolveBundleImage(campaign.heroImageUrl)} alt={campaign.title} className="h-full w-full object-cover" />
           </div>
           <div>
@@ -145,7 +145,7 @@ export function CuratedStackDetail({ campaign, reload }: CuratedStackDetailProps
               <Sparkles className="h-3.5 w-3.5" aria-hidden /> {t("curated.eyebrow")}
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <h1 className="perce-section-title">{campaign.title}</h1>
+              <h1 className="t-h1 text-ink">{campaign.title}</h1>
               {campaign.badgeText && (
                 <span className="bg-perce-ink px-2.5 py-1 text-xs font-medium text-perce-ink-inverse">
                   {campaign.badgeText}
@@ -174,7 +174,7 @@ export function CuratedStackDetail({ campaign, reload }: CuratedStackDetailProps
                 const variantLabel = p.selectedOptions ? formatSelectedOptions(p.selectedOptions) : "";
                 return (
                   <li key={p.productId} className={cn("flex items-center gap-3 py-3", pieceSoldOut && "opacity-60")}>
-                    <Link href={getProductUrl({ id: p.productId, slug: p.slug })} className="h-16 w-16 shrink-0 overflow-hidden bg-perce-surface">
+                    <Link href={getProductUrl({ id: p.productId, slug: p.slug })} className="h-24 w-20 shrink-0 overflow-hidden bg-perce-surface">
                       <img src={resolveBundleImage(p.imageUrl)} alt={p.name} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                     </Link>
                     <div className="min-w-0 flex-1">
@@ -224,38 +224,38 @@ export function CuratedStackDetail({ campaign, reload }: CuratedStackDetailProps
                 )}
               </div>
             )}
+
+            {/* ── Price + CTA: fixed to the bottom on phones, under the pieces from sm ── */}
+            <div
+              ref={panelRef}
+              className="fixed inset-x-0 bottom-0 border-t border-perce-border bg-perce-bg pb-[env(safe-area-inset-bottom)] sm:static sm:mt-6 sm:border-0 sm:bg-transparent sm:pb-0"
+              style={{ zIndex: "var(--perce-z-sticky)" }}
+              data-testid="curated-price-panel">
+              <div className="px-[var(--perce-gutter)] py-3 sm:p-0">
+                <div className="sm:border sm:border-perce-border sm:bg-perce-surface sm:p-6">
+                  {/* One price. The only comparison ever stated is a warning that a
+                      set costs more than its pieces — never a saving. */}
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className="text-[13px] text-perce-ink-secondary">{t("curated.stack_price")}</p>
+                    <p className="text-[18px] font-medium tabular-nums text-perce-ink" style={{ fontFamily: "var(--font-price)" }}>
+                      {formatMoney(price, currency)}
+                    </p>
+                  </div>
+                  {costsMore && <p className="mt-1 text-[12px] text-perce-sale">{t("curated.costs_more")}</p>}
+                  <button
+                    ref={ctaRef}
+                    type="button"
+                    onClick={handleAddToBag}
+                    disabled={soldOut || submitting}
+                    className="mt-3 flex w-full items-center justify-center gap-2 bg-perce-cta py-3.5 text-sm font-medium text-perce-ink-inverse transition-colors hover:bg-perce-cta-hover disabled:cursor-not-allowed disabled:opacity-50">
+                    <ShoppingBag className="h-4 w-4" />
+                    {soldOut ? t("bundles.sold_out") : submitting ? t("bundle.adding") : t("curated.add_to_bag")}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
-      </div>
-
-      {/* ── Price + CTA (sticky bottom on mobile, inline card on desktop) ───── */}
-      <div
-        ref={panelRef}
-        className="fixed inset-x-0 bottom-0 border-t border-perce-border bg-perce-bg pb-[env(safe-area-inset-bottom)] sm:static sm:border-0 sm:bg-transparent sm:pb-0"
-        style={{ zIndex: "var(--perce-z-sticky)" }}
-        data-testid="curated-price-panel">
-        <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6 sm:py-0 lg:px-8">
-          <div className="sm:ms-auto sm:max-w-md sm:border sm:border-perce-border sm:bg-perce-surface sm:p-6">
-            {/* One price. The only comparison ever stated is a warning that a
-                set costs more than its pieces — never a saving. */}
-            <div className="flex items-baseline justify-between gap-3">
-              <p className="text-[13px] text-perce-ink-secondary">{t("curated.stack_price")}</p>
-              <p className="text-[18px] font-medium tabular-nums text-perce-ink" style={{ fontFamily: "var(--font-price)" }}>
-                {formatMoney(price, currency)}
-              </p>
-            </div>
-            {costsMore && <p className="mt-1 text-[12px] text-perce-sale">{t("curated.costs_more")}</p>}
-            <button
-              ref={ctaRef}
-              type="button"
-              onClick={handleAddToBag}
-              disabled={soldOut || submitting}
-              className="mt-3 flex w-full items-center justify-center gap-2 bg-perce-cta py-3.5 text-sm font-medium text-perce-ink-inverse transition-colors hover:bg-perce-cta-hover disabled:cursor-not-allowed disabled:opacity-50">
-              <ShoppingBag className="h-4 w-4" />
-              {soldOut ? t("bundles.sold_out") : submitting ? t("bundle.adding") : t("curated.add_to_bag")}
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );

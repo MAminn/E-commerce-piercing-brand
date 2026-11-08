@@ -71,8 +71,8 @@ function CartPageModernSkeleton({ title, label }: { title: string; label: string
         </h1>
         <div className='lg:grid lg:grid-cols-12 lg:gap-12' aria-hidden>
           <div className='lg:col-span-7'>
-            <div className='grid grid-cols-[80px_1fr] gap-4 border-y border-line py-6'>
-              <div className={`h-25 w-20 ${bar}`} />
+            <div className='grid grid-cols-[96px_1fr] gap-4 border-y border-line py-6 lg:grid-cols-[120px_1fr]'>
+              <div className={`h-30 w-24 lg:h-37.5 lg:w-30 ${bar}`} />
               <div className='space-y-3'>
                 <div className={`h-4 w-3/4 ${bar}`} />
                 <div className={`h-3 w-1/3 ${bar}`} />
@@ -315,11 +315,11 @@ export function CartPageModernTemplate({
                 return (
                   <li
                     key={item.id}
-                    className={`grid grid-cols-[80px_1fr] gap-4 border-b border-line py-6 transition-opacity ${isUpdating ? "pointer-events-none opacity-50" : ""}`}>
+                    className={`grid grid-cols-[96px_1fr] gap-4 border-b border-line py-6 transition-opacity lg:grid-cols-[120px_1fr] ${isUpdating ? "pointer-events-none opacity-50" : ""}`}>
                     <LineLink
                       href={item.href}
                       tabIndex={-1}
-                      className='block h-25 w-20 bg-surface-2'>
+                      className='block h-30 w-24 bg-surface-2 lg:h-37.5 lg:w-30'>
                       {item.imageUrl && (
                         <img
                           src={item.imageUrl}

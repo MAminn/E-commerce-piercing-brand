@@ -84,11 +84,15 @@ export interface MinimalCategoryPageProps {
 
 /* ── Constants ──────────────────────────────────────────────────────── */
 
-const PRODUCTS_PER_PAGE = 12; // 3 rows × 4 cols
+const PRODUCTS_PER_PAGE = 12; // whole rows at 2, 3 and 4 columns
 
-/** Listing grid: 2 / 12 / 32 on phones, 3 / 24 / 48 from 768px, 4 from 1200px. */
+/**
+ * Listing grid, photo first: 2 columns running nearly edge to edge on phones,
+ * 3 large columns from 768px, 4 only once a screen is wide enough to keep them
+ * large (1700px).
+ */
 const GRID_CLASS =
-  "grid grid-cols-2 gap-x-3 gap-y-8 md:grid-cols-3 md:gap-x-6 md:gap-y-12 min-[75rem]:grid-cols-4";
+  "-mx-2 grid grid-cols-2 gap-x-2 gap-y-6 md:mx-0 md:grid-cols-3 md:gap-x-3 md:gap-y-10 min-[106.25rem]:grid-cols-4";
 
 /* ── Sort options ───────────────────────────────────────────────────── */
 
@@ -117,8 +121,8 @@ function CategoryBreadcrumbs({
   const ct = useCategoryT();
 
   return (
-    <div className="bg-bg">
-      <div className="perce-container pt-4 lg:pt-6">
+    <div className="hidden bg-bg md:block">
+      <div className="perce-container pt-4">
         <nav
           aria-label="Breadcrumb"
           className="flex items-center gap-2 overflow-x-auto whitespace-nowrap t-small text-ink-2 scrollbar-hide">
@@ -173,7 +177,7 @@ function PlacementChipRow({ chips }: { chips: PlacementChip[] }) {
     <nav
       aria-label={ct("subnav.label")}
       data-testid="placement-chips"
-      className="-mx-[var(--perce-gutter)] mb-6 overflow-x-auto scrollbar-hide sm:mx-0 sm:mb-8">
+      className="-mx-[var(--perce-gutter)] mt-3 overflow-x-auto scrollbar-hide sm:mx-0 lg:mt-0 lg:shrink-0">
       <ul className="flex w-max gap-2 px-[var(--perce-gutter)] sm:px-0">
         {chips.map((chip) => (
           <li key={chip.id}>
@@ -495,20 +499,17 @@ export function MinimalCategoryPage({
       />
 
       <div className="bg-bg">
-        <div className="perce-container pb-16 pt-6 lg:pb-24 lg:pt-8">
+        <div className="perce-container pb-12 pt-4 lg:pb-16 lg:pt-4">
           {/* Page heading. /shop and /categories/[slug] previously rendered no
               <h1> at all — the first heading on the page was an <h3> inside a
               product card, so assistive tech and crawlers had nothing naming
               the page. Uses the category name when browsing one. */}
-          <div className="mb-6 sm:mb-8">
+          <div className="mb-3 lg:mb-3 lg:flex lg:items-end lg:justify-between lg:gap-8">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-baseline gap-x-3">
             <h1 className="t-h1 text-ink">
               {categoryName || ct("breadcrumb.shop")}
             </h1>
-            {categoryDescription?.trim() && (
-              <p className="mt-2 max-w-prose t-body text-ink-2">
-                {categoryDescription}
-              </p>
-            )}
             {/* Result count is read from the API's own total, never estimated.
                 Blank while loading so the number never counts up from a stale
                 page — but the line itself is always there, so the count
@@ -516,16 +517,22 @@ export function MinimalCategoryPage({
             <p
               aria-live="polite"
               data-testid="results-count"
-              className="mt-2 t-small tabular-nums text-ink-2">
+              className="t-small tabular-nums text-ink-2">
               {!isLoading && !loadFailed && totalProducts > 0
                 ? totalProducts === 1
                   ? ct("results.count_one")
                   : ct("results.count", { count: totalProducts })
                 : "\u00A0" /* keeps the line's height while empty */}
             </p>
+            </div>
+            {categoryDescription?.trim() && (
+              <p className="mt-2 max-w-prose t-body text-ink-2">
+                {categoryDescription}
+              </p>
+            )}
           </div>
-
           {placementChips && <PlacementChipRow chips={placementChips} />}
+          </div>
 
           <div
             ref={resultsRef}
@@ -533,7 +540,7 @@ export function MinimalCategoryPage({
             {/* Toolbar. Filters (left, desktop) only expose dimensions backed
                 by real product fields — see backend/products/listing-facets.
                 Below lg the filters live in a drawer behind one button. */}
-            <div className="mb-8 space-y-4 border-b border-line pb-4">
+            <div className="mb-3 space-y-3 lg:mb-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-6">
                 {showFilters && filterModel && (
                   <div className="hidden lg:block">
@@ -541,8 +548,9 @@ export function MinimalCategoryPage({
                   </div>
                 )}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center lg:ms-auto">
-                  {/* Search */}
-                  <div className="relative min-w-0 sm:flex-1 lg:w-64 lg:flex-none">
+                  {/* Search. Phones reach search from the header, so the first
+                      photos stay high on the screen. */}
+                  <div className="relative hidden min-w-0 sm:block sm:flex-1 lg:w-64 lg:flex-none">
                     <label htmlFor="minimal-cat-search" className="sr-only">
                       {ct("search.placeholder")}
                     </label>

@@ -547,19 +547,19 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
       : null;
 
   return (
-    <div className="perce-header-offset min-h-screen bg-perce-bg pb-12">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-perce-bg pb-12">
+      <div className="mx-auto max-w-[var(--perce-content-max)] px-[var(--perce-gutter)]">
         {/* ── Campaign header ────────────────────────────────────────────── */}
-        <section className="grid gap-6 py-6 sm:py-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-center">
+        <section className="grid gap-4 py-4 sm:py-6 lg:grid-cols-2 lg:items-center lg:gap-8">
           {campaign.imageUrl && (
-            <div className="aspect-[16/10] w-full overflow-hidden bg-perce-surface lg:aspect-[4/3]">
-              <img src={`/uploads/${campaign.imageUrl}`} alt="" className="h-full w-full object-cover" />
+            <div className="-mx-[var(--perce-gutter)] aspect-[4/3] overflow-hidden bg-perce-surface lg:mx-0 lg:aspect-[2/1]">
+              <img src={`/uploads/${campaign.imageUrl}`} alt="" className="h-full w-full object-cover object-[50%_30%]" />
             </div>
           )}
           <div className={cn(!campaign.imageUrl && "lg:col-span-2")}>
             <p className="perce-eyebrow">{t("bundle.eyebrow")}</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <h1 className="perce-section-title">{campaign.title}</h1>
+              <h1 className="t-h1 text-ink">{campaign.title}</h1>
               {campaign.badgeText && (
                 <span className="bg-perce-ink px-2.5 py-1 text-xs font-medium text-perce-ink-inverse">
                   {campaign.badgeText}
@@ -828,7 +828,7 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
           )}
 
           {visiblePool.length === 0 ? null : (
-            <ul className="mt-4 grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-4" data-testid="bundle-grid">
+            <ul className="mt-4 grid grid-cols-2 gap-x-2 gap-y-6 sm:grid-cols-3 sm:gap-x-3 lg:grid-cols-4" data-testid="bundle-grid">
               {visiblePool.map((p) => {
                 const qty = quantityOfProduct(p.productId);
                 // Product-level stock, and — Phase 7 — a product whose options
@@ -1075,7 +1075,7 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
         className="fixed inset-x-0 bottom-0 border-t border-perce-border bg-perce-bg pb-[env(safe-area-inset-bottom)]"
         style={{ zIndex: "var(--perce-z-sticky)" }}
         data-testid="bundle-action-bar">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-[var(--perce-content-max)] items-center gap-3 px-[var(--perce-gutter)] py-3">
           <div className="min-w-0 flex-1">
             <p className="text-[14px] font-medium text-perce-ink">
               {fill(t("bundle.selected"), { selected: selectedCount, required })}
@@ -1098,7 +1098,7 @@ export function BundleBuilder({ campaign, reload: load }: BundleBuilderProps) {
           </button>
         </div>
         {addedInstanceId && (
-          <div className="mx-auto max-w-6xl px-4 pb-2 text-center sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-[var(--perce-content-max)] px-[var(--perce-gutter)] pb-2 text-center">
             <button
               type="button"
               onClick={() => {

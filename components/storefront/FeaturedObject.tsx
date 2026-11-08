@@ -1,6 +1,7 @@
 import { cn } from "#root/lib/utils";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { getProductUrl } from "#root/lib/utils/route-helpers";
+import { formatMoney } from "#root/shared/pricing/format-money";
 import { productPlacement } from "#root/shared/categories/placements";
 import { useStorefrontCategories } from "#root/hooks/useStorefrontCategories";
 import { buttonClass } from "./Button";
@@ -32,21 +33,24 @@ function paidPrice(p: Pick<FeaturedObjectProduct, "price" | "discountPrice">): n
 }
 
 /**
- * One object, large — the homepage's featured piece, and what a module with
- * a single product becomes instead of one card alone in a four-column grid.
+ * One piece, large.
  *
- * From 1024px the photograph takes 7/12 and the index 5/12; below, the
- * photograph runs full width with the index under it. The index is the
- * piece's name and its full index line (catalogue number, measures,
- * placement, price — each only when the product has it), then "View piece".
+ *   default    what a module with a single product becomes instead of one card
+ *              alone in a four-column grid: the photograph takes 7/12 and the
+ *              name, index line and "View piece" 5/12.
+ *   editorial  the homepage's feature: a large photograph beside a black panel
+ *              stating the piece and its price, with one clear way to it. Phones
+ *              run the photograph edge to edge with the panel under it.
  */
 export function FeaturedObject({
   product,
   headingAs: Heading = "h2",
+  variant = "default",
   className,
 }: {
   product: FeaturedObjectProduct;
   headingAs?: "h2" | "h3";
+  variant?: "default" | "editorial";
   className?: string;
 }) {
   const { t, locale } = useMinimalI18n();
@@ -56,6 +60,47 @@ export function FeaturedObject({
   const image = resolveImageUrl(primary?.url ?? product.imageUrl);
   const { title } = indexFields(product);
   const placement = productPlacement(product, categories);
+
+  if (variant === "editorial") {
+    return (
+      <article data-featured-object className={cn("grid grid-cols-1 lg:grid-cols-12", className)}>
+        <a
+          href={href}
+          tabIndex={-1}
+          className='group block aspect-[4/5] overflow-hidden bg-surface-2 lg:col-span-8 lg:aspect-[3/2]'>
+          {image && (
+            <img
+              src={image}
+              alt={product.name}
+              loading='lazy'
+              decoding='async'
+              className='h-full w-full object-cover object-[50%_35%] transition-transform duration-[var(--perce-duration-slow)] ease-out motion-reduce:transition-none lg:group-hover:scale-[1.02]'
+            />
+          )}
+        </a>
+        <div className='flex flex-col justify-end bg-ink p-5 text-bg lg:col-span-4 lg:p-8'>
+          {placement.length > 0 && <p className='t-small text-bg/70'>{placement.join(" · ")}</p>}
+          <Heading className='mt-2 t-h1 text-bg'>
+            <a href={href} className='hover:underline hover:decoration-1 hover:underline-offset-4'>
+              {product.name}
+            </a>
+          </Heading>
+          <p className='mt-3 t-h3 tabular-nums text-bg' style={{ fontFamily: "var(--font-price)" }}>
+            {formatMoney(paidPrice(product), { locale })}
+          </p>
+          <a
+            href={href}
+            className={buttonClass({
+              variant: "primary",
+              size: "lg",
+              className: "mt-6 bg-bg text-ink hover:bg-surface lg:self-start",
+            })}>
+            {t("home.view_piece")}
+          </a>
+        </div>
+      </article>
+    );
+  }
 
   return (
     <article
