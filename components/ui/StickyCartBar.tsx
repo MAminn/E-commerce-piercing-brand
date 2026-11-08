@@ -371,4 +371,3 @@ export function StickyCartBar({
     </div>
   );
 }
-
