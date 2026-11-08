@@ -684,7 +684,7 @@ function toPublic(dto: BundleCampaignDto): PublicBundleCampaignDto {
 const validationError = (message: string) =>
   new ServerError({ tag: "BundleCampaignValidation", statusCode: 400, clientMessage: message });
 
-export const notFound = () =>
+const notFound = () =>
   new ServerError({ tag: "NotFound", statusCode: 404, clientMessage: "Bundle campaign not found" });
 
 // ─── Shared read helpers ──────────────────────────────────────────────────────

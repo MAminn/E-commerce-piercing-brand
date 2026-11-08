@@ -23,7 +23,6 @@ import {
   listAllBundleCampaigns,
   listLiveBundleCampaigns,
   listLiveBundleCampaignsSchema,
-  notFound,
   previewBundleEligibility,
   previewBundleEligibilitySchema,
   setBundleCampaignActive,
@@ -31,7 +30,6 @@ import {
   updateBundleCampaignSchema,
 } from "./service";
 import { bundleAnalyticsSchema, getBundleAnalytics } from "./analytics";
-import { areSetsVisibleToShoppers } from "#root/shared/config/sets-visibility";
 
 export const evaluateSelectionInputSchema = z.object({
   campaignId: z.string().uuid(),
@@ -50,33 +48,21 @@ export const evaluateSelectionInputSchema = z.object({
 });
 
 export const bundlesRouter = t.router({
-  /**
-   * Public: live campaigns for storefront merchandising (Phase 2 consumer).
-   * Empty while Sets are hidden from shoppers — see shared/config/sets-visibility.
-   */
+  /** Public: live campaigns for storefront merchandising (Phase 2 consumer). */
   listLive: publicProcedure
     .input(listLiveBundleCampaignsSchema.optional())
     .query(async ({ ctx, input }) => {
       return await runBackendEffect(
-        Effect.if(areSetsVisibleToShoppers(), {
-          onTrue: () => listLiveBundleCampaigns(input ?? {}),
-          onFalse: () => Effect.succeed([]),
-        }).pipe(provideDatabase(ctx))
+        listLiveBundleCampaigns(input ?? {}).pipe(provideDatabase(ctx))
       ).then(serializeBackendEffectResult);
     }),
 
-  /**
-   * Public: one live campaign by slug — the bundle-builder page's data source.
-   * Not found while Sets are hidden from shoppers.
-   */
+  /** Public: one live campaign by slug — the bundle-builder page's data source. */
   getLiveBySlug: publicProcedure
     .input(z.object({ slug: bundleSlugSchema }))
     .query(async ({ ctx, input }) => {
       return await runBackendEffect(
-        Effect.if(areSetsVisibleToShoppers(), {
-          onTrue: () => getLiveBundleCampaignBySlug(input.slug),
-          onFalse: () => Effect.fail(notFound()),
-        }).pipe(provideDatabase(ctx))
+        getLiveBundleCampaignBySlug(input.slug).pipe(provideDatabase(ctx))
       ).then(serializeBackendEffectResult);
     }),
 
