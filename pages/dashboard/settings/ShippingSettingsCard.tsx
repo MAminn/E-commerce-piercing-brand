@@ -22,8 +22,11 @@ import {
   type GovernorateCode,
 } from "#root/shared/shipping/egypt-governorates";
 import {
+  DEFAULT_FREE_SHIPPING_MINIMUM_AFTER_DISCOUNTS,
   DEFAULT_SHIPPING_RULES,
+  MAX_FREE_SHIPPING_MINIMUM,
   MAX_SHIPPING_FEE,
+  resolveFreeShippingMinimum,
   validateShippingRules,
   type ShippingMode,
   type ShippingRulesConfig,
@@ -36,6 +39,31 @@ interface RateDraft {
 }
 
 type RatesDraft = Record<GovernorateCode, RateDraft>;
+
+/** The post-discount free-shipping minimum as edited. `amount` is the raw input string. */
+export interface FreeShippingMinimumDraft {
+  enabled: boolean;
+  amount: string;
+}
+
+/** Loads the minimum in force (absent in storage → the default) into the form. */
+export function freeShippingMinimumDraftFromRules(rules: ShippingRulesConfig): FreeShippingMinimumDraft {
+  const minimum = resolveFreeShippingMinimum(rules);
+  return minimum === null
+    ? { enabled: false, amount: String(DEFAULT_FREE_SHIPPING_MINIMUM_AFTER_DISCOUNTS) }
+    : { enabled: true, amount: String(minimum) };
+}
+
+/** `null` = switched off, a number = the minimum, `"invalid"` = not a usable amount. */
+function parseFreeShippingMinimum(draft: FreeShippingMinimumDraft): number | null | "invalid" {
+  if (!draft.enabled) return null;
+  const raw = draft.amount.trim();
+  if (raw === "") return "invalid";
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0 || n > MAX_FREE_SHIPPING_MINIMUM) return "invalid";
+  if (Math.round(n * 100) !== n * 100) return "invalid";
+  return n;
+}
 
 function emptyDraft(): RatesDraft {
   const draft = {} as RatesDraft;
@@ -76,6 +104,12 @@ export function buildRulesFromDraft(input: {
   mode: ShippingMode;
   rates: RatesDraft;
   fallback: RateDraft;
+  /**
+   * The card always passes it, so the saved config states the minimum
+   * explicitly (a number, or null when switched off). Omitted → the key is
+   * left out and the default applies.
+   */
+  freeShippingMinimum?: FreeShippingMinimumDraft;
 }): { rules: ShippingRulesConfig } | { error: string } {
   const rates: ShippingRulesConfig["rates"] = {};
   for (const g of EGYPT_GOVERNORATES) {
@@ -98,6 +132,15 @@ export function buildRulesFromDraft(input: {
     // nothing to charge, so an unlisted destination cannot be served.
     fallbackFee: fallbackParsed === undefined ? null : fallbackParsed,
   };
+  if (input.freeShippingMinimum) {
+    const minimum = parseFreeShippingMinimum(input.freeShippingMinimum);
+    if (minimum === "invalid") {
+      return {
+        error: `Free shipping minimum after discounts: enter an amount above 0 and up to ${MAX_FREE_SHIPPING_MINIMUM} ${STORE_CURRENCY} (two decimals at most), or switch it off.`,
+      };
+    }
+    rules.freeShippingMinimumAfterDiscounts = minimum;
+  }
   const problem = validateShippingRules(rules);
   if (problem) return { error: problem };
   return { rules };
@@ -111,6 +154,9 @@ export function ShippingSettingsCard() {
   const [rates, setRates] = useState<RatesDraft>(() => emptyDraft());
   const [fallback, setFallback] = useState<RateDraft>({ fee: "", unavailable: true });
   const [fillValue, setFillValue] = useState("");
+  const [freeShippingMinimum, setFreeShippingMinimum] = useState<FreeShippingMinimumDraft>(() =>
+    freeShippingMinimumDraftFromRules(DEFAULT_SHIPPING_RULES),
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -125,6 +171,7 @@ export function ShippingSettingsCard() {
           const draft = draftFromRules(rules);
           setRates(draft.rates);
           setFallback(draft.fallback);
+          setFreeShippingMinimum(freeShippingMinimumDraftFromRules(rules));
         } else {
           toast.error(res.error || "Failed to load shipping settings");
         }
@@ -176,7 +223,7 @@ export function ShippingSettingsCard() {
     }
     // The governorate table is saved in BOTH modes so switching to flat and
     // back does not throw the rates away; in flat mode it is simply not read.
-    const built = buildRulesFromDraft({ mode, rates, fallback });
+    const built = buildRulesFromDraft({ mode, rates, fallback, freeShippingMinimum });
     if ("error" in built) {
       toast.error(built.error);
       return;
@@ -390,6 +437,47 @@ export function ShippingSettingsCard() {
             </p>
           </div>
         )}
+
+        <div className='space-y-3 rounded-md border p-3' data-testid='free-shipping-minimum'>
+          <label htmlFor='free-shipping-minimum-enabled' className='flex items-start gap-3 cursor-pointer'>
+            <Checkbox
+              id='free-shipping-minimum-enabled'
+              checked={freeShippingMinimum.enabled}
+              onCheckedChange={(checked) => setFreeShippingMinimum((prev) => ({ ...prev, enabled: checked === true }))}
+              className='mt-0.5'
+            />
+            <span>
+              <span className='block text-sm font-medium'>Free shipping minimum after discounts</span>
+              <span className='block text-xs text-muted-foreground'>
+                Shipping is free when the final merchandise total — after set and bundle pricing, automatic
+                offers and promo codes, excluding shipping — reaches this amount. Original prices before
+                discounts are not used. Separate from an automatic offer&apos;s &quot;Min Cart Total&quot;.
+              </span>
+            </span>
+          </label>
+          <div className='flex items-center gap-3 pl-7'>
+            <Label htmlFor='free-shipping-minimum' className='sr-only'>
+              Free shipping minimum after discounts ({STORE_CURRENCY})
+            </Label>
+            <Input
+              id='free-shipping-minimum'
+              type='number'
+              min='0.01'
+              step='0.01'
+              inputMode='decimal'
+              value={freeShippingMinimum.amount}
+              disabled={!freeShippingMinimum.enabled}
+              onChange={(e) => setFreeShippingMinimum((prev) => ({ ...prev, amount: e.target.value }))}
+              placeholder={String(DEFAULT_FREE_SHIPPING_MINIMUM_AFTER_DISCOUNTS)}
+              className='max-w-[200px]'
+            />
+            <span className='text-sm text-muted-foreground'>{STORE_CURRENCY}</span>
+          </div>
+          <p className='pl-7 text-xs text-muted-foreground'>
+            Applies in both modes and to every destination you deliver to. Free-shipping sets, offers and promo
+            codes keep working on their own.
+          </p>
+        </div>
 
         <Button onClick={handleSave} disabled={isSaving}>
           {isSaving ? (

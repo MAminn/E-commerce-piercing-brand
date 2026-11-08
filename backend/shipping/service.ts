@@ -1,6 +1,12 @@
-import type { ShippingCartSummary, ShippingQuote, ShippingQuoteResponse, ShippingSnapshot } from "#root/shared/shipping/quote";
+import type {
+  FreeShippingSource,
+  ShippingCartSummary,
+  ShippingQuote,
+  ShippingQuoteResponse,
+  ShippingSnapshot,
+} from "#root/shared/shipping/quote";
 import type { GovernorateCode } from "#root/shared/shipping/egypt-governorates";
-import type { ShippingMode } from "#root/shared/shipping/rules";
+import { resolveFreeShippingMinimum, type ShippingMode } from "#root/shared/shipping/rules";
 import { flatFeeShippingProvider } from "./providers/flat-fee";
 import { manualZoneShippingProvider } from "./providers/manual-zone";
 import { getShippingRulesRaw, type SelectableDb, type StoredShippingRules } from "./rules-store";
@@ -27,6 +33,7 @@ export function quoteShippingFromRules(
   return {
     mode: stored.rules.mode,
     quote: provider.quote({ governorateCode, cart, stored }),
+    freeShippingMinimumAfterDiscounts: resolveFreeShippingMinimum(stored.rules),
   };
 }
 
@@ -51,12 +58,18 @@ export function describeUnavailableQuote(quote: Extract<ShippingQuote, { availab
     : "We don't deliver to the selected destination yet.";
 }
 
-/** Freeze what was quoted, and what was charged after offers / a free-shipping promo code, onto the order. */
+/**
+ * Freeze what was quoted, and what was charged after a free-shipping set,
+ * offer, promo code or the post-discount minimum, onto the order.
+ */
 export function buildShippingSnapshot(input: {
   quote: Extract<ShippingQuote, { available: true }>;
   mode: ShippingMode;
   freeShippingApplied: boolean;
-  freeShippingSource?: "bundle" | "offer" | "promo_code" | null;
+  freeShippingSource?: FreeShippingSource | null;
+  /** The minimum in force (EGP) and the amount it was compared against. Omitted by callers that predate the setting. */
+  freeShippingMinimumAfterDiscounts?: number | null;
+  merchandiseTotalAfterDiscounts?: number;
   chargedFee: number;
   rulesUpdatedAt: Date | null;
   now?: Date;
@@ -72,6 +85,12 @@ export function buildShippingSnapshot(input: {
     ruleFee: input.quote.amount,
     freeShippingApplied: input.freeShippingApplied,
     freeShippingSource: input.freeShippingApplied ? (input.freeShippingSource ?? "offer") : null,
+    ...(input.freeShippingMinimumAfterDiscounts !== undefined
+      ? { freeShippingMinimumAfterDiscounts: input.freeShippingMinimumAfterDiscounts }
+      : {}),
+    ...(input.merchandiseTotalAfterDiscounts !== undefined
+      ? { merchandiseTotalAfterDiscounts: input.merchandiseTotalAfterDiscounts }
+      : {}),
     chargedFee: input.chargedFee,
     currency: input.quote.currency,
     quotedAt: (input.now ?? new Date()).toISOString(),

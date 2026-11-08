@@ -33,6 +33,11 @@ export interface ShippingWaivers {
   promoFreeShipping?: boolean;
   /** A valid free-shipping Pick Your Set in the cart (e.g. a complete PICK6). */
   bundleFreeShipping?: boolean;
+  /**
+   * The final merchandise amount after all discounts reached the store's
+   * free-shipping minimum — `computeCartTotals(...).thresholdFreeShipping`.
+   */
+  thresholdFreeShipping?: boolean;
 }
 
 /**
@@ -46,7 +51,12 @@ export function isShippingWaived(
   appliedOffers: readonly { freeShipping: boolean }[],
   waivers: ShippingWaivers = {},
 ): boolean {
-  return Boolean(waivers.promoFreeShipping || waivers.bundleFreeShipping || appliedOffers.some((o) => o.freeShipping));
+  return Boolean(
+    waivers.promoFreeShipping ||
+      waivers.bundleFreeShipping ||
+      waivers.thresholdFreeShipping ||
+      appliedOffers.some((o) => o.freeShipping),
+  );
 }
 
 export function deriveShippingLine(
@@ -70,7 +80,7 @@ export function deriveShippingLine(
   }
   // Zeroed once, whichever (and however many) free-shipping sources qualify.
   const fee =
-    options.promoFreeShipping || options.bundleFreeShipping
+    options.promoFreeShipping || options.bundleFreeShipping || options.thresholdFreeShipping
       ? 0
       : deriveEffectiveShipping(quote.amount, appliedOffers);
   return {

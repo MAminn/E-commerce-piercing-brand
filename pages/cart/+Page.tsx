@@ -40,6 +40,7 @@ export default function CartPage() {
     bundleSavings,
     promoFreeShipping,
     bundleFreeShipping,
+    thresholdFreeShipping,
   } = useCart();
   const { getTemplateId } = useTemplate();
   // Until the saved cart has been read the page has nothing true to say: an
@@ -116,11 +117,12 @@ export default function CartPage() {
     // A waived fee is 0 here (rendered "Free"), never omitted. No
     // destination is known on the cart page, so in zones mode the fee is
     // "pending" ("Calculated at checkout") — unless a valid free-shipping set,
-    // code or offer already waives it for every destination (cartSummaryShipping).
+    // code, offer or the post-discount minimum already waives it for every
+    // destination (cartSummaryShipping).
     const shippingRow = cartSummaryShipping(
       shippingLine,
       shippingMode,
-      isShippingWaived(appliedOffers, { promoFreeShipping, bundleFreeShipping }),
+      isShippingWaived(appliedOffers, { promoFreeShipping, bundleFreeShipping, thresholdFreeShipping }),
     );
     return {
       subtotal,
@@ -141,6 +143,7 @@ export default function CartPage() {
     bundleSavings,
     promoFreeShipping,
     bundleFreeShipping,
+    thresholdFreeShipping,
   ]);
 
   // Handle quantity change

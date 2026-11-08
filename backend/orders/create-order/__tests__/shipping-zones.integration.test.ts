@@ -402,4 +402,39 @@ describeIfDb("destination-based shipping (integration)", () => {
     const cairo = await call(payload({ shippingGovernorateCode: "CAI" }));
     expect(cairo.success).toBe(false); // no longer listed, no fallback
   });
+
+  // ── Post-discount free-shipping minimum ───────────────────────────────
+
+  it("the free-shipping minimum saved by the admin mutation decides the next order's shipping", async () => {
+    const save = (freeShippingMinimumAfterDiscounts: number | null) =>
+      runBackendEffect(
+        updateShippingRules({ ...ZONE_RULES, freeShippingMinimumAfterDiscounts }).pipe(provideDatabase({ db: db as never })),
+      );
+    const sevenStuds = { items: [{ productId, quantity: 7 }] }; // 7 × 150 = 1,050
+
+    expect((await save(null)).success).toBe(true);
+    const off = await place({ ...sevenStuds, shippingGovernorateCode: "CAI", expectedShippingFee: 60 });
+    expect(off.shipping).toBe("60.00");
+    expect(off.total).toBe("1110.00");
+
+    expect((await save(1000)).success).toBe(true);
+    const [settings] = await db.select({ rules: schema.storeSettings.shippingRules }).from(schema.storeSettings).where(eq(schema.storeSettings.key, "default"));
+    expect(settings?.rules?.freeShippingMinimumAfterDiscounts).toBe(1000);
+    const on = await place({ ...sevenStuds, shippingGovernorateCode: "CAI", expectedShippingFee: 0 });
+    expect(on.shipping).toBe("0.00");
+    expect(on.total).toBe("1050.00");
+    expect(on.shippingQuote).toMatchObject({ ruleFee: 60, chargedFee: 0, freeShippingSource: "threshold" });
+
+    // Below the minimum the governorate fee is unchanged.
+    const small = await place({ shippingGovernorateCode: "ALX", expectedShippingFee: 75 });
+    expect(small.shipping).toBe("75.00");
+  });
+
+  it("a stored config without the key (saved before the setting existed) uses the EGP 1,000 default", async () => {
+    // ZONE_RULES has no freeShippingMinimumAfterDiscounts key.
+    const under = await place({ items: [{ productId, quantity: 6 }], shippingGovernorateCode: "CAI", expectedShippingFee: 60 }); // 900
+    expect(under.shipping).toBe("60.00");
+    const over = await place({ items: [{ productId, quantity: 7 }], shippingGovernorateCode: "CAI", expectedShippingFee: 0 }); // 1,050
+    expect(over.shipping).toBe("0.00");
+  });
 });

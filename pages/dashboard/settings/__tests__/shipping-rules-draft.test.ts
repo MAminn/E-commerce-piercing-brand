@@ -5,7 +5,8 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("#root/shared/trpc/client", () => ({ trpc: {} }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-import { buildRulesFromDraft } from "../ShippingSettingsCard";
+import { buildRulesFromDraft, freeShippingMinimumDraftFromRules } from "../ShippingSettingsCard";
+import { DEFAULT_SHIPPING_RULES } from "#root/shared/shipping/rules";
 import { EGYPT_GOVERNORATES, type GovernorateCode } from "#root/shared/shipping/egypt-governorates";
 
 type Row = { fee: string; unavailable: boolean };
@@ -86,5 +87,54 @@ describe("admin shipping card — draft validation", () => {
     });
     expect(built).toEqual({ rules: { version: 1, mode: "flat", currency: "EGP", rates: { CAI: 60 }, fallbackFee: null } });
     expect(buildRulesFromDraft({ mode: "flat", rates: blankRates(), fallback: { fee: "", unavailable: true } })).toHaveProperty("rules");
+  });
+});
+
+describe("admin shipping card — free shipping minimum after discounts", () => {
+  const zonesDraft = {
+    mode: "zones" as const,
+    rates: withRows({ CAI: { fee: "70", unavailable: false } }),
+    fallback: { fee: "", unavailable: true },
+  };
+
+  it("loads the default 1,000 (enabled) from a config saved before the setting existed", () => {
+    expect(freeShippingMinimumDraftFromRules(DEFAULT_SHIPPING_RULES)).toEqual({ enabled: true, amount: "1000" });
+  });
+
+  it("loads a stored minimum, and a switched-off one as disabled", () => {
+    const stored = { ...DEFAULT_SHIPPING_RULES, freeShippingMinimumAfterDiscounts: 1250.5 };
+    expect(freeShippingMinimumDraftFromRules(stored)).toEqual({ enabled: true, amount: "1250.5" });
+    const off = { ...DEFAULT_SHIPPING_RULES, freeShippingMinimumAfterDiscounts: null };
+    expect(freeShippingMinimumDraftFromRules(off)).toEqual({ enabled: false, amount: "1000" });
+  });
+
+  it("saves the minimum explicitly when enabled", () => {
+    const built = buildRulesFromDraft({ ...zonesDraft, freeShippingMinimum: { enabled: true, amount: "1000" } });
+    expect(built).toEqual({
+      rules: { version: 1, mode: "zones", currency: "EGP", rates: { CAI: 70 }, fallbackFee: null, freeShippingMinimumAfterDiscounts: 1000 },
+    });
+  });
+
+  it("saves null when switched off, whatever the amount box holds", () => {
+    const built = buildRulesFromDraft({ ...zonesDraft, freeShippingMinimum: { enabled: false, amount: "" } });
+    expect(built).toHaveProperty("rules.freeShippingMinimumAfterDiscounts", null);
+  });
+
+  it("saves in flat mode too — the minimum applies to both modes", () => {
+    const built = buildRulesFromDraft({
+      mode: "flat",
+      rates: blankRates(),
+      fallback: { fee: "", unavailable: true },
+      freeShippingMinimum: { enabled: true, amount: "800" },
+    });
+    expect(built).toHaveProperty("rules.freeShippingMinimumAfterDiscounts", 800);
+  });
+
+  it("refuses a blank, zero, negative or sub-piaster minimum while enabled", () => {
+    for (const bad of ["", "0", "-5", "999.999", "abc"]) {
+      const built = buildRulesFromDraft({ ...zonesDraft, freeShippingMinimum: { enabled: true, amount: bad } });
+      expect(built).toHaveProperty("error");
+      expect((built as { error: string }).error).toMatch(/Free shipping minimum after discounts/);
+    }
   });
 });

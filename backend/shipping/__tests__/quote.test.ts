@@ -179,3 +179,48 @@ describe("buildShippingSnapshot — what gets frozen on the order", () => {
     });
   });
 });
+
+describe("post-discount free-shipping minimum on the quote contract", () => {
+  it("every quote response carries the resolved minimum, even a pending one", () => {
+    expect(quoteShippingFromRules(zoneStore(), null, cart).freeShippingMinimumAfterDiscounts).toBe(1000);
+    expect(quoteShippingFromRules(zoneStore(), "CAI", cart).freeShippingMinimumAfterDiscounts).toBe(1000);
+    expect(quoteShippingFromRules(flatStore(45), null, cart).freeShippingMinimumAfterDiscounts).toBe(1000);
+    expect(
+      quoteShippingFromRules(zoneStore({ freeShippingMinimumAfterDiscounts: null }), "CAI", cart)
+        .freeShippingMinimumAfterDiscounts,
+    ).toBeNull();
+    expect(
+      quoteShippingFromRules(zoneStore({ freeShippingMinimumAfterDiscounts: 1500 }), "CAI", cart)
+        .freeShippingMinimumAfterDiscounts,
+    ).toBe(1500);
+  });
+
+  it("the minimum never changes the quoted rule fee — waiving is the pricing layer's job", () => {
+    const quote = quoteShippingFromRules(zoneStore(), "CAI", { subtotal: 50_000, itemCount: 9 }).quote;
+    expect(quote.available && quote.amount).toBe(60);
+  });
+
+  it("a threshold-waived snapshot records the source, the minimum and the amount it was compared with", () => {
+    const quote = quoteShippingFromRules(zoneStore(), "CAI", cart).quote;
+    if (!quote.available) throw new Error("expected available");
+    expect(
+      buildShippingSnapshot({
+        quote,
+        mode: "zones",
+        freeShippingApplied: true,
+        freeShippingSource: "threshold",
+        freeShippingMinimumAfterDiscounts: 1000,
+        merchandiseTotalAfterDiscounts: 1600,
+        chargedFee: 0,
+        rulesUpdatedAt: updatedAt,
+      }),
+    ).toMatchObject({
+      ruleFee: 60,
+      chargedFee: 0,
+      freeShippingApplied: true,
+      freeShippingSource: "threshold",
+      freeShippingMinimumAfterDiscounts: 1000,
+      merchandiseTotalAfterDiscounts: 1600,
+    });
+  });
+});

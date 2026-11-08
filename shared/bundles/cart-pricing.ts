@@ -22,10 +22,17 @@
  *       fixed      → the amount, capped at the eligible value
  *     — promo codes follow the same offer_stacking policy as offers.
  *  6. shipping             = 0 if a free-shipping Pick Your Set instance, an
- *                            applied offer, or a qualifying promo code with
- *                            free shipping grants it; else the quoted fee. It
- *                            is zeroed ONCE — several free-shipping sources
- *                            never change the total twice.
+ *                            applied offer, a qualifying promo code with
+ *                            free shipping, or the store's post-discount
+ *                            free-shipping minimum grants it; else the quoted
+ *                            fee. It is zeroed ONCE — several free-shipping
+ *                            sources never change the total twice.
+ *                            The minimum compares against
+ *                            merchandiseTotalAfterDiscounts (step 7's goods
+ *                            amount: ordinary lines + bundle CHARGED totals −
+ *                            offer discount − promo discount, no shipping) —
+ *                            never list prices, never the offer base, so an
+ *                            exclusive percentage set counts at what it costs.
  *                            Free shipping only ever zeroes an AVAILABLE quote —
  *                            an undeliverable destination is refused before
  *                            pricing (create-order) and never reaches here.
@@ -66,6 +73,9 @@ import {
 } from "#root/shared/pricing/eligible-units";
 import type { BundleOfferStacking } from "./evaluate";
 import { fromMinorUnits, toMinorUnits } from "./evaluate";
+import type { FreeShippingSource } from "#root/shared/shipping/quote";
+
+export type { FreeShippingSource } from "#root/shared/shipping/quote";
 
 export interface PricingRegularLine {
   id: string;
@@ -271,6 +281,19 @@ export function buildOfferInputs(
 
 // ─── Totals ───────────────────────────────────────────────────────────────────
 
+/**
+ * Whether a final merchandise amount (minor units, after every discount,
+ * excluding shipping) reaches the free-shipping minimum (EGP). Integer
+ * comparison, so 999.99 never qualifies for 1000 and 1000.00 always does.
+ */
+export function meetsFreeShippingMinimumMinor(
+  merchandiseTotalAfterDiscountsMinor: number,
+  minimum: number | null | undefined,
+): boolean {
+  if (minimum === null || minimum === undefined || !(minimum > 0)) return false;
+  return merchandiseTotalAfterDiscountsMinor >= toMinorUnits(minimum);
+}
+
 export interface CartTotalsInput {
   regularLines: readonly PricingRegularLine[];
   bundles: readonly PricingBundle[];
@@ -284,9 +307,13 @@ export interface CartTotalsInput {
   baseShippingFee: number;
   /** An applied automatic offer grants free shipping. */
   freeShipping: boolean;
+  /**
+   * The store's post-discount free-shipping minimum, EGP
+   * (`resolveFreeShippingMinimum` / `ShippingQuoteResponse`). Null or
+   * omitted → no minimum.
+   */
+  freeShippingMinimumAfterDiscounts?: number | null;
 }
-
-export type FreeShippingSource = "bundle" | "offer" | "promo_code";
 
 export interface CartTotals {
   merchandiseSubtotal: number;
@@ -306,9 +333,17 @@ export interface CartTotals {
   /** A free-shipping Pick Your Set instance is in the cart. */
   bundleFreeShipping: boolean;
   /**
+   * The final merchandise amount after ALL discounts (bundle pricing, offers,
+   * promo code), excluding shipping — `total − shipping`.
+   */
+  merchandiseTotalAfterDiscounts: number;
+  /** `merchandiseTotalAfterDiscounts` reached the store's free-shipping minimum. */
+  thresholdFreeShipping: boolean;
+  /**
    * Where a zero shipping charge came from, when one applied. When several
    * sources qualify the charge is still zeroed once; the bundle is reported
-   * first (the shopper chose it deliberately), then an offer, then a code.
+   * first (the shopper chose it deliberately), then an offer, then a code,
+   * then the post-discount minimum.
    */
   freeShippingSource: FreeShippingSource | null;
   shipping: number;
@@ -353,17 +388,21 @@ export function computeCartTotals(input: CartTotalsInput): CartTotals {
         : Math.min(Math.max(0, toMinorUnits(input.promo.discountValue)), baseMinor);
   }
 
+  const goodsMinor = Math.max(0, merchandiseMinor + bundleChargedMinor - offerDiscountMinor - promoDiscountMinor);
+
   const promoFreeShipping = Boolean(input.promo?.freeShipping && plan?.qualifies);
   const bundleFreeShipping = input.bundles.some((b) => b.freeShipping === true);
+  const thresholdFreeShipping = meetsFreeShippingMinimumMinor(goodsMinor, input.freeShippingMinimumAfterDiscounts);
   const freeShippingSource: FreeShippingSource | null = bundleFreeShipping
     ? "bundle"
     : input.freeShipping
       ? "offer"
       : promoFreeShipping
         ? "promo_code"
-        : null;
+        : thresholdFreeShipping
+          ? "threshold"
+          : null;
   const shippingMinor = freeShippingSource ? 0 : toMinorUnits(input.baseShippingFee);
-  const goodsMinor = Math.max(0, merchandiseMinor + bundleChargedMinor - offerDiscountMinor - promoDiscountMinor);
 
   return {
     merchandiseSubtotal: fromMinorUnits(merchandiseMinor),
@@ -377,6 +416,8 @@ export function computeCartTotals(input: CartTotalsInput): CartTotals {
     promoPlan: plan,
     promoFreeShipping,
     bundleFreeShipping,
+    merchandiseTotalAfterDiscounts: fromMinorUnits(goodsMinor),
+    thresholdFreeShipping,
     freeShippingSource,
     shipping: fromMinorUnits(shippingMinor),
     total: fromMinorUnits(goodsMinor + shippingMinor),

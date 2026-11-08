@@ -136,6 +136,10 @@ interface CartContextType {
   promoFreeShipping: boolean;
   /** A free-shipping Pick Your Set in the cart is waiving the shipping charge. */
   bundleFreeShipping: boolean;
+  /** The final merchandise amount after all discounts reached the store's free-shipping minimum. */
+  thresholdFreeShipping: boolean;
+  /** The store's post-discount free-shipping minimum (EGP), null when off or not yet known. */
+  freeShippingMinimumAfterDiscounts: number | null;
   /** Completed Build Your Stack instances — grouped units, never flattened into `items`. */
   bundles: CartBundleInstance[];
   addBundle: (bundle: NewCartBundle) => AddBundleResult;
@@ -406,22 +410,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
     [regularLines, pricingBundles, promoPlan],
   );
 
-  // Derived, not state: recomputes from the latest quote, current offers and
-  // the code's qualification every render, so it can never get stuck at 0
-  // after a free-shipping offer or code stops applying. While no quote is
-  // usable the fee is 0 and `shippingLine.status` tells the UI to say
-  // "calculated at checkout"; an unavailable destination stays unavailable.
-  const shippingLine = useMemo(
-    () => deriveShippingLine(shippingResponse, appliedOffers, { promoFreeShipping, bundleFreeShipping }),
-    [shippingResponse, appliedOffers, promoFreeShipping, bundleFreeShipping],
-  );
-  const baseShippingFee = shippingLine.baseFee;
-  const shipping = shippingLine.fee;
-  // Before the first quote: the store's expected mode, so the server render
-  // and the hydrated page agree (no "(optional)" → required flip at checkout).
-  const shippingMode: ShippingMode = shippingResponse?.mode ?? EXPECTED_SHIPPING_MODE;
+  // The rule fee before any waiver — what `shippingLine.baseFee` reports: the
+  // quoted amount, or 0 while no quote is usable.
+  const baseShippingFee = shippingResponse?.quote.available ? shippingResponse.quote.amount : 0;
+  // Same minimum create-order applies; null until the first quote answers.
+  const freeShippingMinimumAfterDiscounts = shippingResponse?.freeShippingMinimumAfterDiscounts ?? null;
 
   // Derived, not state — see shared/bundles/cart-pricing.ts for the order of operations.
+  // Computed BEFORE the shipping line: whether the post-discount minimum is
+  // met depends only on the goods amount, never on shipping.
   const totals = useMemo(
     () =>
       computeCartTotals({
@@ -431,9 +428,30 @@ export function CartProvider({ children }: { children: ReactNode }) {
         promo: cartPromo,
         baseShippingFee,
         freeShipping: appliedOffers.some((o) => o.freeShipping),
+        freeShippingMinimumAfterDiscounts,
       }),
-    [regularLines, pricingBundles, offerDiscount, cartPromo, baseShippingFee, appliedOffers],
+    [regularLines, pricingBundles, offerDiscount, cartPromo, baseShippingFee, appliedOffers, freeShippingMinimumAfterDiscounts],
   );
+  const thresholdFreeShipping = totals.thresholdFreeShipping;
+
+  // Derived, not state: recomputes from the latest quote, current offers, the
+  // code's qualification and the post-discount minimum every render, so it can
+  // never get stuck at 0 after a free-shipping source stops applying. While no
+  // quote is usable the fee is 0 and `shippingLine.status` tells the UI to say
+  // "calculated at checkout"; an unavailable destination stays unavailable.
+  const shippingLine = useMemo(
+    () =>
+      deriveShippingLine(shippingResponse, appliedOffers, {
+        promoFreeShipping,
+        bundleFreeShipping,
+        thresholdFreeShipping,
+      }),
+    [shippingResponse, appliedOffers, promoFreeShipping, bundleFreeShipping, thresholdFreeShipping],
+  );
+  const shipping = shippingLine.fee;
+  // Before the first quote: the store's expected mode, so the server render
+  // and the hydrated page agree (no "(optional)" → required flip at checkout).
+  const shippingMode: ShippingMode = shippingResponse?.mode ?? EXPECTED_SHIPPING_MODE;
   const subtotal = totals.subtotal;
   const discount = totals.promoDiscount;
 
@@ -850,6 +868,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         promoPlan,
         promoFreeShipping,
         bundleFreeShipping,
+        thresholdFreeShipping,
+        freeShippingMinimumAfterDiscounts,
         freeQuantities,
         bundles,
         addBundle,

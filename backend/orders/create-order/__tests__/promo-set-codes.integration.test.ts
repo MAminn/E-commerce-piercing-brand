@@ -834,8 +834,208 @@ describeIfDb("promo set codes + percentage Pick Your Set (integration)", () => {
       const row = await loadOrder(created.id);
       // Set savings 161.25; offer 10% of 200 = 20; code 10% of (200 − 20) = 18.
       expect(row.discount).toBe((161.25 + 20 + 18).toFixed(2));
-      expect(row.total).toBe((913.75 + 200 - 20 - 18 + 70).toFixed(2));
+      // Final merchandise 913.75 + 200 − 20 − 18 = 1,075.75 ≥ the default
+      // EGP 1,000 post-discount minimum → the 70 Cairo fee is waived.
+      expect(row.shipping).toBe("0.00");
+      expect(row.total).toBe((913.75 + 200 - 20 - 18).toFixed(2));
+      expect(row.shippingQuote).toMatchObject({ ruleFee: 70, chargedFee: 0, freeShippingSource: "threshold" });
       expect(await usedCount(plain.id)).toBe(1);
+    });
+  });
+
+  // ─── Free shipping at EGP 1,000+ AFTER all discounts ────────────────────
+  //
+  // Server-created orders, Cairo = 70. The minimum comes from
+  // store_settings.shipping_rules (absent → the 1,000 default) and is compared
+  // against the FINAL merchandise amount: set prices, offers and promo codes
+  // all taken off, shipping excluded.
+
+  describe("free-shipping minimum after discounts", () => {
+    const createPctSet = () =>
+      Effect.runPromise(
+        bundleService
+          .createBundleCampaign(
+            bundleService.createBundleCampaignSchema.parse({
+              internalName: `${TAG}threshold-set`,
+              title: "Threshold Set",
+              slug: `${TAG}threshold-set`,
+              isActive: true,
+              pricingType: "percentage_discount",
+              allowDuplicates: true,
+              isRepeatable: true,
+              // freeShipping deliberately OFF: only the minimum may waive it.
+              tiers: [
+                { quantity: 3, discountPercent: 20 },
+                { quantity: 6, discountPercent: 15 },
+              ],
+              eligibleProductIds: e,
+            }),
+          )
+          .pipe(provideDatabase({ db: db as never })),
+      );
+    const set = (campaignId: string, items: { productId: string; quantity: number }[], expectedBundleTotal: number) => ({
+      instanceId: `inst-${Math.random().toString(16).slice(2)}`,
+      campaignId,
+      expectedBundleTotal,
+      items,
+    });
+    const alwaysOffer = (percentOff: number) =>
+      db.insert(schema.cartOffer).values({
+        name: `${TAG}always-${percentOff}`,
+        isActive: true,
+        condition: { type: "always" },
+        reward: { type: "percentage_off", percentOff },
+      });
+
+    it("one set: list value 1,075 but 15% off → 913.75 payable → Cairo shipping charged", async () => {
+      const campaign = await createPctSet();
+      const created = await place({ bundles: [set(campaign.id, sixEligible(), 913.75)], expectedShippingFee: 70 });
+      const row = await loadOrder(created.id);
+      expect(row.subtotal).toBe("1075.00");
+      expect(row.shipping).toBe("70.00");
+      expect(row.total).toBe("983.75");
+      expect(row.shippingQuote).toMatchObject({
+        freeShippingApplied: false,
+        freeShippingMinimumAfterDiscounts: 1000,
+        merchandiseTotalAfterDiscounts: 913.75,
+      });
+    });
+
+    it("two sets: 913.75 + 240 = 1,153.75 payable → free shipping, attributed to the minimum", async () => {
+      const campaign = await createPctSet();
+      const created = await place({
+        bundles: [
+          set(campaign.id, sixEligible(), 913.75),
+          set(campaign.id, [line(e[5]!), line(e[6]!), line(e[7]!)], 240),
+        ],
+        expectedShippingFee: 0,
+      });
+      const row = await loadOrder(created.id);
+      expect(row.shipping).toBe("0.00");
+      expect(row.total).toBe("1153.75");
+      expect(row.shippingQuote).toMatchObject({
+        ruleFee: 70,
+        chargedFee: 0,
+        freeShippingApplied: true,
+        freeShippingSource: "threshold",
+        merchandiseTotalAfterDiscounts: 1153.75,
+      });
+      const { describeShippingSnapshot } = await import("#root/shared/shipping/describe-snapshot");
+      expect(describeShippingSnapshot(row.shippingQuote)).toBe(
+        "Zone rate · Cairo · 70.00 EGP waived by the 1000.00 EGP free-shipping minimum (after discounts)",
+      );
+    });
+
+    it("two sets whose list value is 1,075 but payable 480 + 380 = 860 → shipping charged", async () => {
+      const campaign = await createPctSet();
+      const created = await place({
+        bundles: [
+          set(campaign.id, [line(e[3]!), line(e[4]!, 2)], 480),
+          set(campaign.id, [line(e[0]!), line(e[1]!), line(e[2]!)], 380),
+        ],
+        expectedShippingFee: 70,
+      });
+      const row = await loadOrder(created.id);
+      expect(row.subtotal).toBe("1075.00");
+      expect(row.shipping).toBe("70.00");
+      expect(row.total).toBe("930.00");
+    });
+
+    it("promo: 1,100 before a 20% code → 880 → charged; a 5% code → 1,045 → free", async () => {
+      const twenty = await createSetCode("TH20", { percent: 20, exact: null, freeShipping: false, allProducts: true });
+      const below = await place({ items: [line(ring, 5), line(e[5]!)], promoCodeId: twenty.id, expectedShippingFee: 70 });
+      const belowRow = await loadOrder(below.id);
+      expect(belowRow.discount).toBe("220.00");
+      expect(belowRow.shipping).toBe("70.00");
+      expect(belowRow.total).toBe("950.00");
+
+      const five = await createSetCode("TH5", { percent: 5, exact: null, freeShipping: false, allProducts: true });
+      const above = await place({ items: [line(ring, 5), line(e[5]!)], promoCodeId: five.id, expectedShippingFee: 0 });
+      const aboveRow = await loadOrder(above.id);
+      expect(aboveRow.shipping).toBe("0.00");
+      expect(aboveRow.total).toBe("1045.00");
+    });
+
+    it("automatic offer: 1,200 − 20% = 960 → charged; 1,200 − 10% = 1,080 → free", async () => {
+      await alwaysOffer(20);
+      const below = await loadOrder((await place({ items: [line(ring, 6)], expectedShippingFee: 70 })).id);
+      expect(below.discount).toBe("240.00");
+      expect(below.shipping).toBe("70.00");
+      expect(below.total).toBe("1030.00");
+
+      await db.delete(schema.cartOffer).where(like(schema.cartOffer.name, `${TAG}%`));
+      await alwaysOffer(10);
+      const above = await loadOrder((await place({ items: [line(ring, 6)], expectedShippingFee: 0 })).id);
+      expect(above.shipping).toBe("0.00");
+      expect(above.total).toBe("1080.00");
+    });
+
+    it("boundary: exactly 1,000 → free; the same cart against a 1,000.01 minimum → charged", async () => {
+      const exact = await loadOrder((await place({ items: [line(ring, 5)], expectedShippingFee: 0 })).id);
+      expect(exact.shipping).toBe("0.00");
+      expect(exact.total).toBe("1000.00");
+
+      await setRules({ ...ZONE_RULES, freeShippingMinimumAfterDiscounts: 1000.01 });
+      const under = await loadOrder((await place({ items: [line(ring, 5)], expectedShippingFee: 70 })).id);
+      expect(under.shipping).toBe("70.00");
+      expect(under.total).toBe("1070.00");
+    });
+
+    it("just under: 975 → charged", async () => {
+      const row = await loadOrder((await place({ items: [line(ring, 4), line(e[2]!)], expectedShippingFee: 70 })).id);
+      expect(row.shipping).toBe("70.00");
+      expect(row.total).toBe("1045.00");
+    });
+
+    it("switched off (null) → a 1,200 cart pays shipping", async () => {
+      await setRules({ ...ZONE_RULES, freeShippingMinimumAfterDiscounts: null });
+      const row = await loadOrder((await place({ items: [line(ring, 6)], expectedShippingFee: 70 })).id);
+      expect(row.shipping).toBe("70.00");
+      expect(row.shippingQuote).toMatchObject({ freeShippingApplied: false, freeShippingMinimumAfterDiscounts: null });
+    });
+
+    it("never makes an unavailable governorate deliverable", async () => {
+      const message = await refuse({ items: [line(ring, 6)], shippingGovernorateCode: "SSI" });
+      expect(message).toMatch(/don't deliver/i);
+    });
+
+    it("a client that still expects the fee on a qualifying cart is stopped by the drift check", async () => {
+      const message = await refuse({ items: [line(ring, 5)], expectedShippingFee: 70 });
+      expect(message).toMatch(/Shipping fee changed/);
+    });
+
+    it("the cart preview (shipping.quote + computeCartTotals) equals the server-created order", async () => {
+      const campaign = await createPctSet();
+      const { quoteShipping } = await import("#root/backend/shipping/service");
+      const { response } = await quoteShipping(db as never, { governorateCode: "CAI", cart: { subtotal: 0, itemCount: 0 } });
+      expect(response.freeShippingMinimumAfterDiscounts).toBe(1000);
+      const baseFee = response.quote.available ? response.quote.amount : NaN;
+
+      const scenarios: { bundles: ReturnType<typeof set>[]; items: { productId: string; quantity: number }[] }[] = [
+        { bundles: [set(campaign.id, sixEligible(), 913.75)], items: [] },
+        { bundles: [set(campaign.id, sixEligible(), 913.75)], items: [line(ring)] },
+        { bundles: [], items: [line(ring, 5)] },
+      ];
+      for (const s of scenarios) {
+        const preview = pricing.computeCartTotals({
+          regularLines: s.items.map((i) => ({ id: i.productId, name: "x", quantity: i.quantity, price: 200 })),
+          bundles: s.bundles.map((b) => ({
+            instanceId: b.instanceId,
+            offerStacking: "exclusive" as const,
+            regularTotal: 1075,
+            bundleTotal: b.expectedBundleTotal,
+            items: [],
+          })),
+          offerDiscount: 0,
+          promo: null,
+          baseShippingFee: baseFee,
+          freeShipping: false,
+          freeShippingMinimumAfterDiscounts: response.freeShippingMinimumAfterDiscounts,
+        });
+        const row = await loadOrder((await place({ ...s, expectedShippingFee: preview.shipping })).id);
+        expect(row.shipping).toBe(preview.shipping.toFixed(2));
+        expect(row.total).toBe(preview.total.toFixed(2));
+      }
     });
   });
 

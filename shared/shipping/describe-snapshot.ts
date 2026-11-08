@@ -27,7 +27,11 @@ export function describeShippingSnapshot(snapshot: ShippingSnapshot | null | und
         ? "a free-shipping promo code"
         : snapshot.freeShippingSource === "bundle"
           ? "a free-shipping set"
-          : "a free-shipping offer";
+          : snapshot.freeShippingSource === "threshold"
+            ? typeof snapshot.freeShippingMinimumAfterDiscounts === "number"
+              ? `the ${snapshot.freeShippingMinimumAfterDiscounts.toFixed(2)} EGP free-shipping minimum (after discounts)`
+              : "the free-shipping minimum (after discounts)"
+            : "a free-shipping offer";
     return `${base} · ${snapshot.ruleFee.toFixed(2)} EGP waived by ${by}`;
   }
   return base;

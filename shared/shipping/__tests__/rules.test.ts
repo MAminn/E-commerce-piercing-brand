@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_FREE_SHIPPING_MINIMUM_AFTER_DISCOUNTS,
   DEFAULT_SHIPPING_RULES,
   MAX_SHIPPING_FEE,
+  resolveFreeShippingMinimum,
   countConfiguredRates,
   parseShippingRules,
   resolveZoneRate,
@@ -109,5 +111,33 @@ describe("resolveZoneRate — per-governorate lookup", () => {
       kind: "unavailable",
       reason: "governorate_unavailable",
     });
+  });
+});
+
+describe("freeShippingMinimumAfterDiscounts — the post-discount minimum", () => {
+  it("the default is EGP 1,000", () => {
+    expect(DEFAULT_FREE_SHIPPING_MINIMUM_AFTER_DISCOUNTS).toBe(1000);
+  });
+
+  it("absent (configs saved before the setting, or a NULL column) → the default", () => {
+    expect(resolveFreeShippingMinimum(zones())).toBe(1000);
+    expect(resolveFreeShippingMinimum(DEFAULT_SHIPPING_RULES)).toBe(1000);
+    expect(resolveFreeShippingMinimum(parseShippingRules(null))).toBe(1000);
+  });
+
+  it("null → switched off; a number → that minimum", () => {
+    expect(resolveFreeShippingMinimum(zones({ freeShippingMinimumAfterDiscounts: null }))).toBeNull();
+    expect(resolveFreeShippingMinimum(zones({ freeShippingMinimumAfterDiscounts: 750.5 }))).toBe(750.5);
+  });
+
+  it("round-trips through the jsonb parser", () => {
+    expect(parseShippingRules(zones({ freeShippingMinimumAfterDiscounts: 1000 })).freeShippingMinimumAfterDiscounts).toBe(1000);
+    expect(parseShippingRules(zones({ freeShippingMinimumAfterDiscounts: null })).freeShippingMinimumAfterDiscounts).toBeNull();
+  });
+
+  it("rejects 0, negative, sub-piaster and absurd minimums", () => {
+    for (const bad of [0, -1, 12.345, 2_000_000]) {
+      expect(shippingRulesConfigSchema.safeParse(zones({ freeShippingMinimumAfterDiscounts: bad })).success).toBe(false);
+    }
   });
 });

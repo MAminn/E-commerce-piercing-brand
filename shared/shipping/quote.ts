@@ -66,7 +66,18 @@ export type ShippingQuote =
 export interface ShippingQuoteResponse {
   mode: ShippingMode;
   quote: ShippingQuote;
+  /**
+   * The store's post-discount free-shipping minimum in EGP (resolved — see
+   * `resolveFreeShippingMinimum`), or null when switched off. Destination-
+   * independent, so it is sent even when the quote is pending. The cart feeds
+   * it to `computeCartTotals`, exactly as create-order does. The server
+   * always sends it; absent is read as "no minimum".
+   */
+  freeShippingMinimumAfterDiscounts?: number | null;
 }
+
+/** What waived the fee. "threshold" = the final merchandise amount after discounts reached the store's free-shipping minimum. */
+export type FreeShippingSource = "bundle" | "offer" | "promo_code" | "threshold";
 
 /**
  * What `order.shipping_quote` stores. Written once at order creation and
@@ -84,14 +95,22 @@ export interface ShippingSnapshot {
   rateSource: ShippingRateSource;
   /** The quoted rule fee before offers. */
   ruleFee: number;
-  /** True when a free-shipping set, cart offer or promo code reduced the charge to 0. */
+  /** True when a free-shipping set, cart offer, promo code or the post-discount minimum reduced the charge to 0. */
   freeShippingApplied: boolean;
   /**
    * What waived the fee when `freeShippingApplied`. Absent on snapshots
    * written before promo codes could grant free shipping — those were always
    * an offer.
    */
-  freeShippingSource?: "bundle" | "offer" | "promo_code" | null;
+  freeShippingSource?: FreeShippingSource | null;
+  /**
+   * The post-discount free-shipping minimum (EGP) in force when the order was
+   * placed; null when switched off. Absent on snapshots written before the
+   * setting existed.
+   */
+  freeShippingMinimumAfterDiscounts?: number | null;
+  /** The final merchandise amount after all discounts, excluding shipping — what the minimum was compared against. */
+  merchandiseTotalAfterDiscounts?: number;
   /** The amount actually charged — mirrors `order.shipping`. */
   chargedFee: number;
   currency: "EGP";

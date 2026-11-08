@@ -28,7 +28,7 @@ const sinaiUnavailable: ShippingQuoteResponse = {
   quote: { available: false, provider: "manual_zone", reason: "destination_unavailable", governorateCode: "SSI", governorateName: "South Sinai" },
 };
 
-const row = (response: ShippingQuoteResponse | null, waivers: { bundleFreeShipping?: boolean; promoFreeShipping?: boolean }, offers: { freeShipping: boolean }[] = []) =>
+const row = (response: ShippingQuoteResponse | null, waivers: { bundleFreeShipping?: boolean; promoFreeShipping?: boolean; thresholdFreeShipping?: boolean }, offers: { freeShipping: boolean }[] = []) =>
   cartSummaryShipping(
     deriveShippingLine(response, offers, waivers),
     response?.mode ?? "flat",
@@ -72,5 +72,22 @@ describe("cartSummaryShipping", () => {
   it("an unavailable destination stays unavailable — no free-shipping promise there", () => {
     expect(row(sinaiUnavailable, { bundleFreeShipping: true })).toEqual({ shipping: undefined, shippingStatus: "unavailable" });
     expect(row(sinaiUnavailable, { promoFreeShipping: true }, [{ freeShipping: true }]).shippingStatus).toBe("unavailable");
+  });
+});
+
+describe("the post-discount free-shipping minimum on the cart row", () => {
+  it("met → the cart says Free before a governorate is chosen, and the quoted row is 0", () => {
+    expect(isShippingWaived([], { thresholdFreeShipping: true })).toBe(true);
+    expect(row(pendingZones, { thresholdFreeShipping: true })).toEqual({ shipping: 0, shippingStatus: "waived" });
+    expect(row(cairo, { thresholdFreeShipping: true })).toEqual({ shipping: 0, shippingStatus: "quoted" });
+  });
+
+  it("not met → pending / the governorate fee, exactly as before", () => {
+    expect(row(pendingZones, { thresholdFreeShipping: false })).toEqual({ shipping: undefined, shippingStatus: "pending" });
+    expect(row(cairo, { thresholdFreeShipping: false })).toEqual({ shipping: 70, shippingStatus: "quoted" });
+  });
+
+  it("never makes an undeliverable destination deliverable", () => {
+    expect(row(sinaiUnavailable, { thresholdFreeShipping: true })).toEqual({ shipping: undefined, shippingStatus: "unavailable" });
   });
 });

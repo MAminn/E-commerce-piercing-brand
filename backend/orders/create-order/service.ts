@@ -940,6 +940,10 @@ export const createOrder = (
             promo: cartPromo,
             baseShippingFee: shipping,
             freeShipping: hasFreeShippingFromOffer,
+            // The post-discount minimum from the same settings read as the
+            // quote; computeCartTotals compares it against the FINAL goods
+            // amount it just computed from server prices (never the client's).
+            freeShippingMinimumAfterDiscounts: shippingQuoteResult.response.freeShippingMinimumAfterDiscounts,
           });
           const effectiveShipping = pricing.shipping;
 
@@ -965,6 +969,8 @@ export const createOrder = (
             mode: shippingQuoteResult.response.mode,
             freeShippingApplied: pricing.freeShippingSource !== null,
             freeShippingSource: pricing.freeShippingSource,
+            freeShippingMinimumAfterDiscounts: shippingQuoteResult.response.freeShippingMinimumAfterDiscounts,
+            merchandiseTotalAfterDiscounts: pricing.merchandiseTotalAfterDiscounts,
             chargedFee: effectiveShipping,
             rulesUpdatedAt: shippingQuoteResult.stored.updatedAt,
           });

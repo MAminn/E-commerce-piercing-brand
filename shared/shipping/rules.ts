@@ -41,17 +41,54 @@ export type ShippingMode = z.infer<typeof shippingModeSchema>;
 
 export const governorateCodeSchema = z.enum(GOVERNORATE_CODES);
 
+/**
+ * Free shipping once the FINAL merchandise amount — after bundle/set pricing,
+ * automatic offers and promo codes, excluding shipping — reaches this many
+ * EGP. Evaluated by `computeCartTotals` (shared/bundles/cart-pricing.ts) for
+ * both the cart preview and create-order. Independent of, and in addition to,
+ * the set / offer / promo-code free-shipping switches.
+ */
+export const DEFAULT_FREE_SHIPPING_MINIMUM_AFTER_DISCOUNTS = 1000;
+
+/** Sanity ceiling for the minimum, so a typo cannot be saved as a threshold no cart reaches by accident. */
+export const MAX_FREE_SHIPPING_MINIMUM = 1_000_000;
+
+const freeShippingMinimumSchema = z
+  .number()
+  .finite()
+  .positive()
+  .max(MAX_FREE_SHIPPING_MINIMUM)
+  .refine((n) => Math.round(n * 100) === n * 100, {
+    message: "The minimum is whole piasters — at most two decimal places",
+  });
+
 export const shippingRulesConfigSchema = z.object({
   version: z.literal(1),
   mode: shippingModeSchema,
   currency: z.literal(SHIPPING_CURRENCY),
   rates: z.record(governorateCodeSchema, feeSchema.nullable()),
   fallbackFee: feeSchema.nullable(),
+  /**
+   * EGP. A number → that minimum; `null` → the rule is switched off; absent
+   * (every config saved before this setting existed) →
+   * DEFAULT_FREE_SHIPPING_MINIMUM_AFTER_DISCOUNTS. Read it through
+   * `resolveFreeShippingMinimum`, never directly.
+   */
+  freeShippingMinimumAfterDiscounts: freeShippingMinimumSchema.nullable().optional(),
 });
 
 export type ShippingRulesConfig = z.infer<typeof shippingRulesConfigSchema>;
 
-/** What a NULL `shipping_rules` column resolves to: the legacy flat behaviour. */
+/** The post-discount free-shipping minimum in force, in EGP, or null when the merchant switched it off. */
+export function resolveFreeShippingMinimum(rules: ShippingRulesConfig): number | null {
+  const value = rules.freeShippingMinimumAfterDiscounts;
+  return value === undefined ? DEFAULT_FREE_SHIPPING_MINIMUM_AFTER_DISCOUNTS : value;
+}
+
+/**
+ * What a NULL `shipping_rules` column resolves to: the legacy flat behaviour,
+ * plus the default post-discount free-shipping minimum (the key is absent).
+ */
 export const DEFAULT_SHIPPING_RULES: ShippingRulesConfig = {
   version: 1,
   mode: "flat",
