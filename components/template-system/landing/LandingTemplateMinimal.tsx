@@ -224,7 +224,7 @@ function SetsMerch({ campaigns }: { campaigns: BundleCardCampaign[] }) {
  * Homepage — the shop window.
  *
  * Image first, in one clear order:
- *   Hero → Shop by placement → Sets → New in → one large piece → more pieces
+ *   Hero → Sets → Shop by placement → New in → one large piece → more pieces
  * (then the global footer). Each block reads its data from the existing sources
  * and disappears when that data is not there. The CMS section switches still
  * apply (categories, new arrivals, featured products, bundles).
@@ -376,17 +376,6 @@ export function LandingTemplateMinimal({
       {/* Promotional offer block (shared/config/promo-layer, off) */}
       <OfferBlock />
 
-      {showPlacements && (
-        <HomeSection id='home-placement'>
-          <SectionHead
-            id='home-placement-title'
-            title={label(content.categories.title, content.categories.titleAr, "home.shop_by_placement")}
-            action={{ href: "/shop", text: t("home.shop_all") }}
-          />
-          <PlacementMosaic tiles={tiles} />
-        </HomeSection>
-      )}
-
       {sets.length > 0 && (
         <section aria-labelledby='home-sets-title' data-home-section='home-sets' className='bg-ink py-8 lg:py-12'>
           <div className='perce-container'>
@@ -400,6 +389,17 @@ export function LandingTemplateMinimal({
             <SetsMerch campaigns={sets} />
           </div>
         </section>
+      )}
+
+      {showPlacements && (
+        <HomeSection id='home-placement'>
+          <SectionHead
+            id='home-placement-title'
+            title={label(content.categories.title, content.categories.titleAr, "home.shop_by_placement")}
+            action={{ href: "/shop", text: t("home.shop_all") }}
+          />
+          <PlacementMosaic tiles={tiles} />
+        </HomeSection>
       )}
 
       {newIn.length > 0 && (

@@ -119,12 +119,12 @@ const plain = (html: string) => html.replace(/ /g, " ");
 const sections = (html: string) => [...html.matchAll(/data-home-section="([^"]+)"/g)].map((m) => m[1]);
 
 describe("Homepage", () => {
-  it("orders the page: hero → placement → sets → new in → one large piece", () => {
+  it("orders the page: hero → sets → placement → new in → one large piece", () => {
     const html = render();
-    expect(html.indexOf("<h1")).toBeLessThan(html.indexOf('data-home-section="home-placement"'));
-    expect(sections(html)).toEqual(["home-placement", "home-sets", "home-new-in", "home-object"]);
+    expect(html.indexOf("<h1")).toBeLessThan(html.indexOf('data-home-section="home-sets"'));
+    expect(sections(html)).toEqual(["home-sets", "home-placement", "home-new-in", "home-object"]);
     const text = html.replace(/<[^>]+>/g, "");
-    expect(text).toMatch(/Shop by placement[\s\S]*Sets[\s\S]*New in/);
+    expect(text).toMatch(/Sets[\s\S]*Shop by placement[\s\S]*New in/);
   });
 
   it("is not an index: no numbered sections, no catalogue numbers on cards", () => {
@@ -145,7 +145,7 @@ describe("Homepage", () => {
 
   it("placements are photo blocks: each one a link, sub-placements on the first, no counts", () => {
     const html = plain(render());
-    const block = html.slice(html.indexOf('data-testid="placement-tiles"'), html.indexOf('data-home-section="home-sets"'));
+    const block = html.slice(html.indexOf('data-testid="placement-tiles"'), html.indexOf('data-home-section="home-new-in"'));
     const text = block.replace(/<[^>]+>/g, " ");
     expect([...block.matchAll(/data-placement-tile="([^"]+)"/g)].map((m) => m[1])).toEqual(["ear-piercings", "nose-piercings"]);
     expect(block).toContain('href="/categories/ear-piercings"');
@@ -236,7 +236,7 @@ describe("Homepage", () => {
 
   it("Sets: photo cards with the campaign's own offer and a clear way in; no sold-out set, no saving", () => {
     const html = plain(render());
-    const block = html.slice(html.indexOf('data-testid="sets-merch"'), html.indexOf('data-home-section="home-new-in"'));
+    const block = html.slice(html.indexOf('data-testid="sets-merch"'), html.indexOf('data-home-section="home-placement"'));
     expect([...block.matchAll(/data-bundle-card="([^"]+)"/g)].map((m) => m[1])).toEqual([
       "pick-your-3",
       "pick-your-set",
@@ -265,7 +265,7 @@ describe("Homepage", () => {
     });
     const extra = ["x", "y", "z"].map((s) => campaign(s, `Set ${s}`, "build_your_stack"));
     const html = plain(render({ setCampaigns: [upTo, from, ...extra] }));
-    const block = html.slice(html.indexOf('data-testid="sets-merch"'), html.indexOf('data-home-section="home-new-in"'));
+    const block = html.slice(html.indexOf('data-testid="sets-merch"'), html.indexOf('data-home-section="home-placement"'));
     const text = block.replace(/<[^>]+>/g, " ");
     expect(text).toContain("Up to 20% off");
     expect(text).toContain("+ free shipping");
