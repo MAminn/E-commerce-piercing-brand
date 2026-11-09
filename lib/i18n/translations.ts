@@ -386,7 +386,7 @@ export const translations: Record<Locale, Record<string, string>> = {
     "product.click_to_expand": "Click to expand",
     "product.add": "Add",
     "product.added_to_cart_body": "{name} has been added to your cart.",
-    // Recent-order toast (social proof), ported from Mach.
+    // Recent-order toast (social proof) and product upsells, ported from Mach.
     "social_proof.eyebrow": "Recent order",
     "social_proof.ordered": "{name} just ordered",
     "social_proof.ordered_in": "{name} in {location} just ordered",
@@ -397,6 +397,17 @@ export const translations: Record<Locale, Record<string, string>> = {
     "social_proof.days_ago": "{count} days ago",
     "social_proof.view_product": "View product.",
     "social_proof.dismiss": "Dismiss recent order notifications",
+    "upsell.heading_manual": "Frequently bought together",
+    "upsell.heading_random": "Add to your order",
+    "upsell.post_add_heading": "You may also like",
+    "upsell.add": "Add",
+    "upsell.add_label": "Add {name} to bag",
+    "upsell.added": "Added",
+    "upsell.added_label": "{name} added to bag",
+    "upsell.options": "Options",
+    "upsell.options_label": "Choose options for {name}",
+    "upsell.unavailable": "Unavailable",
+    "upsell.sheet_description": "{name} is in your bag. Recommended products follow.",
   },
   ar: {
     // Navbar
@@ -766,7 +777,7 @@ export const translations: Record<Locale, Record<string, string>> = {
     "product.click_to_expand": "اضغطي للتكبير",
     "product.add": "أضيفي",
     "product.added_to_cart_body": "تمت إضافة {name} إلى سلتك.",
-    // Recent-order toast (social proof), ported from Mach.
+    // Recent-order toast (social proof) and product upsells, ported from Mach.
     "social_proof.eyebrow": "طلب حديث",
     "social_proof.ordered": "طلب جديد من {name}",
     "social_proof.ordered_in": "طلب جديد من {name} في {location}",
@@ -777,5 +788,16 @@ export const translations: Record<Locale, Record<string, string>> = {
     "social_proof.days_ago": "منذ {count} أيام",
     "social_proof.view_product": "عرض المنتج.",
     "social_proof.dismiss": "إخفاء إشعارات الطلبات الحديثة",
+    "upsell.heading_manual": "يُشترى معاً عادةً",
+    "upsell.heading_random": "أضيفي إلى طلبك",
+    "upsell.post_add_heading": "قد يعجبك أيضاً",
+    "upsell.add": "أضيفي",
+    "upsell.add_label": "أضيفي {name} إلى الحقيبة",
+    "upsell.added": "تمت الإضافة",
+    "upsell.added_label": "تمت إضافة {name} إلى الحقيبة",
+    "upsell.options": "الخيارات",
+    "upsell.options_label": "اختاري خيارات {name}",
+    "upsell.unavailable": "غير متاح",
+    "upsell.sheet_description": "{name} في حقيبتك. منتجات مقترحة أدناه.",
   },
 };

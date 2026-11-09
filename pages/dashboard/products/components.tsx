@@ -36,6 +36,14 @@ import { MultiFileUploadInput } from "#root/components/file-uploads/MultiFileUpl
 import { Label } from "#root/components/ui/label";
 import { Badge } from "#root/components/ui/badge";
 import { Switch } from "#root/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "#root/components/ui/select";
+import { UPSELL_MODES, normalizeUpsellMode } from "#root/shared/upsell/config";
 import { trpc } from "#root/shared/trpc/client";
 import { CategoryPicker, type CategoryOption } from "./CategoryPicker";
 
@@ -192,6 +200,7 @@ export function ProductForm({
     sortOrder?: number;
     hidden?: boolean;
     bestLayeredWithIds?: string[] | null;
+    upsellMode?: string | null;
     /** Customer-facing catalogue number, 1–999 ("014"). `null` = not numbered yet. */
     catalogueNo?: number | null;
     /** Merchant-only internal reference code, e.g. FB001. */
@@ -250,6 +259,7 @@ export function ProductForm({
     sortOrder: z.coerce.number().int().min(0).optional(),
     hidden: z.boolean().default(false),
     bestLayeredWithIds: z.array(z.string()).optional().default([]),
+    upsellMode: z.enum(UPSELL_MODES).default("global"),
     /**
      * Merchant-only. Normalized again on the server; doing it here too means
      * the admin sees the canonical form ("FB001") before saving.
@@ -333,6 +343,7 @@ export function ProductForm({
       bestLayeredWithIds: Array.isArray(initialValues?.bestLayeredWithIds)
         ? initialValues.bestLayeredWithIds
         : [],
+      upsellMode: normalizeUpsellMode(initialValues?.upsellMode),
       internalCode: initialValues?.internalCode ?? "",
       catalogueNo: initialValues?.catalogueNo ?? null,
       // A stored NULL cost stays null in the form so the input renders empty
@@ -560,17 +571,60 @@ export function ProductForm({
             )}
           />
 
-          <FormField
-            control={form.control}
-            name='bestLayeredWithIds'
-            render={({ field }) => (
-              <StyleItWithPicker
-                value={field.value ?? []}
-                onChange={field.onChange}
-                excludeProductId={initialValues?.id}
-              />
-            )}
-          />
+          {/* Upsells (ported from Mach). One mode per product; the manual
+              list is the "Style It With" list below (DB column still the
+              legacy `best_layered_with_ids`), so there is one relation, not
+              two. */}
+          <div className='space-y-3 rounded-md border p-4'>
+            <FormField
+              control={form.control}
+              name='upsellMode'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Upsells</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger className='w-full' data-testid='upsell-mode-select'>
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value='global'>Use global default</SelectItem>
+                      <SelectItem value='manual'>Manual products</SelectItem>
+                      <SelectItem value='disabled'>Disabled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className='text-xs text-muted-foreground'>
+                    {field.value === "manual"
+                      ? "Only the Style It With products below are recommended, in the order picked. Out-of-stock or hidden picks are skipped automatically."
+                      : field.value === "disabled"
+                        ? "No upsell recommendations for this product."
+                        : "Random in-stock products, chosen automatically. Store-wide rules are in Settings → Upsells."}
+                  </p>
+                  {field.value === "manual" &&
+                    (form.watch("bestLayeredWithIds") ?? []).length === 0 && (
+                      <p className='text-xs text-amber-700'>
+                        Pick at least one Style It With product — with none
+                        picked, this product shows no upsells.
+                      </p>
+                    )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name='bestLayeredWithIds'
+              render={({ field }) => (
+                <StyleItWithPicker
+                  value={field.value ?? []}
+                  onChange={field.onChange}
+                  excludeProductId={initialValues?.id}
+                />
+              )}
+            />
+          </div>
 
           <div className='grid grid-cols-2 gap-4'>
             <FormField

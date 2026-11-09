@@ -18,6 +18,12 @@ import {
   toPurchasableOptionGroups,
 } from "#root/shared/products/options";
 import type { FeaturedProduct } from "#root/components/template-system/home/HomeFeaturedProducts";
+import type { ProductUpsells } from "#root/components/storefront/upsell/types";
+import { getUpsellSessionSeed } from "#root/components/storefront/upsell/upsellSeed";
+import {
+  productPageUpsellProps,
+  type UpsellResponse,
+} from "#root/components/storefront/upsell/productPageUpsellProps";
 
 /** A group of products belonging to a single category type */
 export interface CategoryProductGroup {
@@ -34,6 +40,10 @@ export default function ProductDetailPage() {
   const { addItem, items } = useCart();
   const { trackEvent } = useTracking();
   const hasTrackedView = useRef<string | null>(null);
+  // Read when the upsell request is made, not a fetch dependency — a cart
+  // change must not refetch the whole page.
+  const cartProductIds = useRef<string[]>([]);
+  cartProductIds.current = items.map((i) => i.id);
 
   const [productData, setProductData] = useState<ProductPageProduct | null>(
     null,
@@ -43,6 +53,7 @@ export default function ProductDetailPage() {
     [],
   );
   const [allProducts, setAllProducts] = useState<FeaturedProduct[]>([]);
+  const [upsells, setUpsells] = useState<ProductUpsells | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,12 +81,27 @@ export default function ProductDetailPage() {
 
       // Fetch reviews — use the resolved real product id, not the route
       // param, since that may be a slug and getReviews requires a UUID.
-      const reviewsResponse = await trpc.product.getReviews.query({
-        productId: product.id,
-      });
+      // Upsells come from the one server resolver, fetched alongside; a
+      // failure there only means no upsells, never a broken page.
+      const [reviewsResponse, upsellResponse] = await Promise.all([
+        trpc.product.getReviews.query({
+          productId: product.id,
+        }),
+        trpc.upsell.forProduct
+          .query({
+            productId: product.id,
+            excludeProductIds: [...new Set(cartProductIds.current)].slice(0, 100),
+            seed: getUpsellSessionSeed(),
+          })
+          .catch(() => null),
+      ]);
       const reviewsData = reviewsResponse.success
         ? reviewsResponse.result
         : null;
+      const upsellData =
+        upsellResponse && upsellResponse.success
+          ? (upsellResponse.result as UpsellResponse)
+          : null;
 
       // ── Helpers ──
       const mapViewToFeatured = (items: any[]): FeaturedProduct[] =>
@@ -175,6 +201,15 @@ export default function ProductDetailPage() {
         totalReviews: reviewsData?.totalReviews || 0,
       };
 
+      // While upsells are on, the curated "Style It With" list is this
+      // product's manual upsell list and is shown by the upsell block, so the
+      // templates that draw that strip do not draw it a second time. With
+      // upsells off (the shipped default) or unreachable, nothing changes.
+      const upsellProps = productPageUpsellProps(
+        upsellData,
+        product.bestLayeredWith ?? [],
+      );
+
       // Map product data to ProductPageProduct interface
       const mappedProduct: ProductPageProduct = {
         id: product.id,
@@ -201,13 +236,14 @@ export default function ProductDetailPage() {
         reviewCount: reviewStats.totalReviews,
         variants: product.variants ?? [],
         fragranceInfo: product.fragranceInfo ?? null,
-        bestLayeredWith: product.bestLayeredWith ?? [],
+        bestLayeredWith: upsellProps.curatedAddOns,
       };
 
       setProductData(mappedProduct);
       setRelatedProducts(mappedRelatedProducts);
       setCategoryGroups(groups);
       setAllProducts(allProds);
+      setUpsells(upsellProps.upsells);
       setIsLoading(false);
       setError(null);
 
@@ -280,6 +316,7 @@ export default function ProductDetailPage() {
       categoryGroups={categoryGroups}
       allProducts={allProducts}
       isLoading={isLoading}
+      upsells={upsells}
       onAddToCart={(
         product: ProductPageProduct,
         selectedOptions?: Record<string, string>,
@@ -332,6 +369,7 @@ export default function ProductDetailPage() {
             },
           });
         }
+        return success;
       }}
       onAddToWishlist={(product: ProductPageProduct) =>
         console.log("Add to wishlist", product.id)

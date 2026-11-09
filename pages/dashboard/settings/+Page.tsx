@@ -26,6 +26,7 @@ import {
 import { STORE_CURRENCY } from "#root/shared/config/branding";
 import { v7 } from "uuid";
 import { ShippingSettingsCard } from "./ShippingSettingsCard";
+import { UpsellSettingsCard } from "./UpsellSettingsCard";
 
 export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(true);
@@ -354,6 +355,8 @@ export default function SettingsPage() {
       </div>
 
       <ShippingSettingsCard />
+
+      <UpsellSettingsCard />
 
       {/* Product Page Content Card */}
       <Card>

@@ -11,6 +11,7 @@ import { and, eq, inArray, not } from "drizzle-orm";
 import { Effect } from "effect";
 import { normalizeProductCategoryIds } from "#root/backend/categories/hierarchy";
 import { z } from "zod";
+import { UPSELL_MODES } from "#root/shared/upsell/config";
 import { validateProductRules, fragranceInfoSchema } from "../shared";
 import { assertCatalogueNoAvailable, catalogueNoConflict, catalogueNoInputSchema } from "../catalogue-no";
 import {
@@ -66,6 +67,8 @@ export const editProductSchema = z.object({
   hidden: z.boolean().optional().default(false),
   fragranceInfo: fragranceInfoSchema,
   bestLayeredWithIds: z.array(z.string().uuid()).optional(),
+  /** Upsell mode; the manual list is `bestLayeredWithIds`. */
+  upsellMode: z.enum(UPSELL_MODES).optional(),
   /**
    * Merchant-only. Trimmed and upper-cased by the schema; an empty string
    * clears the code back to NULL. Omitting the key entirely leaves the stored
@@ -165,6 +168,8 @@ export const editProduct = (
               ...(data.bestLayeredWithIds !== undefined
                 ? { bestLayeredWithIds: data.bestLayeredWithIds }
                 : {}),
+              // Omitted by an older client = keep what is stored.
+              ...(data.upsellMode ? { upsellMode: data.upsellMode } : {}),
               // Merchant-only fields. Same "omitted means leave alone"
               // rule as the legacy columns above: a client that doesn't
               // send them must not clear them. Sending an empty code, or a

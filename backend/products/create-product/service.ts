@@ -10,6 +10,7 @@ import { ServerError } from "#root/shared/error/server";
 import { Effect } from "effect";
 import { normalizeProductCategoryIds } from "#root/backend/categories/hierarchy";
 import { z } from "zod";
+import { UPSELL_MODES } from "#root/shared/upsell/config";
 import { validateProductRules, fragranceInfoSchema } from "../shared";
 import {
   costPriceInputSchema,
@@ -67,6 +68,8 @@ export const createProductSchema = z.object({
   hidden: z.boolean().optional().default(false),
   fragranceInfo: fragranceInfoSchema,
   bestLayeredWithIds: z.array(z.string().uuid()).optional(),
+  /** Upsell mode; the manual list is `bestLayeredWithIds`. */
+  upsellMode: z.enum(UPSELL_MODES).optional(),
   /** Merchant-only. Trimmed and upper-cased by the schema; blank stores NULL. */
   internalCode: internalCodeInputSchema,
   /** Merchant-only, EGP. Blank stores NULL — never 0. */
@@ -132,6 +135,7 @@ export const createProduct = (
               hidden: data.hidden ?? false,
               fragranceInfo: data.fragranceInfo ?? null,
               bestLayeredWithIds: data.bestLayeredWithIds ?? [],
+              upsellMode: data.upsellMode ?? "global",
               internalCode,
               // NULL when the admin left it blank; deliberately not 0.
               costPrice: costPriceToColumn(data.costPrice),

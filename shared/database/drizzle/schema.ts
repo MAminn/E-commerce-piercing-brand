@@ -16,6 +16,7 @@ import { sql } from "drizzle-orm";
 import { v7 } from "uuid";
 import type { ShippingSnapshot } from "#root/shared/shipping/quote";
 import type { ShippingRulesConfig } from "#root/shared/shipping/rules";
+import type { UpsellSettings } from "#root/shared/upsell/config";
 
 export const userRole = pgEnum("user_role", ["admin", "vendor", "user", "superadmin"]);
 
@@ -388,10 +389,17 @@ export const product = pgTable("product", {
     ingredientsAr?: string;
     badges?: string[];
   }>(),
-  /** Admin-picked product IDs shown in the "Style It With" carousel on this product's page. Empty/unset hides the section. Column name is the fragrance-era one, kept to avoid a migration. */
+  /** Admin-picked product IDs shown in the "Style It With" carousel on this product's page. Empty/unset hides the section. Column name is the fragrance-era one, kept to avoid a migration.
+   * Also the ordered manual list for upsells when `upsellMode` is "manual". */
   bestLayeredWithIds: jsonb("best_layered_with_ids")
     .default([])
     .$type<string[]>(),
+  /** How this product's upsells are chosen: "global" (store default — random),
+   * "manual" (exactly `bestLayeredWithIds`, in order) or "disabled". See
+   * shared/upsell/config.ts. Ported from the Mach template. */
+  upsellMode: text("upsell_mode", { enum: ["global", "manual", "disabled"] })
+    .notNull()
+    .default("global"),
   /**
    * Merchant-only internal reference code (e.g. FB001, ER001) for the
    * inventory/supplier system. This is NOT the customer-facing "SKU" the
@@ -1679,6 +1687,9 @@ export const storeSettings = pgTable("store_settings", {
   socialProofConfig: jsonb("social_proof_config").$type<SocialProofConfig>(),
   emailAutomationSettings: jsonb("email_automation_settings").$type<EmailAutomationSettings>(),
   typographySettings: jsonb("typography_settings").$type<TypographySettings>(),
+  /** Store-wide upsell switches. Null/partial rows inherit the defaults in
+   * shared/upsell/config.ts (which ship upsells OFF). */
+  upsellConfig: jsonb("upsell_config").$type<Partial<UpsellSettings>>(),
   updatedAt: timestamp("updated_at", {
     withTimezone: true,
     mode: "date",

@@ -31,6 +31,15 @@ import {
   MinimalProductCard,
   type MinimalProduct,
 } from "#root/components/template-system/minimal/MinimalProductCard";
+import {
+  resolvePurchasableLinePrice,
+  resolveSelectedOptions,
+  toPurchasableOptionGroups,
+} from "#root/shared/products/options";
+import { ProductUpsellBlock } from "#root/components/storefront/upsell/ProductUpsellBlock";
+import { PostAddUpsellSheet } from "#root/components/storefront/upsell/PostAddUpsellSheet";
+import { useProductUpsells } from "#root/components/storefront/upsell/useProductUpsells";
+import type { ProductUpsells } from "#root/components/storefront/upsell/types";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -39,15 +48,25 @@ export interface ProductPagePremiumProps {
   relatedProducts?: FeaturedProduct[];
   showWishlist?: boolean;
   showSocialShare?: boolean;
+  /**
+   * Returns `false` when the cart refused the add (stock). `void`/`true` is
+   * treated as accepted, so a caller that returns nothing behaves as before.
+   */
   onAddToCart?: (
     product: ProductPageProduct,
     selectedOptions?: Record<string, string>,
     quantity?: number,
-  ) => void;
+  ) => void | boolean;
   onAddToWishlist?: (product: ProductPageProduct) => void;
   onImageClick?: (imageUrl: string, index: number) => void;
   isLoading?: boolean;
   className?: string;
+  /**
+   * Upsell recommendations from the server resolver (ported from Mach).
+   * Drives the compact block under the purchase controls and the post-add
+   * sheet; absent (upsells off, the shipped default) = neither.
+   */
+  upsells?: ProductUpsells;
 }
 
 // ─── Mock / Defaults ────────────────────────────────────────────────────────
@@ -376,8 +395,10 @@ export function ProductPagePremium({
   onImageClick,
   isLoading = false,
   className = "",
+  upsells,
 }: ProductPagePremiumProps) {
   const { t, locale } = useMinimalI18n();
+  const upsell = useProductUpsells(upsells);
   const { categories: categoryRows } = useStorefrontCategories();
   const { toggle: toggleWishlist, isWishlisted } = useWishlist();
   // ── Image state
@@ -457,12 +478,36 @@ export function ProductPagePremium({
     // IMPORTANT: invoke parent first so the Meta Pixel `AddToCart` event
     // fires upstream BEFORE the visual toast is shown. The chosen quantity
     // travels with it — it used to be dropped, so the stepper did nothing.
-    onAddToCart?.(product, selectedVariants, quantity);
-    showCartToast({
-      name: product.name,
-      price: displayPrice,
-      imageUrl: product.imageUrl || product.images?.[0]?.url || "",
-    });
+    const accepted = onAddToCart?.(product, selectedVariants, quantity) !== false;
+    const addedImage = product.imageUrl || product.images?.[0]?.url || "";
+
+    // The cart has accepted the product. The upsell sheet is the add's
+    // confirmation when it has something to offer; otherwise the usual toast
+    // exactly as before. Its price line is the chosen configuration's — the
+    // same helper the cart line and checkout use.
+    const resolved = resolveSelectedOptions(
+      toPurchasableOptionGroups(product.variants ?? []),
+      selectedVariants,
+    );
+    const sheetOpened =
+      accepted &&
+      upsell.openAfterAdd({
+        id: product.id,
+        name: product.name,
+        price: resolved.ok
+          ? resolvePurchasableLinePrice(displayPrice, resolved.priceModifier)
+          : displayPrice,
+        quantity,
+        imageUrl: addedImage,
+        selectedOptions: selectedVariants,
+      });
+    if (!sheetOpened) {
+      showCartToast({
+        name: product.name,
+        price: displayPrice,
+        imageUrl: addedImage,
+      });
+    }
   };
   const handleWishlist = () => {
     toggleWishlist(product.id);
@@ -644,6 +689,18 @@ export function ProductPagePremium({
                 <li>{fill(t("product.delivery_fee_range"), { range: formatShippingFeeRange(moneyLocale) })}</li>
               </ul>
 
+              {/* Upsells (ported from Mach) — next to the decision they add
+                  to. Nothing renders while upsells are off. */}
+              <ProductUpsellBlock
+                products={upsell.blockItems}
+                heading={
+                  upsells?.source === "manual"
+                    ? t("upsell.heading_manual")
+                    : t("upsell.heading_random")
+                }
+                className='mt-6'
+              />
+
               {/* Promotional set link (shared/config/promo-layer, off) —
                   only when this product is in a live Pick Your Set pool. */}
               <PdpBundleLink productId={product.id} />
@@ -727,6 +784,13 @@ export function ProductPagePremium({
           </div>
         </section>
       )}
+
+      <PostAddUpsellSheet
+        open={upsell.sheet !== null}
+        main={upsell.sheet?.main ?? null}
+        products={upsell.sheet?.items ?? []}
+        onClose={upsell.closeSheet}
+      />
 
       {/* ────────────────── Lightbox ────────────────── */}
       {lightboxOpen && images.length > 0 && (
