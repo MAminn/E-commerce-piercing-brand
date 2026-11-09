@@ -19,6 +19,7 @@ import { bundlesRouter } from "#root/backend/bundles/trpc";
 import { emailSubscriptionRouter } from "#root/backend/email-subscription/trpc";
 import { emailTemplatesRouter } from "#root/backend/email-automations/templates/trpc";
 import { popupRouter } from "#root/backend/popup/trpc";
+import { socialProofRouter } from "#root/backend/social-proof/trpc";
 import { cartCaptureRouter } from "#root/backend/cart-capture/trpc";
 import { broadcastRouter } from "#root/backend/email-automations/broadcast/trpc";
 import { emailAutomationSettingsRouter } from "#root/backend/email-automations/settings-trpc";
@@ -56,6 +57,7 @@ export const appRouter = router({
   emailSubscription: emailSubscriptionRouter,
   emailTemplates: emailTemplatesRouter,
   popup: popupRouter,
+  socialProof: socialProofRouter,
   cartCapture: cartCaptureRouter,
   broadcast: broadcastRouter,
   emailAutomationSettings: emailAutomationSettingsRouter,

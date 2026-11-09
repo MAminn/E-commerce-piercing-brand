@@ -11,6 +11,7 @@ import { toast, Toaster } from "sonner";
 import { CartToastContainer } from "#root/components/ui/cart-toast";
 import { EntryPopup } from "#root/components/EntryPopup";
 import { StickyCartBar } from "#root/components/ui/StickyCartBar";
+import { SocialProofToast } from "#root/components/storefront/social-proof/SocialProofToast";
 import type { ClientSession } from "#root/backend/auth/shared/entities.js";
 import { usePageContext } from "vike-react/usePageContext";
 import { AuthContext } from "#root/context/AuthContext.js";
@@ -313,6 +314,13 @@ function LayoutShell({
             {showGlobalChrome && <GlobalFooter isMinimal={isMinimal} />}
             {!isDashboardRoute && <CartToastContainer />}
             {!isDashboardRoute && <EntryPopup />}
+            {/* CMS-controlled recent-order toast (ported from Mach; ships
+                disabled). Same storefront-shell gate as the Percé chrome —
+                it is drawn in the Percé card language and reads the minimal
+                shell's translations. The component keeps its own route
+                exclusion list (checkout, cart, auth, account…), so mounting
+                it here does not mean showing it everywhere. */}
+            {!isDashboardRoute && isMinimal && <SocialProofToast />}
             {/* Minimal template: phones reach the bag from the header and
                 the offers page from the menu, so this offer/bag bar is
                 desktop-only there. There is no mobile bottom nav. */}

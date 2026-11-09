@@ -1562,6 +1562,39 @@ export interface PopupDiscountConfig {
   codeMode: "existing" | "generate";
 }
 
+// ─── Social Proof config ────────────────────────────────────────────────────
+// Drives the storefront's "recent order" toast (ported from the Mach
+// template). Entirely separate from the Entry Popup above — different
+// surface, different lifecycle, different admin page — so the two are stored
+// in their own columns and neither can break the other.
+//
+// Every field here is presentational or a query bound; the whole object is
+// safe to hand to an anonymous client. What is NOT safe is the order data the
+// feed is built from, which is why the events themselves are sanitised
+// server-side (backend/social-proof/sanitize.ts) and the raw order row never
+// leaves the server.
+
+export interface SocialProofConfig {
+  enabled: boolean;
+  /** Seconds after mount before the first toast appears. */
+  firstDelaySeconds: number;
+  /** Seconds a single toast stays on screen. */
+  displayDurationSeconds: number;
+  /** Seconds between the end of one toast and the start of the next. */
+  intervalSeconds: number;
+  /** Hard cap on toasts shown per browser tab/session. */
+  maxPerSession: number;
+  /** Only orders placed within this many days are eligible. */
+  lookbackDays: number;
+  showLocation: boolean;
+  /** Which broad shipping field supplies the location — never a street address. */
+  locationSource: "city" | "governorate";
+  showRelativeTime: boolean;
+  /** Empty = every eligible product. Otherwise restricted to these product ids. */
+  allowedProductIds: string[];
+  eligibleStatuses: Array<"processing" | "shipped" | "delivered">;
+}
+
 // ─── Typography ─────────────────────────────────────────────────────────────
 // Admin-uploaded fonts (custom_font_file table below) grouped by familyName,
 // assigned per-role here. A role of `null` means "use the site's built-in
@@ -1643,6 +1676,7 @@ export const storeSettings = pgTable("store_settings", {
     }>(),
   popupConfig: jsonb("popup_config").$type<PopupConfig>(),
   popupDiscountConfig: jsonb("popup_discount_config").$type<PopupDiscountConfig>(),
+  socialProofConfig: jsonb("social_proof_config").$type<SocialProofConfig>(),
   emailAutomationSettings: jsonb("email_automation_settings").$type<EmailAutomationSettings>(),
   typographySettings: jsonb("typography_settings").$type<TypographySettings>(),
   updatedAt: timestamp("updated_at", {

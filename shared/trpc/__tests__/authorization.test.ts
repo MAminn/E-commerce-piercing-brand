@@ -74,6 +74,9 @@ const PUBLIC = new Set([
   "emailSubscription.resubscribe",
   "popup.getPublicConfig",
   "popup.claim",
+  // Recent-order toast feed: only server-sanitised events (first name +
+  // initial, broad location, product) — backend/social-proof/sanitize.ts.
+  "socialProof.getPublicFeed",
   "cartCapture.sync",
   "cartCapture.attachEmail",
   "cartCapture.markConverted",

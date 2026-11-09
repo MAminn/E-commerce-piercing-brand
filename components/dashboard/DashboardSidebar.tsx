@@ -17,6 +17,7 @@ import {
   Tag,
   Mail,
   Gift,
+  BellRing,
   Type,
   Layers,
 } from "lucide-react";
@@ -91,6 +92,7 @@ export function DashboardSidebar() {
         { label: "Pixels & Tracking", href: "/dashboard/admin/pixels", icon: Radio },
         { label: "Marketing Emails", href: "/dashboard/admin/marketing-emails", icon: Mail },
         { label: "Entry Popup", href: "/dashboard/admin/popup", icon: Gift },
+        { label: "Social Proof", href: "/dashboard/admin/social-proof", icon: BellRing },
         { label: "Analytics", href: "/dashboard/admin/analytics", icon: BarChart3 },
       ],
     },

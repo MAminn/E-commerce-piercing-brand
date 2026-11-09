@@ -386,6 +386,17 @@ export const translations: Record<Locale, Record<string, string>> = {
     "product.click_to_expand": "Click to expand",
     "product.add": "Add",
     "product.added_to_cart_body": "{name} has been added to your cart.",
+    // Recent-order toast (social proof), ported from Mach.
+    "social_proof.eyebrow": "Recent order",
+    "social_proof.ordered": "{name} just ordered",
+    "social_proof.ordered_in": "{name} in {location} just ordered",
+    "social_proof.just_now": "Just now",
+    "social_proof.minutes_ago": "{count} min ago",
+    "social_proof.hours_ago": "{count} hr ago",
+    "social_proof.day_ago": "1 day ago",
+    "social_proof.days_ago": "{count} days ago",
+    "social_proof.view_product": "View product.",
+    "social_proof.dismiss": "Dismiss recent order notifications",
   },
   ar: {
     // Navbar
@@ -755,5 +766,16 @@ export const translations: Record<Locale, Record<string, string>> = {
     "product.click_to_expand": "اضغطي للتكبير",
     "product.add": "أضيفي",
     "product.added_to_cart_body": "تمت إضافة {name} إلى سلتك.",
+    // Recent-order toast (social proof), ported from Mach.
+    "social_proof.eyebrow": "طلب حديث",
+    "social_proof.ordered": "طلب جديد من {name}",
+    "social_proof.ordered_in": "طلب جديد من {name} في {location}",
+    "social_proof.just_now": "الآن",
+    "social_proof.minutes_ago": "منذ {count} دقيقة",
+    "social_proof.hours_ago": "منذ {count} ساعة",
+    "social_proof.day_ago": "منذ يوم",
+    "social_proof.days_ago": "منذ {count} أيام",
+    "social_proof.view_product": "عرض المنتج.",
+    "social_proof.dismiss": "إخفاء إشعارات الطلبات الحديثة",
   },
 };
