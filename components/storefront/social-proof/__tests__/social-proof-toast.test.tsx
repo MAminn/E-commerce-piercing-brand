@@ -205,12 +205,14 @@ describe("SocialProofToast content and gates", () => {
     expect(card.querySelector("a button")).toBeNull();
   });
 
-  it("capitalises only the name and the place, never the sentence", async () => {
+  it("preserves the exact customer name while capitalising only the place", async () => {
     feed([event(1, { displayName: "sara k.", location: "giza" })]);
     await mount();
     await advance(5.1);
-    const caps = [...cards()[0]!.querySelectorAll(".capitalize")].map((el) => el.textContent);
-    expect(caps).toEqual(["sara k.", "giza"]);
+    const card = cards()[0]!;
+    const caps = [...card.querySelectorAll(".capitalize")].map((el) => el.textContent);
+    expect(card.textContent).toContain("sara k. in giza just ordered");
+    expect(caps).toEqual(["giza"]);
   });
 
   it("omits location and time when the admin has them off, and copes with no image", async () => {
