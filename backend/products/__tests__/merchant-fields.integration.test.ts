@@ -299,6 +299,223 @@ describeIfDb("product merchant-only fields (integration)", () => {
     });
   });
 
+  // ─── Internal code: a product keeps its own code through the admin API ───
+  //
+  // These go through the real `product.create` / `product.edit` tRPC
+  // procedures with the payload the dashboard form actually sends (images,
+  // variants, categories, every merchant field on every save), not a trimmed
+  // service call — so they pin what an admin sees, including the
+  // `{ success: false, error }` envelope the form toasts.
+  describe("internal code through the admin API", () => {
+    const CODE = "FB2_001_R1";
+    type Result = { success: boolean; error?: string };
+    let caller: {
+      create: (input: unknown) => Promise<Result & { result?: { id: string } }>;
+      edit: (input: unknown) => Promise<Result>;
+    };
+
+    beforeAll(async () => {
+      const { productRouter } = await import("#root/backend/products/trpc");
+      const c = productRouter.createCaller({
+        db,
+        clientSession: { role: "admin" },
+      } as never);
+      caller = {
+        create: (input) => c.create(input as never) as never,
+        edit: (input) => c.edit(input as never) as never,
+      };
+    });
+
+    /** Mirrors the edit payload built in pages/dashboard/products/components.tsx. */
+    const formEdit = (id: string, overrides: Record<string, unknown> = {}) => ({
+      id,
+      name: `${TAG}Titanium Labret`,
+      description: "a small piece of titanium",
+      price: 450,
+      discountPrice: undefined,
+      stock: 10,
+      imageId: fileId,
+      productImages: [
+        { id: fileId, url: `/uploads/${TAG}img.webp`, diskname: `${TAG}img.webp`, isPrimary: true },
+      ],
+      categoryId,
+      categoryIds: [categoryId],
+      variants: [],
+      sortOrder: 0,
+      hidden: false,
+      bestLayeredWithIds: [],
+      upsellMode: "global",
+      internalCode: "",
+      costPrice: null,
+      catalogueNo: null,
+      ...overrides,
+    });
+
+    const createWith = async (internalCode: string, name = `${TAG}Titanium Labret`) => {
+      const res = await caller.create(baseProduct({ name, internalCode }));
+      expect(res.success).toBe(true);
+      return res.result!.id;
+    };
+
+    const fullRow = async (id: string) =>
+      (await db.select().from(schema.product).where(eq(schema.product.id, id)))[0]!;
+
+    const holdersOf = async (code: string) =>
+      (
+        await db
+          .select({ id: schema.product.id })
+          .from(schema.product)
+          .where(eq(schema.product.internalCode, code))
+      ).map((r) => r.id);
+
+    it("1. create with a new unique code succeeds", async () => {
+      const id = await createWith(CODE);
+      expect((await readRow(id))?.internalCode).toBe(CODE);
+    });
+
+    it("2. a second create with the same code fails and stores nothing", async () => {
+      const a = await createWith(CODE);
+      const res = await caller.create(
+        baseProduct({ name: `${TAG}Second`, internalCode: CODE }),
+      );
+      expect(res.success).toBe(false);
+      expect(res.error).toMatch(/FB2_001_R1/);
+      expect(res.error).toMatch(/already used/i);
+      expect(await holdersOf(CODE)).toEqual([a]);
+    });
+
+    it("3. editing a product and keeping its code saves", async () => {
+      const a = await createWith(CODE);
+      const res = await caller.edit(formEdit(a, { internalCode: CODE }));
+      expect(res).toMatchObject({ success: true });
+      expect((await readRow(a))?.internalCode).toBe(CODE);
+    });
+
+    it("4. clearing and retyping the same code (any case or spacing) saves", async () => {
+      const a = await createWith(CODE);
+      // What the form sends if the admin retypes before the blur normalizes.
+      const res = await caller.edit(formEdit(a, { internalCode: " fb2_001_r1 " }));
+      expect(res).toMatchObject({ success: true });
+      expect((await readRow(a))?.internalCode).toBe(CODE);
+    });
+
+    it("5. changing an unrelated field while keeping the code saves only that change", async () => {
+      const a = await createWith(CODE);
+      const before = await fullRow(a);
+      const res = await caller.edit(formEdit(a, { internalCode: CODE, stock: 4 }));
+      expect(res).toMatchObject({ success: true });
+      const after = await fullRow(a);
+      expect(after.stock).toBe(4);
+      expect(after.internalCode).toBe(CODE);
+      expect(after.id).toBe(before.id);
+      expect(after.price).toBe(before.price);
+      expect(after.catalogueNo).toBe(before.catalogueNo);
+    });
+
+    it("5b. moving the code away and back across saves succeeds", async () => {
+      const a = await createWith(CODE);
+      expect(await caller.edit(formEdit(a, { internalCode: "TEMP_X" }))).toMatchObject({ success: true });
+      expect(await caller.edit(formEdit(a, { internalCode: CODE }))).toMatchObject({ success: true });
+      expect((await readRow(a))?.internalCode).toBe(CODE);
+    });
+
+    it("6. editing another product to take that code fails and changes nothing", async () => {
+      const a = await createWith(CODE);
+      const b = await createWith("FB2_002", `${TAG}Other`);
+      const bBefore = await fullRow(b);
+
+      const res = await caller.edit(
+        formEdit(b, { name: `${TAG}Other renamed`, stock: 1, internalCode: CODE }),
+      );
+
+      expect(res.success).toBe(false);
+      expect(res.error).toMatch(/FB2_001_R1/);
+      expect(res.error).toMatch(/already used/i);
+      // The rejected save is all-or-nothing: B's other fields are untouched too.
+      const bAfter = await fullRow(b);
+      expect(bAfter.internalCode).toBe("FB2_002");
+      expect(bAfter.name).toBe(bBefore.name);
+      expect(bAfter.stock).toBe(bBefore.stock);
+      expect(await holdersOf(CODE)).toEqual([a]);
+    });
+
+    it("7. blank codes stay NULL and never conflict with each other", async () => {
+      const a = (await caller.create(baseProduct({ internalCode: "" }))).result!.id;
+      const b = (await caller.create(baseProduct({ name: `${TAG}Second`, internalCode: "  " }))).result!.id;
+      expect(await caller.edit(formEdit(a, { internalCode: "" }))).toMatchObject({ success: true });
+      expect(await caller.edit(formEdit(b, { internalCode: "" }))).toMatchObject({ success: true });
+      expect((await readRow(a))?.internalCode).toBeNull();
+      expect((await readRow(b))?.internalCode).toBeNull();
+    });
+
+    it("8. the API rejects a real duplicate sent without the form's normalization", async () => {
+      const a = await createWith(CODE);
+      const b = await createWith("FB2_002", `${TAG}Other`);
+      // A hand-rolled call: lowercase, padded, minimal payload.
+      const res = await caller.edit({
+        id: b,
+        name: `${TAG}Other`,
+        description: "x",
+        imageId: fileId,
+        categoryId,
+        categoryIds: [categoryId],
+        price: 450,
+        stock: 10,
+        internalCode: "  fb2_001_r1",
+      });
+      expect(res.success).toBe(false);
+      expect(await holdersOf(CODE)).toEqual([a]);
+    });
+
+    it("keeps the database-level guarantee when the service is bypassed entirely", async () => {
+      await createWith(CODE);
+      const b = await createWith("FB2_002", `${TAG}Other`);
+      await expect(
+        db.update(schema.product).set({ internalCode: CODE }).where(eq(schema.product.id, b)),
+      ).rejects.toThrow();
+    });
+
+    it("maps an index violation that races past the pre-check to the clean message", async () => {
+      const { rethrowInternalCodeConflict } = await import("#root/backend/products/internal-code");
+      await createWith(CODE);
+      const b = await createWith("FB2_002", `${TAG}Other`);
+
+      // A real driver error, exactly as the edit transaction's catch sees it.
+      const raw = await db
+        .update(schema.product)
+        .set({ internalCode: CODE })
+        .where(eq(schema.product.id, b))
+        .then(() => null, (e: unknown) => e);
+      expect(raw).not.toBeNull();
+
+      let mapped: unknown;
+      try {
+        rethrowInternalCodeConflict(raw, CODE);
+      } catch (e) {
+        mapped = e;
+      }
+      expect(mapped).toMatchObject({ _tag: "DuplicateInternalCode" });
+      expect((mapped as { clientMessage: string }).clientMessage).toMatch(/already used/i);
+
+      // A different unique violation (a slug clash) is NOT relabelled.
+      const aSlug = (await fullRow(b)).slug;
+      const other = await createWith("FB2_003", `${TAG}Third`);
+      const slugClash = await db
+        .update(schema.product)
+        .set({ slug: aSlug })
+        .where(eq(schema.product.id, other))
+        .then(() => null, (e: unknown) => e);
+      expect(slugClash).not.toBeNull();
+      let rethrown: unknown;
+      try {
+        rethrowInternalCodeConflict(slugClash, "FB2_003");
+      } catch (e) {
+        rethrown = e;
+      }
+      expect(rethrown).toBe(slugClash);
+    });
+  });
+
   // ─── Capture: cost ────────────────────────────────────────────────────────
 
   describe("product cost", () => {
