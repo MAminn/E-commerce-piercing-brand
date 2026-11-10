@@ -52,3 +52,13 @@ order notes and activity-log notes are never exported.
 - Hard-deleting an order or editing its lines **after delivery** is detected by
   the ERP and raised as an error for a person, but cannot be undone there
   automatically. Prefer cancelling/archiving, and avoid editing delivered orders.
+- Internal codes (`internalCode`) are unique among **live** products only
+  (migration 0068). A deleted product keeps its historical code, so the
+  `products` feed can carry the same code twice: once on a `deleted: true` row
+  and at most once on a live row. The ERP keys mappings by storefront product
+  id and skips deleted rows when raising issues, so this is safe; any consumer
+  that matches by SKU should prefer the row with `deleted: false`. Order lines
+  keep the code they were sold under.
+- There is no product restore in the storefront: delete is a one-way soft
+  delete. If a row is ever put back live (by a future restore feature or by
+  hand) while a live product holds its code, the database refuses it.

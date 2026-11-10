@@ -404,8 +404,8 @@ export const product = pgTable("product", {
    * Merchant-only internal reference code (e.g. FB001, ER001) for the
    * inventory/supplier system. This is NOT the customer-facing "SKU" the
    * product-page templates render — it must never reach a storefront client.
-   * Unique when present; NULL means "not entered yet", and Postgres exempts
-   * NULLs from a unique index so any number of rows may be blank.
+   * Unique among non-deleted products when present; NULL means "not entered
+   * yet", and any number of rows may be blank.
    */
   internalCode: text("internal_code"),
   /**
@@ -429,10 +429,16 @@ export const product = pgTable("product", {
   catalogueNo: integer("catalogue_no"),
 }, (table) => ({
   slugUnique: uniqueIndex("product_slug_idx").on(table.slug),
-  /** Enforces "no duplicate non-empty internal codes"; NULLs are exempt. */
-  internalCodeUnique: uniqueIndex("product_internal_code_idx").on(
-    table.internalCode,
-  ),
+  /**
+   * No two LIVE products share an internal code. A soft-deleted product keeps
+   * its historical code (order and ERP history still point at it) but no
+   * longer reserves it, so a live product may reuse it. Restoring a deleted
+   * product whose code is now taken fails on this index. NULLs are exempt.
+   * Migration 0068 replaced the old all-rows `product_internal_code_idx`.
+   */
+  internalCodeUnique: uniqueIndex("product_internal_code_active_idx")
+    .on(table.internalCode)
+    .where(sql`${table.deleted} = false and ${table.internalCode} is not null`),
   /** One product per catalogue number; NULLs (not numbered yet) are exempt. */
   catalogueNoUnique: uniqueIndex("product_catalogue_no_idx").on(table.catalogueNo),
   /** Backs category browsing and the Phase 4 dynamic bundle-eligibility scan. */

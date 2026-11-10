@@ -131,4 +131,32 @@ describeIfDb("ERP export (integration)", () => {
       expect.objectContaining({ internalCode: null, costPrice: null, stock: 3 }),
     ]);
   });
+
+  it("a code reused after its old product was deleted exports once as live, history intact", async () => {
+    // Migration 0068: a deleted product keeps its code but no longer reserves
+    // it. The ERP keys mappings by storefront product id and ignores deleted
+    // rows for issues, so the feed must flag which row is the live owner.
+    const [oldCopy] = productIds;
+    await db.update(schema.product).set({ deleted: true }).where(eq(schema.product.id, oldCopy!));
+    const storeOwner = (await import("#root/shared/config/store")).getStoreOwnerId();
+    const [live] = await db
+      .insert(schema.product)
+      .values({
+        name: `${TAG}Hoop v2`, description: "d", imageId: fileId, categoryId, vendorId: storeOwner,
+        price: "250.00", stock: 5, internalCode: `${TAG}ER002`,
+      })
+      .returning();
+    productIds.push(live!.id);
+
+    const rows = (await svc.listProductsForExport(db as never)).filter((p) => p.internalCode === `${TAG}ER002`);
+    expect(rows.map((p) => [p.id, p.deleted])).toEqual([
+      [oldCopy, true],
+      [live!.id, false],
+    ]);
+    expect(rows.filter((p) => !p.deleted)).toHaveLength(1);
+
+    // Orders placed against the old copy keep the code they were sold under.
+    const [o1] = await svc.getOrdersForExport(db as never, [orderIds[0]!]);
+    expect(o1!.lines.some((l) => l.internalCode === `${TAG}ER002`)).toBe(true);
+  });
 });

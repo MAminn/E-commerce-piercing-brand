@@ -5,16 +5,25 @@ import type { DatabaseClient } from "#root/shared/database/drizzle/db";
 
 /** Postgres `unique_violation`. */
 const UNIQUE_VIOLATION = "23505";
-const INTERNAL_CODE_INDEX = "product_internal_code_idx";
+/**
+ * The live-products-only index (migration 0068). The old all-rows name is
+ * still matched so a clash is reported cleanly on a database that has not run
+ * 0068 yet.
+ */
+const INTERNAL_CODE_INDEXES = [
+  "product_internal_code_active_idx",
+  "product_internal_code_idx",
+];
 
 /**
  * Fails with a message an admin can act on when `code` is already on another
- * product. A `null` code (nothing entered) is always available — the unique
- * index exempts NULLs, so any number of products may be blank.
+ * LIVE product. A `null` code (nothing entered) is always available — the
+ * unique index exempts NULLs, so any number of products may be blank.
  *
- * Soft-deleted products are deliberately included in the check: their rows
- * still occupy the unique index, so excluding them here would let the admin
- * past this guard only to hit a raw database error on insert.
+ * Soft-deleted products are ignored: they keep their historical code for
+ * order/ERP history but do not reserve it. This mirrors the partial unique
+ * index `product_internal_code_active_idx` (deleted = false), which stays the
+ * authority for simultaneous saves.
  *
  * @param excludeProductId the product being edited, so re-saving it without
  *   changing its code is not a conflict with itself.
@@ -30,9 +39,11 @@ export async function assertInternalCodeAvailable(
     .select({ id: product.id, name: product.name })
     .from(product)
     .where(
-      excludeProductId
-        ? and(eq(product.internalCode, code), ne(product.id, excludeProductId))
-        : eq(product.internalCode, code),
+      and(
+        eq(product.internalCode, code),
+        eq(product.deleted, false),
+        excludeProductId ? ne(product.id, excludeProductId) : undefined,
+      ),
     )
     .limit(1);
 
@@ -43,7 +54,7 @@ export async function assertInternalCodeAvailable(
     tag: "DuplicateInternalCode",
     statusCode: 400,
     message: `Internal code ${code} already in use by product ${existing.id}`,
-    clientMessage: `Internal code "${code}" is already used by "${existing.name}". Internal codes must be unique.`,
+    clientMessage: `Internal code "${code}" is already used by "${existing.name}".`,
   });
 }
 
@@ -71,8 +82,10 @@ export function rethrowInternalCodeConflict(
     | undefined;
   const isIndexClash = (e: PgLike) =>
     e?.code === UNIQUE_VIOLATION &&
-    (e.constraint === INTERNAL_CODE_INDEX ||
-      String(e.message ?? "").includes(INTERNAL_CODE_INDEX));
+    INTERNAL_CODE_INDEXES.some(
+      (index) =>
+        e.constraint === index || String(e.message ?? "").includes(`"${index}"`),
+    );
 
   const e = error as PgLike;
   const isInternalCodeClash =
