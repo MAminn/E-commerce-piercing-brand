@@ -1,11 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   SOCIAL_PROOF_KEYS,
+  displayedNameKey,
   formatRelativeTime,
   relativeTimeBucket,
   getSocialProofStorage,
   isSocialProofSuppressed,
   readShownCount,
+  readShownNameKeys,
+  rememberShownName,
   suppressSocialProof,
   writeShownCount,
 } from "#root/lib/social-proof-session";
@@ -125,6 +128,30 @@ describe("session shown count", () => {
     expect(readShownCount(throwingStorage)).toBe(0);
     expect(() => writeShownCount(throwingStorage, 1)).not.toThrow();
     expect(() => writeShownCount(null, 1)).not.toThrow();
+  });
+});
+
+describe("session displayed names", () => {
+  it("normalises spacing, case and Unicode before comparing names", () => {
+    expect(displayedNameKey("  Sara  ")).toBe(displayedNameKey("sara"));
+    expect(displayedNameKey("  سارة  ")).toBe("سارة");
+  });
+
+  it("remembers each displayed first name once per tab", () => {
+    const storage = makeSessionStorage();
+    rememberShownName(storage, "سارة");
+    rememberShownName(storage, "  سارة ");
+    rememberShownName(storage, "مريم");
+    expect(readShownNameKeys(storage)).toEqual(["سارة", "مريم"]);
+  });
+
+  it("degrades safely for corrupt or unavailable storage", () => {
+    expect(readShownNameKeys(makeSessionStorage())).toEqual([]);
+    expect(readShownNameKeys(makeSessionStorage({
+      [SOCIAL_PROOF_KEYS.shownNames]: "not-json",
+    }))).toEqual([]);
+    expect(readShownNameKeys(throwingStorage)).toEqual([]);
+    expect(() => rememberShownName(throwingStorage, "نور")).not.toThrow();
   });
 });
 

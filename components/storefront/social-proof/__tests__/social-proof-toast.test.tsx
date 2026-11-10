@@ -153,6 +153,31 @@ describe("SocialProofToast timing", () => {
     expect(cards()).toHaveLength(0);
   });
 
+  it("never repeats a displayed first name, including after navigation", async () => {
+    feed([
+      event(1, { displayName: "سارة" }),
+      event(2, { displayName: "سارة" }),
+      event(3, { displayName: "مريم" }),
+    ], { maxPerSession: 8 });
+    await mount();
+    await advance(120);
+    expect(sessionStorage.getItem(SOCIAL_PROOF_KEYS.shownCount)).toBe("2");
+    expect(JSON.parse(sessionStorage.getItem(SOCIAL_PROOF_KEYS.shownNames)!)).toEqual([
+      "سارة",
+      "مريم",
+    ]);
+
+    act(() => root.unmount());
+    root = createRoot(container);
+    feed([
+      event(4, { displayName: "  سارة " }),
+      event(5, { displayName: "نور" }),
+    ], { maxPerSession: 8 });
+    await mount();
+    await advance(120);
+    expect(sessionStorage.getItem(SOCIAL_PROOF_KEYS.shownCount)).toBe("3");
+  });
+
   it("dismissal hides the card and silences the rest of the session", async () => {
     feed([event(1), event(2)]);
     await mount();
