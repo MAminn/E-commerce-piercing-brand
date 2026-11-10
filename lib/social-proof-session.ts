@@ -17,11 +17,49 @@
 
 const SUPPRESSED_KEY = "perce-social-proof-suppressed";
 const SHOWN_COUNT_KEY = "perce-social-proof-shown";
+const SHOWN_NAMES_KEY = "perce-social-proof-shown-names";
 
 export const SOCIAL_PROOF_KEYS = {
   suppressed: SUPPRESSED_KEY,
   shownCount: SHOWN_COUNT_KEY,
+  shownNames: SHOWN_NAMES_KEY,
 } as const;
+
+/** Stable comparison form for the privacy-safe displayed first name. */
+export function displayedNameKey(displayName: string): string {
+  return displayName
+    .normalize("NFKC")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleLowerCase();
+}
+
+export function readShownNameKeys(storage: SocialProofStorage | null): string[] {
+  if (!storage) return [];
+  try {
+    const parsed: unknown = JSON.parse(storage.getItem(SHOWN_NAMES_KEY) ?? "[]");
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((value): value is string => typeof value === "string");
+  } catch {
+    return [];
+  }
+}
+
+export function rememberShownName(
+  storage: SocialProofStorage | null,
+  displayName: string,
+): void {
+  if (!storage) return;
+  try {
+    const key = displayedNameKey(displayName);
+    if (!key) return;
+    const keys = new Set(readShownNameKeys(storage));
+    keys.add(key);
+    storage.setItem(SHOWN_NAMES_KEY, JSON.stringify([...keys]));
+  } catch {
+    /* storage unavailable — the in-memory queue is still name-unique */
+  }
+}
 
 /** The slice of the Storage API these helpers use. */
 export interface SocialProofStorage {

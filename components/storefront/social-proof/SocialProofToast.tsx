@@ -6,9 +6,12 @@ import { getProductUrl } from "#root/lib/utils/route-helpers";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { fillTemplate } from "#root/components/bundles/bundle-ui";
 import {
+  displayedNameKey,
   getSocialProofStorage,
   isSocialProofSuppressed,
   readShownCount,
+  readShownNameKeys,
+  rememberShownName,
   relativeTimeBucket,
   suppressSocialProof,
   writeShownCount,
@@ -159,14 +162,20 @@ export function SocialProofToast() {
     const storage = getSocialProofStorage();
     if (isSocialProofSuppressed(storage)) return;
 
-    // The session's whole allowance: never more than the cap, and never more
-    // than the number of distinct real events available. Cycling the pool a
-    // second time just to reach `maxPerSession` would mean showing the same
-    // person's order twice, which is where social proof starts reading as
-    // fabricated.
-    const total = Math.min(config.maxPerSession, events.length);
-    let cursor = readShownCount(storage);
-    if (cursor >= total) return;
+    const reservedNames = new Set(readShownNameKeys(storage));
+    const queuedEvents = events.filter((event) => {
+      const key = displayedNameKey(event.displayName);
+      if (!key || reservedNames.has(key)) return false;
+      reservedNames.add(key);
+      return true;
+    });
+
+    // The cap is session-wide. Fewer unseen real names means fewer cards,
+    // never a repeated name to fill the configured allowance.
+    let shownCount = readShownCount(storage);
+    const total = Math.min(config.maxPerSession - shownCount, queuedEvents.length);
+    if (total <= 0) return;
+    let cursor = 0;
 
     const timers: number[] = [];
     const wait = (fn: () => void, ms: number) => {
@@ -178,11 +187,13 @@ export function SocialProofToast() {
       // Re-checked here rather than only up front: a dismissal could have
       // landed in this tab while the cycle was waiting.
       if (isSocialProofSuppressed(storage)) return;
-      const event = events[cursor];
+      const event = queuedEvents[cursor];
       if (!event) return;
 
       cursor += 1;
-      writeShownCount(storage, cursor);
+      shownCount += 1;
+      writeShownCount(storage, shownCount);
+      rememberShownName(storage, event.displayName);
       setActive(event);
       wait(() => {
         if (mountedRef.current) setShown(true);

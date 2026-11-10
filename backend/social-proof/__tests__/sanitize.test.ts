@@ -26,8 +26,8 @@ function makeRow(overrides: Partial<RawSocialProofRow> = {}): RawSocialProofRow 
 }
 
 describe("sanitizeDisplayName", () => {
-  it("reduces a full name to first name plus one initial", () => {
-    expect(sanitizeDisplayName("Ahmed Mohamed Hassan")).toBe("Ahmed M.");
+  it("reduces a full name to the customer's first name", () => {
+    expect(sanitizeDisplayName("Ahmed Mohamed Hassan")).toBe("Ahmed");
   });
 
   it("returns the first name alone when there is only one usable token", () => {
@@ -42,13 +42,12 @@ describe("sanitizeDisplayName", () => {
     expect(sanitizeDisplayName(full)).not.toContain("Hassan");
   });
 
-  it("initialises only the second token, dropping the rest entirely", () => {
-    // Three initials would identify a person far more narrowly than one.
-    expect(sanitizeDisplayName("Mona Adel Badr Fouad")).toBe("Mona A.");
+  it("drops every token after the first", () => {
+    expect(sanitizeDisplayName("Mona Adel Badr Fouad")).toBe("Mona");
   });
 
   it("handles non-Latin names without splitting a character", () => {
-    expect(sanitizeDisplayName("أحمد محمد")).toBe("أحمد م.");
+    expect(sanitizeDisplayName("أحمد محمد")).toBe("أحمد");
   });
 
   it("returns an empty string for a name with no usable tokens", () => {
@@ -166,13 +165,29 @@ describe("toPublicEvents", () => {
     expect(events[0]!.productName).toBe("Whey");
   });
 
-  it("keeps distinct orders separate", () => {
+  it("keeps distinct orders with distinct displayed names separate", () => {
     const events = toPublicEvents(
-      [makeRow({ orderId: "o1" }), makeRow({ orderId: "o2" })],
+      [
+        makeRow({ orderId: "o1", customerName: "أحمد محمد" }),
+        makeRow({ orderId: "o2", customerName: "مريم علي" }),
+      ],
       CONFIG,
       10,
     );
     expect(events).toHaveLength(2);
+  });
+
+  it("keeps only one real order when displayed first names repeat", () => {
+    const events = toPublicEvents(
+      [
+        makeRow({ orderId: "o1", customerName: "سارة كريم" }),
+        makeRow({ orderId: "o2", customerName: "سارة محمد" }),
+        makeRow({ orderId: "o3", customerName: "مريم علي" }),
+      ],
+      CONFIG,
+      10,
+    );
+    expect(events.map((event) => event.displayName)).toEqual(["سارة", "مريم"]);
   });
 
   it("drops rows whose name sanitises to nothing", () => {
@@ -182,7 +197,7 @@ describe("toPublicEvents", () => {
 
   it("respects the event cap", () => {
     const rows = Array.from({ length: 9 }, (_, i) =>
-      makeRow({ orderId: `order-${i}` }),
+      makeRow({ orderId: `order-${i}`, customerName: `Customer${i} Family` }),
     );
     expect(toPublicEvents(rows, CONFIG, 4)).toHaveLength(4);
   });

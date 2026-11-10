@@ -19,7 +19,7 @@ export interface PublicSocialProofEvent {
    * card without being a handle anyone can use against the order API.
    */
   eventKey: string;
-  /** "Ahmed M." — never the full customer name. */
+  /** "Ahmed" — the first name exactly as entered, never the full name. */
   displayName: string;
   /** Broad city/governorate only, or null when location display is off. */
   location: string | null;
@@ -44,11 +44,10 @@ export interface RawSocialProofRow {
 }
 
 /**
- * "Ahmed Mohamed Hassan" → "Ahmed M."; "Ahmed" → "Ahmed".
+ * "Ahmed Mohamed Hassan" → "Ahmed"; "Ahmed" → "Ahmed".
  *
- * Only the first token survives in full, and only the first letter of the
- * second. Anything beyond the second token is dropped entirely rather than
- * initialised — three initials narrow a person down far more than one does.
+ * Only the first token survives. The rest is dropped entirely so the public
+ * card keeps the customer's own spelling without exposing their full name.
  * Returns "" for a name with no usable letters, which callers treat as an
  * ineligible row rather than rendering an empty card.
  */
@@ -61,13 +60,7 @@ export function sanitizeDisplayName(customerName: string): string {
   const first = tokens[0];
   if (!first) return "";
 
-  const second = tokens[1];
-  if (!second) return first;
-
-  // Take the first character by code point so an Arabic or accented initial
-  // isn't sliced into half a surrogate pair.
-  const initial = [...second][0];
-  return initial ? `${first} ${initial}.` : first;
+  return first;
 }
 
 /**
@@ -119,7 +112,7 @@ export function eventKeyForOrder(orderId: string): string {
 }
 
 /**
- * Collapses raw rows into at most one public event per order.
+ * Collapses raw rows into at most one public event per displayed first name.
  *
  * Rows arrive newest-first with one row per eligible order item, so an order
  * containing four products would otherwise produce four consecutive toasts
@@ -136,6 +129,7 @@ export function toPublicEvents(
   limit: number,
 ): PublicSocialProofEvent[] {
   const seenOrders = new Set<string>();
+  const seenNames = new Set<string>();
   const events: PublicSocialProofEvent[] = [];
 
   for (const row of rows) {
@@ -144,8 +138,11 @@ export function toPublicEvents(
 
     const displayName = sanitizeDisplayName(row.customerName);
     if (!displayName) continue;
+    const nameKey = displayName.normalize("NFKC").toLocaleLowerCase();
+    if (seenNames.has(nameKey)) continue;
 
     seenOrders.add(row.orderId);
+    seenNames.add(nameKey);
     events.push({
       eventKey: eventKeyForOrder(row.orderId),
       displayName,
