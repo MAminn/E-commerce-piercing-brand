@@ -55,21 +55,28 @@ export async function assertInternalCodeAvailable(
  *
  * Only that one index is matched — any other unique violation (a slug clash,
  * say) is re-thrown untouched so it is not mislabelled.
+ *
+ * drizzle-orm (0.44+) wraps driver errors in a `DrizzleQueryError` whose own
+ * `code`/`constraint` are undefined; the Postgres fields live on `.cause`.
+ * Both the error and its cause are checked so the mapping works whether or
+ * not the driver error arrives wrapped.
  */
 export function rethrowInternalCodeConflict(
   error: unknown,
   code: string | null,
 ): never {
-  const e = error as
-    | { code?: string; constraint?: string; message?: string }
+  type PgLike =
+    | { code?: string; constraint?: string; message?: string; cause?: unknown }
     | null
     | undefined;
-
-  const isInternalCodeClash =
-    code !== null &&
+  const isIndexClash = (e: PgLike) =>
     e?.code === UNIQUE_VIOLATION &&
     (e.constraint === INTERNAL_CODE_INDEX ||
       String(e.message ?? "").includes(INTERNAL_CODE_INDEX));
+
+  const e = error as PgLike;
+  const isInternalCodeClash =
+    code !== null && (isIndexClash(e) || isIndexClash(e?.cause as PgLike));
 
   if (isInternalCodeClash) {
     throw new ServerError({
