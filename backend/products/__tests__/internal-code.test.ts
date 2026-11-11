@@ -34,6 +34,16 @@ describe("rethrowInternalCodeConflict", () => {
     expect((e as { clientMessage: string }).clientMessage).toMatch(/"FB2_001_R1" is already used/);
   });
 
+  it("maps a clash on the live-products-only index (migration 0068)", () => {
+    const e = capture(() =>
+      rethrowInternalCodeConflict(
+        drizzleWrapped(pgClash("product_internal_code_active_idx")),
+        "FB2_001",
+      ),
+    );
+    expect(e).toMatchObject({ _tag: "DuplicateInternalCode" });
+  });
+
   it("maps the same clash when drizzle wraps it as the cause", () => {
     const e = capture(() =>
       rethrowInternalCodeConflict(

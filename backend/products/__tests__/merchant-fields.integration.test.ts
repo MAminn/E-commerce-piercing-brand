@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { eq, inArray, like } from "drizzle-orm";
+import { eq, inArray, like, sql } from "drizzle-orm";
 import { Effect } from "effect";
 
 /**
@@ -312,6 +312,7 @@ describeIfDb("product merchant-only fields (integration)", () => {
     let caller: {
       create: (input: unknown) => Promise<Result & { result?: { id: string } }>;
       edit: (input: unknown) => Promise<Result>;
+      delete: (input: { id: string }) => Promise<Result>;
     };
 
     beforeAll(async () => {
@@ -323,6 +324,7 @@ describeIfDb("product merchant-only fields (integration)", () => {
       caller = {
         create: (input) => c.create(input as never) as never,
         edit: (input) => c.edit(input as never) as never,
+        delete: (input) => c.delete(input as never) as never,
       };
     });
 
@@ -513,6 +515,133 @@ describeIfDb("product merchant-only fields (integration)", () => {
         rethrown = e;
       }
       expect(rethrown).toBe(slugClash);
+    });
+
+    // ─── Deleted products keep their code but do not reserve it ────────────
+    //
+    // Policy (migration 0068): codes are unique among LIVE products. A
+    // soft-deleted product keeps its historical code for order/ERP history,
+    // a live product may reuse it, and putting the deleted one back live is
+    // refused while someone else holds the code.
+    describe("deleted products", () => {
+      const del = (id: string) => caller.delete({ id });
+      /**
+       * There is no restore flow in the storefront (delete is one-way). This
+       * is the raw write any future restore — or a manual SQL fix — performs,
+       * so it is what the database has to police.
+       */
+      const restore = (id: string) =>
+        db
+          .update(schema.product)
+          .set({ deleted: false })
+          .where(eq(schema.product.id, id))
+          .then(() => null, (e: unknown) => e);
+
+      it("1–3. a live owner blocks other products and keeps its own code", async () => {
+        const a = await createWith(CODE);
+        const b = await createWith("CODE_B", `${TAG}Other`);
+        expect((await caller.edit(formEdit(b, { internalCode: CODE }))).success).toBe(false);
+        expect(await caller.edit(formEdit(a, { internalCode: CODE }))).toMatchObject({ success: true });
+        expect(await holdersOf(CODE)).toEqual([a]);
+      });
+
+      it("4–6. a deleted product keeps its code, and a live product can then take it", async () => {
+        const a = await createWith(CODE);
+        const b = await createWith("CODE_B", `${TAG}Other`);
+
+        expect(await del(a)).toMatchObject({ success: true });
+        expect(await fullRow(a)).toMatchObject({ deleted: true, internalCode: CODE });
+
+        expect(await caller.edit(formEdit(b, { internalCode: CODE }))).toMatchObject({ success: true });
+        expect((await fullRow(b)).internalCode).toBe(CODE);
+        // The deleted row's historical code is untouched by B taking it.
+        expect(await fullRow(a)).toMatchObject({ deleted: true, internalCode: CODE });
+        expect((await holdersOf(CODE)).sort()).toEqual([a, b].sort());
+      });
+
+      it("a new product can be created with a code only deleted products hold", async () => {
+        const a = await createWith(CODE);
+        await del(a);
+        const c = await createWith(CODE, `${TAG}Recreated`);
+        expect((await fullRow(c)).internalCode).toBe(CODE);
+        expect((await fullRow(a)).internalCode).toBe(CODE);
+      });
+
+      it("a collision names the live owner, never a deleted one", async () => {
+        const a = await createWith(CODE, `${TAG}Old deleted copy`);
+        await del(a);
+        await createWith(CODE, `${TAG}Live owner`);
+        const res = await caller.create(baseProduct({ name: `${TAG}Third`, internalCode: CODE }));
+        expect(res.success).toBe(false);
+        expect(res.error).toBe(`Internal code "${CODE}" is already used by "${TAG}Live owner".`);
+      });
+
+      it("7. restoring A while B owns the code is refused with the clean message", async () => {
+        const a = await createWith(CODE);
+        await del(a);
+        const b = await createWith(CODE, `${TAG}Other`);
+
+        const err = await restore(a);
+        expect(err).not.toBeNull();
+        const { rethrowInternalCodeConflict } = await import("#root/backend/products/internal-code");
+        let mapped: unknown;
+        try {
+          rethrowInternalCodeConflict(err, CODE);
+        } catch (e) {
+          mapped = e;
+        }
+        expect(mapped).toMatchObject({ _tag: "DuplicateInternalCode" });
+        expect((mapped as { clientMessage: string }).clientMessage).toMatch(/already used by another product/);
+
+        // Nothing moved: A is still deleted, both still hold their codes.
+        expect(await fullRow(a)).toMatchObject({ deleted: true, internalCode: CODE });
+        expect(await fullRow(b)).toMatchObject({ deleted: false, internalCode: CODE });
+      });
+
+      it("8. once B is deleted too, A can be restored with its code", async () => {
+        const a = await createWith(CODE);
+        await del(a);
+        const b = await createWith(CODE, `${TAG}Other`);
+        await del(b);
+        expect(await restore(a)).toBeNull();
+        expect(await fullRow(a)).toMatchObject({ deleted: false, internalCode: CODE });
+        expect(await fullRow(b)).toMatchObject({ deleted: true, internalCode: CODE });
+      });
+
+      it("9. simultaneous saves of one code on two live products: one wins, one gets the clean message", async () => {
+        for (let round = 0; round < 5; round++) {
+          const code = `RACE_${round}`;
+          const a = await createWith(`RACE_A_${round}`, `${TAG}Race A ${round}`);
+          const b = await createWith(`RACE_B_${round}`, `${TAG}Race B ${round}`);
+          const results = await Promise.all([
+            caller.edit(formEdit(a, { name: `${TAG}Race A ${round}`, internalCode: code })),
+            caller.edit(formEdit(b, { name: `${TAG}Race B ${round}`, internalCode: code })),
+          ]);
+          expect(results.filter((r) => r.success)).toHaveLength(1);
+          const loser = results.find((r) => !r.success);
+          expect(loser?.error).toMatch(new RegExp(`"${code}" is already used by`));
+          expect(await holdersOf(code)).toHaveLength(1);
+        }
+      });
+
+      it("10. blank codes are unaffected by deletion and restore", async () => {
+        const a = (await caller.create(baseProduct({ internalCode: "" }))).result!.id;
+        await del(a);
+        const b = (await caller.create(baseProduct({ name: `${TAG}Second`, internalCode: "" }))).result!.id;
+        expect(await restore(a)).toBeNull();
+        expect((await readRow(a))?.internalCode).toBeNull();
+        expect((await readRow(b))?.internalCode).toBeNull();
+      });
+
+      it("12. the database enforces uniqueness on live rows only, via the partial index", async () => {
+        const { rows } = await db.execute<{ indexname: string; indexdef: string }>(sql`
+          select indexname, indexdef from pg_indexes
+          where tablename = 'product' and indexdef ilike '%(internal_code)%'
+        `);
+        expect(rows.map((r) => r.indexname)).toEqual(["product_internal_code_active_idx"]);
+        expect(rows[0]!.indexdef).toMatch(/^CREATE UNIQUE INDEX/);
+        expect(rows[0]!.indexdef).toMatch(/WHERE \(\(deleted = false\) AND \(internal_code IS NOT NULL\)\)/);
+      });
     });
   });
 

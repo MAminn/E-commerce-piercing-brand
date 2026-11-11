@@ -56,9 +56,9 @@ export interface SocialProofCardProps {
 }
 
 /**
- * Renders a translated sentence with the name and place as their own spans,
- * so `capitalize` reaches only those two — never the whole sentence, which
- * would read "In Cairo Just Ordered".
+ * Renders a translated sentence with the name and place as their own spans.
+ * Customer names stay exactly as entered; only the broad location gets the
+ * existing presentation-only `capitalize` treatment.
  */
 function renderContext(
   template: string,
@@ -68,7 +68,9 @@ function renderContext(
     const key = /^\{(\w+)\}$/.exec(part)?.[1];
     if (key && key in values) {
       return (
-        <span key={i} className='capitalize'>
+        <span
+          key={i}
+          className={key === "location" ? "capitalize" : undefined}>
           {values[key]}
         </span>
       );
@@ -145,12 +147,7 @@ export function SocialProofCard({
         {/* pe clears the close control so copy never runs underneath it. */}
         <div className='flex min-w-0 flex-1 flex-col justify-center pe-8'>
           <p className='t-micro text-ink-2'>{eyebrow}</p>
-          {/*
-            `capitalize` (name and place only — see renderContext) is
-            presentation only. Orders are stored exactly as the customer typed
-            them, and plenty arrive lowercase. Arabic has no case mapping, so
-            an Arabic name renders exactly as stored.
-          */}
+          {/* The customer name renders exactly as entered; see renderContext. */}
           <p className='mt-1 truncate t-small text-ink-2'>
             {renderContext(template, values)}
           </p>

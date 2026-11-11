@@ -39,6 +39,7 @@ import { resolveUploadPath } from "#root/server/routes/upload-path.js";
 import { bootstrapSuperadmin } from "#root/backend/auth/superadmin-bootstrap.js";
 import { startEmailAutomationWorker } from "#root/backend/email-automations/worker.js";
 import { emailUnsubscribeApiPlugin } from "#root/backend/email-subscription/api.js";
+import { erpSyncApiPlugin } from "#root/backend/erp-sync/api.js";
 
 // Normalize env vars — Coolify sometimes injects a leading '=' into values
 function normalizeEnv(key: string): string {
@@ -70,6 +71,7 @@ for (const key of [
   "PAYMOB_INTEGRATION_ID",
   "PAYMOB_IFRAME_ID",
   "PAYMOB_HMAC_SECRET",
+  "ERP_SYNC_TOKEN",
 ]) {
   if (process.env[key]) normalizeEnv(key);
 }
@@ -385,6 +387,12 @@ async function buildServer() {
   await instance.register(envSyncApiPlugin, {
     prefix: "/api/superadmin/sync",
     rootDir: root,
+  });
+
+  // Read-only order/catalogue export for the ERP. Registers no routes unless
+  // ERP_SYNC_TOKEN is set (>= 32 chars); see backend/erp-sync/api.ts.
+  await instance.register(erpSyncApiPlugin, {
+    prefix: "/api/erp/v1",
   });
 
   // RFC 8058 one-click unsubscribe endpoint (mail clients POST here directly)
