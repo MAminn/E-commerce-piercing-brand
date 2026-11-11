@@ -44,11 +44,24 @@ export const updatePixelConfigSchema = z.object({
   settings: z.record(z.unknown()).nullable().optional(),
 });
 
+/**
+ * The admin-facing shape of a pixel config: everything except the secret.
+ * The Conversions API token / GA4 Measurement Protocol API secret stays on
+ * the server — the admin UI only learns whether one is saved.
+ */
+export function toAdminPixelConfig<T extends { accessToken?: string | null }>(
+  row: T,
+): Omit<T, "accessToken"> & { hasAccessToken: boolean } {
+  const { accessToken, ...rest } = row;
+  return { ...rest, hasAccessToken: Boolean(accessToken) };
+}
+
 export const listPixelConfigs = () =>
   Effect.gen(function* () {
-    return yield* query(async (db) => {
+    const rows = yield* query(async (db) => {
       return await db.select().from(pixelConfig).execute();
     });
+    return rows.map(toAdminPixelConfig);
   });
 
 /**
@@ -105,7 +118,7 @@ export const getPixelConfig = (id: string) =>
       );
     }
 
-    return config;
+    return toAdminPixelConfig(config);
   });
 
 export const createPixelConfig = (
@@ -119,7 +132,7 @@ export const createPixelConfig = (
           id: v7(),
           platform: input.platform,
           pixelId: input.pixelId,
-          accessToken: input.accessToken ?? null,
+          accessToken: input.accessToken?.trim() || null,
           enabled: input.enabled,
           enableClientSide: input.enableClientSide,
           enableServerSide: input.enableServerSide,
@@ -142,7 +155,7 @@ export const createPixelConfig = (
       );
     }
 
-    return inserted;
+    return toAdminPixelConfig(inserted);
   });
 
 export const updatePixelConfig = (
@@ -157,8 +170,11 @@ export const updatePixelConfig = (
     };
     if (updates.platform !== undefined) updateData.platform = updates.platform;
     if (updates.pixelId !== undefined) updateData.pixelId = updates.pixelId;
-    if (updates.accessToken !== undefined)
-      updateData.accessToken = updates.accessToken;
+    // Write-only secret: undefined or "" keeps the saved one, null clears it,
+    // any other string replaces it.
+    if (updates.accessToken === null) updateData.accessToken = null;
+    else if (updates.accessToken?.trim())
+      updateData.accessToken = updates.accessToken.trim();
     if (updates.enabled !== undefined) updateData.enabled = updates.enabled;
     if (updates.enableClientSide !== undefined)
       updateData.enableClientSide = updates.enableClientSide;
@@ -190,7 +206,7 @@ export const updatePixelConfig = (
       );
     }
 
-    return updated;
+    return toAdminPixelConfig(updated);
   });
 
 export const deletePixelConfig = (id: string) =>

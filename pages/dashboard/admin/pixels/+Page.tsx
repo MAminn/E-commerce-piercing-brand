@@ -54,7 +54,8 @@ interface PixelConfigRow {
   id: string;
   platform: string;
   pixelId: string;
-  accessToken: string | null;
+  /** The secret itself never reaches the browser (S1). */
+  hasAccessToken: boolean;
   enabled: boolean;
   enableClientSide: boolean;
   enableServerSide: boolean;
@@ -68,7 +69,12 @@ interface PixelConfigRow {
 interface PixelFormState {
   platform: string;
   pixelId: string;
+  /** A NEW secret to save. Empty = keep the saved one. */
   accessToken: string;
+  /** Explicitly remove the saved secret. */
+  clearAccessToken: boolean;
+  /** Whether a secret is saved for the config being edited. */
+  hasSavedAccessToken: boolean;
   enabled: boolean;
   enableClientSide: boolean;
   enableServerSide: boolean;
@@ -80,6 +86,8 @@ const EMPTY_FORM: PixelFormState = {
   platform: "meta",
   pixelId: "",
   accessToken: "",
+  clearAccessToken: false,
+  hasSavedAccessToken: false,
   enabled: true,
   enableClientSide: true,
   enableServerSide: false,
@@ -110,6 +118,23 @@ const PIXEL_ID_PLACEHOLDERS: Record<string, string> = {
 // Clarity is a session-recording/heatmap tool: it has no server-side
 // Conversions API and no access-token concept, unlike the ad pixels above.
 const PLATFORMS_WITHOUT_SERVER_SIDE = new Set(["clarity"]);
+
+/** What the server-side secret is called on each platform. */
+const SERVER_SECRET_LABELS: Record<string, { label: string; hint: string }> = {
+  meta: {
+    label: "Conversions API access token",
+    hint: "Events Manager → dataset → Settings → Conversions API → Generate access token",
+  },
+  google_ga4: {
+    label: "Measurement Protocol API secret",
+    hint: "GA4 Admin → Data streams → web stream → Measurement Protocol API secrets",
+  },
+};
+const serverSecretLabel = (platform: string) =>
+  SERVER_SECRET_LABELS[platform] ?? {
+    label: "Access token",
+    hint: "for the platform's server-side events API",
+  };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -226,7 +251,9 @@ export default function AdminPixelsPage() {
     setForm({
       platform: config.platform,
       pixelId: config.pixelId,
-      accessToken: config.accessToken ?? "",
+      accessToken: "",
+      clearAccessToken: false,
+      hasSavedAccessToken: config.hasAccessToken,
       enabled: config.enabled,
       enableClientSide: config.enableClientSide,
       enableServerSide: config.enableServerSide,
@@ -251,7 +278,10 @@ export default function AdminPixelsPage() {
           id: editingId,
           platform: form.platform as PixelPlatform,
           pixelId: form.pixelId.trim(),
-          accessToken: form.accessToken.trim() || null,
+          // Write-only: blank keeps the saved secret, "clear" removes it.
+          accessToken: form.clearAccessToken
+            ? null
+            : form.accessToken.trim() || undefined,
           enabled: form.enabled,
           enableClientSide: form.enableClientSide,
           enableServerSide: form.enableServerSide,
@@ -421,7 +451,7 @@ export default function AdminPixelsPage() {
                       const health = platformHealth.find(
                         (h) => h.platform === cfg.platform,
                       );
-                      const hasToken = !!cfg.accessToken;
+                      const hasToken = cfg.hasAccessToken;
                       const hasServerSide = cfg.enableServerSide;
                       const hasClientSide = cfg.enableClientSide;
                       const totalDelivered =
@@ -572,7 +602,7 @@ export default function AdminPixelsPage() {
                 </div>
 
                 {/* Honesty note about server-side delivery */}
-                {configs.some((c) => c.enableServerSide && !c.accessToken) && (
+                {configs.some((c) => c.enableServerSide && !c.hasAccessToken) && (
                   <div className='flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2'>
                     <AlertTriangle className='w-3.5 h-3.5 mt-0.5 shrink-0' />
                     <span>
@@ -706,6 +736,7 @@ export default function AdminPixelsPage() {
                           platform: v,
                           enableServerSide: false,
                           accessToken: "",
+                          clearAccessToken: f.hasSavedAccessToken,
                         }
                       : { ...f, platform: v },
                   )
@@ -742,20 +773,48 @@ export default function AdminPixelsPage() {
             {!PLATFORMS_WITHOUT_SERVER_SIDE.has(form.platform) && (
               <div className='space-y-2'>
                 <Label htmlFor='accessToken'>
-                  Access Token{" "}
+                  {serverSecretLabel(form.platform).label}{" "}
                   <span className='text-muted-foreground text-xs'>
-                    (optional — for server-side Conversions API)
+                    (optional — server-side only)
                   </span>
                 </Label>
                 <Input
                   id='accessToken'
                   type='password'
+                  autoComplete='off'
                   value={form.accessToken}
+                  disabled={form.clearAccessToken}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, accessToken: e.target.value }))
                   }
-                  placeholder='Paste your access token here'
+                  placeholder={
+                    form.hasSavedAccessToken
+                      ? "Saved — leave blank to keep it, or paste a new one"
+                      : "Paste it here"
+                  }
                 />
+                <p className='text-xs text-muted-foreground'>
+                  {serverSecretLabel(form.platform).hint}. Never shown again
+                  after saving.
+                </p>
+                {form.hasSavedAccessToken && (
+                  <div className='flex items-center justify-between'>
+                    <Label htmlFor='clearAccessToken' className='text-xs font-normal'>
+                      Remove the saved secret
+                    </Label>
+                    <Switch
+                      id='clearAccessToken'
+                      checked={form.clearAccessToken}
+                      onCheckedChange={(v) =>
+                        setForm((f) => ({
+                          ...f,
+                          clearAccessToken: v,
+                          accessToken: v ? "" : f.accessToken,
+                        }))
+                      }
+                    />
+                  </div>
+                )}
               </div>
             )}
 
