@@ -9,6 +9,10 @@ import {
   user,
 } from "#root/shared/database/drizzle/schema";
 import {
+  excludeDashboardDeliveries,
+  excludeDashboardEvents,
+} from "#root/backend/pixel-tracking/internal-traffic";
+import {
   count,
   countDistinct,
   desc,
@@ -105,6 +109,7 @@ export const getOverviewMetrics = () =>
           and(
             isNull(trackingEvent.archivedAt),
             gte(trackingEvent.createdAt, thirtyDaysAgo),
+            excludeDashboardEvents(),
             sql`${trackingEvent.eventName} IN (${sql.join(
               sessionFunnelEvents.map((e) => sql`${e}`),
               sql`, `,
@@ -165,6 +170,7 @@ export const getConversionFunnel = () =>
           and(
             isNull(trackingEvent.archivedAt),
             gte(trackingEvent.createdAt, thirtyDaysAgo),
+            excludeDashboardEvents(),
             sql`${trackingEvent.eventName} IN (${sql.join(
               funnelEvents.map((e) => sql`${e}`),
               sql`, `,
@@ -204,7 +210,7 @@ export const getEventBreakdown = () =>
           uniqueSessions: countDistinct(trackingEvent.sessionId),
         })
         .from(trackingEvent)
-        .where(and(isNull(trackingEvent.archivedAt), gte(trackingEvent.createdAt, thirtyDaysAgo)))
+        .where(and(isNull(trackingEvent.archivedAt), gte(trackingEvent.createdAt, thirtyDaysAgo), excludeDashboardEvents()))
         .groupBy(trackingEvent.eventName)
         .orderBy(desc(count()))
         .execute();
@@ -216,7 +222,7 @@ export const getEventBreakdown = () =>
           totalSessions: countDistinct(trackingEvent.sessionId),
         })
         .from(trackingEvent)
-        .where(and(isNull(trackingEvent.archivedAt), gte(trackingEvent.createdAt, thirtyDaysAgo)))
+        .where(and(isNull(trackingEvent.archivedAt), gte(trackingEvent.createdAt, thirtyDaysAgo), excludeDashboardEvents()))
         .execute();
 
       return {
@@ -251,7 +257,7 @@ export const getPlatformHealth = () =>
           total: count(),
         })
         .from(trackingEventDelivery)
-        .where(gte(trackingEventDelivery.createdAt, sevenDaysAgo))
+        .where(and(gte(trackingEventDelivery.createdAt, sevenDaysAgo), excludeDashboardDeliveries()))
         .groupBy(trackingEventDelivery.platform, trackingEventDelivery.sent)
         .execute();
 
@@ -262,6 +268,7 @@ export const getPlatformHealth = () =>
           lastEvent: max(trackingEventDelivery.createdAt),
         })
         .from(trackingEventDelivery)
+        .where(excludeDashboardDeliveries())
         .groupBy(trackingEventDelivery.platform)
         .execute();
 
