@@ -21,6 +21,7 @@ import {
   useTemplate,
 } from "#root/frontend/contexts/TemplateContext";
 import { TrackingProvider } from "#root/frontend/contexts/TrackingContext";
+import { isDashboardPath } from "#root/shared/utils/tracking-routes";
 import { Toaster as ShadcnToaster } from "#root/components/ui/toaster";
 import {
   NavbarModeContext,
@@ -238,6 +239,13 @@ function LayoutShell({
   // Suppress the global navbar/footer wherever the active landing template
   // brings its own — decided at render time so SSR and hydration agree.
   const showGlobalChrome = !isDashboardRoute && !templateOwnsChrome;
+  // TRACKING_EXCLUDE_INTERNAL: no pixels, beacon or engagement tracking on
+  // /dashboard* (route-based only — storefront events are never dropped by
+  // role, staff may place real orders).
+  const trackingDisabled = Boolean(
+    pageContext.trackingFlags?.excludeDashboard &&
+      isDashboardPath(pageContext.urlPathname),
+  );
 
   // ── Coming-soon gate (minimal template only) ──────────────────────────────
   const { session } = useContext(AuthContext);
@@ -289,7 +297,7 @@ function LayoutShell({
   const inner = (
     <LayoutSettingsContext.Provider value={layoutSettings}>
       <NavbarModeContext.Provider value={shellNavbarMode}>
-        <TrackingProvider>
+        <TrackingProvider disabled={trackingDisabled}>
           <main
             id='page-content'
             /* Storefront routes inherit their base family from the

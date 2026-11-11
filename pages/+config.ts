@@ -35,5 +35,6 @@ export default {
     "typographySettings",
     "customFonts",
     "activeGA4PixelId",
+    "trackingFlags",
   ],
 } satisfies Config;

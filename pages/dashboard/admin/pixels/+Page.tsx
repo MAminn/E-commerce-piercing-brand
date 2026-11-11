@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { usePageContext } from "vike-react/usePageContext";
 import { trpc } from "#root/shared/trpc/client";
 import { toast } from "sonner";
 import { PixelPlatform } from "#root/shared/types/pixel-tracking";
@@ -138,6 +139,9 @@ interface CommerceEventSeen {
 // ─── Page Component ─────────────────────────────────────────────────────────
 
 export default function AdminPixelsPage() {
+  const dashboardTrackingExcluded = Boolean(
+    usePageContext().trackingFlags?.excludeDashboard,
+  );
   const [configs, setConfigs] = useState<PixelConfigRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -313,6 +317,12 @@ export default function AdminPixelsPage() {
   // ── Test pixel ──────────────────────────────────────────────────────────
 
   const handleTestPixel = async (config: PixelConfigRow) => {
+    if (dashboardTrackingExcluded) {
+      toast.info(
+        "Browser pixels are switched off on dashboard pages (TRACKING_EXCLUDE_INTERNAL), so a browser test from here reaches no platform. Test from the storefront instead.",
+      );
+      return;
+    }
     setTestingId(config.id);
     try {
       const { v7 } = await import("uuid");

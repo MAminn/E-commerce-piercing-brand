@@ -106,3 +106,23 @@ describe("Meta Pixel automatic history PageViews", () => {
     ]);
   });
 });
+
+describe("page_viewed and TRACKING_EXCLUDE_INTERNAL (A1)", () => {
+  const withFlags = (to: string, from: string, excludeDashboard: boolean) =>
+    ({ ...(ctx(to, from) as object), trackingFlags: { excludeDashboard } }) as never;
+
+  it("is not emitted for a dashboard page when the flag is on", async () => {
+    await onPageTransitionEnd(withFlags("/dashboard/orders", "/shop", true));
+    expect(pageViews()).toHaveLength(0);
+  });
+
+  it("is still emitted for a dashboard page when the flag is off (default)", async () => {
+    await onPageTransitionEnd(withFlags("/dashboard/orders", "/shop", false));
+    expect(pageViews()).toHaveLength(1);
+  });
+
+  it("is emitted for a storefront page reached from the dashboard when the flag is on", async () => {
+    await onPageTransitionEnd(withFlags("/shop", "/dashboard/orders", true));
+    expect(pageViews()).toHaveLength(1);
+  });
+});

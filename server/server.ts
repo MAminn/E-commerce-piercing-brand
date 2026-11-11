@@ -30,6 +30,8 @@ import { listActiveClientConfigsRaw } from "#root/backend/pixel-tracking/pixel-c
 import { PixelPlatform } from "#root/shared/types/pixel-tracking.js";
 import { getStoreOwnerId } from "#root/shared/config/store.js";
 import { trackBeaconPlugin } from "#root/server/routes/track.js";
+import { readClientTrackingFlags } from "#root/shared/config/tracking-flags.js";
+import { isDashboardPath } from "#root/shared/utils/tracking-routes.js";
 import { envSyncApiPlugin } from "#root/backend/env-sync/api.js";
 import { heroVideoUploadApiPlugin } from "#root/backend/homepage/upload-hero-video/api.js";
 import { parseByteRange } from "#root/server/routes/byte-range.js";
@@ -451,7 +453,13 @@ async function buildServer() {
       const customFonts = await listCustomFontsRaw(request.db);
       // Fetch the active GA4 config for SSR so the gtag script is present in
       // the raw HTML rather than only loading after client hydration/tRPC
-      const activePixelConfigs = await listActiveClientConfigsRaw(request.db);
+      // TRACKING_EXCLUDE_INTERNAL: no GA4 tag at all on /dashboard* routes.
+      const trackingFlags = readClientTrackingFlags();
+      const skipTrackers =
+        trackingFlags.excludeDashboard && isDashboardPath(request.raw.url);
+      const activePixelConfigs = skipTrackers
+        ? []
+        : await listActiveClientConfigsRaw(request.db);
       const activeGA4PixelId =
         activePixelConfigs.find((p) => p.platform === PixelPlatform.GOOGLE_GA4)
           ?.pixelId ?? null;
@@ -475,6 +483,7 @@ async function buildServer() {
         typographySettings,
         customFonts,
         activeGA4PixelId,
+        trackingFlags,
       };
 
       let pageContext: Awaited<ReturnType<typeof renderPage>>;

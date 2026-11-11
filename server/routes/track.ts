@@ -3,6 +3,8 @@ import { z } from "zod";
 import { createHash } from "node:crypto";
 import { processTrackingBeacon } from "#root/backend/pixel-tracking/delivery-pipeline";
 import { sanitizeTrackingUrl } from "#root/shared/utils/tracking-url";
+import { isDashboardPath } from "#root/shared/utils/tracking-routes";
+import { readClientTrackingFlags } from "#root/shared/config/tracking-flags";
 
 /**
  * Beacon tracking endpoint schema.
@@ -159,7 +161,17 @@ function sanitizeBeaconEvents(events: BeaconBody["events"]): BeaconBody["events"
   }));
 }
 
+/**
+ * TRACKING_EXCLUDE_INTERNAL: events from /dashboard* pages are neither stored
+ * nor relayed. Route-based only — a storefront event is kept whoever sends it
+ * (staff may place real orders), so the admin role never filters on its own.
+ */
+function dropDashboardEvents(events: BeaconBody["events"]): BeaconBody["events"] {
+  return events.filter((event) => !isDashboardPath(event.pageUrl));
+}
+
 export {
+  dropDashboardEvents,
   extractServerContext,
   hashIp,
   isRateLimited,
@@ -186,7 +198,10 @@ export const trackBeaconPlugin: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send();
     }
 
-    const events = sanitizeBeaconEvents(parsed.data.events);
+    const sanitized = sanitizeBeaconEvents(parsed.data.events);
+    const events = readClientTrackingFlags().excludeDashboard
+      ? dropDashboardEvents(sanitized)
+      : sanitized;
     if (events.length === 0) {
       return reply.status(204).send();
     }

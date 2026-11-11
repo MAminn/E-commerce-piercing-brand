@@ -13,6 +13,8 @@ import {
 } from "#root/backend/typography/service.js";
 import { listActiveClientConfigsRaw } from "#root/backend/pixel-tracking/pixel-config/ssr.js";
 import { PixelPlatform } from "#root/shared/types/pixel-tracking.js";
+import { readClientTrackingFlags } from "#root/shared/config/tracking-flags.js";
+import { isDashboardPath } from "#root/shared/utils/tracking-routes.js";
 
 export const vikeHonoMiddleware = createMiddleware(
   async (c) => {
@@ -40,7 +42,12 @@ export const vikeHonoMiddleware = createMiddleware(
     const customFonts = await listCustomFontsRaw(c.var.db);
     // Fetch the active GA4 config for SSR so the gtag script is present in
     // the raw HTML rather than only loading after client hydration/tRPC
-    const activePixelConfigs = await listActiveClientConfigsRaw(c.var.db);
+    const trackingFlags = readClientTrackingFlags();
+    const skipTrackers =
+      trackingFlags.excludeDashboard && isDashboardPath(c.req.url);
+    const activePixelConfigs = skipTrackers
+      ? []
+      : await listActiveClientConfigsRaw(c.var.db);
     const activeGA4PixelId =
       activePixelConfigs.find((p) => p.platform === PixelPlatform.GOOGLE_GA4)
         ?.pixelId ?? null;
@@ -64,6 +71,7 @@ export const vikeHonoMiddleware = createMiddleware(
       typographySettings,
       customFonts,
       activeGA4PixelId,
+      trackingFlags,
     };
     const pageContext = await renderPage(pageContextInit);
     const response = pageContext.httpResponse;
