@@ -79,8 +79,25 @@ const useIsomorphicLayoutEffect =
 
 // ─── Provider ───────────────────────────────────────────────────────────────
 
-export function TrackingProvider({ children }: { children: ReactNode }) {
+export function TrackingProvider({
+  children,
+  disabled = false,
+}: {
+  children: ReactNode;
+  /**
+   * No pixels, no beacon, no engagement or custom-event tracking while true
+   * (TRACKING_EXCLUDE_INTERNAL on /dashboard* routes — see LayoutDefault).
+   * trackEvent becomes a no-op. Flipping it tears the adapters down / brings
+   * them back.
+   */
+  disabled?: boolean;
+}) {
   const [sessionId, setSessionId] = useState<string>("");
+  // Set once tracking has been switched off in this page load. A later
+  // re-enable comes from a client navigation (dashboard → storefront), whose
+  // PageView +onPageTransitionEnd already emits — no second "initial" one.
+  const wasDisabledRef = useRef(disabled);
+  const everEnabledRef = useRef(false);
   const utmRef = useRef<UtmParams>({});
 
   // Initialize session ID and UTM params once
@@ -211,6 +228,7 @@ export function TrackingProvider({ children }: { children: ReactNode }) {
         eventId?: string;
       },
     ) => {
+      if (disabled) return;
       const event: TrackingEvent = {
         eventId: data?.eventId ?? v7(),
         eventName,
@@ -245,7 +263,7 @@ export function TrackingProvider({ children }: { children: ReactNode }) {
         console.debug("[Tracking]", event.eventName, event);
       }
     },
-    [sessionId, bufferEvent],
+    [sessionId, bufferEvent, disabled],
   );
   trackEventRef.current = trackEvent;
 
@@ -255,6 +273,22 @@ export function TrackingProvider({ children }: { children: ReactNode }) {
   useIsomorphicLayoutEffect(() => {
     // Only run client-side
     if (typeof window === "undefined") return;
+
+    if (disabled) {
+      wasDisabledRef.current = true;
+      // A Clarity recording already running (client navigation from the
+      // storefront into the dashboard) cannot be unloaded — label it.
+      if (everEnabledRef.current) {
+        try {
+          window.clarity?.("set", "perce_dashboard", "true");
+        } catch {
+          /* best-effort */
+        }
+      }
+      return;
+    }
+    everEnabledRef.current = true;
+    if (wasDisabledRef.current) hasFiredInitialPageView.current = true;
 
     let cancelled = false;
     const registry = new PixelAdapterRegistry();
@@ -324,10 +358,10 @@ export function TrackingProvider({ children }: { children: ReactNode }) {
       registry.destroyAll();
       registryRef.current = null;
     };
-  }, []);
+  }, [disabled]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || disabled) return;
 
     let cancelled = false;
     const manager = new CustomEventTriggerManager(
@@ -372,11 +406,11 @@ export function TrackingProvider({ children }: { children: ReactNode }) {
       manager.destroyAll();
       customTriggerRef.current = null;
     };
-  }, [trackEvent]);
+  }, [trackEvent, disabled]);
 
   // ── Engagement Tracker Initialization ──────────────────────────────────
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || disabled) return;
 
     const tracker = new EngagementTracker((eventName, customProperties) => {
       trackEvent(eventName, { customProperties });
@@ -388,7 +422,7 @@ export function TrackingProvider({ children }: { children: ReactNode }) {
       tracker.destroy();
       engagementRef.current = null;
     };
-  }, [trackEvent]);
+  }, [trackEvent, disabled]);
 
   const value = useMemo<TrackingContextValue>(
     () => ({ trackEvent, sessionId }),

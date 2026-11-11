@@ -23,6 +23,8 @@ declare global {
       typographySettings?: TypographySettings;
       customFonts?: CustomFontFileRow[];
       activeGA4PixelId?: string | null;
+      /** Non-secret tracking flags from the server env (shared/config/tracking-flags.ts). */
+      trackingFlags?: import("./shared/config/tracking-flags").ClientTrackingFlags;
     }
   }
 

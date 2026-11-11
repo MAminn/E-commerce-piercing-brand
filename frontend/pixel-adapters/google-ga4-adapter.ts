@@ -82,10 +82,11 @@ export class GoogleGA4Adapter implements PixelAdapter {
   }
 
   destroy(): void {
-    if (this.scriptElement?.parentNode) {
-      this.scriptElement.parentNode.removeChild(this.scriptElement);
-      this.scriptElement = null;
-    }
+    // The gtag.js tag is left in place: removing a loaded script does not
+    // unload it, and keeping it lets a later initialize() (tracking switched
+    // back on after a dashboard visit) find it instead of loading gtag.js a
+    // second time.
+    this.scriptElement = null;
     this.loaded = false;
     this.enabled = false;
   }

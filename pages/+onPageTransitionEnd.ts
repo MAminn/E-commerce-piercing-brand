@@ -5,6 +5,7 @@ import { getSessionId } from "#root/shared/utils/session-id";
 import { v7 } from "uuid";
 import { isSamePageNavigation } from "./page-transition-guard";
 import { sanitizeTrackingUrl } from "#root/shared/utils/tracking-url";
+import { isDashboardPath } from "#root/shared/utils/tracking-routes";
 
 /**
  * After a client-side navigation: the PageView event (real page changes
@@ -26,6 +27,13 @@ export async function onPageTransitionEnd(
   // same page in a new state, not a page view — with paid campaigns
   // optimising on PageView, those would be fake visits.
   if (isSamePageNavigation(pageContext)) return;
+  // TRACKING_EXCLUDE_INTERNAL: dashboard pages are not visits.
+  if (
+    pageContext.trackingFlags?.excludeDashboard &&
+    isDashboardPath(pageContext.urlPathname)
+  ) {
+    return;
+  }
   trackingEventBus.emit({
     eventId: v7(),
     eventName: TrackingEventName.PAGE_VIEWED,
