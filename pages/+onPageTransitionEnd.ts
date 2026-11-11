@@ -4,6 +4,7 @@ import { TrackingEventName } from "#root/shared/types/pixel-tracking";
 import { getSessionId } from "#root/shared/utils/session-id";
 import { v7 } from "uuid";
 import { isSamePageNavigation } from "./page-transition-guard";
+import { sanitizeTrackingUrl } from "#root/shared/utils/tracking-url";
 
 /**
  * After a client-side navigation: the PageView event (real page changes
@@ -29,8 +30,8 @@ export async function onPageTransitionEnd(
     eventId: v7(),
     eventName: TrackingEventName.PAGE_VIEWED,
     timestamp: Date.now(),
-    pageUrl: window.location.href,
-    referrer: document.referrer || undefined,
+    pageUrl: sanitizeTrackingUrl(window.location.href),
+    referrer: sanitizeTrackingUrl(document.referrer || undefined),
     sessionId: getSessionId(),
   });
 }
