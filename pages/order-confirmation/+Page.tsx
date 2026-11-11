@@ -6,6 +6,7 @@ import { trackPurchaseOnce } from "#root/frontend/tracking/purchase-event";
 import { useCart } from "#root/lib/context/CartContext";
 import { trpc } from "#root/shared/trpc/client";
 import { OrderConfirmationCard } from "./OrderConfirmationCard";
+import { readOrderEmail } from "./order-email";
 import { formatOrderNumber } from "#root/shared/orders/order-number";
 import {
   deriveConfirmationView,
@@ -14,6 +15,14 @@ import {
   type OrderLookup,
   type OrderPaymentStatus,
 } from "./confirmation-state";
+
+function safeSessionStorage(): Storage | null {
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
 
 const POLL_INTERVAL_MS = 4000;
 const POLL_TIMEOUT_MS = 60000;
@@ -29,7 +38,12 @@ export default function OrderConfirmationPage() {
     : null;
   const orderIdParam = searchParams?.get("id") ?? "";
   const orderTotal = searchParams?.get("total") ?? "";
-  const customerEmail = searchParams?.get("email") ?? "";
+  // The email is no longer in the URL (trackers read the URL): checkout keeps
+  // it in this tab's sessionStorage, and the <head> script moves an old-style
+  // `?email=` there before any tracker loads. The URL param is the last resort.
+  const customerEmail =
+    (isBrowser ? readOrderEmail(safeSessionStorage(), orderIdParam) : "") ||
+    (searchParams?.get("email") ?? "");
   const paymentParam = parsePaymentParam(searchParams?.get("payment") ?? null);
 
   // Only a well-formed reference is worth a round trip; anything else is a

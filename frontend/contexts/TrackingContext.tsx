@@ -19,6 +19,7 @@ import {
 } from "#root/shared/types/pixel-tracking";
 import { trackingEventBus } from "#root/shared/utils/tracking-event-bus";
 import { getSessionId } from "#root/shared/utils/session-id";
+import { sanitizeTrackingUrl } from "#root/shared/utils/tracking-url";
 import { trpc } from "#root/shared/trpc/client";
 import { PixelAdapterRegistry } from "#root/frontend/pixel-adapters/registry";
 import { createAdapterForPlatform } from "#root/frontend/pixel-adapters/factory";
@@ -214,9 +215,16 @@ export function TrackingProvider({ children }: { children: ReactNode }) {
         eventId: data?.eventId ?? v7(),
         eventName,
         timestamp: Date.now(),
-        pageUrl: typeof window !== "undefined" ? window.location.href : "",
+        // PII query params (e.g. a legacy ?email=) never leave the browser
+        // inside an event — see shared/utils/tracking-url.ts.
+        pageUrl:
+          typeof window !== "undefined"
+            ? sanitizeTrackingUrl(window.location.href)
+            : "",
         referrer:
-          typeof document !== "undefined" ? document.referrer : undefined,
+          typeof document !== "undefined"
+            ? sanitizeTrackingUrl(document.referrer)
+            : undefined,
         sessionId: sessionId || getSessionId(),
         ...utmRef.current,
         ecommerce: data?.ecommerce,

@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { createHash } from "node:crypto";
 import { processTrackingBeacon } from "#root/backend/pixel-tracking/delivery-pipeline";
+import { sanitizeTrackingUrl } from "#root/shared/utils/tracking-url";
 
 /**
  * Beacon tracking endpoint schema.
@@ -135,7 +136,7 @@ function extractServerContext(request: {
     ip,
     ipHash: hashIp(ip),
     userAgent,
-    referrer,
+    referrer: sanitizeTrackingUrl(referrer),
     fbp,
     fbc,
     gclid,
@@ -145,7 +146,26 @@ function extractServerContext(request: {
   };
 }
 
-export { extractServerContext, hashIp, isRateLimited, beaconBodySchema };
+/**
+ * Strip PII query parameters from every URL a client sent, before anything is
+ * persisted or relayed (`event_source_url`). Defence in depth: current clients
+ * already sanitise, but old cached bundles and hand-made requests may not.
+ */
+function sanitizeBeaconEvents(events: BeaconBody["events"]): BeaconBody["events"] {
+  return events.map((event) => ({
+    ...event,
+    pageUrl: sanitizeTrackingUrl(event.pageUrl),
+    referrer: sanitizeTrackingUrl(event.referrer),
+  }));
+}
+
+export {
+  extractServerContext,
+  hashIp,
+  isRateLimited,
+  beaconBodySchema,
+  sanitizeBeaconEvents,
+};
 
 /**
  * POST /api/track — Beacon endpoint for server-side event relay.
@@ -166,7 +186,7 @@ export const trackBeaconPlugin: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send();
     }
 
-    const { events } = parsed.data;
+    const events = sanitizeBeaconEvents(parsed.data.events);
     if (events.length === 0) {
       return reply.status(204).send();
     }

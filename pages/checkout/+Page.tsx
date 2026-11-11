@@ -23,6 +23,10 @@ import { navigate } from "vike/client/router";
 import { useTracking } from "#root/frontend/contexts/TrackingContext";
 import { TrackingEventName } from "#root/shared/types/pixel-tracking";
 import { savePurchaseItems } from "#root/frontend/tracking/purchase-event";
+import {
+  buildOrderConfirmationUrl,
+  saveOrderEmail,
+} from "#root/pages/order-confirmation/order-email";
 import { getCartSessionToken } from "#root/lib/cart-session";
 import { formatMoney } from "#root/shared/pricing/format-money";
 import { summaryShippingAmount } from "#root/shared/shipping/checkout-shipping";
@@ -343,7 +347,15 @@ export default function CheckoutPage() {
 
       const orderId = result.result?.id ?? "";
       const orderTotal = result.result?.total ?? "";
-      const email = encodeURIComponent(formValues.email || "");
+      // The email is shown on the confirmation page but never put in its URL
+      // (every tracker on that page reads the URL) — it stays in this tab.
+      if (orderId) {
+        try {
+          saveOrderEmail(sessionStorage, orderId, formValues.email || "");
+        } catch {
+          /* best-effort */
+        }
+      }
 
       // Stop any pending abandoned-cart emails for this browser session now
       // that a real order exists. Fire-and-forget by design — this must
@@ -383,8 +395,8 @@ export default function CheckoutPage() {
           const paymentResult = await trpc.payment.createSession.mutate({
             orderId,
             paymentMethod: selectedPaymentMethod as "stripe" | "paymob",
-            successUrl: `${origin}/order-confirmation?id=${orderId}&total=${orderTotal}&email=${email}&payment=success`,
-            cancelUrl: `${origin}/order-confirmation?id=${orderId}&total=${orderTotal}&email=${email}&payment=cancelled`,
+            successUrl: buildOrderConfirmationUrl({ origin, orderId, total: orderTotal, payment: "success" }),
+            cancelUrl: buildOrderConfirmationUrl({ origin, orderId, total: orderTotal, payment: "cancelled" }),
           });
 
           if (paymentResult.success && paymentResult.result?.paymentUrl) {
@@ -409,7 +421,7 @@ export default function CheckoutPage() {
           // Still clear cart and navigate to confirmation (order exists, payment pending)
           clearCart();
           navigate(
-            `/order-confirmation?id=${orderId}&total=${orderTotal}&email=${email}&payment=pending`,
+            buildOrderConfirmationUrl({ orderId, total: orderTotal, payment: "pending" }),
           );
           return;
         }
@@ -417,9 +429,7 @@ export default function CheckoutPage() {
 
       // ─── COD flow: just navigate to confirmation ──────────────────────
       clearCart();
-      navigate(
-        `/order-confirmation?id=${orderId}&total=${orderTotal}&email=${email}`,
-      );
+      navigate(buildOrderConfirmationUrl({ orderId, total: orderTotal }));
     } catch (error) {
       console.error("[Checkout] Order submission failed:", error);
       const message = parseOrderError(error);

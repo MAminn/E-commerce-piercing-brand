@@ -11,6 +11,7 @@ import {
 import { getPublicOrigin, toAbsoluteUrl } from "#root/shared/config/site-url";
 import { resolveMetaDescription } from "#root/pages/index/meta-description";
 import { buildTypographyHeadCss } from "#root/shared/typography/build-head-css";
+import { STRIP_URL_PII_SCRIPT } from "#root/shared/utils/strip-url-pii-script";
 
 export default function HeadDefault() {
   const pageContext = usePageContext();
@@ -119,6 +120,15 @@ export default function HeadDefault() {
 
   return (
     <>
+      {/* PII out of the address bar BEFORE any tracker tag below reads
+          document.location (shared/utils/strip-url-pii-script.ts). Must stay
+          the first script in <head>. */}
+      <script
+        data-strip-url-pii=''
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: a static, build-time constant — no user input reaches it
+        dangerouslySetInnerHTML={{ __html: STRIP_URL_PII_SCRIPT }}
+      />
+
       {/* Basic favicon */}
       <link rel='icon' href={faviconUrl} type={faviconType} />
 
