@@ -12,6 +12,7 @@ import {
   excludeDashboardDeliveries,
   excludeDashboardEvents,
 } from "#root/backend/pixel-tracking/internal-traffic";
+import { evaluatePlatformHealth } from "#root/backend/analytics/platform-health";
 import {
   count,
   countDistinct,
@@ -245,6 +246,8 @@ export const getPlatformHealth = () =>
         .select({
           platform: pixelConfig.platform,
           enabled: pixelConfig.enabled,
+          enableClientSide: pixelConfig.enableClientSide,
+          pixelId: pixelConfig.pixelId,
         })
         .from(pixelConfig)
         .execute();
@@ -315,29 +318,18 @@ export const getPlatformHealth = () =>
         }
       }
 
-      return Array.from(platformMap.entries()).map(([platform, data]) => {
-        const total = data.success + data.failed;
-        const successRate = total > 0 ? (data.success / total) * 100 : 0;
-        const status: "healthy" | "degraded" | "down" | "no_data" =
-          total === 0
-            ? "no_data"
-            : successRate >= 99
-              ? "healthy"
-              : successRate >= 90
-                ? "degraded"
-                : "down";
-
-        return {
+      // Server-delivery success rate per platform — except GA4 in its
+      // client-owned mode (G1), judged from the browser tag's config instead.
+      // See backend/analytics/platform-health.ts.
+      return Array.from(platformMap.entries()).map(([platform, data]) =>
+        evaluatePlatformHealth({
           platform,
-          enabled:
-            configs.find((c) => c.platform === platform)?.enabled ?? false,
-          successRate: Math.round(successRate * 10) / 10,
-          successCount: data.success,
-          failedCount: data.failed,
-          lastEventAt: data.lastEvent?.toISOString() ?? null,
-          status,
-        };
-      });
+          config: configs.find((c) => c.platform === platform) ?? null,
+          successCount: Number(data.success),
+          failedCount: Number(data.failed),
+          lastEventAt: data.lastEvent,
+        }),
+      );
     });
   });
 

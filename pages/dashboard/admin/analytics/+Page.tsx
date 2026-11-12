@@ -95,6 +95,9 @@ interface PlatformRow {
   failedCount: number;
   lastEventAt: string | null;
   enabled: boolean;
+  /** "client" = GA4 judged from the browser tag (G1 client-owned mode). */
+  basis?: "server_delivery" | "client";
+  note?: string;
 }
 
 interface TopSellingRow {
@@ -603,7 +606,9 @@ export default function AnalyticsDashboardPage() {
               Platform Health
             </CardTitle>
             <CardDescription>
-              Server-side delivery status for each pixel platform (last 7 days)
+              Server-side delivery status for each pixel platform (last 7
+              days). GA4 is measured by the browser tag, so its status is the
+              tag's state, not server deliveries.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -650,19 +655,34 @@ export default function AnalyticsDashboardPage() {
                           {ph.status === "down" && (
                             <AlertTriangle className='h-3 w-3' />
                           )}
-                          {ph.status === "no_data" ? "No data" : ph.status}
+                          {ph.basis === "client" && ph.status === "healthy"
+                            ? "client-side active"
+                            : ph.status === "no_data"
+                              ? "No data"
+                              : ph.status}
                         </Badge>
+                        {ph.basis === "client" && ph.note && (
+                          <p
+                            className='mt-1 text-xs text-muted-foreground'
+                            data-testid='platform-health-note'>
+                            {ph.note}
+                          </p>
+                        )}
                       </TableCell>
                       <TableCell className='text-right'>
-                        {ph.successRate > 0
-                          ? `${ph.successRate.toFixed(1)}%`
-                          : "N/A"}
+                        {ph.basis === "client"
+                          ? "—"
+                          : ph.successRate > 0
+                            ? `${ph.successRate.toFixed(1)}%`
+                            : "N/A"}
                       </TableCell>
                       <TableCell className='text-right'>
-                        {ph.failedCount}
+                        {ph.basis === "client" ? "—" : ph.failedCount}
                       </TableCell>
                       <TableCell className='text-right'>
-                        {ph.lastEventAt ? (
+                        {ph.basis === "client" ? (
+                          "—"
+                        ) : ph.lastEventAt ? (
                           <span className='flex items-center justify-end gap-1'>
                             <Clock className='h-3 w-3' />
                             {formatTimeAgo(ph.lastEventAt)}
