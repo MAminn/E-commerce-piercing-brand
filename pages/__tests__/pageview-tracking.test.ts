@@ -116,7 +116,13 @@ describe("page_viewed and TRACKING_EXCLUDE_INTERNAL (A1)", () => {
     expect(pageViews()).toHaveLength(0);
   });
 
-  it("is still emitted for a dashboard page when the flag is off (default)", async () => {
+  it("is not emitted for /admin pages when the flag is on", async () => {
+    await onPageTransitionEnd(withFlags("/admin", "/shop", true));
+    await onPageTransitionEnd(withFlags("/admin/login", "/admin", true));
+    expect(pageViews()).toHaveLength(0);
+  });
+
+  it("is still emitted for a dashboard page when the flag is explicitly off", async () => {
     await onPageTransitionEnd(withFlags("/dashboard/orders", "/shop", false));
     expect(pageViews()).toHaveLength(1);
   });

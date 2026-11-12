@@ -6,11 +6,12 @@ import {
 import { readClientTrackingFlags } from "#root/shared/config/tracking-flags";
 
 /**
- * A /dashboard* page URL — absolute (`https://host/dashboard…`) or a bare
- * path — matching shared/utils/tracking-routes.ts isDashboardPath.
+ * An internal page URL (/dashboard*, /admin*) — absolute
+ * (`https://host/dashboard…`) or a bare path — matching
+ * shared/utils/tracking-routes.ts isDashboardPath.
  * POSIX regex for Postgres `~*` (case-insensitive).
  */
-export const DASHBOARD_URL_PATTERN = "^([a-z][a-z0-9+.-]*://[^/]+)?/dashboard([/?#]|$)";
+export const DASHBOARD_URL_PATTERN = "^([a-z][a-z0-9+.-]*://[^/]+)?/(dashboard|admin)([/?#]|$)";
 
 /**
  * TRACKING_EXCLUDE_INTERNAL (A2): a WHERE condition that keeps only

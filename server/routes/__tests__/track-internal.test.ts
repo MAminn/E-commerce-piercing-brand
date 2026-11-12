@@ -43,10 +43,23 @@ describe("/api/track — TRACKING_EXCLUDE_INTERNAL (route-based)", () => {
     else process.env.TRACKING_EXCLUDE_INTERNAL = prev;
   });
 
-  it("flag OFF (default): dashboard events still flow exactly as before", async () => {
-    Reflect.deleteProperty(process.env, "TRACKING_EXCLUDE_INTERNAL");
+  it("flag explicitly OFF (TRACKING_EXCLUDE_INTERNAL=false): dashboard events still flow as before", async () => {
+    process.env.TRACKING_EXCLUDE_INTERNAL = "false";
     await post([ev("a", "https://shop.test/dashboard/orders"), ev("b", "https://shop.test/shop")]);
     expect(relayedIds()).toEqual(["a", "b"]);
+  });
+
+  it("flag UNSET (production default): /dashboard* and /admin* events are dropped, storefront kept", async () => {
+    Reflect.deleteProperty(process.env, "TRACKING_EXCLUDE_INTERNAL");
+    await post([
+      ev("dash", "https://shop.test/dashboard/orders"),
+      ev("admin", "https://shop.test/admin"),
+      ev("admin2", "https://shop.test/admin/login?x=1"),
+      ev("shop", "https://shop.test/shop"),
+      ev("pdp", "https://shop.test/shop/seamless-ring-8mm"),
+      ev("buy", "https://shop.test/order-confirmation?id=1"),
+    ]);
+    expect(relayedIds()).toEqual(["shop", "pdp", "buy"]);
   });
 
   it("flag ON: /dashboard* events are dropped, storefront events kept", async () => {

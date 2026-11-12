@@ -25,6 +25,7 @@ import { PixelAdapterRegistry } from "#root/frontend/pixel-adapters/registry";
 import { createAdapterForPlatform } from "#root/frontend/pixel-adapters/factory";
 import { CustomEventTriggerManager } from "#root/frontend/tracking/custom-event-triggers";
 import { EngagementTracker } from "#root/frontend/pixel-adapters/engagement-tracker";
+import { setGa4HitsDisabled } from "#root/frontend/pixel-adapters/google-ga4-adapter";
 
 // ─── UTM Parsing ────────────────────────────────────────────────────────────
 
@@ -276,6 +277,9 @@ export function TrackingProvider({
 
     if (disabled) {
       wasDisabledRef.current = true;
+      // A gtag.js loaded by an earlier storefront page keeps sending its own
+      // enhanced-measurement hits unless switched off for the property.
+      setGa4HitsDisabled(true);
       // A Clarity recording already running (client navigation from the
       // storefront into the dashboard) cannot be unloaded — label it.
       if (everEnabledRef.current) {
@@ -288,7 +292,11 @@ export function TrackingProvider({
       return;
     }
     everEnabledRef.current = true;
-    if (wasDisabledRef.current) hasFiredInitialPageView.current = true;
+    if (wasDisabledRef.current) {
+      hasFiredInitialPageView.current = true;
+      // Back on the storefront after an internal route: GA4 sends again.
+      setGa4HitsDisabled(false);
+    }
 
     let cancelled = false;
     const registry = new PixelAdapterRegistry();

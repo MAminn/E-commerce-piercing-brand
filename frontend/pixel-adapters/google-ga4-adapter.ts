@@ -47,6 +47,29 @@ function buildGA4Params(event: TrackingEvent): Record<string, unknown> {
   return params;
 }
 
+// ─── Internal-route opt-out ─────────────────────────────────────────────────
+
+/**
+ * Google's documented per-property opt-out: while `window['ga-disable-<ID>']`
+ * is true, gtag.js sends nothing for that measurement id — including its own
+ * enhanced-measurement hits (history-change page_view, scroll, clicks), which
+ * our adapter never sees. A1 tears our adapters down on internal routes, but a
+ * gtag.js already loaded by a storefront page (client navigation into the
+ * dashboard) cannot be unloaded, so this is what silences it there.
+ *
+ * Applies to every GA4 tag on the page (SSR-rendered or adapter-injected —
+ * both carry data-pixel-platform="google_ga4" data-pixel-id="G-…").
+ */
+export function setGa4HitsDisabled(disabled: boolean): void {
+  if (typeof window === "undefined" || typeof document === "undefined") return;
+  const tags = document.querySelectorAll<HTMLScriptElement>('script[data-pixel-platform="google_ga4"][data-pixel-id]');
+  const w = window as unknown as Record<string, unknown>;
+  for (const tag of tags) {
+    const id = tag.getAttribute("data-pixel-id");
+    if (id) w[`ga-disable-${id}`] = disabled;
+  }
+}
+
 // ─── Google GA4 Adapter ─────────────────────────────────────────────────────
 
 const GA4_EVENT_MAP = PLATFORM_EVENT_MAP[PixelPlatform.GOOGLE_GA4];

@@ -99,7 +99,7 @@ describeIfDb("dashboard rows excluded from tracking stats (integration)", () => 
     stats.platformStats.filter((p) => p.platform === "meta" && p.sent).reduce((s, p) => s + Number(p.total), 0);
 
   it("flag OFF: every row counts, as before", async () => {
-    Reflect.deleteProperty(process.env, "TRACKING_EXCLUDE_INTERNAL");
+    process.env.TRACKING_EXCLUDE_INTERNAL = "false";
     const stats = await run(deliveryService.getDeliveryStats());
     expect(stats.events24h).toBe(8);
     expect(metaSent(stats)).toBe(8);

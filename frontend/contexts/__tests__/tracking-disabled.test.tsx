@@ -116,6 +116,68 @@ describe("TrackingProvider disabled (dashboard routes)", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it("GA4 on an internal route: no gtag event, and the already-loaded gtag.js is opted out (ga-disable)", async () => {
+    const tag = document.createElement("script");
+    tag.setAttribute("data-pixel-platform", "google_ga4");
+    tag.setAttribute("data-pixel-id", "G-TESTGA4");
+    document.head.appendChild(tag);
+    const gtag = vi.fn();
+    (window as unknown as { gtag: unknown }).gtag = gtag;
+    const metaOnly = listActive.getMockImplementation();
+    listActive.mockImplementation(async () => ({
+      success: true,
+      result: [
+        {
+          id: "cfg-ga4",
+          platform: "google_ga4",
+          pixelId: "G-TESTGA4",
+          enabled: true,
+          enableClientSide: true,
+          enableServerSide: true,
+          consentRequired: false,
+          createdAt: new Date(),
+        },
+      ],
+    }));
+    const flag = () => (window as unknown as Record<string, unknown>)["ga-disable-G-TESTGA4"];
+    try {
+      // Storefront first (gtag.js loaded), then client navigation into the dashboard.
+      const view = render(
+        <TrackingProvider>
+          <Grab />
+        </TrackingProvider>,
+      );
+      await waitFor(() => expect(gtag.mock.calls.filter(([c, n]) => c === "event" && n === "page_view")).toHaveLength(1));
+      expect(flag()).toBeUndefined(); // storefront never touches the opt-out
+      view.rerender(
+        <TrackingProvider disabled>
+          <Grab />
+        </TrackingProvider>,
+      );
+      expect(flag()).toBe(true);
+      gtag.mockClear();
+      act(() => track("product_added_to_cart"));
+      await new Promise((r) => setTimeout(r, 300));
+      expect(gtag.mock.calls.filter(([c]) => c === "event")).toHaveLength(0);
+      // Back to the storefront: GA4 sends again.
+      view.rerender(
+        <TrackingProvider disabled={false}>
+          <Grab />
+        </TrackingProvider>,
+      );
+      expect(flag()).toBe(false);
+      act(() => track("product_added_to_cart"));
+      await waitFor(() =>
+        expect(gtag.mock.calls.filter(([c, n]) => c === "event" && n === "add_to_cart")).toHaveLength(1),
+      );
+    } finally {
+      tag.remove();
+      Reflect.deleteProperty(window, "ga-disable-G-TESTGA4");
+      Reflect.deleteProperty(window, "gtag");
+      if (metaOnly) listActive.mockImplementation(metaOnly);
+    }
+  });
+
   it("default (not disabled) behaves exactly as before: PageView on load", async () => {
     render(
       <TrackingProvider>

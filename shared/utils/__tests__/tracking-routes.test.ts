@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isDashboardPath } from "../tracking-routes";
-import { isEnvFlagOn, readClientTrackingFlags } from "#root/shared/config/tracking-flags";
+import { isEnvFlagOff, isEnvFlagOn, readClientTrackingFlags } from "#root/shared/config/tracking-flags";
 
 describe("isDashboardPath", () => {
   it.each([
@@ -10,7 +10,11 @@ describe("isDashboardPath", () => {
     "/dashboard/admin/pixels?tab=events",
     "https://shop.test/dashboard/admin/pixels/events",
     "/Dashboard/Orders",
-  ])("treats %s as a dashboard route", (u) => {
+    "/admin",
+    "/admin/",
+    "/Admin/login",
+    "https://shop.test/admin?next=/dashboard",
+  ])("treats %s as an internal route", (u) => {
     expect(isDashboardPath(u)).toBe(true);
   });
 
@@ -22,6 +26,12 @@ describe("isDashboardPath", () => {
     "/bundles/pick-your-3",
     "https://shop.test/order-confirmation?id=1",
     "https://shop.test/shop?ref=/dashboard",
+    "/administrator",
+    "/admins",
+    "/shop/admin-ring",
+    "/account",
+    "/checkout",
+    "/order-confirmation",
     "",
     undefined,
   ])("treats %s as a storefront route", (u) => {
@@ -30,8 +40,17 @@ describe("isDashboardPath", () => {
 });
 
 describe("tracking flags", () => {
-  it("default OFF when unset", () => {
-    expect(readClientTrackingFlags({})).toEqual({ excludeDashboard: false });
+  it("default ON when unset (production never set it — internal traffic must be excluded)", () => {
+    expect(readClientTrackingFlags({})).toEqual({ excludeDashboard: true });
+    expect(readClientTrackingFlags({ TRACKING_EXCLUDE_INTERNAL: "" }).excludeDashboard).toBe(true);
+  });
+
+  it("only an explicit false/0/no/off switches it off", () => {
+    for (const v of ["false", "FALSE", "0", "no", "off", " off "]) {
+      expect(readClientTrackingFlags({ TRACKING_EXCLUDE_INTERNAL: v }).excludeDashboard).toBe(false);
+      expect(isEnvFlagOff(v)).toBe(true);
+    }
+    for (const v of ["true", "1", "garbage", "", undefined]) expect(isEnvFlagOff(v)).toBe(false);
   });
 
   it("TRACKING_EXCLUDE_INTERNAL=true switches dashboard exclusion on", () => {

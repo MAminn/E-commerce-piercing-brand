@@ -13,10 +13,16 @@ afterEach(() => {
 });
 
 describe("A2 stats conditions", () => {
-  it("are undefined (no-op in and()) while the flag is off", () => {
-    Reflect.deleteProperty(process.env, "TRACKING_EXCLUDE_INTERNAL");
+  it("are undefined (no-op in and()) while the flag is explicitly off", () => {
+    process.env.TRACKING_EXCLUDE_INTERNAL = "false";
     expect(excludeDashboardEvents()).toBeUndefined();
     expect(excludeDashboardDeliveries()).toBeUndefined();
+  });
+
+  it("are SQL conditions by default (flag unset)", () => {
+    Reflect.deleteProperty(process.env, "TRACKING_EXCLUDE_INTERNAL");
+    expect(excludeDashboardEvents()).toBeDefined();
+    expect(excludeDashboardDeliveries()).toBeDefined();
   });
 
   it("are SQL conditions while the flag is on", () => {
@@ -36,6 +42,11 @@ describe("A2 stats conditions", () => {
       "https://shop.test/dashboards",
       "https://shop.test/shop?next=/dashboard",
       "/bundles",
+      "https://shop.test/admin",
+      "https://shop.test/Admin/login?next=1",
+      "/admin/",
+      "https://shop.test/administrator",
+      "https://shop.test/shop?next=/admin",
     ]) {
       expect(re.test(u)).toBe(isDashboardPath(u));
     }
