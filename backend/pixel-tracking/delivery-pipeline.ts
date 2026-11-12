@@ -16,6 +16,7 @@ import {
 } from "#root/shared/database/drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { v7 } from "uuid";
+import { shouldServerSendToGa4 } from "#root/backend/pixel-tracking/ga4-ownership";
 
 // Server-side adapters
 import { metaCapiAdapter } from "#root/backend/pixel-tracking/server-adapters/meta-capi-adapter";
@@ -201,6 +202,11 @@ export async function processTrackingBeacon(
     .map((config) => {
       const adapter = SERVER_ADAPTERS[config.platform];
       if (!adapter) return null;
+      // G1: the browser gtag owns every GA4 event (purchase included) and GA4
+      // cannot merge a browser hit with an MP copy — so the server relays
+      // nothing to GA4 unless GA4_MP_MODE=legacy_all. Nothing is sent, so no
+      // delivery row is logged for GA4 either. See ga4-ownership.ts.
+      if (config.platform === "google_ga4" && !shouldServerSendToGa4()) return null;
       return sendToAdapterAndLog(adapter, enriched, config, insertedRows, db);
     })
     .filter(Boolean);

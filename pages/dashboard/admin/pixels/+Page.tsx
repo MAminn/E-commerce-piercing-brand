@@ -854,6 +854,14 @@ export default function AdminPixelsPage() {
                   />
                 </div>
               )}
+              {form.platform === "google_ga4" && (
+                <p className='text-xs text-muted-foreground'>
+                  GA4 events, purchases included, are sent once by the browser
+                  tag. GA4 cannot merge a browser hit with a server copy, so the
+                  server does not send to GA4 (GA4_MP_MODE=off) even when this
+                  switch is on.
+                </p>
+              )}
 
               <div className='flex items-center justify-between'>
                 <Label htmlFor='consentRequired'>Require Consent</Label>
