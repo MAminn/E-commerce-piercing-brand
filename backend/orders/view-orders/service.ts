@@ -13,17 +13,13 @@ import {
   count,
   desc,
   eq,
-  gte,
   inArray,
-  isNotNull,
-  lt,
-  notInArray,
-  or,
   sql,
   type SQL,
 } from "drizzle-orm";
 import { Effect } from "effect";
 import { stripOrderItemMerchantFields } from "../merchant-fields";
+import { orderFilterConditions } from "./filters";
 import { z } from "zod";
 import type { ClientSession } from "#root/backend/auth/shared/entities";
 import { ServerError } from "#root/shared/error/server";
@@ -73,31 +69,12 @@ export const viewOrders = (
     return yield* $(
       query(async (db) => {
         return await db.transaction(async (tx) => {
-          const conditions: SQL<unknown>[] = [];
-
-          if (status) {
-            conditions.push(eq(order.status, status));
-          }
-
-          if (dateFrom) {
-            conditions.push(gte(order.createdAt, new Date(dateFrom)));
-          }
-          if (dateTo) {
-            conditions.push(lt(order.createdAt, new Date(dateTo)));
-          }
-
-          if (paymentIssueOnly) {
-            conditions.push(
-              and(
-                inArray(order.paymentMethod, ["stripe", "paymob"]),
-                notInArray(order.paymentStatus, ["paid", "refunded"]),
-                or(
-                  isNotNull(order.bostaDeliveryId),
-                  inArray(order.bostaSyncStatus, ["sent", "pending"]),
-                )!,
-              )!,
-            );
-          }
+          const conditions: SQL<unknown>[] = orderFilterConditions({
+            status,
+            dateFrom,
+            dateTo,
+            paymentIssueOnly,
+          });
 
           // Users (non-admins) only see their own orders
           if (!isAdmin) {

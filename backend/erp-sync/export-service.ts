@@ -138,7 +138,23 @@ type LogRow = Pick<typeof orderLog.$inferSelect, "orderId" | "action" | "oldStat
 const iso = (d: Date | null | undefined): string | null => (d ? d.toISOString() : null);
 const money = (v: string | number): string => Number(v).toFixed(2);
 
-function courierOf(o: OrderRow): ExportedOrder["courier"] {
+/** The order columns `courierOf` reads. */
+export type CourierFields = Pick<
+  OrderRow,
+  | "bostaDeliveryId"
+  | "bostaTrackingNumber"
+  | "bostaStatus"
+  | "bostaStatusCode"
+  | "bostaStatusUpdatedAt"
+  | "fincartTrackingNumber"
+  | "fincartStatus"
+  | "fincartSubStatus"
+  | "fincartReturnTrackingNumber"
+  | "fincartStatusUpdatedDate"
+>;
+
+/** Which courier holds the order and its raw status. Also used by the admin Excel export. */
+export function courierOf(o: CourierFields): ExportedOrder["courier"] {
   if (o.bostaDeliveryId || o.bostaTrackingNumber || o.bostaStatus) {
     return {
       provider: "bosta",

@@ -79,6 +79,7 @@ import { Pagination } from "#root/components/utils/Pagination";
 import { OrderEditPanel } from "./OrderEditPanel";
 import { OrderActivityLog } from "./OrderActivityLog";
 import { OrderItemsList, OrderItemsTable } from "./OrderItemsPanel";
+import { OrdersExportMenu, type OrdersExportFilters } from "./OrdersExportMenu";
 import type { OrderBundleSnapshot } from "#root/shared/bundles/order-grouping";
 import { groupOrderLines, totalUnits } from "#root/shared/bundles/order-grouping";
 
@@ -732,6 +733,37 @@ export default function Orders() {
                   <AlertTriangle className='h-3.5 w-3.5' />
                   Payment Issues
                 </Button>
+                {isAdmin && (
+                  <OrdersExportMenu
+                    filtersActive={
+                      statusFilter !== "all" ||
+                      dateFilter !== "all" ||
+                      paymentIssueOnly ||
+                      searchQuery !== ""
+                    }
+                    getFilters={(): OrdersExportFilters => {
+                      const { from, to } = getDateRange();
+                      return {
+                        status:
+                          statusFilter === "all"
+                            ? undefined
+                            : (statusFilter as OrdersExportFilters["status"]),
+                        dateFrom: from,
+                        dateTo: to,
+                        dateLabel:
+                          dateFilter === "today"
+                            ? "Today"
+                            : dateFilter === "yesterday"
+                              ? "Yesterday"
+                              : dateFilter === "custom"
+                                ? customDate
+                                : undefined,
+                        paymentIssueOnly: paymentIssueOnly || undefined,
+                        search: searchQuery || undefined,
+                      };
+                    }}
+                  />
+                )}
               </div>
             </div>
             {paymentIssueOnly && (
