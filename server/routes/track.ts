@@ -5,6 +5,7 @@ import { processTrackingBeacon } from "#root/backend/pixel-tracking/delivery-pip
 import { sanitizeTrackingUrl } from "#root/shared/utils/tracking-url";
 import { isDashboardPath } from "#root/shared/utils/tracking-routes";
 import { readClientTrackingFlags } from "#root/shared/config/tracking-flags";
+import { hashSessionIdentity } from "#root/backend/pixel-tracking/meta-user-data";
 
 /**
  * Beacon tracking endpoint schema.
@@ -198,8 +199,9 @@ export const trackBeaconPlugin: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send();
     }
 
+    const flags = readClientTrackingFlags();
     const sanitized = sanitizeBeaconEvents(parsed.data.events);
-    const events = readClientTrackingFlags().excludeDashboard
+    const events = flags.excludeDashboard
       ? dropDashboardEvents(sanitized)
       : sanitized;
     if (events.length === 0) {
@@ -222,7 +224,16 @@ export const trackBeaconPlugin: FastifyPluginAsync = async (fastify) => {
     try {
       // processTrackingBeacon is async — we intentionally do NOT await it
       // so the client gets 204 immediately.
-      processTrackingBeacon(events, serverContext, request.db).catch(
+      // META_ADVANCED_MATCHING: a signed-in shopper's account email / phone /
+      // name, hashed here — the raw values never leave this handler and are
+      // never stored or logged.
+      const sessionIdentity = flags.metaAdvancedMatching
+        ? hashSessionIdentity(request.clientSession)
+        : null;
+      processTrackingBeacon(events, serverContext, request.db, {
+        metaAdvancedMatching: flags.metaAdvancedMatching,
+        sessionIdentity,
+      }).catch(
         (err: unknown) => {
           request.log.error({ err }, "Delivery pipeline error");
         },

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { trackingEventBus } from "#root/shared/utils/tracking-event-bus";
 import { TrackingEventName, type TrackingEvent } from "#root/shared/types/pixel-tracking";
 import { onPageTransitionEnd } from "../+onPageTransitionEnd";
+import { registerPageViewSink } from "#root/frontend/tracking/page-view";
 
 /**
  * A PageView is a new page, not a new state of the same page. The shop
@@ -130,5 +131,34 @@ describe("page_viewed and TRACKING_EXCLUDE_INTERNAL (A1)", () => {
   it("is emitted for a storefront page reached from the dashboard when the flag is on", async () => {
     await onPageTransitionEnd(withFlags("/shop", "/dashboard/orders", true));
     expect(pageViews()).toHaveLength(1);
+  });
+});
+
+describe("page_viewed goes through the canonical tracking path (TrackingProvider)", () => {
+  it("with a registered provider sink: the sink is called once per real navigation, nothing is emitted directly", async () => {
+    const sink = vi.fn();
+    const unregister = registerPageViewSink(sink);
+    try {
+      await onPageTransitionEnd(ctx("/shop", "/"));
+      await onPageTransitionEnd(ctx("/shop?sort=price", "/shop")); // query-only: none
+      await onPageTransitionEnd(ctx("/cart", "/shop?sort=price"));
+      expect(sink).toHaveBeenCalledTimes(2);
+      expect(pageViews()).toHaveLength(0); // the provider's trackEvent emits; the hook does not
+    } finally {
+      unregister();
+    }
+  });
+
+  it("internal routes never reach the sink", async () => {
+    const sink = vi.fn();
+    const unregister = registerPageViewSink(sink);
+    try {
+      for (const to of ["/admin", "/admin/login", "/dashboard", "/dashboard/orders"]) {
+        await onPageTransitionEnd({ ...(ctx(to, "/shop") as object), trackingFlags: { excludeDashboard: true } } as never);
+      }
+      expect(sink).not.toHaveBeenCalled();
+    } finally {
+      unregister();
+    }
   });
 });

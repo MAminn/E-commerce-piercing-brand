@@ -2,6 +2,7 @@ import { query } from "#root/shared/database/drizzle/db";
 import { trackingEvent } from "#root/shared/database/drizzle/schema";
 import type { TrackingEvent } from "#root/shared/types/pixel-tracking";
 import type { ServerContext } from "#root/server/routes/track";
+import type { HashedMetaUserData } from "#root/shared/tracking/meta-user-data";
 import { Effect } from "effect";
 import { v7 } from "uuid";
 
@@ -11,6 +12,12 @@ import { v7 } from "uuid";
  */
 export interface EnrichedTrackingEvent extends TrackingEvent {
   serverContext: ServerContext;
+  /**
+   * Hashed Meta user_data (external_id, em, ph, …) — SHA-256 digests only.
+   * Attached to the Meta CAPI relay copy AFTER persistence, so it is never
+   * written to tracking_event. (META_ADVANCED_MATCHING)
+   */
+  metaUserData?: HashedMetaUserData;
 }
 
 /**

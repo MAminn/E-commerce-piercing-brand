@@ -5,6 +5,7 @@ import {
   type PixelConfig,
 } from "#root/shared/types/pixel-tracking";
 import type { EnrichedTrackingEvent } from "#root/backend/pixel-tracking/event-logger";
+import { isSha256Hex } from "#root/shared/tracking/meta-user-data";
 import type {
   ServerPixelAdapter,
   AdapterDeliveryResult,
@@ -31,6 +32,16 @@ function buildUserData(event: EnrichedTrackingEvent): Record<string, unknown> {
   if (ctx.fbp) userData.fbp = ctx.fbp;
   if (ctx.fbc) userData.fbc = ctx.fbc;
 
+  // META_ADVANCED_MATCHING: hashed external_id / em / ph / fn / ln / ct / st
+  // / zp / country, attached by the pipeline to this relay copy only. Only a
+  // SHA-256 digest is ever copied — anything else is dropped, so a raw value
+  // can never reach Meta through this path.
+  if (event.metaUserData) {
+    for (const [key, value] of Object.entries(event.metaUserData)) {
+      if (isSha256Hex(value)) userData[key] = value;
+    }
+  }
+
   return userData;
 }
 
@@ -55,6 +66,10 @@ function buildCustomData(
       quantity: item.quantity ?? 1,
     }));
     customData.content_type = "product";
+    // Same convention as the browser pixel (first item's name / category).
+    const first = ecom.items[0];
+    if (first?.itemName) customData.content_name = first.itemName;
+    if (first?.category) customData.content_category = first.category;
     customData.num_items = ecom.items.reduce(
       (sum, item) => sum + (item.quantity ?? 1),
       0,

@@ -1,11 +1,7 @@
 import type { PageContextClient } from "vike/types";
-import { trackingEventBus } from "#root/shared/utils/tracking-event-bus";
-import { TrackingEventName } from "#root/shared/types/pixel-tracking";
-import { getSessionId } from "#root/shared/utils/session-id";
-import { v7 } from "uuid";
 import { isSamePageNavigation } from "./page-transition-guard";
-import { sanitizeTrackingUrl } from "#root/shared/utils/tracking-url";
 import { isDashboardPath } from "#root/shared/utils/tracking-routes";
+import { trackClientNavigationPageView } from "#root/frontend/tracking/page-view";
 
 /**
  * After a client-side navigation: the PageView event (real page changes
@@ -34,12 +30,8 @@ export async function onPageTransitionEnd(
   ) {
     return;
   }
-  trackingEventBus.emit({
-    eventId: v7(),
-    eventName: TrackingEventName.PAGE_VIEWED,
-    timestamp: Date.now(),
-    pageUrl: sanitizeTrackingUrl(window.location.href),
-    referrer: sanitizeTrackingUrl(document.referrer || undefined),
-    sessionId: getSessionId(),
-  });
+  // The canonical tracking path (TrackingProvider.trackEvent): one event id
+  // to the browser pixels AND the /api/track beacon (tracking_event row +
+  // Meta CAPI PageView) — see frontend/tracking/page-view.ts.
+  trackClientNavigationPageView();
 }

@@ -17,6 +17,15 @@ import {
 import { eq, and } from "drizzle-orm";
 import { v7 } from "uuid";
 import { shouldServerSendToGa4 } from "#root/backend/pixel-tracking/ga4-ownership";
+import { TrackingEventName } from "#root/shared/types/pixel-tracking";
+import { readClientTrackingFlags } from "#root/shared/config/tracking-flags";
+import type { HashedMetaUserData } from "#root/shared/tracking/meta-user-data";
+import { hashMetaIdentity } from "#root/backend/pixel-tracking/meta-user-data";
+import {
+  loadPurchaseMatch,
+  type PurchaseMatch,
+} from "#root/backend/pixel-tracking/purchase-match";
+import { purchaseEventId } from "#root/frontend/tracking/purchase-event";
 
 // Server-side adapters
 import { metaCapiAdapter } from "#root/backend/pixel-tracking/server-adapters/meta-capi-adapter";
@@ -39,6 +48,63 @@ const SERVER_ADAPTERS: Partial<Record<string, ServerPixelAdapter>> = {
   snapchat: snapchatCapiAdapter,
   pinterest: pinterestCapiAdapter,
 };
+
+/**
+ * META_ADVANCED_MATCHING: the hashed user_data each Meta relay copy carries.
+ *
+ * - every event: external_id = SHA-256 of the event's tracking session id
+ *   (random, first-party, PII-free — the browser pixel's advanced matching
+ *   hashes the same string, see shared/tracking/meta-user-data.ts)
+ * - a Purchase (`checkout_completed` with event id `purchase-<order id>`)
+ *   that this beacon stored first: the hashed customer fields of the placed,
+ *   recent order it names — read-only lookup, enrichment only
+ * - otherwise, a signed-in shopper: their hashed account em / ph / fn / ln
+ *
+ * Returns copies; the persisted events are not touched, so no hash is ever
+ * stored. Event ids, names, values and contents are unchanged.
+ */
+export async function attachMetaUserData(
+  events: EnrichedTrackingEvent[],
+  input: {
+    /** Event ids this beacon newly inserted (first claim of the id). */
+    insertedEventIds: ReadonlySet<string>;
+    /** Hashed account fields of the signed-in shopper, if any. */
+    sessionIdentity?: HashedMetaUserData | null;
+    getPurchaseMatch: (orderId: string) => Promise<PurchaseMatch | null>;
+  },
+): Promise<EnrichedTrackingEvent[]> {
+  const out: EnrichedTrackingEvent[] = [];
+  for (const event of events) {
+    let fields: HashedMetaUserData = input.sessionIdentity ?? {};
+    const orderId = event.ecommerce?.transactionId;
+    // Only the order's own Purchase id, and only the beacon that stored it
+    // first: a replayed or forged beacon naming someone's order id gets no
+    // customer data attached (it is still relayed exactly as before).
+    if (
+      event.eventName === TrackingEventName.CHECKOUT_COMPLETED &&
+      orderId &&
+      event.eventId === purchaseEventId(orderId) &&
+      input.insertedEventIds.has(event.eventId)
+    ) {
+      const match = await input.getPurchaseMatch(orderId);
+      if (match) fields = match.hashedUserData;
+    }
+    const externalId = hashMetaIdentity({ externalId: event.sessionId }).external_id;
+    const metaUserData: HashedMetaUserData = { ...fields };
+    if (externalId) metaUserData.external_id = externalId;
+    out.push(Object.keys(metaUserData).length > 0 ? { ...event, metaUserData } : { ...event });
+  }
+  return out;
+}
+
+export interface PipelineOptions {
+  /** META_ADVANCED_MATCHING; read from the env when omitted. */
+  metaAdvancedMatching?: boolean;
+  /** Hashed account fields of the signed-in shopper (server/routes/track.ts). */
+  sessionIdentity?: HashedMetaUserData | null;
+  /** Injected in tests; the real lookup otherwise. */
+  loadPurchaseMatch?: (db: DatabaseClient, orderId: string) => Promise<PurchaseMatch | null>;
+}
 
 /**
  * Persist enriched events to the tracking_event table using a direct DB call.
@@ -171,6 +237,7 @@ export async function processTrackingBeacon(
   events: TrackingEvent[],
   serverContext: ServerContext,
   db: DatabaseClient,
+  options: PipelineOptions = {},
 ): Promise<void> {
   if (events.length === 0) return;
 
@@ -197,6 +264,25 @@ export async function processTrackingBeacon(
 
   if (serverConfigs.length === 0) return;
 
+  const metaAdvancedMatching =
+    options.metaAdvancedMatching ?? readClientTrackingFlags().metaAdvancedMatching;
+
+  /** Meta relay copies with hashed user_data; the plain events on any failure. */
+  const metaEvents = async (): Promise<EnrichedTrackingEvent[]> => {
+    if (!metaAdvancedMatching) return enriched;
+    const lookup = options.loadPurchaseMatch ?? loadPurchaseMatch;
+    try {
+      return await attachMetaUserData(enriched, {
+        insertedEventIds: new Set(insertedRows.map((r) => r.eventId)),
+        sessionIdentity: options.sessionIdentity,
+        getPurchaseMatch: (orderId) => lookup(db, orderId),
+      });
+    } catch {
+      console.error("[Delivery Pipeline] Meta user_data enrichment failed");
+      return enriched;
+    }
+  };
+
   // 4. Fan-out to adapters in parallel
   const adapterPromises = serverConfigs
     .map((config) => {
@@ -207,6 +293,11 @@ export async function processTrackingBeacon(
       // nothing to GA4 unless GA4_MP_MODE=legacy_all. Nothing is sent, so no
       // delivery row is logged for GA4 either. See ga4-ownership.ts.
       if (config.platform === "google_ga4" && !shouldServerSendToGa4()) return null;
+      if (config.platform === "meta") {
+        return metaEvents().then((events) =>
+          sendToAdapterAndLog(adapter, events, config, insertedRows, db),
+        );
+      }
       return sendToAdapterAndLog(adapter, enriched, config, insertedRows, db);
     })
     .filter(Boolean);

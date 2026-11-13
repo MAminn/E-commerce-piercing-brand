@@ -36,10 +36,25 @@ export interface ClientTrackingFlags {
    * staff dashboard traffic kept reaching GA4/Meta.
    */
   excludeDashboard: boolean;
+  /**
+   * META_ADVANCED_MATCHING — Meta match quality (EMQ):
+   * - browser pixel: manual advanced matching at `init` with pre-hashed
+   *   external_id (our random tracking id) and, for a signed-in shopper,
+   *   their account em / ph / fn / ln; a first-party _fbc cookie from
+   *   ?fbclid=; the first beacon briefly waits for Meta's _fbp cookie
+   * - Conversions API: hashed external_id on every event, hashed account
+   *   fields for a signed-in shopper, and for a Purchase the hashed fields of
+   *   the verified order it names
+   *
+   * DEFAULT ON (2026-11-13): only an explicit false/0/no/off turns it off,
+   * which restores the previous user_data exactly (IP, UA, fbp, fbc).
+   */
+  metaAdvancedMatching: boolean;
 }
 
 export function readClientTrackingFlags(env: Env = process.env): ClientTrackingFlags {
   return {
     excludeDashboard: !isEnvFlagOff(env.TRACKING_EXCLUDE_INTERNAL),
+    metaAdvancedMatching: !isEnvFlagOff(env.META_ADVANCED_MATCHING),
   };
 }

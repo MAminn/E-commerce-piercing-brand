@@ -41,8 +41,19 @@ describe("isDashboardPath", () => {
 
 describe("tracking flags", () => {
   it("default ON when unset (production never set it — internal traffic must be excluded)", () => {
-    expect(readClientTrackingFlags({})).toEqual({ excludeDashboard: true });
+    expect(readClientTrackingFlags({})).toEqual({ excludeDashboard: true, metaAdvancedMatching: true });
     expect(readClientTrackingFlags({ TRACKING_EXCLUDE_INTERNAL: "" }).excludeDashboard).toBe(true);
+  });
+
+  it("META_ADVANCED_MATCHING: default ON; only an explicit false/0/no/off disables it", () => {
+    expect(readClientTrackingFlags({}).metaAdvancedMatching).toBe(true);
+    expect(readClientTrackingFlags({ META_ADVANCED_MATCHING: "" }).metaAdvancedMatching).toBe(true);
+    expect(readClientTrackingFlags({ META_ADVANCED_MATCHING: "true" }).metaAdvancedMatching).toBe(true);
+    for (const v of ["false", "0", "no", "off", " OFF "]) {
+      expect(readClientTrackingFlags({ META_ADVANCED_MATCHING: v }).metaAdvancedMatching).toBe(false);
+    }
+    // Independent of the internal-traffic switch.
+    expect(readClientTrackingFlags({ TRACKING_EXCLUDE_INTERNAL: "off" }).metaAdvancedMatching).toBe(true);
   });
 
   it("only an explicit false/0/no/off switches it off", () => {

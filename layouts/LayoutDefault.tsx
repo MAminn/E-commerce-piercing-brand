@@ -297,7 +297,10 @@ function LayoutShell({
   const inner = (
     <LayoutSettingsContext.Provider value={layoutSettings}>
       <NavbarModeContext.Provider value={shellNavbarMode}>
-        <TrackingProvider disabled={trackingDisabled}>
+        <TrackingProvider
+          disabled={trackingDisabled}
+          metaAdvancedMatching={Boolean(pageContext.trackingFlags?.metaAdvancedMatching)}
+          metaCustomer={session}>
           <main
             id='page-content'
             /* Storefront routes inherit their base family from the

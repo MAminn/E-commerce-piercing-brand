@@ -26,6 +26,26 @@ import { createAdapterForPlatform } from "#root/frontend/pixel-adapters/factory"
 import { CustomEventTriggerManager } from "#root/frontend/tracking/custom-event-triggers";
 import { EngagementTracker } from "#root/frontend/pixel-adapters/engagement-tracker";
 import { setGa4HitsDisabled } from "#root/frontend/pixel-adapters/google-ga4-adapter";
+import { MetaPixelAdapter } from "#root/frontend/pixel-adapters/meta-pixel-adapter";
+import { registerPageViewSink } from "#root/frontend/tracking/page-view";
+import { ensureFbcCookie, hasCookie } from "#root/frontend/tracking/fbc-cookie";
+import { hashMetaIdentityWeb, type HashedMetaUserData } from "#root/shared/tracking/meta-user-data";
+
+/**
+ * META_ADVANCED_MATCHING: how long the first beacon of a page load may wait
+ * for Meta's `_fbp` browser-id cookie (written by fbevents.js once it has
+ * loaded), so the landing PageView's Conversions API copy carries it.
+ * Bounded — after this the beacon goes without it, as before.
+ */
+export const FBP_WAIT_MAX_MS = 1500;
+const FBP_POLL_MS = 100;
+
+/** A signed-in shopper's own account fields (pageContext.clientSession). */
+export interface MetaCustomer {
+  email?: string | null;
+  phone?: string | null;
+  name?: string | null;
+}
 
 // ─── UTM Parsing ────────────────────────────────────────────────────────────
 
@@ -83,6 +103,8 @@ const useIsomorphicLayoutEffect =
 export function TrackingProvider({
   children,
   disabled = false,
+  metaAdvancedMatching = false,
+  metaCustomer = null,
 }: {
   children: ReactNode;
   /**
@@ -92,8 +114,32 @@ export function TrackingProvider({
    * them back.
    */
   disabled?: boolean;
+  /**
+   * META_ADVANCED_MATCHING (pageContext.trackingFlags): the Meta pixel is
+   * initialised with pre-hashed external_id (+ the signed-in shopper's em /
+   * ph / fn / ln), `_fbc` is kept from ?fbclid=, and the first beacon waits
+   * briefly for `_fbp`.
+   */
+  metaAdvancedMatching?: boolean;
+  /** The signed-in shopper's own account fields; hashed before use. */
+  metaCustomer?: MetaCustomer | null;
 }) {
   const [sessionId, setSessionId] = useState<string>("");
+  // Read by the adapter effect without being its dependencies: a new
+  // clientSession object on every navigation must not tear the pixels down
+  // and init them again.
+  const metaAdvancedMatchingRef = useRef(metaAdvancedMatching);
+  metaAdvancedMatchingRef.current = metaAdvancedMatching;
+  const metaCustomerRef = useRef(metaCustomer);
+  metaCustomerRef.current = metaCustomer;
+  // One id per page load even when localStorage is unavailable (then
+  // getSessionId() returns a new id per call): events and the pixel's
+  // external_id must agree.
+  const stableSessionIdRef = useRef<string | null>(null);
+  const stableSessionId = useCallback(() => {
+    if (!stableSessionIdRef.current) stableSessionIdRef.current = getSessionId();
+    return stableSessionIdRef.current;
+  }, []);
   // Set once tracking has been switched off in this page load. A later
   // re-enable comes from a client navigation (dashboard → storefront), whose
   // PageView +onPageTransitionEnd already emits — no second "initial" one.
@@ -103,9 +149,9 @@ export function TrackingProvider({
 
   // Initialize session ID and UTM params once
   useEffect(() => {
-    setSessionId(getSessionId());
+    setSessionId(stableSessionId());
     utmRef.current = parseUtmParams();
-  }, []);
+  }, [stableSessionId]);
 
   // ── Pixel Adapter Wiring ────────────────────────────────────────────────
   const registryRef = useRef<PixelAdapterRegistry | null>(null);
@@ -138,12 +184,35 @@ export function TrackingProvider({
   // ── Beacon Buffer ──────────────────────────────────────────────────────
   const eventBufferRef = useRef<TrackingEvent[]>([]);
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // META_ADVANCED_MATCHING: armed once per page load when a Meta pixel was
+  // just initialised and `_fbp` is not set yet; released by the cookie or by
+  // FBP_WAIT_MAX_MS, whichever comes first.
+  const fbpWaitRef = useRef<{ active: boolean; since: number | null }>({
+    active: false,
+    since: null,
+  });
+  const flushBufferRef = useRef<() => void>(() => {});
 
   /** Flush all buffered events to the beacon endpoint via fetch. */
   const flushBuffer = useCallback(() => {
     if (typeof window === "undefined") return;
     const buffer = eventBufferRef.current;
     if (buffer.length === 0) return;
+
+    const wait = fbpWaitRef.current;
+    if (wait.active) {
+      if (hasCookie(document, "_fbp")) {
+        wait.active = false;
+      } else {
+        const now = Date.now();
+        if (wait.since === null) wait.since = now;
+        if (now - wait.since < FBP_WAIT_MAX_MS) {
+          flushTimerRef.current = setTimeout(() => flushBufferRef.current(), FBP_POLL_MS);
+          return;
+        }
+        wait.active = false;
+      }
+    }
 
     const batch = [...buffer];
     eventBufferRef.current = [];
@@ -158,6 +227,7 @@ export function TrackingProvider({
       // Silent — fire-and-forget
     });
   }, []);
+  flushBufferRef.current = flushBuffer;
 
   /** Add an event to the buffer; auto-flush after 250ms debounce. */
   const bufferEvent = useCallback(
@@ -244,7 +314,7 @@ export function TrackingProvider({
           typeof document !== "undefined"
             ? sanitizeTrackingUrl(document.referrer)
             : undefined,
-        sessionId: sessionId || getSessionId(),
+        sessionId: sessionId || stableSessionId(),
         ...utmRef.current,
         ecommerce: data?.ecommerce,
         customProperties: data?.customProperties,
@@ -264,9 +334,18 @@ export function TrackingProvider({
         console.debug("[Tracking]", event.eventName, event);
       }
     },
-    [sessionId, bufferEvent, disabled],
+    [sessionId, bufferEvent, disabled, stableSessionId],
   );
   trackEventRef.current = trackEvent;
+
+  // Client-navigation PageViews (+onPageTransitionEnd) go through trackEvent:
+  // browser pixels and the /api/track beacon, one shared event id.
+  useIsomorphicLayoutEffect(() => {
+    if (typeof window === "undefined") return;
+    return registerPageViewSink(() => {
+      trackEventRef.current(TrackingEventName.PAGE_VIEWED);
+    });
+  }, []);
 
   // A layout effect, so the bus subscription below exists before any page's
   // own mount effects run (React runs a child's effects before its parent's):
@@ -298,6 +377,17 @@ export function TrackingProvider({
       setGa4HitsDisabled(false);
     }
 
+    const advancedMatching = metaAdvancedMatchingRef.current;
+    // Keep an ad click id even if fbevents.js is slow or blocked. Runs before
+    // the first beacon flush, so /api/track already sees the cookie.
+    if (advancedMatching) {
+      try {
+        ensureFbcCookie(document, window.location);
+      } catch {
+        /* best-effort */
+      }
+    }
+
     let cancelled = false;
     const registry = new PixelAdapterRegistry();
     registryRef.current = registry;
@@ -320,17 +410,47 @@ export function TrackingProvider({
     // Fetch enabled client-side configs and bootstrap adapters
     trpc.pixelTracking.config.listActive
       .query()
-      .then((result) => {
+      .then(async (result) => {
         if (cancelled) return;
         if (result.success) {
           const configs = result.result as PixelConfig[];
 
+          // Manual advanced matching: hashed here, before the pixel's single
+          // init. Without the flag nothing is awaited.
+          let metaMatch: HashedMetaUserData | null = null;
+          if (advancedMatching && configs.some((c) => c.platform === "meta")) {
+            const customer = metaCustomerRef.current;
+            try {
+              metaMatch = await hashMetaIdentityWeb({
+                externalId: stableSessionId(),
+                email: customer?.email,
+                phone: customer?.phone,
+                name: customer?.name,
+              });
+            } catch {
+              metaMatch = null;
+            }
+            if (cancelled) return;
+          }
+
+          let metaInitialised = false;
           for (const config of configs) {
             const adapter = createAdapterForPlatform(config.platform);
             if (adapter) {
+              if (adapter instanceof MetaPixelAdapter) {
+                adapter.setAdvancedMatching(metaMatch);
+                metaInitialised = true;
+              }
               adapter.initialize(config);
               registry.register(adapter);
             }
+          }
+
+          // The PageView about to be buffered is usually this page load's
+          // only chance at a CAPI copy with `_fbp`: give fbevents.js a
+          // moment to write it.
+          if (advancedMatching && metaInitialised && !hasCookie(document, "_fbp")) {
+            fbpWaitRef.current = { active: true, since: null };
           }
         }
 

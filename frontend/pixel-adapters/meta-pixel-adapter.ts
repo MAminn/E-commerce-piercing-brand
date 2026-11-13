@@ -7,6 +7,13 @@ import {
   type TrackingProductItem,
 } from "#root/shared/types/pixel-tracking";
 import type { PixelAdapter } from "./types";
+import { isSha256Hex, type HashedMetaUserData } from "#root/shared/tracking/meta-user-data";
+
+/**
+ * Manual advanced matching keys the pixel accepts at `init`. Values are
+ * passed pre-hashed (SHA-256 hex), which fbevents.js forwards as is.
+ */
+const ADVANCED_MATCHING_KEYS = ["em", "ph", "fn", "ln", "ct", "st", "zp", "country", "external_id"] as const;
 
 // ─── Window augmentation for fbq ────────────────────────────────────────────
 
@@ -113,6 +120,21 @@ export class MetaPixelAdapter implements PixelAdapter {
   private enabled = false;
   private pixelId = "";
   private scriptElement: HTMLScriptElement | null = null;
+  private advancedMatching: Record<string, string> | null = null;
+
+  /**
+   * Manual advanced matching (META_ADVANCED_MATCHING). Call before
+   * initialize(). Only SHA-256 digests of known keys are kept, so a raw
+   * email or phone can never reach fbq through here.
+   */
+  setAdvancedMatching(data: HashedMetaUserData | null | undefined): void {
+    const kept: Record<string, string> = {};
+    for (const key of ADVANCED_MATCHING_KEYS) {
+      const value = data?.[key];
+      if (isSha256Hex(value)) kept[key] = value;
+    }
+    this.advancedMatching = Object.keys(kept).length > 0 ? kept : null;
+  }
 
   initialize(config: PixelConfig): void {
     if (typeof window === "undefined") return;
@@ -134,8 +156,13 @@ export class MetaPixelAdapter implements PixelAdapter {
     window.fbq.disablePushState = true;
     window.fbq.allowDuplicatePageViews = true;
 
-    // Init the pixel
-    window.fbq("init", this.pixelId);
+    // Init the pixel — once per adapter. With advanced matching, the hashed
+    // identifiers ride on this same single init call.
+    if (this.advancedMatching) {
+      window.fbq("init", this.pixelId, { ...this.advancedMatching });
+    } else {
+      window.fbq("init", this.pixelId);
+    }
 
     this.loaded = true;
   }
