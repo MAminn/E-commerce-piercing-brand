@@ -57,6 +57,15 @@ import { persistBostaSyncStatus } from "#root/backend/orders/bosta/sync-status";
 import { isFincartEnabled } from "#root/backend/orders/fincart/config";
 import { logOrderEvent } from "#root/backend/orders/order-log";
 import { formatMoney } from "#root/shared/pricing/format-money";
+import { effectiveGa4PurchaseOwner } from "#root/shared/config/ga4-purchase-owner";
+import { loadGa4ServerConfig } from "#root/backend/pixel-tracking/ga4-purchase/config";
+import {
+  captureGa4PurchaseContextInTx,
+  enqueueGa4PurchaseInTx,
+  kickGa4PurchaseWorker,
+} from "#root/backend/pixel-tracking/ga4-purchase/enqueue";
+import { isPurchaseMilestone } from "#root/backend/pixel-tracking/ga4-purchase/eligibility";
+import type { Ga4CookieInput } from "#root/backend/pixel-tracking/ga4-purchase/identifiers";
 
 /**
  * The chosen option configuration. New clients send the map itself
@@ -490,11 +499,26 @@ async function autoSendOrderToBosta(orderData: CreatedOrder): Promise<void> {
 export const createOrder = (
   input: z.infer<typeof createOrderSchema>,
   session?: ClientSession,
+  /** GA4 cookies of the order request (server-owned GA4 purchase only). */
+  analytics?: { cookies: Ga4CookieInput },
 ) =>
   Effect.gen(function* ($) {
+    // GA4_PURCHASE_OWNER (backend/pixel-tracking/ga4-purchase): one mode for
+    // the whole request. In the default `browser` mode nothing below runs.
+    const ga4Owner = effectiveGa4PurchaseOwner();
     // We no longer require a session for ordering
     const result = yield* $(
       query(async (db) => {
+        // Read before the transaction (cached); only picks which `_ga_<id>`
+        // session cookie belongs to the store's GA4 property.
+        let ga4MeasurementId: string | null = null;
+        if (ga4Owner !== "browser") {
+          try {
+            ga4MeasurementId = (await loadGa4ServerConfig(db))?.measurementId ?? null;
+          } catch {
+            ga4MeasurementId = null;
+          }
+        }
         return await db.transaction(async (tx) => {
           // Get user ID if the user is logged in, otherwise set to null
           let userId = null;
@@ -1217,6 +1241,27 @@ export const createOrder = (
             }
           }
 
+          // ─── GA4 server-owned purchase (shadow / server mode only) ─────
+          // Same transaction as the order: the GA4 ids from this request's
+          // cookies (the only request that carries them), and for COD — a
+          // purchase from this moment — the outbox row. Online orders are
+          // enqueued when their payment is confirmed paid. Savepointed:
+          // neither write can fail the order.
+          if (ga4Owner !== "browser") {
+            await captureGa4PurchaseContextInTx(
+              tx,
+              { orderId: newOrder.id, cookies: analytics?.cookies ?? {}, measurementId: ga4MeasurementId },
+              ga4Owner,
+            );
+            if (isPurchaseMilestone("order_create", null, newOrder)) {
+              await enqueueGa4PurchaseInTx(
+                tx,
+                { orderId: newOrder.id, source: "order_create", eligibleAt: newOrder.createdAt },
+                ga4Owner,
+              );
+            }
+          }
+
           return {
             // `order.create` is a public procedure — this object is the
             // checkout response the shopper's browser receives. The inserted
@@ -1232,6 +1277,9 @@ export const createOrder = (
         });
       }),
     );
+
+    // Committed: let the GA4 purchase worker deliver now, not at its next poll.
+    if (ga4Owner === "server") kickGa4PurchaseWorker();
 
     // Start of the per-order audit trail. Cart/checkout state before this
     // point is client-only (no server row exists to log against) — this is

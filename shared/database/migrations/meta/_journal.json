@@ -484,6 +484,13 @@
       "when": 1794323370224,
       "tag": "0068_product_internal_code_active",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1794662633392,
+      "tag": "0069_ga4_purchase_outbox",
+      "breakpoints": true
     }
   ]
 }

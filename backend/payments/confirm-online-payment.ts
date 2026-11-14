@@ -9,6 +9,9 @@ import { createBostaDelivery, isBostaEnabled } from "#root/backend/orders/bosta/
 import { persistBostaSyncStatus } from "#root/backend/orders/bosta/sync-status";
 import { logOrderEvent } from "#root/backend/orders/order-log";
 import { queueOrderPlacedEmails } from "#root/backend/orders/order-emails/service";
+import { effectiveGa4PurchaseOwner } from "#root/shared/config/ga4-purchase-owner";
+import { enqueueGa4PurchaseInTx, kickGa4PurchaseWorker } from "#root/backend/pixel-tracking/ga4-purchase/enqueue";
+import { isPurchaseMilestone } from "#root/backend/pixel-tracking/ga4-purchase/eligibility";
 
 type PaymentStatus = "paid" | "failed" | "processing";
 
@@ -113,36 +116,64 @@ export async function applyOnlinePaymentUpdate(
     gatewayData?: unknown;
   },
 ): Promise<{ updated: boolean; paymentStatus: PaymentStatus }> {
-  const [orderRow] = await db
-    .select()
-    .from(order)
-    .where(eq(order.id, orderId))
-    .limit(1)
-    .execute();
+  // Read-and-update under a row lock: two callbacks for the same order (the
+  // webhook and the confirmation page's verify poll often race) are
+  // serialised, so exactly one of them sees the transition to `paid`. The
+  // GA4 purchase row (GA4_PURCHASE_OWNER shadow/server; a no-op in browser
+  // mode) commits atomically with that transition.
+  const ga4Owner = effectiveGa4PurchaseOwner();
+  const locked = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .select()
+      .from(order)
+      .where(eq(order.id, orderId))
+      .limit(1)
+      .for("update")
+      .execute();
+    if (!row) return null;
 
-  if (!orderRow) {
+    const status =
+      update.paymentStatus === "paid"
+        ? "processing"
+        : update.paymentStatus === "failed"
+          ? "pending"
+          : row.status;
+    const paidAt = new Date();
+
+    await tx
+      .update(order)
+      .set({
+        paymentStatus: update.paymentStatus,
+        paymentTransactionId: update.transactionId ?? row.paymentTransactionId,
+        paymentGatewayData: (update.gatewayData ?? row.paymentGatewayData) as never,
+        status,
+        updatedAt: paidAt,
+      })
+      .where(eq(order.id, orderId))
+      .execute();
+
+    let ga4Enqueued = false;
+    if (
+      ga4Owner !== "browser" &&
+      isPurchaseMilestone("payment_confirmed", row, {
+        paymentMethod: row.paymentMethod,
+        paymentStatus: update.paymentStatus,
+        status,
+      })
+    ) {
+      ga4Enqueued =
+        (await enqueueGa4PurchaseInTx(tx, { orderId, source: "payment_confirmed", eligibleAt: paidAt }, ga4Owner)) ===
+        "enqueued";
+    }
+    return { row, ga4Enqueued };
+  });
+
+  if (!locked) {
     return { updated: false, paymentStatus: update.paymentStatus };
   }
-
+  const orderRow = locked.row;
   const wasAlreadyPaid = orderRow.paymentStatus === "paid";
-  const orderStatus =
-    update.paymentStatus === "paid"
-      ? "processing"
-      : update.paymentStatus === "failed"
-        ? "pending"
-        : orderRow.status;
-
-  await db
-    .update(order)
-    .set({
-      paymentStatus: update.paymentStatus,
-      paymentTransactionId: update.transactionId ?? orderRow.paymentTransactionId,
-      paymentGatewayData: (update.gatewayData ?? orderRow.paymentGatewayData) as never,
-      status: orderStatus,
-      updatedAt: new Date(),
-    })
-    .where(eq(order.id, orderId))
-    .execute();
+  if (locked.ga4Enqueued && ga4Owner === "server") kickGa4PurchaseWorker();
 
   // Only log an actual transition — a duplicate "paid" webhook for an
   // already-paid order isn't a new event worth recording.

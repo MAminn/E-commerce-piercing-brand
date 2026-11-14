@@ -41,7 +41,7 @@ describe("isDashboardPath", () => {
 
 describe("tracking flags", () => {
   it("default ON when unset (production never set it — internal traffic must be excluded)", () => {
-    expect(readClientTrackingFlags({})).toEqual({ excludeDashboard: true, metaAdvancedMatching: true });
+    expect(readClientTrackingFlags({})).toEqual({ excludeDashboard: true, metaAdvancedMatching: true, ga4BrowserPurchase: true });
     expect(readClientTrackingFlags({ TRACKING_EXCLUDE_INTERNAL: "" }).excludeDashboard).toBe(true);
   });
 

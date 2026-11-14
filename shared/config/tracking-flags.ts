@@ -9,6 +9,8 @@
  * is a secret.
  */
 
+import { browserSendsGa4Purchase } from "./ga4-purchase-owner";
+
 type Env = Record<string, string | undefined>;
 
 export function isEnvFlagOn(value: string | undefined): boolean {
@@ -50,11 +52,19 @@ export interface ClientTrackingFlags {
    * which restores the previous user_data exactly (IP, UA, fbp, fbc).
    */
   metaAdvancedMatching: boolean;
+  /**
+   * GA4_PURCHASE_OWNER (see shared/config/ga4-purchase-owner.ts) — false
+   * only while the server effectively owns the GA4 `purchase`: the browser
+   * GA4 tag then skips `purchase` and nothing else. True in `browser` and
+   * `shadow` mode, and whenever the server is not confirmed ready.
+   */
+  ga4BrowserPurchase: boolean;
 }
 
 export function readClientTrackingFlags(env: Env = process.env): ClientTrackingFlags {
   return {
     excludeDashboard: !isEnvFlagOff(env.TRACKING_EXCLUDE_INTERNAL),
     metaAdvancedMatching: !isEnvFlagOff(env.META_ADVANCED_MATCHING),
+    ga4BrowserPurchase: browserSendsGa4Purchase(),
   };
 }

@@ -12,7 +12,7 @@ export const createOrderProcedure = publicProcedure
   .input(createOrderSchema)
   .mutation(async ({ ctx, input }) => {
     return await runBackendEffect(
-      createOrder(input, ctx.clientSession ?? undefined).pipe(
+      createOrder(input, ctx.clientSession ?? undefined, { cookies: ctx.ga4Cookies }).pipe(
         provideDatabase(ctx),
       ),
     ).then(serializeBackendEffectResult);

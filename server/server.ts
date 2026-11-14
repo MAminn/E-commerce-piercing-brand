@@ -38,6 +38,9 @@ import { parseByteRange } from "#root/server/routes/byte-range.js";
 import { resolveUploadPath } from "#root/server/routes/upload-path.js";
 import { bootstrapSuperadmin } from "#root/backend/auth/superadmin-bootstrap.js";
 import { startEmailAutomationWorker } from "#root/backend/email-automations/worker.js";
+import { initGa4PurchaseOwner } from "#root/backend/pixel-tracking/ga4-purchase/readiness.js";
+import { startGa4PurchaseWorker } from "#root/backend/pixel-tracking/ga4-purchase/worker.js";
+import { db as createDb } from "#root/shared/database/drizzle/db.js";
 import { emailUnsubscribeApiPlugin } from "#root/backend/email-subscription/api.js";
 import { erpSyncApiPlugin } from "#root/backend/erp-sync/api.js";
 
@@ -549,6 +552,16 @@ async function main() {
   const fastify = await buildServer();
 
   await startEmailAutomationWorker();
+
+  // GA4_PURCHASE_OWNER: decided before the first request, so every page
+  // render and every order sees the same owner. Stays `browser` (today's
+  // behaviour) unless shadow/server is requested AND migration 0069 exists.
+  // The worker only starts in shadow/server mode.
+  if (process.env.DATABASE_URL) {
+    const ga4Db = createDb();
+    await initGa4PurchaseOwner(ga4Db);
+    startGa4PurchaseWorker({ db: ga4Db });
+  }
 
   fastify.listen({ port: port, host: "0.0.0.0" }, (err) => {
     console.info(`Server running at http://localhost:${port}`);

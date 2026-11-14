@@ -81,6 +81,17 @@ export class GoogleGA4Adapter implements PixelAdapter {
   private enabled = false;
   private measurementId = "";
   private scriptElement: HTMLScriptElement | null = null;
+  /**
+   * GA4_PURCHASE_OWNER: false only while the SERVER owns the GA4 purchase
+   * (pageContext.trackingFlags.ga4BrowserPurchase). Then `purchase` alone is
+   * skipped here; every other GA4 event is sent as before.
+   */
+  private browserPurchase = true;
+
+  /** Call before initialize(); defaults to true (browser sends purchase). */
+  setBrowserPurchase(enabled: boolean): void {
+    this.browserPurchase = enabled;
+  }
 
   initialize(config: PixelConfig): void {
     if (typeof window === "undefined") return;
@@ -120,6 +131,9 @@ export class GoogleGA4Adapter implements PixelAdapter {
       return;
 
     const ga4EventName = GA4_EVENT_MAP[event.eventName as TrackingEventName];
+
+    // Server-owned GA4 purchase: the outbox sends it from the verified order.
+    if (!this.browserPurchase && event.eventName === TrackingEventName.CHECKOUT_COMPLETED) return;
 
     if (ga4EventName) {
       const params = buildGA4Params(event);

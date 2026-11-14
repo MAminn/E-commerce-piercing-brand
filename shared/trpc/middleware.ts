@@ -6,6 +6,8 @@ import {
   fetchRequestHandler,
 } from "@trpc/server/adapters/fetch";
 import { createMiddleware } from "hono/factory";
+import { getCookie } from "hono/cookie";
+import { pickGa4PurchaseCookies } from "#root/backend/pixel-tracking/ga4-purchase/identifiers";
 
 export const trpcHonoMiddleware = (options: { endpoint: string }) =>
   createMiddleware(async (c) => {
@@ -25,6 +27,7 @@ export const trpcHonoMiddleware = (options: { endpoint: string }) =>
             req.headers.get("x-real-ip") ??
             "",
           userAgent: req.headers.get("user-agent") ?? undefined,
+          ga4Cookies: pickGa4PurchaseCookies(getCookie(c)),
         };
       },
     });

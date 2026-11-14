@@ -1429,6 +1429,96 @@ export const trackingEventDelivery = pgTable("tracking_event_delivery", {
     .notNull(),
 });
 
+// ─── GA4 server-owned Purchase (GA4_PURCHASE_OWNER) ─────────────────────────
+//
+// See backend/pixel-tracking/ga4-purchase/README.md. Both tables are written
+// only while GA4_PURCHASE_OWNER is `shadow` or `server`; in the default
+// `browser` mode nothing reads or writes them.
+
+/**
+ * GA4 identifiers read from the shopper's first-party cookies on the
+ * `order.create` request — the only request in the order's life that carries
+ * them (payment webhooks do not). Never invented: a missing or malformed
+ * cookie stores NULL. No customer PII.
+ */
+export const ga4PurchaseContext = pgTable("ga4_purchase_context", {
+  orderId: uuid("order_id")
+    .primaryKey()
+    .references(() => order.id, { onDelete: "cascade", onUpdate: "cascade" }),
+  /** `_ga` → "<random>.<first-visit-seconds>", e.g. "1234567890.1730000000". */
+  gaClientId: text("ga_client_id"),
+  /** `_ga_<container>` → GA4 session id (seconds), e.g. "1731600000". */
+  gaSessionId: text("ga_session_id"),
+  gaSessionNumber: integer("ga_session_number"),
+  /** `_tracking_consent` snapshot: null = no consent cookie / not decided. */
+  consentAnalytics: boolean("consent_analytics"),
+  consentMarketing: boolean("consent_marketing"),
+  capturedAt: timestamp("captured_at", { withTimezone: true, mode: "date" })
+    .defaultNow()
+    .notNull(),
+});
+
+/**
+ * Durable outbox: at most ONE row per order (unique order_id), inserted in
+ * the same transaction as the milestone that makes the order a purchase
+ * (COD placed / online payment confirmed paid).
+ *
+ * status:
+ *   shadow  — recorded in shadow mode; payload prepared, NEVER sent
+ *   pending — waiting for (re)delivery at next_attempt_at
+ *   sending — claimed by a worker until locked_until (a crash leaves it to
+ *             be reclaimed once the lease expires)
+ *   sent    — GA4 answered 2xx
+ *   held    — not sent by policy (held_reason: missing_client_id,
+ *             consent_denied, …); waits for an owner decision
+ *   failed  — permanent: 4xx, invalid payload, past GA4's 72 h window, or
+ *             attempts exhausted (last_error says which)
+ */
+export const ga4PurchaseOutbox = pgTable(
+  "ga4_purchase_outbox",
+  {
+    id: uuid("id")
+      .$defaultFn(() => v7())
+      .primaryKey(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => order.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    /** Owner mode when the row was enqueued: shadow | server. */
+    mode: text("mode").notNull(),
+    /** Milestone that enqueued it: order_create | payment_confirmed | stripe_webhook | admin_edit. */
+    source: text("source").notNull(),
+    status: text("status").notNull(),
+    /** When the order became a purchase — GA4 timestamp_micros. */
+    eligibleAt: timestamp("eligible_at", { withTimezone: true, mode: "date" }).notNull(),
+    /** Frozen Measurement Protocol body (no api_secret, no customer PII). */
+    payload: jsonb("payload"),
+    heldReason: text("held_reason"),
+    attempts: integer("attempts").notNull().default(0),
+    /** Attempts whose outcome is unknown (timeout / crash mid-request). */
+    ambiguousAttempts: integer("ambiguous_attempts").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true, mode: "date" })
+      .defaultNow()
+      .notNull(),
+    lockedUntil: timestamp("locked_until", { withTimezone: true, mode: "date" }),
+    /** Set on each claim; only the worker holding it may record the outcome. */
+    claimToken: uuid("claim_token"),
+    lastStatusCode: integer("last_status_code"),
+    lastError: text("last_error"),
+    preparedAt: timestamp("prepared_at", { withTimezone: true, mode: "date" }),
+    sentAt: timestamp("sent_at", { withTimezone: true, mode: "date" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("ga4_purchase_outbox_order_id_idx").on(table.orderId),
+    index("ga4_purchase_outbox_due_idx").on(table.status, table.nextAttemptAt),
+  ],
+);
+
 // ─── Custom Tracking Events ─────────────────────────────────────────────────
 
 export const customEventTriggerType = pgEnum("custom_event_trigger_type", [

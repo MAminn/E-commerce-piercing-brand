@@ -263,3 +263,42 @@ describe("GoogleGA4Adapter", () => {
     });
   });
 });
+
+// ─── GA4_PURCHASE_OWNER (server-owned purchase) ─────────────────────────────
+describe("GoogleGA4Adapter — server-owned purchase", () => {
+  const cfg = {
+    id: "g",
+    platform: PixelPlatform.GOOGLE_GA4,
+    pixelId: "G-OWNER123",
+    enabled: true,
+    enableClientSide: true,
+    enableServerSide: false,
+    consentRequired: false,
+    createdAt: new Date(),
+  } as PixelConfig;
+  const ev = (eventName: string, ecommerce?: TrackingEvent["ecommerce"]): TrackingEvent =>
+    ({ eventId: "e", eventName, timestamp: 0, pageUrl: "", sessionId: "s", ecommerce }) as TrackingEvent;
+
+  it("sends purchase by default", () => {
+    const gtag = vi.fn();
+    (window as unknown as { gtag: unknown }).gtag = gtag;
+    const a = new GoogleGA4Adapter();
+    a.initialize(cfg);
+    a.trackEvent(ev(TrackingEventName.CHECKOUT_COMPLETED, { currency: "EGP", value: 10, transactionId: "o1" }));
+    expect(gtag).toHaveBeenCalledWith("event", "purchase", { currency: "EGP", value: 10, transaction_id: "o1" });
+  });
+
+  it("skips only purchase when the server owns it", () => {
+    const gtag = vi.fn();
+    (window as unknown as { gtag: unknown }).gtag = gtag;
+    const a = new GoogleGA4Adapter();
+    a.setBrowserPurchase(false);
+    a.initialize(cfg);
+    a.trackEvent(ev(TrackingEventName.CHECKOUT_COMPLETED, { currency: "EGP", value: 10, transactionId: "o1" }));
+    a.trackEvent(ev(TrackingEventName.PAGE_VIEWED));
+    a.trackEvent(ev(TrackingEventName.CHECKOUT_STARTED, { currency: "EGP", value: 10 }));
+    a.trackEvent(ev("scroll_depth"));
+    const names = gtag.mock.calls.filter(([c]) => c === "event").map(([, n]) => n);
+    expect(names).toEqual(["page_view", "begin_checkout", "scroll_depth"]);
+  });
+});

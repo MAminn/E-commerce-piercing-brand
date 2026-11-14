@@ -10,6 +10,9 @@ import { ServerError } from "#root/shared/error/server";
 import { eq, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import { z } from "zod";
+import { effectiveGa4PurchaseOwner } from "#root/shared/config/ga4-purchase-owner";
+import { enqueueGa4PurchaseInTx } from "#root/backend/pixel-tracking/ga4-purchase/enqueue";
+import { isPurchaseMilestone } from "#root/backend/pixel-tracking/ga4-purchase/eligibility";
 import type { ClientSession } from "#root/backend/auth/shared/entities";
 import { getStoreOwnerId } from "#root/shared/config/store";
 
@@ -106,6 +109,8 @@ export const editOrder = (
             .select({
               id: order.id,
               status: order.status,
+              paymentMethod: order.paymentMethod,
+              paymentStatus: order.paymentStatus,
               shipping: order.shipping,
               tax: order.tax,
               discount: order.discount,
@@ -349,6 +354,21 @@ export const editOrder = (
             .set(orderUpdate)
             .where(eq(order.id, orderId))
             .returning();
+
+          // GA4 server-owned purchase (shadow/server only): an ONLINE order
+          // that staff move to `paid` is a confirmed payment. Edits of COD
+          // orders, or of an order already paid, never enqueue.
+          const ga4Owner = effectiveGa4PurchaseOwner();
+          const before = existingOrder[0];
+          const after = updatedOrder[0];
+          if (ga4Owner !== "browser" && before && after && isPurchaseMilestone("admin_edit", before, after)) {
+            // Delivered by the worker's next poll (≤ 15 s) once this commits.
+            await enqueueGa4PurchaseInTx(
+              tx,
+              { orderId, source: "admin_edit", eligibleAt: after.updatedAt ?? new Date() },
+              ga4Owner,
+            );
+          }
 
           const userData = await tx
             .select({ id: user.id })

@@ -25,7 +25,7 @@ import { PixelAdapterRegistry } from "#root/frontend/pixel-adapters/registry";
 import { createAdapterForPlatform } from "#root/frontend/pixel-adapters/factory";
 import { CustomEventTriggerManager } from "#root/frontend/tracking/custom-event-triggers";
 import { EngagementTracker } from "#root/frontend/pixel-adapters/engagement-tracker";
-import { setGa4HitsDisabled } from "#root/frontend/pixel-adapters/google-ga4-adapter";
+import { GoogleGA4Adapter, setGa4HitsDisabled } from "#root/frontend/pixel-adapters/google-ga4-adapter";
 import { MetaPixelAdapter } from "#root/frontend/pixel-adapters/meta-pixel-adapter";
 import { registerPageViewSink } from "#root/frontend/tracking/page-view";
 import { ensureFbcCookie, hasCookie } from "#root/frontend/tracking/fbc-cookie";
@@ -105,6 +105,7 @@ export function TrackingProvider({
   disabled = false,
   metaAdvancedMatching = false,
   metaCustomer = null,
+  ga4BrowserPurchase = true,
 }: {
   children: ReactNode;
   /**
@@ -123,6 +124,13 @@ export function TrackingProvider({
   metaAdvancedMatching?: boolean;
   /** The signed-in shopper's own account fields; hashed before use. */
   metaCustomer?: MetaCustomer | null;
+  /**
+   * GA4_PURCHASE_OWNER (pageContext.trackingFlags.ga4BrowserPurchase): false
+   * only in server mode — the GA4 tag then skips `purchase`. The Meta pixel,
+   * the /api/track beacon (Meta CAPI) and every other GA4 event are
+   * unaffected.
+   */
+  ga4BrowserPurchase?: boolean;
 }) {
   const [sessionId, setSessionId] = useState<string>("");
   // Read by the adapter effect without being its dependencies: a new
@@ -132,6 +140,8 @@ export function TrackingProvider({
   metaAdvancedMatchingRef.current = metaAdvancedMatching;
   const metaCustomerRef = useRef(metaCustomer);
   metaCustomerRef.current = metaCustomer;
+  const ga4BrowserPurchaseRef = useRef(ga4BrowserPurchase);
+  ga4BrowserPurchaseRef.current = ga4BrowserPurchase;
   // One id per page load even when localStorage is unavailable (then
   // getSessionId() returns a new id per call): events and the pixel's
   // external_id must agree.
@@ -440,6 +450,9 @@ export function TrackingProvider({
               if (adapter instanceof MetaPixelAdapter) {
                 adapter.setAdvancedMatching(metaMatch);
                 metaInitialised = true;
+              }
+              if (adapter instanceof GoogleGA4Adapter) {
+                adapter.setBrowserPurchase(ga4BrowserPurchaseRef.current);
               }
               adapter.initialize(config);
               registry.register(adapter);
