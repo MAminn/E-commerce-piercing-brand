@@ -3,6 +3,7 @@ import {
   type EcommerceEventData,
   type TrackingProductItem,
 } from "#root/shared/types/pixel-tracking";
+import { purchaseEventId } from "#root/shared/tracking/purchase-event-id";
 
 /**
  * The Purchase (`checkout_completed` → Meta `Purchase`) event.
@@ -26,7 +27,9 @@ import {
  * re-render or a reopened confirmation link from emitting it again.
  */
 
-export const purchaseEventId = (orderId: string) => `purchase-${orderId}`;
+// One definition for the browser pixel and the server's CAPI relay (Meta
+// dedupes the two by this id) — see shared/tracking/purchase-event-id.ts.
+export { purchaseEventId };
 
 /**
  * The ISO 4217 code every order is charged in. A literal, deliberately: the

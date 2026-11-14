@@ -25,7 +25,7 @@ import {
   loadPurchaseMatch,
   type PurchaseMatch,
 } from "#root/backend/pixel-tracking/purchase-match";
-import { purchaseEventId } from "#root/frontend/tracking/purchase-event";
+import { purchaseEventId } from "#root/shared/tracking/purchase-event-id";
 
 // Server-side adapters
 import { metaCapiAdapter } from "#root/backend/pixel-tracking/server-adapters/meta-capi-adapter";
