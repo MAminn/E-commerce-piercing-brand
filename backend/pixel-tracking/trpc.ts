@@ -6,6 +6,7 @@ import { customEventsRouter } from "./custom-events/trpc";
 import { attributionRouter } from "./attribution/trpc";
 import { consentRouter } from "./consent/trpc";
 import { ga4PurchaseRouter } from "./ga4-purchase/trpc";
+import { cookieHealthProcedure } from "./cookie-health-trpc";
 
 export const pixelTrackingRouter = t.router({
   trackEvent: trackEventProcedure,
@@ -15,4 +16,5 @@ export const pixelTrackingRouter = t.router({
   attribution: attributionRouter,
   consent: consentRouter,
   ga4Purchase: ga4PurchaseRouter,
+  cookieHealth: cookieHealthProcedure,
 });

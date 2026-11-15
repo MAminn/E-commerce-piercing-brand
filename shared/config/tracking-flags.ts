@@ -59,6 +59,29 @@ export interface ClientTrackingFlags {
    * `shadow` mode, and whenever the server is not confirmed ready.
    */
   ga4BrowserPurchase: boolean;
+  /**
+   * META_FBC_FALLBACK — Meta click-id continuity without any database lookup:
+   * the browser keeps the landing `?fbclid=` in localStorage ("perce_fbc")
+   * and every beacon event carries an `fbcHint`; the server uses it for the
+   * Conversions API copy only when the request has no `_fbc` cookie (see
+   * frontend/tracking/fbc-hint.ts, backend/pixel-tracking/meta-server-feed.ts).
+   * Never stored.
+   *
+   * DEFAULT ON (2026-11-15): only an explicit false/0/no/off turns it off —
+   * then the browser stores and sends nothing and the server ignores hints.
+   */
+  metaFbcFallback: boolean;
+  /**
+   * GA4_CLIENT_ID_CONTINUITY — the SSR gtag snippet (pages/+Head.tsx) keeps
+   * the `_ga` client id in localStorage ("perce_ga_cid") and, only when the
+   * `_ga` cookie is missing, passes the stored id as `client_id` to the
+   * first `gtag("config")`. Never invents an id, never overrides a valid
+   * `_ga` (see shared/tracking/ga4-head-snippet.ts).
+   *
+   * DEFAULT ON (2026-11-15): only an explicit false/0/no/off turns it off,
+   * which restores the previous snippet byte for byte.
+   */
+  ga4ClientIdContinuity: boolean;
 }
 
 export function readClientTrackingFlags(env: Env = process.env): ClientTrackingFlags {
@@ -66,5 +89,7 @@ export function readClientTrackingFlags(env: Env = process.env): ClientTrackingF
     excludeDashboard: !isEnvFlagOff(env.TRACKING_EXCLUDE_INTERNAL),
     metaAdvancedMatching: !isEnvFlagOff(env.META_ADVANCED_MATCHING),
     ga4BrowserPurchase: browserSendsGa4Purchase(),
+    metaFbcFallback: !isEnvFlagOff(env.META_FBC_FALLBACK),
+    ga4ClientIdContinuity: !isEnvFlagOff(env.GA4_CLIENT_ID_CONTINUITY),
   };
 }

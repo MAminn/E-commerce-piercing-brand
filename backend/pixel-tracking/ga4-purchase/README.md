@@ -126,6 +126,29 @@ returns:
 - shadow coverage: candidates with vs without a browser purchase beacon
 - recent problems (order id and number only)
 
+### `gapOrders` baseline and the restart caveat
+
+An order is listed as a gap only if it was placed after the gap baseline and
+has no outbox row. The baseline is the earlier of:
+
+- the first outbox row ever written (`min(created_at)`), and
+- the moment **this process** started the current shadow/server mode
+  (`effectiveGa4PurchaseOwnerSince()`, set by the boot readiness check).
+
+Orders placed before activation are never gaps (no backfill). Before
+2026-11-15, an empty outbox made the first term NULL, `GREATEST` ignored it,
+and every order in the window was listed.
+
+**Restart caveat.** The second term lives in memory and resets on every boot
+or redeploy. It only matters while the outbox is **completely empty**. That
+is the case right after activation, or when every enqueue since activation
+has failed. Orders placed before the latest restart then drop out of
+`gapOrders`; orders placed after it are still listed. Once one outbox row
+exists, the first term pins the baseline and restarts change nothing. If
+`gapOrders` is empty but orders exist, check `byStatus` too: an outbox with
+zero rows while orders are being placed in shadow/server mode is itself the
+failure signal.
+
 ## Not done here (owner decisions)
 
 - No refund events on cancellation.

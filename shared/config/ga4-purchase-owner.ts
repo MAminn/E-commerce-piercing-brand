@@ -34,6 +34,7 @@ export function readGa4PurchaseOwner(
 }
 
 let effective: Ga4PurchaseOwner = "browser";
+let effectiveSince: Date | null = null;
 
 /** The mode the app is running — `browser` until readiness confirmed more. */
 export function effectiveGa4PurchaseOwner(): Ga4PurchaseOwner {
@@ -41,8 +42,19 @@ export function effectiveGa4PurchaseOwner(): Ga4PurchaseOwner {
 }
 
 /** Set by the boot readiness check only (and by tests). */
-export function setEffectiveGa4PurchaseOwner(owner: Ga4PurchaseOwner): void {
+export function setEffectiveGa4PurchaseOwner(owner: Ga4PurchaseOwner, at: Date = new Date()): void {
+  if (owner !== effective) effectiveSince = owner === "browser" ? null : at;
   effective = owner;
+}
+
+/**
+ * When THIS PROCESS started running the current non-browser mode (null in
+ * `browser`). In-memory only: it restarts with every boot / redeploy — see
+ * the restart caveat in backend/pixel-tracking/ga4-purchase/README.md.
+ * Used by the diagnostics gap baseline.
+ */
+export function effectiveGa4PurchaseOwnerSince(): Date | null {
+  return effectiveSince;
 }
 
 /** Whether the browser should send GA4 `purchase` itself. */

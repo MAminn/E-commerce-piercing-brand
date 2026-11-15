@@ -302,6 +302,7 @@ function LayoutShell({
           metaAdvancedMatching={Boolean(pageContext.trackingFlags?.metaAdvancedMatching)}
           // Missing flag (older server) = the browser keeps sending purchase.
           ga4BrowserPurchase={pageContext.trackingFlags?.ga4BrowserPurchase !== false}
+          metaFbcFallback={Boolean(pageContext.trackingFlags?.metaFbcFallback)}
           metaCustomer={session}>
           <main
             id='page-content'

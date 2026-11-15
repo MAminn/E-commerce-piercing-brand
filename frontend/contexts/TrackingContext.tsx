@@ -29,6 +29,10 @@ import { GoogleGA4Adapter, setGa4HitsDisabled } from "#root/frontend/pixel-adapt
 import { MetaPixelAdapter } from "#root/frontend/pixel-adapters/meta-pixel-adapter";
 import { registerPageViewSink } from "#root/frontend/tracking/page-view";
 import { ensureFbcCookie, hasCookie } from "#root/frontend/tracking/fbc-cookie";
+import { readFbcHint, rememberFbclid, safeLocalStorage } from "#root/frontend/tracking/fbc-hint";
+
+/** A beacon copy of an event: META_FBC_FALLBACK may add the kept click id. */
+type BeaconTrackingEvent = TrackingEvent & { fbcHint?: string };
 import { hashMetaIdentityWeb, type HashedMetaUserData } from "#root/shared/tracking/meta-user-data";
 
 /**
@@ -106,6 +110,7 @@ export function TrackingProvider({
   metaAdvancedMatching = false,
   metaCustomer = null,
   ga4BrowserPurchase = true,
+  metaFbcFallback = false,
 }: {
   children: ReactNode;
   /**
@@ -131,8 +136,17 @@ export function TrackingProvider({
    * unaffected.
    */
   ga4BrowserPurchase?: boolean;
+  /**
+   * META_FBC_FALLBACK (pageContext.trackingFlags.metaFbcFallback): a landing
+   * ?fbclid= is kept in localStorage and every /api/track event carries it as
+   * `fbcHint` (frontend/tracking/fbc-hint.ts). Off → nothing stored or sent.
+   * The browser pixels never see the hint.
+   */
+  metaFbcFallback?: boolean;
 }) {
   const [sessionId, setSessionId] = useState<string>("");
+  const metaFbcFallbackRef = useRef(metaFbcFallback);
+  metaFbcFallbackRef.current = metaFbcFallback;
   // Read by the adapter effect without being its dependencies: a new
   // clientSession object on every navigation must not tear the pixels down
   // and init them again.
@@ -192,7 +206,7 @@ export function TrackingProvider({
   const engagementRef = useRef<EngagementTracker | null>(null);
 
   // ── Beacon Buffer ──────────────────────────────────────────────────────
-  const eventBufferRef = useRef<TrackingEvent[]>([]);
+  const eventBufferRef = useRef<BeaconTrackingEvent[]>([]);
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // META_ADVANCED_MATCHING: armed once per page load when a Meta pixel was
   // just initialised and `_fbp` is not set yet; released by the cookie or by
@@ -242,7 +256,20 @@ export function TrackingProvider({
   /** Add an event to the buffer; auto-flush after 250ms debounce. */
   const bufferEvent = useCallback(
     (event: TrackingEvent) => {
-      eventBufferRef.current.push(event);
+      let beaconEvent: BeaconTrackingEvent = event;
+      if (metaFbcFallbackRef.current && typeof window !== "undefined") {
+        // Keep a landing ?fbclid= (first sight wins for the same click) and
+        // attach the kept click to the beacon copy only. Best-effort.
+        try {
+          const store = safeLocalStorage();
+          rememberFbclid(store, window.location.search);
+          const fbcHint = readFbcHint(store);
+          if (fbcHint) beaconEvent = { ...event, fbcHint };
+        } catch {
+          /* best-effort */
+        }
+      }
+      eventBufferRef.current.push(beaconEvent);
       if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
       flushTimerRef.current = setTimeout(flushBuffer, 250);
     },

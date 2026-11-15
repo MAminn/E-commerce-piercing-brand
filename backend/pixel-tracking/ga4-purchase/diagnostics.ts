@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import type { DatabaseClient } from "#root/shared/database/drizzle/db";
 import {
   effectiveGa4PurchaseOwner,
+  effectiveGa4PurchaseOwnerSince,
   readGa4PurchaseOwner,
 } from "#root/shared/config/ga4-purchase-owner";
 
@@ -12,8 +13,10 @@ import {
  * - status / held_reason counts (missing_client_id, consent_not_granted …)
  * - attribution coverage: orders captured without a GA4 client id / session
  * - gap: orders that look like purchases but have no outbox row although
- *   they were placed after the first row existed (an enqueue that failed,
- *   or a path that is not wired) — these are NOT re-sent automatically
+ *   they were placed after the gap baseline (an enqueue that failed, or a
+ *   path that is not wired) — these are NOT re-sent automatically. Baseline
+ *   = the earlier of the first outbox row and the moment this process
+ *   started the current shadow/server mode (restart caveat: README.md)
  * - shadow coverage: shadow candidates with vs without a browser purchase
  *   beacon (tracking_event `purchase-<order id>`) — the orders the browser
  *   missed are what server mode would recover
@@ -42,9 +45,21 @@ export interface Ga4PurchaseDiagnostics {
 
 const rowsOf = <T>(r: unknown): T[] => (r as { rows: T[] }).rows;
 
-export async function getGa4PurchaseDiagnostics(db: Pick<DatabaseClient, "execute">, windowDays = 7): Promise<Ga4PurchaseDiagnostics> {
+export async function getGa4PurchaseDiagnostics(
+  db: Pick<DatabaseClient, "execute">,
+  windowDays = 7,
+  opts: { modeSince?: Date | null } = {},
+): Promise<Ga4PurchaseDiagnostics> {
   const days = Math.min(Math.max(Math.trunc(windowDays), 1), 90);
   const since = sql`now() - make_interval(days => ${days})`;
+  // Gap baseline: the earlier of the first outbox row ever written and the
+  // moment this process started the current shadow/server mode. Orders
+  // older than that were never meant to have a row (no backfill). Before,
+  // an EMPTY outbox made min(created_at) NULL, GREATEST ignored it, and every
+  // order of the window was listed as a gap. In-memory: see the restart
+  // caveat in README.md.
+  const modeSince = (opts.modeSince !== undefined ? opts.modeSince : effectiveGa4PurchaseOwnerSince()) ?? new Date();
+  const gapStart = sql`greatest(${since}, least((SELECT min(created_at) FROM ga4_purchase_outbox), ${modeSince.toISOString()}::timestamptz))`;
 
   const byStatus = rowsOf<{ mode: string; status: string; held_reason: string | null; count: string }>(
     await db.execute(sql`
@@ -70,7 +85,7 @@ export async function getGa4PurchaseDiagnostics(db: Pick<DatabaseClient, "execut
     await db.execute(sql`
       SELECT o.id, o.order_number, o.payment_method, o.payment_status
       FROM "order" o
-      WHERE o.created_at >= greatest(${since}, (SELECT min(created_at) FROM ga4_purchase_outbox))
+      WHERE o.created_at >= ${gapStart}
         AND o.status <> 'cancelled'
         AND ((o.payment_method = 'cod' AND o.payment_status = 'not_required')
              OR (o.payment_method <> 'cod' AND o.payment_status = 'paid'))

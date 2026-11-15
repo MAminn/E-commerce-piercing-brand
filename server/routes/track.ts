@@ -6,6 +6,7 @@ import { sanitizeTrackingUrl } from "#root/shared/utils/tracking-url";
 import { isDashboardPath } from "#root/shared/utils/tracking-routes";
 import { readClientTrackingFlags } from "#root/shared/config/tracking-flags";
 import { hashSessionIdentity } from "#root/backend/pixel-tracking/meta-user-data";
+import { FBC_HINT_MAX_LENGTH } from "#root/shared/tracking/fbc-hint";
 
 /**
  * Beacon tracking endpoint schema.
@@ -51,6 +52,11 @@ const beaconBodySchema = z.object({
         })
         .optional(),
       customProperties: z.record(z.unknown()).optional(),
+      // META_FBC_FALLBACK: the browser's kept landing click id. Validated
+      // later against the server clock (shared/tracking/fbc-hint.ts) and
+      // taken off the event by takeFbcHints — never persisted. Accepted as
+      // unknown so a malformed hint can never fail the whole beacon.
+      fbcHint: z.unknown().optional(),
     }),
   ),
 });
@@ -171,6 +177,28 @@ function dropDashboardEvents(events: BeaconBody["events"]): BeaconBody["events"]
   return events.filter((event) => !isDashboardPath(event.pageUrl));
 }
 
+type BeaconEventWithoutHint = Omit<BeaconBody["events"][number], "fbcHint">;
+
+/**
+ * META_FBC_FALLBACK: every event loses its `fbcHint` here, before anything
+ * is persisted or relayed. When the flag is on, the hints (bounded strings
+ * only; full validation happens against the server clock in the pipeline)
+ * are returned by event id for the Meta relay copy. Flag off → no hints.
+ */
+function takeFbcHints(
+  events: BeaconBody["events"],
+  enabled: boolean,
+): { events: BeaconEventWithoutHint[]; hints: Map<string, string> } {
+  const hints = new Map<string, string>();
+  const stripped = events.map(({ fbcHint, ...event }) => {
+    if (enabled && typeof fbcHint === "string" && fbcHint.length <= FBC_HINT_MAX_LENGTH) {
+      hints.set(event.eventId, fbcHint);
+    }
+    return event;
+  });
+  return { events: stripped, hints };
+}
+
 export {
   dropDashboardEvents,
   extractServerContext,
@@ -178,6 +206,7 @@ export {
   isRateLimited,
   beaconBodySchema,
   sanitizeBeaconEvents,
+  takeFbcHints,
 };
 
 /**
@@ -201,9 +230,10 @@ export const trackBeaconPlugin: FastifyPluginAsync = async (fastify) => {
 
     const flags = readClientTrackingFlags();
     const sanitized = sanitizeBeaconEvents(parsed.data.events);
-    const events = flags.excludeDashboard
+    const kept = flags.excludeDashboard
       ? dropDashboardEvents(sanitized)
       : sanitized;
+    const { events, hints: fbcHints } = takeFbcHints(kept, flags.metaFbcFallback);
     if (events.length === 0) {
       return reply.status(204).send();
     }
@@ -233,6 +263,7 @@ export const trackBeaconPlugin: FastifyPluginAsync = async (fastify) => {
       processTrackingBeacon(events, serverContext, request.db, {
         metaAdvancedMatching: flags.metaAdvancedMatching,
         sessionIdentity,
+        fbcHints,
       }).catch(
         (err: unknown) => {
           request.log.error({ err }, "Delivery pipeline error");

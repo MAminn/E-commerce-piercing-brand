@@ -41,8 +41,25 @@ describe("isDashboardPath", () => {
 
 describe("tracking flags", () => {
   it("default ON when unset (production never set it — internal traffic must be excluded)", () => {
-    expect(readClientTrackingFlags({})).toEqual({ excludeDashboard: true, metaAdvancedMatching: true, ga4BrowserPurchase: true });
+    expect(readClientTrackingFlags({})).toEqual({
+      excludeDashboard: true,
+      metaAdvancedMatching: true,
+      ga4BrowserPurchase: true,
+      metaFbcFallback: true,
+      ga4ClientIdContinuity: true,
+    });
     expect(readClientTrackingFlags({ TRACKING_EXCLUDE_INTERNAL: "" }).excludeDashboard).toBe(true);
+  });
+
+  it("META_FBC_FALLBACK / GA4_CLIENT_ID_CONTINUITY: default ON; only an explicit off value disables each", () => {
+    expect(readClientTrackingFlags({ META_FBC_FALLBACK: "", GA4_CLIENT_ID_CONTINUITY: "yes" })).toMatchObject({
+      metaFbcFallback: true,
+      ga4ClientIdContinuity: true,
+    });
+    expect(readClientTrackingFlags({ META_FBC_FALLBACK: "off", GA4_CLIENT_ID_CONTINUITY: "0" })).toMatchObject({
+      metaFbcFallback: false,
+      ga4ClientIdContinuity: false,
+    });
   });
 
   it("META_ADVANCED_MATCHING: default ON; only an explicit false/0/no/off disables it", () => {

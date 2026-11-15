@@ -243,7 +243,7 @@ describe("G1 — one logical event, one GA4 measurement (production config: GA4 
 });
 
 describe("G1 — Meta CAPI is unaffected", () => {
-  it("every storefront event still reaches Meta CAPI once, with the browser's event_id for dedup", async () => {
+  it("every commerce event still reaches Meta CAPI once, with the browser's event_id for dedup", async () => {
     const { db, deliveries } = fakeDb(PROD_CONFIGS);
     const events = storefrontEvents();
     await processTrackingBeacon(events, serverContext, db);
@@ -252,19 +252,29 @@ describe("G1 — Meta CAPI is unaffected", () => {
     const body = JSON.parse(String((metaCalls()[0]?.[1] as RequestInit).body)) as {
       data: Array<{ event_name: string; event_id: string; custom_data?: Record<string, unknown> }>;
     };
-    expect(body.data.map((d) => d.event_id)).toEqual(events.map((e) => e.eventId));
+    // META_CAPI_SKIP_ENGAGEMENT (default on): scroll_depth stays on the
+    // browser pixel and in tracking_event but is not relayed to the CAPI.
+    const relayed = events.filter((e) => e.eventName !== "scroll_depth");
+    expect(body.data.map((d) => d.event_id)).toEqual(relayed.map((e) => e.eventId));
     expect(body.data.map((d) => d.event_name)).toEqual([
       "PageView",
       "ViewContent",
       "AddToCart",
       "InitiateCheckout",
       "Purchase",
-      "scroll_depth",
     ]);
     const purchase = body.data.find((d) => d.event_name === "Purchase");
     expect(purchase?.event_id).toBe(`purchase-${ORDER_ID}`);
     expect(purchase?.custom_data).toMatchObject({ value: 290, currency: "EGP" });
-    expect(deliveries.filter((d) => d.platform === "meta" && d.sent)).toHaveLength(events.length);
+    expect(deliveries.filter((d) => d.platform === "meta" && d.sent)).toHaveLength(relayed.length);
+  });
+
+  it("META_CAPI_SKIP_ENGAGEMENT off → scroll_depth is relayed again (rollback)", async () => {
+    const { db } = fakeDb(PROD_CONFIGS);
+    const events = storefrontEvents();
+    await processTrackingBeacon(events, serverContext, db, { metaServerFeed: { fbcFallback: true, skipEngagement: false } });
+    const body = JSON.parse(String((metaCalls()[0]?.[1] as RequestInit).body)) as { data: Array<{ event_id: string }> };
+    expect(body.data.map((d) => d.event_id)).toEqual(events.map((e) => e.eventId));
   });
 
   it("Meta output is identical with GA4 server-side on or off", async () => {

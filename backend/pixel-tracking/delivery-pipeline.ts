@@ -26,6 +26,12 @@ import {
   type PurchaseMatch,
 } from "#root/backend/pixel-tracking/purchase-match";
 import { purchaseEventId } from "#root/shared/tracking/purchase-event-id";
+import {
+  applyFbcHints,
+  isRelayedToMetaCapi,
+  readMetaServerFeedFlags,
+  type MetaServerFeedFlags,
+} from "#root/backend/pixel-tracking/meta-server-feed";
 
 // Server-side adapters
 import { metaCapiAdapter } from "#root/backend/pixel-tracking/server-adapters/meta-capi-adapter";
@@ -104,6 +110,16 @@ export interface PipelineOptions {
   sessionIdentity?: HashedMetaUserData | null;
   /** Injected in tests; the real lookup otherwise. */
   loadPurchaseMatch?: (db: DatabaseClient, orderId: string) => Promise<PurchaseMatch | null>;
+  /** META_FBC_FALLBACK / META_CAPI_SKIP_ENGAGEMENT; read from the env when omitted. */
+  metaServerFeed?: MetaServerFeedFlags;
+  /**
+   * META_FBC_FALLBACK: event id → the browser's `fbcHint`, taken off the
+   * events by server/routes/track.ts before this pipeline runs (so it is
+   * never persisted). Used for the Meta relay copy only.
+   */
+  fbcHints?: ReadonlyMap<string, string>;
+  /** Injected in tests; Date.now() otherwise. */
+  nowMs?: number;
 }
 
 /**
@@ -267,19 +283,31 @@ export async function processTrackingBeacon(
   const metaAdvancedMatching =
     options.metaAdvancedMatching ?? readClientTrackingFlags().metaAdvancedMatching;
 
-  /** Meta relay copies with hashed user_data; the plain events on any failure. */
+  const metaFeed = options.metaServerFeed ?? readMetaServerFeedFlags();
+  // META_CAPI_SKIP_ENGAGEMENT: the events the Conversions API copy carries,
+  // and the delivery-log rows that go with them. Excluded events stay stored
+  // and stay on the browser pixel; they get no Meta delivery row.
+  const metaSource = enriched.filter((e) => isRelayedToMetaCapi(e.eventName, metaFeed));
+  const metaEventIds = new Set(metaSource.map((e) => e.eventId));
+  const metaRows = insertedRows.filter((r) => metaEventIds.has(r.eventId));
+
+  /** Meta relay copies with fbc (from the hint) and hashed user_data; the plain events on any failure. */
   const metaEvents = async (): Promise<EnrichedTrackingEvent[]> => {
-    if (!metaAdvancedMatching) return enriched;
+    const events =
+      metaFeed.fbcFallback && options.fbcHints
+        ? applyFbcHints(metaSource, options.fbcHints, options.nowMs ?? Date.now())
+        : metaSource;
+    if (!metaAdvancedMatching) return events;
     const lookup = options.loadPurchaseMatch ?? loadPurchaseMatch;
     try {
-      return await attachMetaUserData(enriched, {
+      return await attachMetaUserData(events, {
         insertedEventIds: new Set(insertedRows.map((r) => r.eventId)),
         sessionIdentity: options.sessionIdentity,
         getPurchaseMatch: (orderId) => lookup(db, orderId),
       });
     } catch {
       console.error("[Delivery Pipeline] Meta user_data enrichment failed");
-      return enriched;
+      return events;
     }
   };
 
@@ -294,8 +322,9 @@ export async function processTrackingBeacon(
       // delivery row is logged for GA4 either. See ga4-ownership.ts.
       if (config.platform === "google_ga4" && !shouldServerSendToGa4()) return null;
       if (config.platform === "meta") {
+        if (metaSource.length === 0) return null;
         return metaEvents().then((events) =>
-          sendToAdapterAndLog(adapter, events, config, insertedRows, db),
+          sendToAdapterAndLog(adapter, events, config, metaRows, db),
         );
       }
       return sendToAdapterAndLog(adapter, enriched, config, insertedRows, db);

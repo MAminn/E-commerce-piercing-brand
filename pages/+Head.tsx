@@ -12,6 +12,7 @@ import { getPublicOrigin, toAbsoluteUrl } from "#root/shared/config/site-url";
 import { resolveMetaDescription } from "#root/pages/index/meta-description";
 import { buildTypographyHeadCss } from "#root/shared/typography/build-head-css";
 import { STRIP_URL_PII_SCRIPT } from "#root/shared/utils/strip-url-pii-script";
+import { buildGa4HeadSnippet } from "#root/shared/tracking/ga4-head-snippet";
 
 export default function HeadDefault() {
   const pageContext = usePageContext();
@@ -154,9 +155,13 @@ export default function HeadDefault() {
           />
           <script
             dangerouslySetInnerHTML={{
-              __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}window.gtag=gtag;gtag("js",new Date());gtag("config",${JSON.stringify(
-                activeGA4PixelId,
-              )},{send_page_view:false});`,
+              // GA4_CLIENT_ID_CONTINUITY runs inside this snippet, before the
+              // first gtag("config") — see shared/tracking/ga4-head-snippet.ts.
+              __html: buildGa4HeadSnippet(activeGA4PixelId, {
+                clientIdContinuity: Boolean(
+                  pageContext.trackingFlags?.ga4ClientIdContinuity,
+                ),
+              }),
             }}
           />
         </>
