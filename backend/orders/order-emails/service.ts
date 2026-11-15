@@ -66,6 +66,12 @@ import {
   type OrderEmailModel,
   type OrderEmailPaymentMethod,
 } from "./model";
+import {
+  ORDER_NOTIFICATION_EMAILS_ENV,
+  describeNotificationRecipients,
+  pluralEntries,
+  resolveNotificationRecipientSource,
+} from "./notification-recipients";
 
 export const ORDER_CONFIRMATION = "order_confirmation" as const;
 export const ORDER_ADMIN_NOTIFICATION = "order_admin_notification" as const;
@@ -85,17 +91,54 @@ function emailImageUrl(diskname: string | null | undefined): string | null {
 
 export interface QueueOrderEmailsDeps {
   enqueue: typeof enqueueScheduledEmail;
+  /** Store-notification recipients: ORDER_NOTIFICATION_EMAILS, else every admin user. */
   listAdminEmails: () => Promise<string[]>;
   logEvent: typeof logOrderEvent;
   kickWorker: () => void;
 }
 
-async function listAdminEmails(): Promise<string[]> {
+async function listAdminUserEmails(): Promise<string[]> {
   const rows = await db()
     .select({ email: user.email })
     .from(user)
     .where(eq(user.role, "admin"));
   return rows.map((r) => r.email).filter((e): e is string => !!e && e.includes("@"));
+}
+
+/**
+ * Store-notification recipients for one order. ORDER_NOTIFICATION_EMAILS is
+ * read on every call (not cached at boot): with at least one valid address
+ * only those are returned and the admin-user query never runs; otherwise
+ * every admin user, as before. See ./notification-recipients.ts.
+ */
+export async function listNotificationRecipients(
+  raw: string | undefined = process.env[ORDER_NOTIFICATION_EMAILS_ENV],
+  loadAdminUserEmails: () => Promise<string[]> = listAdminUserEmails,
+): Promise<string[]> {
+  const resolved = resolveNotificationRecipientSource(raw);
+  if (resolved.source === "env") {
+    if (resolved.invalidCount > 0) {
+      console.warn(
+        `[OrderEmails] ${ORDER_NOTIFICATION_EMAILS_ENV}: ${pluralEntries(resolved.invalidCount)} ignored`,
+      );
+    }
+    return resolved.emails;
+  }
+  if (resolved.reason === "no_valid_address") {
+    console.warn(
+      `[OrderEmails] ${ORDER_NOTIFICATION_EMAILS_ENV} is set but has no valid address (${pluralEntries(resolved.invalidCount)}) — notifying every admin user instead`,
+    );
+  }
+  return loadAdminUserEmails();
+}
+
+/** Logs, once at start-up, where new-order notifications will go (addresses masked). */
+export function logOrderNotificationRecipients(
+  raw: string | undefined = process.env[ORDER_NOTIFICATION_EMAILS_ENV],
+): void {
+  const { level, message } = describeNotificationRecipients(raw);
+  if (level === "warn") console.warn(message);
+  else console.info(message);
 }
 
 let workerKick: () => void = () => {};
@@ -107,7 +150,7 @@ export function setOrderEmailWorkerKick(kick: () => void): void {
 
 const defaultDeps = (): QueueOrderEmailsDeps => ({
   enqueue: enqueueScheduledEmail,
-  listAdminEmails,
+  listAdminEmails: () => listNotificationRecipients(),
   logEvent: logOrderEvent,
   kickWorker: () => workerKick(),
 });

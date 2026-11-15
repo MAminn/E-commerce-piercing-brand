@@ -125,6 +125,7 @@ see `docs/PERCE_LAUNCH_CONFIGURATION.md` §1 and §3.
 |---|---|
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` | Without all four the server logs `Missing SMTP configuration environment variables` and installs a dummy mailer: **no order confirmation, password reset or email verification is sent**, and nothing tells the customer. Both mail paths connect with implicit TLS (`secure: true`), so use the provider's TLS port (usually `465`), not a STARTTLS port such as `587`. |
 | `VITE_SUPPORT_EMAIL` | The customer-facing support address. It has **no default**: while unset, customer emails omit the contact line entirely. Never reuse a previous brand's inbox. |
+| `ORDER_NOTIFICATION_EMAILS` | The inbox(es) that receive the "New order" store notification — comma/semicolon/space/new-line separated. **Runtime** variable (not build-time), set on the production environment, read for every order. With at least one valid address only those are notified; while unset, every `role = admin` user is notified instead, and an admin login (e.g. the `ADMIN_EMAIL` account) is not necessarily a real inbox. After deploying, check the start-up line `[OrderEmails] New-order notifications → ORDER_NOTIFICATION_EMAILS: xx***@domain` — `every admin user (… not set)` or `(… is set but has no valid address …)` means it is not taking effect. |
 
 `EMAIL_FROM_ADDRESS` / `EMAIL_FROM_NAME` stay optional (they default to the
 SMTP account).

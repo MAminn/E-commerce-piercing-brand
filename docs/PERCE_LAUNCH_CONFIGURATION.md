@@ -67,7 +67,7 @@ to the customer.**
 | `EMAIL_FROM_NAME` | send options | falls back to the store name (`Percé`) | Recommended: `Percé` |
 | `EMAIL_REPLY_TO` | send options | falls back to the support email | OPTIONAL |
 | Order confirmation | `backend/orders/order-emails/service.ts` via the email queue (`scheduled_email`, key `order_confirmation:<orderId>`) | COD: queued after the order commits; online payment: queued when payment is confirmed paid | DONE — bilingual EN/AR, retried up to 5 times, outcome on the order's activity log (`confirmation_email_sent` / `confirmation_email_failed`). Not affected by the marketing on/off or test-mode switches. |
-| New-order notification to admins | same queue, key `order_admin_notification:<orderId>:<email>` | every `role = admin` user | DONE — separate operational template |
+| New-order notification to the store | same queue, key `order_admin_notification:<orderId>:<email>`; recipients from `ORDER_NOTIFICATION_EMAILS` (`backend/orders/order-emails/notification-recipients.ts`) | `ORDER_NOTIFICATION_EMAILS` (runtime, read per order; commas/semicolons/spaces/new lines) with ≥1 valid address → only those addresses, admin users not looked up. Unset → every `role = admin` user. Set but no valid address → every admin user + warning. Boot logs `[OrderEmails] New-order notifications → …` (masked) | **REQUIRED** — set it to the inbox the owner actually reads; an admin login email is not necessarily a real inbox. Separate operational template |
 | Password reset / email verification | `backend/auth/*` via the same email service | — | **REQUIRED FOR FIRST SALE** if customer accounts are offered at all (guest checkout works without it) |
 
 > The order-confirmation page no longer claims an email was sent. It only

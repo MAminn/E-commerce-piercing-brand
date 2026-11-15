@@ -16,6 +16,7 @@ import { renderScheduledEmail } from "./render";
 import "./templates/render";
 // Side effect: registers the transactional order-email renderers.
 import {
+  logOrderNotificationRecipients,
   recordOrderConfirmationOutcome,
   setOrderEmailWorkerKick,
 } from "#root/backend/orders/order-emails/service";
@@ -260,6 +261,9 @@ export async function startEmailAutomationWorker(): Promise<EmailAutomationWorke
   console.info(
     `[EmailWorker] Started — polling every ${TICK_INTERVAL_MS / 1000}s, scanning triggers every ${TRIGGER_SCAN_INTERVAL_MS / 60_000}m (actual sending gated by admin settings, off by default)`,
   );
+
+  // Where new-order notifications go (ORDER_NOTIFICATION_EMAILS or admin users), masked.
+  logOrderNotificationRecipients();
 
   // A newly placed order nudges the worker so its confirmation goes out
   // within seconds instead of at the next poll.
