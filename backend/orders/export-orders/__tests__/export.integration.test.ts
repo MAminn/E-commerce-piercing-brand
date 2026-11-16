@@ -279,7 +279,8 @@ describeIfDb("admin orders Excel export (integration)", () => {
     const { ordersExportApiPlugin } = await import("../api");
     const app = Fastify();
     app.decorateRequest("clientSession", undefined);
-    app.decorateRequest("db", { getter: () => db });
+    // The test's drizzle handle is untyped; the request decorator expects the schema-typed one.
+    app.decorateRequest("db", { getter: () => db as never });
     app.addHook("onRequest", async (req) => {
       const role = req.headers["x-test-role"];
       (req as { clientSession?: unknown }).clientSession = role ? { ...adminSession, role } : undefined;
