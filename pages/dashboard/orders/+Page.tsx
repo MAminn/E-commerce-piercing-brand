@@ -74,6 +74,7 @@ import {
 import { usePageContext } from "vike-react/usePageContext";
 import { trpc } from "#root/shared/trpc/client";
 import { formatOrderNumber } from "#root/shared/orders/order-number";
+import { ORDER_CHANGED_MESSAGE } from "#root/shared/orders/edit-rules";
 import { useToast } from "#root/components/ui/use-toast";
 import { Pagination } from "#root/components/utils/Pagination";
 import { OrderEditPanel } from "./OrderEditPanel";
@@ -355,6 +356,14 @@ export default function Orders() {
       description: message,
       variant: "destructive",
     });
+    // The order moved on under the editor (status change, courier hand-off,
+    // another admin's edit): the details shown are stale, so close them and
+    // reload the list rather than let the admin keep editing an old copy.
+    if (message === ORDER_CHANGED_MESSAGE) {
+      setIsEditingOrder(false);
+      setIsDetailsOpen(false);
+      fetchOrders();
+    }
   };
 
   const updateOrderStatus = async (orderId: string, status: string) => {

@@ -163,7 +163,7 @@ export function OrderActivityLog({ orderId }: { orderId: string }) {
                     </p>
                   )}
                   {entry.note && (
-                    <p className='text-xs text-muted-foreground mt-0.5 break-words'>
+                    <p className='text-xs text-muted-foreground mt-0.5 break-words whitespace-pre-line'>
                       {entry.note}
                     </p>
                   )}

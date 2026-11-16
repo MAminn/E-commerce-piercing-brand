@@ -18,7 +18,7 @@
  * so they can never disagree about what belongs to which stack.
  */
 
-import { Fragment } from "react";
+import { Fragment, useState } from "react";
 import { Layers } from "lucide-react";
 import { Badge } from "#root/components/ui/badge";
 import {
@@ -41,6 +41,7 @@ import {
   standaloneLineTotal,
 } from "#root/shared/bundles/order-grouping";
 import { formatMoney } from "#root/shared/pricing/format-money";
+import { type ImagePreview, ImagePreviewDialog } from "#root/components/ui/image-preview-dialog";
 
 export interface AdminOrderItem extends GroupableOrderItem {
   productId: string;
@@ -86,8 +87,34 @@ function LineName({ item, campaignTitle }: { item: AdminOrderItem; campaignTitle
 
 const money = (value: number) => formatMoney(value, { currency: STORE_CURRENCY, alwaysShowFraction: true });
 
-function Thumb({ item, size }: { item: AdminOrderItem; size: "sm" | "lg" }) {
+/**
+ * The line's product thumbnail. When the line has an image it is a button
+ * that opens the full-size image (the thumbnail already loads the original
+ * upload, so the preview is the same file at its natural size).
+ */
+function Thumb({
+  item,
+  size,
+  onPreview,
+}: {
+  item: AdminOrderItem;
+  size: "sm" | "lg";
+  onPreview: (preview: ImagePreview) => void;
+}) {
   const box = size === "lg" ? "h-14 w-14" : "h-12 w-12";
+  if (item.productImage) {
+    const url = item.productImage;
+    return (
+      <button
+        type='button'
+        aria-label={`Preview image of ${item.name}`}
+        title='View larger image'
+        onClick={() => onPreview({ url, alt: item.name })}
+        className={`${box} rounded-md overflow-hidden bg-stone-100 shrink-0 cursor-zoom-in transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1`}>
+        <img src={url} alt={item.name} className='h-full w-full object-cover' />
+      </button>
+    );
+  }
   return (
     <div
       className={`${box} rounded-md overflow-hidden bg-stone-100 flex items-center justify-center text-sm font-medium text-stone-600 shrink-0`}>
@@ -157,8 +184,10 @@ export function OrderItemsTable({
   bundles: OrderBundleSnapshot[] | undefined;
 }) {
   const groups = groupOrderLines(items ?? [], bundles ?? []);
+  const [preview, setPreview] = useState<ImagePreview | null>(null);
 
   return (
+    <>
     <Table>
       <TableHeader>
         <TableRow>
@@ -185,7 +214,7 @@ export function OrderItemsTable({
                 <TableRow key={item.id}>
                   <TableCell>
                     <div className='flex items-center gap-3'>
-                      <Thumb item={item} size='sm' />
+                      <Thumb item={item} size='sm' onPreview={setPreview} />
                       <LineName item={item} />
                     </div>
                   </TableCell>
@@ -227,7 +256,7 @@ export function OrderItemsTable({
                       <TableRow key={item.id} className='border-l-2 border-l-muted-foreground/30'>
                         <TableCell className='pl-8'>
                           <div className='flex items-center gap-3'>
-                            <Thumb item={item} size='sm' />
+                            <Thumb item={item} size='sm' onPreview={setPreview} />
                             <LineName item={item} campaignTitle={group.bundle.campaignTitle} />
                           </div>
                         </TableCell>
@@ -251,6 +280,8 @@ export function OrderItemsTable({
         )}
       </TableBody>
     </Table>
+    <ImagePreviewDialog preview={preview} onClose={() => setPreview(null)} />
+    </>
   );
 }
 
@@ -263,12 +294,14 @@ export function OrderItemsList({
   bundles: OrderBundleSnapshot[] | undefined;
 }) {
   const groups = groupOrderLines(items ?? [], bundles ?? []);
+  const [preview, setPreview] = useState<ImagePreview | null>(null);
   if (groups.length === 0) {
     return <p className='text-sm text-muted-foreground text-center'>No items found for this order.</p>;
   }
 
   return (
     <div className='space-y-3'>
+      <ImagePreviewDialog preview={preview} onClose={() => setPreview(null)} />
       {groups.map((group) => {
         if (group.kind === "item") {
           const item = group.item;
@@ -277,7 +310,7 @@ export function OrderItemsList({
           const unit = discount !== null && discount < price ? discount : price;
           return (
             <div key={item.id} className='flex items-center gap-3'>
-              <Thumb item={item} size='lg' />
+              <Thumb item={item} size='lg' onPreview={setPreview} />
               <div className='min-w-0 flex-1'>
                 <p className='text-sm font-medium truncate'>{item.name}</p>
                 <LineCode item={item} />
@@ -302,7 +335,7 @@ export function OrderItemsList({
                   const unit = discount !== null && discount < price ? discount : price;
                   return (
                     <div key={item.id} className='flex items-center gap-3'>
-                      <Thumb item={item} size='sm' />
+                      <Thumb item={item} size='sm' onPreview={setPreview} />
                       <div className='min-w-0 flex-1'>
                         <p className='text-sm truncate'>
                           {orderLineDisplay(item.name, item.selectedOptions, group.bundle.campaignTitle).name} ×{item.quantity}
