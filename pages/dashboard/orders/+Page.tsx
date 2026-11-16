@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
   Card,
   CardHeader,
@@ -73,12 +73,13 @@ import {
 } from "lucide-react";
 import { usePageContext } from "vike-react/usePageContext";
 import { trpc } from "#root/shared/trpc/client";
-import { formatOrderNumber, matchesOrderNumber } from "#root/shared/orders/order-number";
+import { formatOrderNumber } from "#root/shared/orders/order-number";
 import { useToast } from "#root/components/ui/use-toast";
 import { Pagination } from "#root/components/utils/Pagination";
 import { OrderEditPanel } from "./OrderEditPanel";
 import { OrderActivityLog } from "./OrderActivityLog";
 import { OrderItemsList, OrderItemsTable } from "./OrderItemsPanel";
+import { OrdersExportMenu, type OrdersExportFilters } from "./OrdersExportMenu";
 import type { OrderBundleSnapshot } from "#root/shared/bundles/order-grouping";
 import { groupOrderLines, totalUnits } from "#root/shared/bundles/order-grouping";
 
@@ -174,6 +175,18 @@ export default function Orders() {
     () => new Date().toISOString().slice(0, 10),
   );
   const [searchQuery, setSearchQuery] = useState<string>("");
+  /**
+   * The search text the server is asked for: trimmed, and only once typing
+   * pauses, so each keystroke does not fire its own query. The search runs
+   * in the database across every order (not just the loaded page), so the
+   * count, pagination and "Export filtered" all follow it.
+   */
+  const [appliedSearch, setAppliedSearch] = useState<string>("");
+  useEffect(() => {
+    const next = searchQuery.trim();
+    const t = setTimeout(() => setAppliedSearch(next), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -213,7 +226,7 @@ export default function Orders() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentional
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, searchQuery, dateFilter, customDate, paymentIssueOnly]);
+  }, [statusFilter, appliedSearch, dateFilter, customDate, paymentIssueOnly]);
 
   /** Resolves the active date filter into a [from, to) local-day range. */
   const getDateRange = useCallback((): { from?: string; to?: string } => {
@@ -244,7 +257,11 @@ export default function Orders() {
     return {};
   }, [dateFilter, customDate]);
 
+  /** Only the newest request may update the table (typing can overlap requests). */
+  const latestFetch = useRef(0);
+
   const fetchOrders = useCallback(async () => {
+    const requestId = ++latestFetch.current;
     setIsLoading(true);
     setError(null);
 
@@ -261,6 +278,7 @@ export default function Orders() {
         dateFrom?: string;
         dateTo?: string;
         paymentIssueOnly?: boolean;
+        search?: string;
       } = {
         limit: pageSize,
         offset: (page - 1) * pageSize,
@@ -279,8 +297,10 @@ export default function Orders() {
       if (from) params.dateFrom = from;
       if (to) params.dateTo = to;
       if (paymentIssueOnly) params.paymentIssueOnly = true;
+      if (appliedSearch) params.search = appliedSearch;
 
       const result = await trpc.order.view.query(params);
+      if (requestId !== latestFetch.current) return;
 
       if (result.success) {
         const items = result.result?.items ?? [];
@@ -305,12 +325,13 @@ export default function Orders() {
         setError(result.error || "Failed to fetch orders");
       }
     } catch (err) {
+      if (requestId !== latestFetch.current) return;
       setError("An error occurred while fetching orders");
       console.error(err);
     } finally {
-      setIsLoading(false);
+      if (requestId === latestFetch.current) setIsLoading(false);
     }
-  }, [statusFilter, page, getDateRange, paymentIssueOnly]);
+  }, [statusFilter, page, getDateRange, paymentIssueOnly, appliedSearch]);
 
   useEffect(() => {
     fetchOrders();
@@ -455,20 +476,6 @@ export default function Orders() {
   /** "#10001" for an order on this page; the full id only if it has no number. */
   const orderLabel = (id: string) =>
     formatOrderNumber(orders.find((o) => o.id === id)?.orderNumber) || id;
-
-  const filteredOrders = orders.filter((order) => {
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      return (
-        order.id.toLowerCase().includes(query) ||
-        matchesOrderNumber(query, order.orderNumber) ||
-        order.customerName.toLowerCase().includes(query) ||
-        order.customerEmail.toLowerCase().includes(query) ||
-        order.items?.some((item) => item.name.toLowerCase().includes(query))
-      );
-    }
-    return true;
-  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -732,6 +739,38 @@ export default function Orders() {
                   <AlertTriangle className='h-3.5 w-3.5' />
                   Payment Issues
                 </Button>
+                {isAdmin && (
+                  <OrdersExportMenu
+                    filtersActive={
+                      statusFilter !== "all" ||
+                      dateFilter !== "all" ||
+                      paymentIssueOnly ||
+                      appliedSearch !== ""
+                    }
+                    getFilters={(): OrdersExportFilters => {
+                      const { from, to } = getDateRange();
+                      return {
+                        status:
+                          statusFilter === "all"
+                            ? undefined
+                            : (statusFilter as OrdersExportFilters["status"]),
+                        dateFrom: from,
+                        dateTo: to,
+                        dateLabel:
+                          dateFilter === "today"
+                            ? "Today"
+                            : dateFilter === "yesterday"
+                              ? "Yesterday"
+                              : dateFilter === "custom"
+                                ? customDate
+                                : undefined,
+                        paymentIssueOnly: paymentIssueOnly || undefined,
+                        // What the table shows, not the half-typed box text.
+                        search: appliedSearch || undefined,
+                      };
+                    }}
+                  />
+                )}
               </div>
             </div>
             {paymentIssueOnly && (
@@ -773,12 +812,12 @@ export default function Orders() {
                   Try Again
                 </Button>
               </div>
-            ) : filteredOrders.length === 0 ? (
+            ) : orders.length === 0 ? (
               <div className='text-center py-10'>
                 <Package className='mx-auto h-12 w-12 text-muted-foreground' />
                 <h3 className='mt-4 text-lg font-semibold'>No orders found</h3>
                 <p className='mt-2 text-muted-foreground'>
-                  {searchQuery || statusFilter !== "all"
+                  {appliedSearch || statusFilter !== "all"
                     ? "Try adjusting your filters"
                     : "When you receive orders, they'll appear here"}
                 </p>
@@ -804,7 +843,7 @@ export default function Orders() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredOrders.map((order) => (
+                      {orders.map((order) => (
                         <TableRow
                           key={order.id}
                           className={`hover:bg-muted/50 ${order.hasPaymentIssue ? "bg-red-50/60" : ""}`}>
@@ -892,7 +931,7 @@ export default function Orders() {
 
                 {/* Mobile card list */}
                 <div className='md:hidden block space-y-3'>
-                  {filteredOrders.map((order) => (
+                  {orders.map((order) => (
                     <div
                       key={order.id}
                       className={`rounded-lg border bg-card p-4 shadow-sm ${order.hasPaymentIssue ? "bg-red-50/60 border-red-200" : ""}`}>

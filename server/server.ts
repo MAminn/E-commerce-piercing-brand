@@ -43,6 +43,7 @@ import { startGa4PurchaseWorker } from "#root/backend/pixel-tracking/ga4-purchas
 import { db as createDb } from "#root/shared/database/drizzle/db.js";
 import { emailUnsubscribeApiPlugin } from "#root/backend/email-subscription/api.js";
 import { erpSyncApiPlugin } from "#root/backend/erp-sync/api.js";
+import { ordersExportApiPlugin } from "#root/backend/orders/export-orders/api.js";
 
 // Normalize env vars — Coolify sometimes injects a leading '=' into values
 function normalizeEnv(key: string): string {
@@ -396,6 +397,11 @@ async function buildServer() {
   // ERP_SYNC_TOKEN is set (>= 32 chars); see backend/erp-sync/api.ts.
   await instance.register(erpSyncApiPlugin, {
     prefix: "/api/erp/v1",
+  });
+
+  // Admin-only Excel export of orders (Orders page "Export" button). Read-only.
+  await instance.register(ordersExportApiPlugin, {
+    prefix: "/api/admin/orders",
   });
 
   // RFC 8058 one-click unsubscribe endpoint (mail clients POST here directly)
