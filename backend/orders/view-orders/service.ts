@@ -19,7 +19,11 @@ import {
 } from "drizzle-orm";
 import { Effect } from "effect";
 import { stripOrderItemMerchantFields } from "../merchant-fields";
-import { orderFilterConditions } from "./filters";
+import {
+  ORDER_SEARCH_MAX_LENGTH,
+  orderFilterConditions,
+  orderSearchCondition,
+} from "./filters";
 import { z } from "zod";
 import type { ClientSession } from "#root/backend/auth/shared/entities";
 import { ServerError } from "#root/shared/error/server";
@@ -40,6 +44,12 @@ export const viewOrdersSchema = z.object({
    * anything already in that state, or a regression, immediately.
    */
   paymentIssueOnly: z.boolean().optional(),
+  /**
+   * The Orders page search box: order id/number, customer name or email,
+   * product name. Applied in the database, so `total`, `totalSales` and
+   * pagination count only the matching orders.
+   */
+  search: z.string().max(ORDER_SEARCH_MAX_LENGTH).optional(),
 });
 
 export const viewOrders = (
@@ -63,7 +73,8 @@ export const viewOrders = (
     // Admin can view all orders, users can view their own orders
     // No special authentication needed beyond session check
 
-    const { limit, offset, status, dateFrom, dateTo, paymentIssueOnly } = input;
+    const { limit, offset, status, dateFrom, dateTo, paymentIssueOnly, search } =
+      input;
     const isAdmin = session.role === "admin" || session.role === "superadmin";
 
     return yield* $(
@@ -75,6 +86,8 @@ export const viewOrders = (
             dateTo,
             paymentIssueOnly,
           });
+          const searchCondition = orderSearchCondition(search);
+          if (searchCondition) conditions.push(searchCondition);
 
           // Users (non-admins) only see their own orders
           if (!isAdmin) {

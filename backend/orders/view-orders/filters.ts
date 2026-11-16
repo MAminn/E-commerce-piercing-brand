@@ -70,27 +70,38 @@ function likeLiteral(text: string): string {
   return text.replace(/[\\%_]/g, (c) => `\\${c}`);
 }
 
+/** Upper bound on the search text, shared by order.view and the export. */
+export const ORDER_SEARCH_MAX_LENGTH = 200;
+
 /**
- * Server-side twin of the Orders page search box (which filters the loaded
- * page in the browser): order id, order number ("10001" / "#10001"), customer
+ * The Orders page search box, applied in the database so it covers every
+ * order, not just the loaded page. Used by the paginated list (`order.view`)
+ * and the Excel export, so the table, its count and the export always agree.
+ *
+ * Matches when the order id, order number ("10001" / "#10001"), customer
  * name, customer email or any line's product name contains the text,
- * case-insensitively. Returns undefined for an empty query.
+ * case-insensitively (English; Arabic has no case). Leading and trailing
+ * spaces are ignored. For the customer name, runs of spaces count as one on
+ * both sides, so "Mona  Ali" and "Mona Ali" find each other — the checkout
+ * has a single free-text "Full Name" field. Returns undefined for an empty
+ * or all-space query.
  */
 export function orderSearchCondition(rawQuery: string | undefined): SQL<unknown> | undefined {
   if (!rawQuery) return undefined;
-  const q = rawQuery.toLowerCase();
+  const q = rawQuery.trim().toLowerCase();
   if (q === "") return undefined;
 
   const pattern = `%${likeLiteral(q)}%`;
+  const namePattern = `%${likeLiteral(q.replace(/\s+/g, " "))}%`;
   const parts: SQL<unknown>[] = [
     sql`${order.id}::text ilike ${pattern}`,
-    sql`${order.customerName} ilike ${pattern}`,
+    sql`regexp_replace(${order.customerName}, ${"\\s+"}, ' ', 'g') ilike ${namePattern}`,
     sql`${order.customerEmail} ilike ${pattern}`,
     sql`exists (select 1 from ${orderItem} where ${orderItem.orderId} = ${order.id} and ${orderItem.name} ilike ${pattern})`,
   ];
 
   // Same rule as matchesOrderNumber(): trimmed, one leading "#" ignored.
-  const numberQuery = q.trim().replace(/^#/, "");
+  const numberQuery = q.replace(/^#/, "");
   if (numberQuery !== "") {
     parts.push(sql`${order.orderNumber}::text like ${`%${likeLiteral(numberQuery)}%`}`);
   }

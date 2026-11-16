@@ -12,7 +12,11 @@ import {
   user,
   webhookLog,
 } from "#root/shared/database/drizzle/schema";
-import { orderFilterConditions, orderSearchCondition } from "../view-orders/filters";
+import {
+  ORDER_SEARCH_MAX_LENGTH,
+  orderFilterConditions,
+  orderSearchCondition,
+} from "../view-orders/filters";
 import {
   EXPORT_TIME_ZONE,
   type ExportBundleRecord,
@@ -53,7 +57,7 @@ export const exportOrdersRequestSchema = z.object({
   dateTo: isoDateTime.optional(),
   paymentIssueOnly: z.boolean().optional(),
   /** The Orders page search box text. */
-  search: z.string().max(200).optional(),
+  search: z.string().max(ORDER_SEARCH_MAX_LENGTH).optional(),
   /** Label of the dashboard date filter ("Today", "2026-11-12"), shown on the Export Info sheet. */
   dateLabel: z.string().max(60).optional(),
 });

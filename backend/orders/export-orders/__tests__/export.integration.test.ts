@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { inArray, like, sql } from "drizzle-orm";
-import unzipper from "unzipper";
+import { readWorkbook } from "./read-workbook";
 
 /**
  * The admin Excel export against a real Postgres, read back from the .xlsx:
@@ -17,49 +17,6 @@ import unzipper from "unzipper";
  */
 const TEST_DB_URL = process.env.TEST_DATABASE_URL;
 const describeIfDb = TEST_DB_URL ? describe : describe.skip;
-
-type Row = Record<string, string | number>;
-
-const unescapeXml = (s: string) =>
-  s
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&amp;/g, "&");
-
-/** Minimal reader for the writer's own output: inline strings and numbers. */
-function parseSheet(xml: string): Row[] {
-  const rows: Array<Record<string, string | number>> = [];
-  for (const m of xml.matchAll(/<row r="(\d+)">(.*?)<\/row>/g)) {
-    const cells: Record<string, string | number> = {};
-    for (const c of m[2]!.matchAll(
-      /<c r="([A-Z]+)\d+"(?: s="\d+")?( t="inlineStr")?>(?:<v>(.*?)<\/v>|<is><t xml:space="preserve">(.*?)<\/t><\/is>)<\/c>/g,
-    )) {
-      cells[c[1]!] = c[2] ? unescapeXml(c[4] ?? "") : Number(c[3]);
-    }
-    rows.push(cells);
-  }
-  const [header, ...data] = rows;
-  return data.map((r) => {
-    const out: Row = {};
-    for (const [colRef, name] of Object.entries(header ?? {})) {
-      if (r[colRef] !== undefined) out[String(name)] = r[colRef]!;
-    }
-    return out;
-  });
-}
-
-async function readWorkbook(buf: Buffer) {
-  const dir = await unzipper.Open.buffer(buf);
-  const text = async (p: string) => (await dir.files.find((f) => f.path === p)!.buffer()).toString("utf8");
-  const workbook = await text("xl/workbook.xml");
-  const names = [...workbook.matchAll(/<sheet name="([^"]+)"/g)].map((m) => unescapeXml(m[1]!));
-  const sheets: Record<string, Row[]> = {};
-  for (let i = 0; i < names.length; i++) {
-    sheets[names[i]!] = parseSheet(await text(`xl/worksheets/sheet${i + 1}.xml`));
-  }
-  return { names, sheets };
-}
 
 describeIfDb("admin orders Excel export (integration)", () => {
   let db: ReturnType<typeof import("drizzle-orm/node-postgres").drizzle>;
@@ -299,12 +256,11 @@ describeIfDb("admin orders Excel export (integration)", () => {
       expect(exported).toContain(byStatus[status]);
     }
 
-    // Trailing space: matches the "<TAG>Customer <status>" names but not the shared "<TAG>customer@" email.
-    const { buf: searched } = await exportBuffer({ scope: "filtered", search: `${TAG}customer ` }, 2);
+    // Customer-name search: case-insensitive, surrounding spaces ignored. "<TAG>customer d" is in the
+    // "<TAG>Customer delivered" name only — not in the shared "<TAG>customer@" email.
+    const { buf: searched } = await exportBuffer({ scope: "filtered", search: `  ${TAG.toUpperCase()}CUSTOMER D  ` }, 2);
     const names = (await readWorkbook(searched)).sheets.Orders!.map((o) => String(o["Customer name"]));
-    expect(names.sort()).toEqual(
-      ["cancelled", "delivered", "processing", "shipped"].map((s) => `${TAG}Customer ${s}`).sort(),
-    );
+    expect(names).toEqual([`${TAG}Customer delivered`]);
     // Order-number search, "#" optional; item-name search.
     const pendingNumber = (await readWorkbook((await exportBuffer({ scope: "all" })).buf)).sheets.Orders!.find(
       (o) => o["Order ID"] === byStatus.pending,
