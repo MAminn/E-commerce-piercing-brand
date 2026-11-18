@@ -27,6 +27,7 @@ import { emailAutomationSettingsRouter } from "#root/backend/email-automations/s
 import { emailQueueRouter } from "#root/backend/email-automations/queue/trpc";
 import { typographyRouter } from "#root/backend/typography/trpc";
 import { shippingRouter } from "#root/backend/shipping/trpc";
+import { absTrackingRouter } from "#root/backend/shipping-tracking/abs/trpc";
 import { publicProcedure, router, t } from "./server";
 
 const authRouter = t.router({
@@ -66,6 +67,7 @@ export const appRouter = router({
   emailQueue: emailQueueRouter,
   typography: typographyRouter,
   shipping: shippingRouter,
+  absTracking: absTrackingRouter,
 });
 
 export type AppRouter = typeof appRouter;
