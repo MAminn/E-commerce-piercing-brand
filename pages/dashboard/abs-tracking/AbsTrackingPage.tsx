@@ -99,7 +99,7 @@ function NoteAction({
   const [busy, setBusy] = useState(false);
   if (!open) {
     return (
-      <Button size="sm" variant={variant} onClick={() => setOpen(true)} data-testid={`${testId}-open`}>
+      <Button size="sm" variant={variant} className="w-fit self-start" onClick={() => setOpen(true)} data-testid={`${testId}-open`}>
         {label}
       </Button>
     );
