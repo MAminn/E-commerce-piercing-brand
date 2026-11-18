@@ -1,5 +1,6 @@
 import {
   boolean,
+  check,
   decimal,
   index,
   integer,
@@ -1517,6 +1518,200 @@ export const ga4PurchaseOutbox = pgTable(
     uniqueIndex("ga4_purchase_outbox_order_id_idx").on(table.orderId),
     index("ga4_purchase_outbox_due_idx").on(table.status, table.nextAttemptAt),
   ],
+);
+
+// ─── ABS courier tracking (ABS_TRACKING_MODE) ───────────────────────────────
+//
+// See docs/ABS_TRACKING.md. Read-only mirror of ABS shipments, their links to
+// website orders and the shadow decisions the poller WOULD take. Written only
+// by backend/shipping-tracking/abs/** while ABS_TRACKING_MODE is shadow; in
+// the default `off` mode nothing reads or writes them. Status / state / role
+// / decision columns are plain text (values documented in
+// backend/shipping-tracking/abs/types.ts) so later phases never need an enum
+// migration.
+
+/** One row per ABS airway bill, last observed state. */
+export const absShipment = pgTable(
+  "abs_shipment",
+  {
+    awb: text("awb").primaryKey(),
+    reference: text("reference"),
+    /** DELIVERY | REVERSE | EXCHANGE | CASH_COLLECTION (as sent by ABS). */
+    cmpService: text("cmp_service"),
+    statusRaw: text("status_raw"),
+    /** Canonical status (normalize.ts); UNKNOWN when unrecognised. */
+    status: text("status").notNull(),
+    lastEventCode: text("last_event_code"),
+    lastReason: text("last_reason"),
+    cash: decimal("cash", { precision: 10, scale: 2 }),
+    collectedCash: decimal("collected_cash", { precision: 10, scale: 2 }),
+    absFees: decimal("abs_fees", { precision: 10, scale: 2 }),
+    totalFees: decimal("total_fees", { precision: 10, scale: 2 }),
+    isPaid: boolean("is_paid"),
+    paymentDate: timestamp("payment_date", { withTimezone: true, mode: "date" }),
+    deliveryDate: timestamp("delivery_date", { withTimezone: true, mode: "date" }),
+    absCreatedAt: timestamp("abs_created_at", { withTimezone: true, mode: "date" }),
+    /** National 10-digit mobile, no leading 0 (normalizeEgyptPhone). */
+    consigneePhoneNorm: text("consignee_phone_norm"),
+    consigneePhoneLast4: text("consignee_phone_last4"),
+    noOfPieces: integer("no_of_pieces"),
+    originAwb: text("origin_awb"),
+    /** Last row as returned by ABS (validated), for audit. */
+    raw: jsonb("raw").notNull(),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+    statusChangedAt: timestamp("status_changed_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("abs_shipment_status_idx").on(table.status),
+    index("abs_shipment_phone_idx").on(table.consigneePhoneNorm),
+  ],
+);
+
+/**
+ * Every distinct status an AWB was observed in. `occurred_at` is ABS's own
+ * time when known (history / delivery date), NULL for a plain poll
+ * observation; re-reads never duplicate (unique on awb + status +
+ * occurred_at, NULL counted as one value).
+ */
+export const absShipmentStatusHistory = pgTable(
+  "abs_shipment_status_history",
+  {
+    id: uuid("id")
+      .$defaultFn(() => v7())
+      .primaryKey(),
+    awb: text("awb")
+      .notNull()
+      .references(() => absShipment.awb, { onDelete: "cascade", onUpdate: "cascade" }),
+    status: text("status").notNull(),
+    statusRaw: text("status_raw"),
+    occurredAt: timestamp("occurred_at", { withTimezone: true, mode: "date" }),
+    observedAt: timestamp("observed_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+    /** poll | bulk | history */
+    source: text("source").notNull(),
+  },
+  (table) => [
+    uniqueIndex("abs_shipment_status_history_dedupe_idx").on(
+      table.awb,
+      table.status,
+      sql`coalesce(${table.occurredAt}, '1970-01-01 00:00:00+00'::timestamptz)`,
+    ),
+  ],
+);
+
+/**
+ * AWB → website order. One link per AWB. `confirmed` / `rejected` are human
+ * decisions (Phase 2) and are never overwritten by the matcher. At most one
+ * PRIMARY link in `auto|confirmed` per order. The FK lives on this new table
+ * only; `order` is not altered.
+ */
+export const absOrderLink = pgTable(
+  "abs_order_link",
+  {
+    id: uuid("id")
+      .$defaultFn(() => v7())
+      .primaryKey(),
+    awb: text("awb")
+      .notNull()
+      .references(() => absShipment.awb, { onDelete: "cascade", onUpdate: "cascade" }),
+    orderId: uuid("order_id").references(() => order.id, { onDelete: "set null" }),
+    /** primary | reverse | exchange | other */
+    linkRole: text("link_role").notNull(),
+    /** auto | needs_review | confirmed | rejected | unmatched */
+    state: text("state").notNull(),
+    /** reference | phone_amount | phone_amount_fuzzy | manual (NULL when unmatched) */
+    method: text("method"),
+    /** Why the matcher stopped where it did (cod_mismatch, multiple_candidates, …). */
+    reasonCode: text("reason_code"),
+    confidence: integer("confidence").notNull().default(0),
+    /** Ranked [{ orderId, orderNumber, score, reasons[] }] — no customer PII. */
+    candidates: jsonb("candidates").notNull().default([]),
+    decidedBy: text("decided_by"),
+    decidedAt: timestamp("decided_at", { withTimezone: true, mode: "date" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("abs_order_link_awb_idx").on(table.awb),
+    uniqueIndex("abs_order_link_primary_order_idx")
+      .on(table.orderId)
+      .where(sql`${table.linkRole} = 'primary' and ${table.state} in ('auto', 'confirmed')`),
+    index("abs_order_link_state_idx").on(table.state),
+    index("abs_order_link_order_idx").on(table.orderId),
+  ],
+);
+
+/**
+ * The shadow audit trail: what the poller WOULD do. One row per distinct
+ * (awb, shipment status, order status, decision) — re-polls only move
+ * seen_count / last_seen_at. `applied` is always false in Phase 1.
+ */
+export const absTrackingDecision = pgTable(
+  "abs_tracking_decision",
+  {
+    id: uuid("id")
+      .$defaultFn(() => v7())
+      .primaryKey(),
+    awb: text("awb")
+      .notNull()
+      .references(() => absShipment.awb, { onDelete: "cascade", onUpdate: "cascade" }),
+    orderId: uuid("order_id").references(() => order.id, { onDelete: "set null" }),
+    orderStatusSeen: text("order_status_seen"),
+    shipmentStatus: text("shipment_status").notNull(),
+    /** no_action | would_mark_shipped | would_mark_delivered | needs_return_confirmation | alert */
+    decision: text("decision").notNull(),
+    reasonCode: text("reason_code"),
+    details: jsonb("details"),
+    mode: text("mode").notNull(),
+    applied: boolean("applied").notNull().default(false),
+    dedupeKey: text("dedupe_key").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+    seenCount: integer("seen_count").notNull().default(1),
+  },
+  (table) => [
+    uniqueIndex("abs_tracking_decision_dedupe_idx").on(table.dedupeKey),
+    index("abs_tracking_decision_created_idx").on(table.createdAt),
+    index("abs_tracking_decision_awb_idx").on(table.awb),
+  ],
+);
+
+/** One row per poller tick (including skipped ones). */
+export const absSyncRun = pgTable(
+  "abs_sync_run",
+  {
+    id: uuid("id")
+      .$defaultFn(() => v7())
+      .primaryKey(),
+    startedAt: timestamp("started_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+    finishedAt: timestamp("finished_at", { withTimezone: true, mode: "date" }),
+    /** schedule | manual | backfill */
+    trigger: text("trigger").notNull(),
+    /** ok | partial | failed | skipped_locked | skipped_config — NULL while running (or interrupted). */
+    outcome: text("outcome"),
+    windowFrom: timestamp("window_from", { withTimezone: true, mode: "date" }),
+    windowTo: timestamp("window_to", { withTimezone: true, mode: "date" }),
+    pages: integer("pages").notNull().default(0),
+    shipmentsSeen: integer("shipments_seen").notNull().default(0),
+    shipmentsChanged: integer("shipments_changed").notNull().default(0),
+    linksAuto: integer("links_auto").notNull().default(0),
+    linksReview: integer("links_review").notNull().default(0),
+    decisionsNew: integer("decisions_new").notNull().default(0),
+    /** Redacted, ≤ 500 chars. */
+    error: text("error"),
+  },
+  (table) => [index("abs_sync_run_started_idx").on(table.startedAt)],
+);
+
+/** Single row (id = 1): end of the last fully successful poll window. */
+export const absSyncState = pgTable(
+  "abs_sync_state",
+  {
+    id: integer("id").primaryKey().default(1),
+    watermark: timestamp("watermark", { withTimezone: true, mode: "date" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [check("abs_sync_state_singleton", sql`${table.id} = 1`)],
 );
 
 // ─── Custom Tracking Events ─────────────────────────────────────────────────
