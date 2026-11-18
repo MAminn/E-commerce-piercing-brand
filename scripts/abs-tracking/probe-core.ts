@@ -15,6 +15,7 @@
  */
 import { ABS_LIST_COLUMNS, AbsApiError, createAbsClient, type AbsFetchLike, type FetchResponseLike } from "#root/backend/shipping-tracking/abs/client";
 import { canonicalStatus, orderNumbersInReference, parseAbsDate } from "#root/backend/shipping-tracking/abs/normalize";
+import { type ListEnvelope, unwrapListEnvelope } from "#root/backend/shipping-tracking/abs/parse";
 import { redact } from "#root/backend/shipping-tracking/abs/redact";
 import { parseAbsBaseUrl } from "#root/shared/config/abs-tracking";
 
@@ -82,16 +83,32 @@ export function checkProbeEnv(env: Record<string, string | undefined>): ProbeEnv
 // ─── Pure analysers (unit-tested) ───────────────────────────────────────────
 
 type Row = Record<string, unknown>;
-const rowsOf = (json: unknown): Row[] => {
-  const data = (json as { data?: unknown } | null)?.data;
-  return Array.isArray(data) ? (data.filter((r) => r && typeof r === "object") as Row[]) : [];
+/**
+ * A /shipments/list body read through the SAME envelope parser as the poller
+ * (real nested `{success, message, data:{data, hasMore, nextCursor}}` or the
+ * documented flat shape). `page` is the object that carries rows + paging.
+ */
+const listOf = (json: unknown): { env: ListEnvelope | null; page: Row } => {
+  try {
+    const env = unwrapListEnvelope(json);
+    const body = json as Row;
+    return { env, page: (env.shape === "nested" ? body.data : body) as Row };
+  } catch {
+    return { env: null, page: {} };
+  }
 };
+const rowsOf = (json: unknown): Row[] => (listOf(json).env?.rows ?? []).filter((r): r is Row => !!r && typeof r === "object");
 const awbOf = (r: Row): string | null => (typeof r.awb === "string" || typeof r.awb === "number" ? String(r.awb).trim() || null : null);
 export const last4 = (awb: string | null | undefined): string => (awb ? `…${String(awb).slice(-4)}` : "…????");
 
 export interface PageContract {
   contract: "cursor" | "page" | "single_page" | "unknown";
+  /** "nested" = the real ABS body, "flat" = the documented one, "invalid" = neither (the poller would refuse it). */
+  envelopeShape: "nested" | "flat" | "invalid";
+  /** Keys of the outer body (names only). */
   envelopeKeys: string[];
+  /** Keys of the page object inside a nested body (empty for the flat shape). */
+  pageKeys: string[];
   hasMoreField: boolean;
   nextCursorPresent: boolean;
   pageSizeHonoured: boolean | null;
@@ -102,16 +119,18 @@ export interface PageContract {
 
 /** How ABS paginates, from page 1 (and page 2 when it was fetched). */
 export function detectPageContract(page1: unknown, page2: unknown | null, limit: number, page2Via: "cursor" | "page" | null): PageContract {
-  const env = (page1 && typeof page1 === "object" ? page1 : {}) as Record<string, unknown>;
+  const parsed = listOf(page1);
+  const env = parsed.page;
   const r1 = rowsOf(page1);
   const r2 = page2 === null ? null : rowsOf(page2);
   const cursor = env.nextCursor;
   const nextCursorPresent = cursor !== null && cursor !== undefined && String(cursor) !== "";
   const hasMoreField = typeof env.hasMore === "boolean";
   let contract: PageContract["contract"] = "unknown";
-  if (nextCursorPresent) contract = "cursor";
+  // hasMore:false ends the window even when ABS still sends a cursor string (as the poller reads it).
+  if (hasMoreField && env.hasMore === false) contract = "single_page";
+  else if (nextCursorPresent) contract = "cursor";
   else if (hasMoreField && env.hasMore === true) contract = "page";
-  else if (hasMoreField && env.hasMore === false) contract = "single_page";
   if (page2Via) contract = page2Via;
   let overlap: number | null = null;
   if (r2) {
@@ -120,7 +139,9 @@ export function detectPageContract(page1: unknown, page2: unknown | null, limit:
   }
   return {
     contract,
-    envelopeKeys: Object.keys(env).sort(),
+    envelopeShape: parsed.env?.shape ?? "invalid",
+    envelopeKeys: parsed.env ? parsed.env.outerKeys : page1 && typeof page1 === "object" ? Object.keys(page1).sort() : [],
+    pageKeys: parsed.env?.pageKeys ?? [],
     hasMoreField,
     nextCursorPresent,
     pageSizeHonoured: r1.length === 0 ? null : r1.length <= limit && (r2 === null || r2.length <= limit),
@@ -349,9 +370,11 @@ export async function runAbsProbe(opts: ProbeOptions): Promise<ProbeReport> {
   if (!stopIfAborted(3, `Pagination contract (page size 5, last ${days} days)`)) {
     let page2Json: unknown | null = null;
     let via: "cursor" | "page" | null = null;
-    const env1 = (page1Json ?? {}) as { nextCursor?: unknown; hasMore?: unknown };
+    // Paging fields sit in the page object (one level down in the real nested body).
+    const env1 = listOf(page1Json).page as { nextCursor?: unknown; hasMore?: unknown };
     const statuses = p1?.status ? [p1.status] : [];
-    if (p1?.ok && (env1.hasMore === true || (env1.nextCursor !== null && env1.nextCursor !== undefined && env1.nextCursor !== ""))) {
+    // Page 2 only when ABS says there is more — the poller's rule, whatever nextCursor holds.
+    if (p1?.ok && env1.hasMore === true) {
       const cursor = env1.nextCursor !== null && env1.nextCursor !== undefined && env1.nextCursor !== "" ? String(env1.nextCursor) : null;
       via = cursor ? "cursor" : "page";
       const p2 = await attempt(() => client.listChangedShipments({ ...window(days), cursor, page: 2, limit: 5 }));
@@ -367,7 +390,7 @@ export async function runAbsProbe(opts: ProbeOptions): Promise<ProbeReport> {
       httpStatus: statuses,
       summary: !p1?.ok
         ? `page 1 failed (${p1?.status ?? "error"})`
-        : `contract=${contract.contract}; page size honoured=${contract.pageSizeHonoured ?? "n/a (no rows)"}; overlap between pages=${contract.overlapBetweenPages ?? "n/a"}`,
+        : `envelope=${contract.envelopeShape}; contract=${contract.contract}; page size honoured=${contract.pageSizeHonoured ?? "n/a (no rows)"}; overlap between pages=${contract.overlapBetweenPages ?? "n/a"}`,
       details: { ...contract },
     });
   }

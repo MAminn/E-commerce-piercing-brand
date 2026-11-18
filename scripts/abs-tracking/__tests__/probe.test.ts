@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 /**
@@ -194,6 +196,65 @@ describe("ABS probe — full run against a mocked ABS", () => {
     });
     const report = await run(abs.impl);
     expect(report.steps.find((s) => s.step === 9)?.details).toMatchObject({ http429: 1, retryAfter: ["2"] });
+  });
+});
+
+describe("ABS probe — the real /shipments/list contract (fixture)", () => {
+  /** Read directly (not via fixture-helpers, which would pull the matcher and schema into this graph). */
+  const fixtureRealContract = () =>
+    JSON.parse(readFileSync(path.join(__dirname, "../../../backend/shipping-tracking/abs/__tests__/fixtures/shipments-list-real-contract.json"), "utf8")) as {
+      httpStatus: number;
+      body: { success: boolean; message: string; data: { data: Array<Record<string, unknown>>; hasMore: boolean; nextCursor: string } };
+    };
+
+  /** HTTP 201, nested envelope, array phones, cmpService not a requestable column — as verified on 18 Nov 2026. */
+  const realAbs = (): Handler => {
+    const fx = fixtureRealContract();
+    return (req) => {
+      if (req.path === "/api/v1/shipments/list") {
+        const cols = (req.body.columns as string[]) ?? [];
+        const bad = cols.find((c) => c === "cmpService" || c === "percProbeUnknownColumn");
+        if (bad) return { status: 400, body: { success: false, message: `'${bad}' is not a valid shipment column` } };
+        const limit = Number(req.body.limit);
+        const page = { ...fx.body.data, data: fx.body.data.data.slice(0, limit) };
+        return { status: fx.httpStatus, body: { ...fx.body, data: page } };
+      }
+      if (req.path.endsWith("/history")) {
+        return { status: 200, body: { success: true, message: "ok", data: [{ status: "DELIVERED", displayStatus: "Delivered", datetime: "2026-11-17T15:20:00+02:00", inheritedFromAwb: null }] } };
+      }
+      if (req.path === "/api/v1/tracking/bulk") return { status: 201, body: { success: true, message: "ok", data: { found: [], notFound: [] } } };
+      return { status: 200, body: { success: true, message: "ok", data: { awb: "RCT0000001", status: "DELIVERED", customerPhone: "201000003001", shipmentHistory: [] } } };
+    };
+  };
+
+  it("reads the nested envelope through the poller's parser: rows, paging and statuses", async () => {
+    const abs = mockAbs(realAbs());
+    const report = await run(abs.impl);
+    expect(report.aborted).toBeNull();
+    const step = (n: number) => report.steps.find((s) => s.step === n) as (typeof report.steps)[number];
+    expect(step(1)).toMatchObject({ result: "PASS", httpStatus: [201] });
+    // Step 1 asks for a page of 5: the rows come out of data.data.
+    expect(step(1).summary).toMatch(/key accepted; 5 row\(s\)/);
+    // hasMore:false ends the window even though ABS sent a cursor string; no page 2 is requested.
+    expect(step(3)).toMatchObject({ result: "PASS", details: { envelopeShape: "nested", contract: "single_page", page2Rows: null } });
+    expect(step(3).details).toMatchObject({ envelopeKeys: ["data", "message", "success"], pageKeys: ["data", "hasMore", "nextCursor"] });
+    expect(step(3).summary).toMatch(/envelope=nested/);
+    // Every status is canonical (no UNKNOWN), and the probe never asks for cmpService.
+    expect(step(6).result).not.toBe("FAIL");
+    expect(step(6).details.unknownStatuses).toEqual([]);
+    for (const c of abs.calls.filter((x) => x.path === "/api/v1/shipments/list")) {
+      expect(c.body.columns as string[]).not.toContain("cmpService");
+    }
+    expect(step(7).details).toMatchObject({ rows: 8 });
+  });
+
+  it("the report holds no phone digits, names or full AWBs from the array-phone rows", async () => {
+    const report = await run(mockAbs(realAbs()).impl);
+    const text = JSON.stringify(report) + formatProbeSummary(report);
+    expect(text).not.toContain(KEY);
+    expect(text).not.toMatch(/2010000030\d\d|10000030\d\d|Fake Consignee/);
+    expect(text).not.toMatch(/RCT000000\d/);
+    expect(dbTouched).toEqual([]);
   });
 });
 
