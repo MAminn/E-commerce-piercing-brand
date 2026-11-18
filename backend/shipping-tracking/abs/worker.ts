@@ -9,7 +9,17 @@ import { loadCandidateOrders, matchShipment } from "./matcher";
 import type { ParsedListPage } from "./parse";
 import { redact } from "./redact";
 import { decide, decisionDedupeKey } from "./rules";
-import { createDbStore, createDryRunStore, type AbsStore, type ExistingLink, type PlannedWrite, type RunCounters, type RunOutcome, type RunTrigger } from "./store";
+import {
+  createDbStore,
+  createDryRunStore,
+  type AbsStore,
+  type ExistingLink,
+  type PlannedWrite,
+  type RunCounters,
+  type RunOutcome,
+  type RunTrigger,
+  type StoredShipment,
+} from "./store";
 import type { CanonicalStatus, NormalizedShipment } from "./types";
 
 /**
@@ -20,13 +30,18 @@ import type { CanonicalStatus, NormalizedShipment } from "./types";
  *   3. page through /shipments/list (≤ 100 per page, ≤ 50 pages);
  *   4. per shipment: upsert abs_shipment, append history, (re)match the link
  *      unless it is auto/confirmed/rejected, record the shadow decision;
- *   5. advance the watermark ONLY after a fully successful run.
+ *   5. recompute decisions that changed without an ABS change: links a human
+ *      changed on the review screen, and linked AWBs whose order status or
+ *      total changed on the website (read-only on "order");
+ *   6. advance the watermark ONLY after a fully successful run.
  * Every write goes to an abs_* table; the order is only read. A tick never
  * throws: errors are redacted into abs_sync_run.error.
  */
 
 export const ABS_TICK_LOCK_KEY = 7_310_420_001;
 export const MAX_PAGES_PER_TICK = 50;
+/** AWBs recomputed per tick (human link changes first, then stale decisions). */
+export const RECOMPUTE_PER_TICK = 200;
 const PAGE_LIMIT = 100;
 const DELIVERED_FAMILY: ReadonlySet<CanonicalStatus> = new Set(["DELIVERED", "PARTIALLY_DELIVERED", "DELIVERY_REVERTED"]);
 
@@ -67,8 +82,56 @@ export interface AbsTickReport extends RunCounters {
   windowTo: Date | null;
   rowsSkipped: number;
   linksUnmatched: number;
+  /** Decisions recomputed from stored shipments (step 5). */
+  recomputed: number;
   error: string | null;
   planned: PlannedWrite[];
+}
+
+/**
+ * Decide and record ONE AWB's shadow decision. Used by the page loop and by
+ * the recompute pass, so both produce identical rows. Reads the linked order
+ * (SELECT only); writes abs_tracking_decision only.
+ */
+export async function recordDecision(st: AbsStore, codToleranceEgp: number, s: StoredShipment, link: ExistingLink | null, at: Date): Promise<boolean> {
+  const usable = link && (link.state === "auto" || link.state === "confirmed") && link.orderId;
+  const orders = usable ? await st.readOrders([link?.orderId as string]) : new Map();
+  const o = usable ? orders.get(link?.orderId as string) : undefined;
+  const verdict = decide({
+    orderStatus: o?.status ?? null,
+    shipment: { status: s.status, cash: s.cash, collectedCash: s.collectedCash },
+    link: link ? { state: link.state, role: link.role, reasonCode: link.reasonCode } : null,
+    orderTotal: o?.total ?? null,
+    expectedCod: o?.expectedCod ?? null,
+    codToleranceEgp,
+  });
+  return await st.upsertDecision(
+    {
+      awb: s.awb,
+      orderId: o?.id ?? null,
+      orderStatusSeen: o?.status ?? null,
+      shipmentStatus: s.status,
+      decision: verdict.decision,
+      reasonCode: verdict.reasonCode,
+      dedupeKey: decisionDedupeKey(s.awb, s.status, o?.status ?? null, verdict.decision),
+      orderTotal: o?.total ?? null,
+      absDeliveryDate: s.deliveryDate,
+      details: {
+        orderNumber: o?.orderNumber ?? null,
+        linkState: link?.state ?? null,
+        linkRole: link?.role ?? null,
+        linkMethod: link?.method ?? null,
+        linkReason: link?.reasonCode ?? null,
+        statusRaw: s.statusRaw,
+        lastEventCode: s.lastEventCode,
+        cash: s.cash,
+        collectedCash: s.collectedCash,
+        expectedCod: o?.expectedCod ?? null,
+        phoneLast4: s.consigneePhoneLast4,
+      },
+    },
+    at,
+  );
 }
 
 /** Session-level advisory lock held on its own pooled connection for the whole tick. */
@@ -124,6 +187,7 @@ export async function runAbsTrackingTick(deps: AbsTickDeps): Promise<AbsTickRepo
     windowTo: null,
     rowsSkipped: 0,
     linksUnmatched: 0,
+    recomputed: 0,
     error: null,
     planned: [],
   };
@@ -208,6 +272,9 @@ export async function runAbsTrackingTick(deps: AbsTickDeps): Promise<AbsTickRepo
         }
       }
 
+      // Step 5 runs even when ABS failed: it only needs stored data.
+      if (!deps.shouldStop?.()) shipmentErrors += await recomputeDecisions(store, deps, now, log, scrub);
+
       if (outcome === "ok" && shipmentErrors > 0) {
         outcome = "partial";
         error = `${shipmentErrors} shipment(s) failed to process; watermark kept`;
@@ -256,12 +323,14 @@ export async function runAbsTrackingTick(deps: AbsTickDeps): Promise<AbsTickRepo
 
         let link: ExistingLink | null = links.get(s.awb) ?? null;
         if (!link || link.state === "unmatched" || link.state === "needs_review") {
-          const candidates = await loadCandidateOrders(d.db, s, { windowDays: d.config.matchWindowDays, observedAt: at });
-          const match = matchShipment(s, candidates, {
-            windowDays: d.config.matchWindowDays,
-            codToleranceEgp: d.config.codToleranceEgp,
-            observedAt: at,
-          });
+          const windows = { windowDays: d.config.matchWindowDays, reverseWindowDays: d.config.reverseWindowDays, observedAt: at };
+          const candidates = await loadCandidateOrders(d.db, s, windows);
+          let match = matchShipment(s, candidates, { ...windows, codToleranceEgp: d.config.codToleranceEgp });
+          // Once a human has touched this AWB (unlink sends it back to review),
+          // the matcher may only PROPOSE again — never auto-link it.
+          if (link?.decidedBy && match.state === "auto") {
+            match = { ...match, state: "needs_review", orderId: null, reasonCode: "previously_unlinked", confidence: Math.min(match.confidence, 60) };
+          }
           const before = link?.state ?? null;
           link = await st.upsertLink(s.awb, match, at);
           if (link.state === "auto" && before !== "auto") counters.linksAuto++;
@@ -269,51 +338,36 @@ export async function runAbsTrackingTick(deps: AbsTickDeps): Promise<AbsTickRepo
           if (link.state === "unmatched") report.linksUnmatched++;
         }
 
-        const usable = link && (link.state === "auto" || link.state === "confirmed") && link.orderId;
-        const orders = usable ? await st.readOrders([link?.orderId as string]) : new Map();
-        const o = usable ? orders.get(link?.orderId as string) : undefined;
-        const verdict = decide({
-          orderStatus: o?.status ?? null,
-          shipment: { status: s.status, cash: s.cash, collectedCash: s.collectedCash },
-          link: link ? { state: link.state, role: link.role, reasonCode: link.reasonCode } : null,
-          orderTotal: o?.total ?? null,
-          expectedCod: o?.expectedCod ?? null,
-          codToleranceEgp: d.config.codToleranceEgp,
-        });
-        const inserted = await st.upsertDecision(
-          {
-            awb: s.awb,
-            orderId: o?.id ?? null,
-            orderStatusSeen: o?.status ?? null,
-            shipmentStatus: s.status,
-            decision: verdict.decision,
-            reasonCode: verdict.reasonCode,
-            dedupeKey: decisionDedupeKey(s.awb, s.status, o?.status ?? null, verdict.decision),
-            orderTotal: o?.total ?? null,
-            absDeliveryDate: s.deliveryDate,
-            details: {
-              orderNumber: o?.orderNumber ?? null,
-              linkState: link?.state ?? null,
-              linkRole: link?.role ?? null,
-              linkMethod: link?.method ?? null,
-              linkReason: link?.reasonCode ?? null,
-              statusRaw: s.statusRaw,
-              lastEventCode: s.lastEventCode,
-              cash: s.cash,
-              collectedCash: s.collectedCash,
-              expectedCod: o?.expectedCod ?? null,
-              phoneLast4: s.consigneePhoneLast4,
-            },
-          },
-          at,
-        );
-        if (inserted) counters.decisionsNew++;
+        if (await recordDecision(st, d.config.codToleranceEgp, s, link, at)) counters.decisionsNew++;
       } catch (err) {
         errors++;
-        logLine(`[ABS tracking] shipment ${s.awb} failed: ${redactFn(err)}`);
+        logLine(`[ABS tracking] shipment …${s.awb.slice(-4)} failed: ${redactFn(err)}`);
       }
     }
     return { errors, stopped: false };
+  }
+
+  /** Step 5. Returns the number of AWBs that failed. */
+  async function recomputeDecisions(st: AbsStore, d: AbsTickDeps, clock: () => Date, logLine: (m: string) => void, redactFn: (v: unknown) => string): Promise<number> {
+    let errors = 0;
+    const items = await st.listRecompute(RECOMPUTE_PER_TICK);
+    if (items.length === 0) return 0;
+    const awbs = items.map((i) => i.awb);
+    const stored = await st.loadStoredShipments(awbs);
+    const { links } = await st.loadExisting(awbs);
+    for (const item of items) {
+      if (d.shouldStop?.()) break;
+      try {
+        const s = stored.get(item.awb);
+        if (s && (await recordDecision(st, d.config.codToleranceEgp, s, links.get(item.awb) ?? null, clock()))) counters.decisionsNew++;
+        if (item.flaggedAt) await st.clearRecompute(item.awb, item.flaggedAt);
+        report.recomputed++;
+      } catch (err) {
+        errors++;
+        logLine(`[ABS tracking] recompute ${item.awb.slice(-4)} failed: ${redactFn(err)}`);
+      }
+    }
+    return errors;
   }
 }
 

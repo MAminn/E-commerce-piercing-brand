@@ -46,6 +46,12 @@ export interface MatchResult {
 
 export interface MatchOptions {
   windowDays: number;
+  /**
+   * Window for REVERSE / EXCHANGE / other shipments (ABS_REVERSE_WINDOW_DAYS,
+   * default 45): a return can come weeks after delivery. Exact phone only,
+   * always needs_review. Falls back to windowDays when not given.
+   */
+  reverseWindowDays?: number;
   codToleranceEgp: number;
   /** Fallback anchor when ABS sent no createdAt (the time we first saw the AWB). */
   observedAt: Date;
@@ -71,9 +77,13 @@ export function isFuzzyPhoneMatch(a: string | null, b: string | null): boolean {
   return true;
 }
 
-export function matchWindow(shipment: Pick<NormalizedShipment, "absCreatedAt">, opts: Pick<MatchOptions, "windowDays" | "observedAt">) {
+export function matchWindow(
+  shipment: Pick<NormalizedShipment, "absCreatedAt"> & Partial<Pick<NormalizedShipment, "cmpService">>,
+  opts: Pick<MatchOptions, "windowDays" | "observedAt" | "reverseWindowDays">,
+) {
   const anchor = shipment.absCreatedAt ?? opts.observedAt;
-  return { from: new Date(anchor.getTime() - opts.windowDays * DAY_MS), to: new Date(anchor.getTime() + DAY_MS) };
+  const days = roleForService(shipment.cmpService) === "primary" ? opts.windowDays : (opts.reverseWindowDays ?? opts.windowDays);
+  return { from: new Date(anchor.getTime() - days * DAY_MS), to: new Date(anchor.getTime() + DAY_MS) };
 }
 
 function rank(list: Array<RankedCandidate>): RankedCandidate[] {
@@ -204,7 +214,7 @@ export function expectedCodFor(row: { total: string | number; paymentMethod: str
 export async function loadCandidateOrders(
   db: DatabaseClient,
   shipment: NormalizedShipment,
-  opts: Pick<MatchOptions, "windowDays" | "observedAt">,
+  opts: Pick<MatchOptions, "windowDays" | "observedAt" | "reverseWindowDays">,
 ): Promise<CandidateOrder[]> {
   const { from, to } = matchWindow(shipment, opts);
   const cols = {

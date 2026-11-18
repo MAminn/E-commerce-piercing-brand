@@ -20,6 +20,7 @@ import {
   BellRing,
   Type,
   Layers,
+  Truck,
 } from "lucide-react";
 
 import {
@@ -60,6 +61,7 @@ export function DashboardSidebar() {
     { label: "Categories", href: "/dashboard/categories", icon: LayoutGrid },
     { label: "Products", href: "/dashboard/products", icon: Package },
     { label: "Orders", href: "/dashboard/orders", icon: ShoppingCart },
+    { label: "ABS Tracking", href: "/dashboard/abs-tracking", icon: Truck },
     { label: "Promo Codes", href: "/dashboard/promo-codes", icon: TicketPercent },
     { label: "Offers", href: "/dashboard/offers", icon: Tag },
     { label: "Bundles & Stacks", href: "/dashboard/bundles", icon: Layers },

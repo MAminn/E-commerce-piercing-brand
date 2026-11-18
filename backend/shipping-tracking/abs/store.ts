@@ -1,4 +1,4 @@
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import type { DatabaseClient } from "#root/shared/database/drizzle/db";
 import {
   absOrderLink,
@@ -35,6 +35,24 @@ export interface ExistingLink {
   orderId: string | null;
   method: string | null;
   reasonCode: string | null;
+  /** Set once a human confirmed / rejected / linked / unlinked this AWB. */
+  decidedBy: string | null;
+}
+/** What the rule engine needs from a stored abs_shipment row (recompute pass). */
+export interface StoredShipment {
+  awb: string;
+  status: CanonicalStatus;
+  statusRaw: string | null;
+  lastEventCode: string | null;
+  cash: number | null;
+  collectedCash: number | null;
+  deliveryDate: Date | null;
+  consigneePhoneLast4: string | null;
+}
+export interface RecomputeItem {
+  awb: string;
+  /** recompute_requested_at as read (null = stale decision, not flagged). */
+  flaggedAt: Date | null;
 }
 export interface OrderSnapshot {
   id: string;
@@ -86,6 +104,16 @@ export interface AbsStore {
   /** True when a NEW decision row was created (false = seen_count bumped). */
   upsertDecision(row: DecisionRow, now: Date): Promise<boolean>;
   readOrders(ids: string[]): Promise<Map<string, OrderSnapshot>>;
+  /**
+   * AWBs whose decision must be recomputed without a change at ABS: links a
+   * human changed (recompute_requested_at), and linked AWBs whose latest
+   * decision saw a different website order status or total than the order
+   * has now. SELECT only (joins "order" read-only).
+   */
+  listRecompute(limit: number): Promise<RecomputeItem[]>;
+  loadStoredShipments(awbs: string[]): Promise<Map<string, StoredShipment>>;
+  /** Clears the flag only if nobody re-flagged the link since it was read. */
+  clearRecompute(awb: string, flaggedAt: Date): Promise<void>;
   planned(): PlannedWrite[];
 }
 
@@ -120,6 +148,7 @@ async function readCommon(db: DatabaseClient) {
           orderId: absOrderLink.orderId,
           method: absOrderLink.method,
           reasonCode: absOrderLink.reasonCode,
+          decidedBy: absOrderLink.decidedBy,
         })
         .from(absOrderLink)
         .where(inArray(absOrderLink.awb, awbs));
@@ -149,6 +178,52 @@ async function readCommon(db: DatabaseClient) {
           total: parseMoney(r.total) ?? 0,
           expectedCod: expectedCodFor(r),
         });
+      }
+      return out;
+    },
+    async listRecompute(limit: number): Promise<RecomputeItem[]> {
+      const flagged = await db
+        .select({ awb: absOrderLink.awb, flaggedAt: absOrderLink.recomputeRequestedAt })
+        .from(absOrderLink)
+        .where(isNotNull(absOrderLink.recomputeRequestedAt))
+        .orderBy(absOrderLink.recomputeRequestedAt)
+        .limit(limit);
+      const room = limit - flagged.length;
+      if (room <= 0) return flagged;
+      // Linked AWBs whose latest decision no longer matches the order (SELECT only).
+      const stale = (await db.execute(sql`
+        SELECT l.awb FROM abs_order_link l
+        JOIN "order" o ON o.id = l.order_id
+        JOIN LATERAL (
+          SELECT d.order_status_seen, d.order_total_at_decision FROM abs_tracking_decision d
+          WHERE d.awb = l.awb ORDER BY d.last_seen_at DESC, d.created_at DESC LIMIT 1
+        ) d ON true
+        WHERE l.state IN ('auto', 'confirmed') AND l.recompute_requested_at IS NULL
+          AND (d.order_status_seen IS DISTINCT FROM o.status::text
+               OR (d.order_total_at_decision IS NOT NULL AND d.order_total_at_decision <> o.total))
+        ORDER BY l.awb
+        LIMIT ${room}
+      `)) as unknown as { rows: Array<{ awb: string }> };
+      return [...flagged, ...stale.rows.map((r) => ({ awb: r.awb, flaggedAt: null }))];
+    },
+    async loadStoredShipments(awbs: string[]): Promise<Map<string, StoredShipment>> {
+      const out = new Map<string, StoredShipment>();
+      if (awbs.length === 0) return out;
+      const rows = await db
+        .select({
+          awb: absShipment.awb,
+          status: absShipment.status,
+          statusRaw: absShipment.statusRaw,
+          lastEventCode: absShipment.lastEventCode,
+          cash: absShipment.cash,
+          collectedCash: absShipment.collectedCash,
+          deliveryDate: absShipment.deliveryDate,
+          consigneePhoneLast4: absShipment.consigneePhoneLast4,
+        })
+        .from(absShipment)
+        .where(inArray(absShipment.awb, awbs));
+      for (const r of rows) {
+        out.set(r.awb, { ...r, status: r.status as CanonicalStatus, cash: parseMoney(r.cash), collectedCash: parseMoney(r.collectedCash) });
       }
       return out;
     },
@@ -212,6 +287,7 @@ export async function createDbStore(db: DatabaseClient): Promise<AbsStore> {
         orderId: absOrderLink.orderId,
         method: absOrderLink.method,
         reasonCode: absOrderLink.reasonCode,
+        decidedBy: absOrderLink.decidedBy,
       });
     const r = rows[0];
     return r ? { ...r, state: r.state as LinkState, role: r.role as LinkRole } : null;
@@ -284,6 +360,12 @@ export async function createDbStore(db: DatabaseClient): Promise<AbsStore> {
         .returning({ inserted: sql<boolean>`(xmax = 0)` });
       return res?.inserted === true;
     },
+    async clearRecompute(awb, flaggedAt) {
+      await db
+        .update(absOrderLink)
+        .set({ recomputeRequestedAt: null })
+        .where(and(eq(absOrderLink.awb, awb), lte(absOrderLink.recomputeRequestedAt, flaggedAt)));
+    },
     planned: () => [],
   };
 }
@@ -332,6 +414,7 @@ export async function createDryRunStore(db: DatabaseClient): Promise<AbsStore> {
         orderId: match.state === "auto" ? match.orderId : null,
         method: match.method,
         reasonCode: match.reasonCode,
+        decidedBy: current?.decidedBy ?? null,
       };
       pendingLinks.set(awb, link);
       plan.push({ table: "abs_order_link", op: "upsert", key: awb, summary: { state: link.state, role: link.role, method: link.method, reason: link.reasonCode, candidates: match.candidates.map((c) => c.orderNumber) } });
@@ -347,6 +430,9 @@ export async function createDryRunStore(db: DatabaseClient): Promise<AbsStore> {
       seenDecisionKeys.add(row.dedupeKey);
       plan.push({ table: "abs_tracking_decision", op: inserted ? "insert" : "update", key: row.dedupeKey, summary: { decision: row.decision, reason: row.reasonCode } });
       return inserted;
+    },
+    async clearRecompute(awb) {
+      plan.push({ table: "abs_order_link", op: "update", key: awb, summary: { recomputeRequestedAt: null } });
     },
     planned: () => plan,
   };

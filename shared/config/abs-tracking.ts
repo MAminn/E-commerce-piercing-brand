@@ -27,6 +27,11 @@ export const ABS_POLL_OVERLAP_DEFAULT_MS = 1_800_000;
 export const ABS_BACKFILL_FROM_DEFAULT = "2026-11-01";
 export const ABS_MATCH_WINDOW_DAYS_DEFAULT = 10;
 export const ABS_COD_TOLERANCE_EGP_DEFAULT = 1;
+/** ABS is the only courier for orders placed on/after this Cairo date (owner decision, 18 Nov 2026). */
+export const ABS_ONLY_SINCE_DEFAULT = "2026-11-18";
+export const ABS_MISSING_AWB_ALERT_DAYS_DEFAULT = 2;
+/** Candidate window for REVERSE / EXCHANGE shipments (suggestions only, never auto). */
+export const ABS_REVERSE_WINDOW_DAYS_DEFAULT = 45;
 
 export interface AbsTrackingConfig {
   requestedMode: AbsTrackingRequestedMode;
@@ -41,6 +46,10 @@ export interface AbsTrackingConfig {
   backfillFrom: Date;
   matchWindowDays: number;
   codToleranceEgp: number;
+  /** Orders placed on/after this instant must have an ABS shipment (missing-AWB alert). */
+  absOnlySince: Date;
+  missingAwbAlertDays: number;
+  reverseWindowDays: number;
   /** Why the poller cannot start even though a mode was requested. */
   missing: string[];
   /** One-line notes for the boot log (never contain the key). */
@@ -87,8 +96,13 @@ function numberFrom(raw: string | undefined, fallback: number): number {
  * standard time); a full ISO timestamp WITH an offset is used as given.
  */
 export function parseBackfillFrom(raw: string | undefined): Date {
+  return parseCairoDate(raw, ABS_BACKFILL_FROM_DEFAULT);
+}
+
+/** Same rules as ABS_BACKFILL_FROM, with its own default. */
+export function parseCairoDate(raw: string | undefined, fallbackDay: string): Date {
   const v = (raw ?? "").trim();
-  const fallback = new Date(`${ABS_BACKFILL_FROM_DEFAULT}T00:00:00+02:00`);
+  const fallback = new Date(`${fallbackDay}T00:00:00+02:00`);
   if (!v) return fallback;
   if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
     const d = new Date(`${v}T00:00:00+02:00`);
@@ -135,6 +149,9 @@ export function readAbsTrackingConfig(env: Env = process.env): AbsTrackingConfig
     backfillFrom: parseBackfillFrom(env.ABS_BACKFILL_FROM),
     matchWindowDays: Math.max(1, intFrom(env.ABS_MATCH_WINDOW_DAYS, ABS_MATCH_WINDOW_DAYS_DEFAULT)),
     codToleranceEgp: numberFrom(env.ABS_COD_TOLERANCE_EGP, ABS_COD_TOLERANCE_EGP_DEFAULT),
+    absOnlySince: parseCairoDate(env.ABS_ONLY_SINCE, ABS_ONLY_SINCE_DEFAULT),
+    missingAwbAlertDays: intFrom(env.ABS_MISSING_AWB_ALERT_DAYS, ABS_MISSING_AWB_ALERT_DAYS_DEFAULT),
+    reverseWindowDays: Math.max(1, intFrom(env.ABS_REVERSE_WINDOW_DAYS, ABS_REVERSE_WINDOW_DAYS_DEFAULT)),
     missing,
     warnings,
   };
@@ -150,4 +167,23 @@ export function effectiveAbsTrackingMode(): AbsTrackingMode {
 /** Set by the boot readiness check only (and by tests). */
 export function setEffectiveAbsTrackingMode(mode: AbsTrackingMode): void {
   effective = mode;
+}
+
+/** What the boot check decided, for absTracking.overview (no secrets: reasons name env vars only). */
+export interface AbsTrackingBootStatus {
+  requestedMode: AbsTrackingRequestedMode;
+  effective: AbsTrackingMode;
+  /** Why the mode is off (null when running). */
+  reason: string | null;
+  /** Readiness result when it was checked (null when the mode was off before the check). */
+  ready: boolean | null;
+  missing: string[];
+  checkedAt: string;
+}
+let bootStatus: AbsTrackingBootStatus | null = null;
+export function setAbsTrackingBootStatus(status: AbsTrackingBootStatus | null): void {
+  bootStatus = status;
+}
+export function getAbsTrackingBootStatus(): AbsTrackingBootStatus | null {
+  return bootStatus;
 }

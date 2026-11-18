@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import type { DatabaseClient } from "#root/shared/database/drizzle/db";
 import {
   readAbsTrackingConfig,
+  setAbsTrackingBootStatus,
   setEffectiveAbsTrackingMode,
   type AbsTrackingConfig,
   type AbsTrackingMode,
@@ -93,8 +94,18 @@ export async function initAbsTracking(
 ): Promise<AbsTrackingInit> {
   const config = readAbsTrackingConfig(env);
   for (const w of config.warnings) log.warn(`[ABS tracking] ${w}`);
+  const publish = (effective: AbsTrackingMode, reason: string | null, readiness: AbsTrackingReadiness | null) =>
+    setAbsTrackingBootStatus({
+      requestedMode: config.requestedMode,
+      effective,
+      reason,
+      ready: readiness ? readiness.ready : null,
+      missing: readiness?.missing ?? [],
+      checkedAt: new Date().toISOString(),
+    });
   const off = (reason: string, readiness: AbsTrackingReadiness | null = null): AbsTrackingInit => {
     setEffectiveAbsTrackingMode("off");
+    publish("off", reason, readiness);
     log.info(`[ABS tracking] off (${reason})`);
     return { config, effective: "off", reason, readiness };
   };
@@ -103,6 +114,7 @@ export async function initAbsTracking(
   const readiness = await checkAbsTrackingReadiness(db);
   if (!readiness.ready) return off(`not ready: ${readiness.missing.join(", ")}`, readiness);
   setEffectiveAbsTrackingMode(config.mode);
+  publish(config.mode, null, readiness);
   log.info(`[ABS tracking] mode=${config.mode}`);
   return { config, effective: config.mode, reason: null, readiness };
 }
