@@ -132,6 +132,11 @@ export interface ListChangedShipmentsInput {
   cursor?: string | null;
   page?: number;
   limit?: number;
+  /**
+   * Explicit column list for THIS call (the probe). When given, a column ABS
+   * rejects is NOT dropped and retried: the error is returned as is.
+   */
+  columns?: readonly string[];
 }
 
 export interface AbsClient {
@@ -288,7 +293,7 @@ export function createAbsClient(opts: AbsClientOptions): AbsClient {
         lastChangeDateTo: toCairoIso(input.to),
         timezone: "Africa/Cairo",
         limit,
-        columns,
+        columns: input.columns ? [...input.columns] : columns,
         // Never an export job: this is an interactive read.
         isExport: false,
       };
@@ -299,7 +304,7 @@ export function createAbsClient(opts: AbsClientOptions): AbsClient {
         const json = await call("POST", "/api/v1/shipments/list", body);
         return parseListResponse(json, driftLog);
       } catch (err) {
-        const rejected = rejectedColumn(err, columns);
+        const rejected = input.columns ? null : rejectedColumn(err, columns);
         if (!rejected) throw err;
         columns = columns.filter((c) => c !== rejected);
         logOnce(`column:${rejected}`, `ABS rejected column "${rejected}"; requesting without it from now on`);

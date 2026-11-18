@@ -153,3 +153,5 @@ uploads/*
 
 # graphify
 graphify-out/
+# ABS tracking probe reports (redacted, but local only)
+scripts/abs-tracking/out/
