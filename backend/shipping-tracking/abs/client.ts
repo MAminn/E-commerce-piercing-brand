@@ -36,7 +36,13 @@ export const ABS_ALLOWED_ENDPOINTS = [
 const AWB_SEGMENT = /^[A-Za-z0-9_-]{1,64}$/;
 const RESERVED_SEGMENTS = new Set(["bulk", "history", "list"]);
 
-/** Columns requested from /shipments/list (an ABS-rejected column is dropped once). */
+/**
+ * Columns requested from /shipments/list (an ABS-rejected column is dropped once).
+ * `cmpService` is deliberately NOT requested: ABS rejects it as a column
+ * (HTTP 400 "'cmpService' is not a valid shipment column", 18 Nov 2026) but
+ * returns it in every row by default, and the parser still reads it
+ * (reverse / exchange detection).
+ */
 export const ABS_LIST_COLUMNS = [
   "awb",
   "reference",
@@ -57,7 +63,6 @@ export const ABS_LIST_COLUMNS = [
   "consigneeName",
   "noOfPieces",
   "originAwb",
-  "cmpService",
 ] as const;
 
 export type AbsErrorKind = "forbidden_endpoint" | "http" | "network" | "timeout" | "invalid_response";
