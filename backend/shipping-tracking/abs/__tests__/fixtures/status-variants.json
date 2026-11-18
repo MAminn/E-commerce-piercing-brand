@@ -1,0 +1,17 @@
+{
+  "_comment": "Fixture 8: enum vs display text vs event code → one canonical status. Each entry: [status, lastEventCode].",
+  "variants": {
+    "DELIVERED": [["DELIVERED", null], ["Delivered", null], ["delivered", "SHP_DLVD"], [null, "SHP_DLVD"], ["", "SHP_DLVD"], ["SHP_DLVD", null]],
+    "OUT_FOR_DELIVERY": [["OUT_FOR_DELIVERY", null], ["Out for Delivery", null], ["out-for-delivery", null]],
+    "RETURNED_TO_SHIPPER": [["RETURNED_TO_SHIPPER", null], ["Returned to shipper", null], [null, "SHP_RTN_SHPR"], ["Returned to Shipper", "SHP_RTN_SHPR"]],
+    "HOLD_DECISION": [["HOLD_DECISION", null], ["Hold Decision", null], [null, "SHP_HOLD"]],
+    "UNDELIVERED": [["UNDELIVERED", null], ["Undelivered", null], [null, "SHP_UNDLVD"]],
+    "PARTIALLY_DELIVERED": [["Delivered", "SHP_PRTL_DLVD"], ["DELIVERED", "SHP_PRTL_DLVD"], [null, "SHP_PRTL_DLVD"]],
+    "DELIVERY_REVERTED": [["DELIVERED", "SHP_DLVD_RVRT"], ["Delivered", "SHP_DLVD_RVRT"]],
+    "CANCELED": [["CANCELED", null], ["Cancelled", null], ["Canceled", null]],
+    "AWAITING_PICKUP": [["AWAITING_PICKUP", null], ["Awaiting Pickup", null]],
+    "AT_DESTINATION_BRANCH": [["AT_DESTINATION_BRANCH", null], ["At Destination Branch", null]],
+    "REOPERATE": [["REOPERATE", null], ["Re-operate", null], ["Reoperate", null]],
+    "UNKNOWN": [["Teleported", null], [null, null], ["", "SHP_SOMETHING_NEW"], ["UNKNOWN", null]]
+  }
+}

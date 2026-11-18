@@ -1,0 +1,19 @@
+{
+  "_comment": "SYNTHETIC website orders for the ABS fixtures. Fake names and phones (0100000xxxx); order numbers 9100001+ cannot collide with the real sequence (starts at 10001).",
+  "orders": [
+    { "key": "o1", "orderNumber": 9100001, "customerName": "Test Customer One", "customerPhone": "01000000101", "total": "450.00", "status": "shipped", "createdAt": "2026-11-03T10:00:00+02:00", "paymentMethod": "cod", "paymentStatus": "not_required" },
+    { "key": "o2", "orderNumber": 9100002, "customerName": "Test Customer Two", "customerPhone": "0100 000 0202", "total": "300.00", "status": "processing", "createdAt": "2026-11-04T10:00:00+02:00", "paymentMethod": "cod", "paymentStatus": "not_required" },
+    { "key": "o3", "orderNumber": 9100003, "customerName": "Test Customer Three", "customerPhone": "+20 100 000 0303", "total": "320.00", "status": "shipped", "createdAt": "2026-11-04T12:00:00+02:00", "paymentMethod": "cod", "paymentStatus": "not_required" },
+    { "key": "o4a", "orderNumber": 9100004, "customerName": "Test Customer Four", "customerPhone": "01000000404", "total": "250.00", "status": "pending", "createdAt": "2026-11-05T09:00:00+02:00", "paymentMethod": "cod", "paymentStatus": "not_required" },
+    { "key": "o4b", "orderNumber": 9100005, "customerName": "Test Customer Four", "customerPhone": "+201000000404", "total": "250.00", "status": "processing", "createdAt": "2026-11-06T09:00:00+02:00", "paymentMethod": "cod", "paymentStatus": "not_required" },
+    { "key": "o5", "orderNumber": 9100006, "customerName": "Test Customer Five", "customerPhone": "01000000505", "total": "600.00", "status": "delivered", "createdAt": "2026-11-02T10:00:00+02:00", "paymentMethod": "cod", "paymentStatus": "not_required" },
+    { "key": "o6", "orderNumber": 9100007, "customerName": "Test Customer Six", "customerPhone": "01000000606", "total": "410.00", "status": "shipped", "createdAt": "2026-11-05T10:00:00+02:00", "paymentMethod": "cod", "paymentStatus": "not_required" },
+    { "key": "o7", "orderNumber": 9100008, "customerName": "Test Customer Seven", "customerPhone": "01000000707", "total": "199.00", "status": "shipped", "createdAt": "2026-11-06T10:00:00+02:00", "paymentMethod": "cod", "paymentStatus": "not_required" },
+    { "key": "o9", "orderNumber": 9100009, "customerName": "Test Customer Nine", "customerPhone": "01000000909", "total": "275.00", "status": "processing", "createdAt": "2026-11-07T10:00:00+02:00", "paymentMethod": "cod", "paymentStatus": "not_required" },
+    { "key": "o10", "orderNumber": 9100010, "customerName": "Test Customer Ten", "customerPhone": "01000001010", "total": "520.00", "status": "processing", "createdAt": "2026-11-08T10:00:00+02:00", "paymentMethod": "cod", "paymentStatus": "not_required" },
+    { "key": "o11", "orderNumber": 9100011, "customerName": "Test Customer Eleven", "customerPhone": "01000001111", "total": "330.00", "status": "delivered", "createdAt": "2026-11-03T10:00:00+02:00", "paymentMethod": "cod", "paymentStatus": "not_required" },
+    { "key": "o12", "orderNumber": 9100012, "customerName": "Test Customer Twelve", "customerPhone": "01000001212", "total": "380.00", "status": "cancelled", "createdAt": "2026-11-08T10:00:00+02:00", "paymentMethod": "cod", "paymentStatus": "not_required" },
+    { "key": "o13", "orderNumber": 9100013, "customerName": "Test Customer Thirteen", "customerPhone": "01000001313", "total": "700.00", "status": "shipped", "createdAt": "2026-11-09T10:00:00+02:00", "paymentMethod": "paymob", "paymentStatus": "paid" },
+    { "key": "o14", "orderNumber": 9100014, "customerName": "Test Customer Fourteen", "customerPhone": "01000001414", "total": "320.00", "status": "shipped", "createdAt": "2026-11-09T11:00:00+02:00", "paymentMethod": "cod", "paymentStatus": "not_required" }
+  ]
+}

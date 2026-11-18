@@ -1,0 +1,20 @@
+{
+  "_comment": "Expected outcome per synthetic AWB (brief section 6 case numbers). linkOrder = the order key the AWB auto-links to (null = no link). candidates = order keys listed for review, in any order.",
+  "cases": [
+    { "case": "1 exact phone + amount, DELIVERED", "awb": "TST00001", "linkState": "auto", "method": "phone_amount", "linkOrder": "o1", "decision": "would_mark_delivered", "decisionReason": "delivered_amount_ok" },
+    { "case": "2 phone keyed with two shifted digits", "awb": "TST00002", "linkState": "needs_review", "method": "phone_amount_fuzzy", "linkReason": "fuzzy_phone", "candidates": ["o2"], "decision": "no_action", "decisionReason": "link_needs_review" },
+    { "case": "3 DELIVERED, order 320, collected 350 (linked by reference)", "awb": "TST00003", "linkState": "auto", "method": "reference", "linkOrder": "o3", "decision": "alert", "decisionReason": "cod_mismatch" },
+    { "case": "3b phone matches, COD 350 vs order 320, no reference (#10100-type)", "awb": "TST00014", "linkState": "needs_review", "method": "phone_amount", "linkReason": "cod_mismatch", "candidates": ["o14"], "decision": "no_action", "decisionReason": "link_needs_review" },
+    { "case": "4 same phone, two open orders, same amount", "awb": "TST00004", "linkState": "needs_review", "method": "phone_amount", "linkReason": "multiple_candidates", "candidates": ["o4a", "o4b"], "decision": "no_action", "decisionReason": "link_needs_review" },
+    { "case": "5a delivery shipment of the delivered order", "awb": "TST00005", "linkState": "auto", "method": "phone_amount", "linkOrder": "o5", "decision": "no_action", "decisionReason": "already_delivered" },
+    { "case": "5 REVERSE shipment for an already-delivered order", "awb": "TST00051", "linkState": "needs_review", "role": "reverse", "linkReason": "reverse_shipment", "candidates": ["o5"], "decision": "no_action", "decisionReason": "reverse_shipment" },
+    { "case": "6 RETURNED_TO_SHIPPER for a shipped order", "awb": "TST00006", "linkState": "auto", "method": "phone_amount", "linkOrder": "o6", "decision": "needs_return_confirmation", "decisionReason": "returned_to_shipper" },
+    { "case": "7 HOLD_DECISION", "awb": "TST00007", "linkState": "auto", "method": "phone_amount", "linkOrder": "o7", "decision": "alert", "decisionReason": "delivery_problem" },
+    { "case": "9 unknown status string", "awb": "TST00009", "status": "UNKNOWN", "linkState": "auto", "method": "phone_amount", "linkOrder": "o9", "decision": "alert", "decisionReason": "unknown_status" },
+    { "case": "10 reference with matching phone", "awb": "TST00010", "linkState": "auto", "method": "reference", "linkOrder": "o10", "decision": "would_mark_shipped", "decisionReason": "in_transit" },
+    { "case": "11 order already delivered, ABS DELIVERED again", "awb": "TST00011", "linkState": "auto", "method": "phone_amount", "linkOrder": "o11", "decision": "no_action", "decisionReason": "already_delivered" },
+    { "case": "12 order cancelled, ABS DELIVERED", "awb": "TST00012", "linkState": "auto", "method": "reference", "linkOrder": "o12", "decision": "alert", "decisionReason": "delivered_but_cancelled" },
+    { "case": "extra: online order already paid, COD 0, DELIVERED", "awb": "TST00013", "linkState": "auto", "method": "phone_amount", "linkOrder": "o13", "decision": "would_mark_delivered", "decisionReason": "delivered_amount_ok" },
+    { "case": "extra: no candidate at all, DELIVERED", "awb": "TST00099", "linkState": "unmatched", "linkReason": "no_candidate", "decision": "alert", "decisionReason": "unlinked_terminal" }
+  ]
+}
