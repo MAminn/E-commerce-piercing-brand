@@ -385,7 +385,7 @@ describeIfDb("ABS tracking Phase 1 (integration)", () => {
 
   // ── Partial failure ─────────────────────────────────────────────────────
 
-  it("a 500 on page 2 → partial, watermark unchanged; the next tick re-covers the same window", async () => {
+  it("a 500 on page 2 → partial, watermark unchanged; the next tick continues the same window from page 2 (resume point)", async () => {
     await resetAbs();
     const W = new Date("2026-11-15T10:00:00.000Z");
     await db.insert(schema.absSyncState).values({ id: 1, watermark: W });
@@ -401,14 +401,20 @@ describeIfDb("ABS tracking Phase 1 (integration)", () => {
     expect(failing.calls.filter((c) => c.body.cursor === "p2")).toHaveLength(3); // retried 3×
     const [s1] = await db.select().from(schema.absSyncState);
     expect(s1?.watermark?.toISOString()).toBe(W.toISOString());
+    expect(s1).toMatchObject({ resumeCursor: "p2", resumePage: 1 });
+    expect(s1?.resumeWindowFrom?.toISOString()).toBe(r1.windowFrom?.toISOString());
     const [run1] = await db.select().from(schema.absSyncRun).where(eq(schema.absSyncRun.outcome, "partial"));
     expect(run1?.error).toMatch(/http 500/);
 
-    const r2 = await tick(listFetch([page1, page2]).impl);
-    expect(r2).toMatchObject({ outcome: "ok", pages: 2, shipmentsSeen: 15 });
+    const resumed = listFetch([page2]);
+    const r2 = await tick(resumed.impl);
+    expect(r2).toMatchObject({ outcome: "ok", pages: 1, shipmentsSeen: 10 });
+    expect(resumed.calls[0]?.body.cursor).toBe("p2");
     expect(r2.windowFrom?.toISOString()).toBe(r1.windowFrom?.toISOString());
+    expect(r2.windowTo?.toISOString()).toBe(r1.windowTo?.toISOString());
     const [s2] = await db.select().from(schema.absSyncState);
     expect(s2?.watermark?.getTime()).toBe(r2.windowTo?.getTime());
+    expect(s2).toMatchObject({ resumeWindowFrom: null, resumeWindowTo: null, resumePage: null, resumeCursor: null });
     expect(await db.select().from(schema.absShipment)).toHaveLength(15);
   }, 60_000);
 
@@ -432,7 +438,96 @@ describeIfDb("ABS tracking Phase 1 (integration)", () => {
     const capped = await tick(null, { source: endless, maxPages: 2 });
     expect(capped).toMatchObject({ outcome: "partial", pages: 2 });
     expect(capped.error).toMatch(/page cap/);
-    expect(await db.select().from(schema.absSyncState)).toHaveLength(0);
+    // No watermark yet; the resume point says where the next tick continues.
+    const [st] = await db.select().from(schema.absSyncState);
+    expect(st).toMatchObject({ watermark: null, resumePage: 3, resumeCursor: null });
+  }, 60_000);
+
+  // ── Part D: gentle first production tick ───────────────────────────────
+
+  it("page-cap continuation: a large backfill is read across ticks without re-reading pages; the watermark moves only at the end", async () => {
+    await resetAbs();
+    const { parseListResponse } = await import("../parse");
+    const rows = parseListResponse(helpers.fixtureListResponse()).rows;
+    // 15 rows as 5 pages of 3 (page + hasMore contract).
+    const pageOf = (p: number) => ({ rows: rows.slice((p - 1) * 3, p * 3), skipped: 0, hasMore: p < 5, nextCursor: null });
+    const asked: Array<{ page?: number; from: string; to: string }> = [];
+    const source = {
+      listChangedShipments: async (i: { page?: number; from: Date; to: Date }) => {
+        asked.push({ page: i.page, from: i.from.toISOString(), to: i.to.toISOString() });
+        return pageOf(i.page ?? 1);
+      },
+    };
+    const t1 = await tick(null, { source, maxPages: 2 });
+    expect(t1).toMatchObject({ outcome: "partial", pages: 2, shipmentsSeen: 6 });
+    const t2 = await tick(null, { source, maxPages: 2 });
+    expect(t2).toMatchObject({ outcome: "partial", pages: 2, shipmentsSeen: 6 });
+    expect((await db.select().from(schema.absSyncState))[0]?.watermark).toBeNull();
+    const t3 = await tick(null, { source, maxPages: 2 });
+    expect(t3).toMatchObject({ outcome: "ok", pages: 1, shipmentsSeen: 3 });
+    expect(asked.map((a) => a.page)).toEqual([1, 2, 3, 4, 5]);
+    // The same window throughout, from the backfill date minus the overlap.
+    expect(new Set(asked.map((a) => `${a.from}|${a.to}`)).size).toBe(1);
+    expect(asked[0]?.from).toBe("2026-10-31T21:30:00.000Z");
+    const [st] = await db.select().from(schema.absSyncState);
+    expect(st?.watermark?.toISOString()).toBe(asked[0]?.to);
+    expect(st).toMatchObject({ resumePage: null, resumeWindowTo: null });
+    expect(await db.select().from(schema.absShipment)).toHaveLength(15);
+    // Next tick: a NEW window starting from the watermark − overlap.
+    asked.length = 0;
+    await tick(null, { source: { listChangedShipments: async (i: { page?: number; from: Date; to: Date }) => { asked.push({ page: i.page, from: i.from.toISOString(), to: i.to.toISOString() }); return { rows: [], skipped: 0, hasMore: false, nextCursor: null }; } } });
+    expect(asked[0]?.from).toBe(new Date((st?.watermark?.getTime() ?? 0) - 1_800_000).toISOString());
+  }, 60_000);
+
+  it("tick time budget: stops between pages, keeps the resume point, continues next tick", async () => {
+    await resetAbs();
+    const { parseListResponse } = await import("../parse");
+    const rows = parseListResponse(helpers.fixtureListResponse()).rows;
+    let clock = 0;
+    const source = {
+      listChangedShipments: async (i: { page?: number }) => {
+        clock += 40_000; // each page "takes" 40 s
+        const p = i.page ?? 1;
+        return { rows: rows.slice((p - 1) * 5, p * 5), skipped: 0, hasMore: p < 3, nextCursor: null };
+      },
+    };
+    const r = await tick(null, { source, tickTimeoutMs: 60_000, clockMs: () => clock });
+    expect(r).toMatchObject({ outcome: "partial", pages: 2 });
+    expect(r.error).toMatch(/time budget/);
+    expect((await db.select().from(schema.absSyncState))[0]).toMatchObject({ resumePage: 3 });
+    const r2 = await tick(null, { source, tickTimeoutMs: 60_000, clockMs: () => clock });
+    expect(r2).toMatchObject({ outcome: "ok", pages: 1 });
+  }, 60_000);
+
+  it("failure backoff: failed runs store an exponential backoff_until (≤ 1 h); scheduled ticks skip, manual ones do not", async () => {
+    await resetAbs();
+    const t0 = new Date("2026-11-20T10:00:00.000Z");
+    const fail = (at: Date, trigger: "schedule" | "manual" = "schedule") => tick(listFetch([{ status: 503 }]).impl, { now: () => at, trigger });
+    const r1 = await fail(t0);
+    expect(r1.outcome).toBe("failed");
+    expect(r1.backoffUntil?.toISOString()).toBe(new Date(t0.getTime() + 600_000).toISOString()); // 1st: 10 min
+    // Inside the backoff: skipped, no ABS call, no run row.
+    const spy = listFetch([helpers.fixtureListResponse()]);
+    const skipped = await tick(spy.impl, { now: () => new Date(t0.getTime() + 60_000) });
+    expect(skipped.outcome).toBe("skipped_backoff");
+    expect(spy.calls).toHaveLength(0);
+    expect(await db.select().from(schema.absSyncRun)).toHaveLength(1);
+    const t1 = new Date(t0.getTime() + 11 * 60_000);
+    const r2 = await fail(t1);
+    expect(r2.backoffUntil?.toISOString()).toBe(new Date(t1.getTime() + 1_200_000).toISOString()); // 2nd: 20 min
+    const t2 = new Date(t1.getTime() + 21 * 60_000);
+    const r3 = await fail(t2);
+    expect(r3.backoffUntil?.toISOString()).toBe(new Date(t2.getTime() + 2_400_000).toISOString()); // 3rd: 40 min
+    const t3 = new Date(t2.getTime() + 41 * 60_000);
+    const r4 = await fail(t3);
+    expect(r4.backoffUntil?.toISOString()).toBe(new Date(t3.getTime() + 3_600_000).toISOString()); // capped at 1 h
+    const [stored] = await db.select().from(schema.absSyncRun).where(eq(schema.absSyncRun.startedAt, t3));
+    expect(stored?.backoffUntil?.toISOString()).toBe(r4.backoffUntil?.toISOString());
+    // A person asking ignores the backoff; success ends it.
+    const manual = await tick(listFetch([helpers.fixtureListResponse()]).impl, { now: () => new Date(t3.getTime() + 60_000), trigger: "manual" });
+    expect(manual.outcome).toBe("ok");
+    const after = await tick(listFetch([helpers.fixtureListResponse()]).impl, { now: () => new Date(t3.getTime() + 120_000) });
+    expect(after.outcome).toBe("ok");
   }, 60_000);
 
   it("a failure on page 1 → failed, watermark unchanged", async () => {

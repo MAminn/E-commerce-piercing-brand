@@ -32,6 +32,14 @@ export const ABS_ONLY_SINCE_DEFAULT = "2026-11-18";
 export const ABS_MISSING_AWB_ALERT_DAYS_DEFAULT = 2;
 /** Candidate window for REVERSE / EXCHANGE shipments (suggestions only, never auto). */
 export const ABS_REVERSE_WINDOW_DAYS_DEFAULT = 45;
+/** Pages of 100 per tick; a bigger window continues on the next tick (gentle first production run). */
+export const ABS_MAX_PAGES_PER_TICK_DEFAULT = 20;
+export const ABS_MAX_PAGES_PER_TICK_LIMIT = 50;
+/** Total time budget of one tick (all ABS requests + processing). */
+export const ABS_TICK_TIMEOUT_DEFAULT_MS = 300_000;
+export const ABS_TICK_TIMEOUT_MIN_MS = 30_000;
+/** Failure backoff ceiling. */
+export const ABS_BACKOFF_MAX_MS = 3_600_000;
 
 export interface AbsTrackingConfig {
   requestedMode: AbsTrackingRequestedMode;
@@ -50,6 +58,8 @@ export interface AbsTrackingConfig {
   absOnlySince: Date;
   missingAwbAlertDays: number;
   reverseWindowDays: number;
+  maxPagesPerTick: number;
+  tickTimeoutMs: number;
   /** Why the poller cannot start even though a mode was requested. */
   missing: string[];
   /** One-line notes for the boot log (never contain the key). */
@@ -152,6 +162,8 @@ export function readAbsTrackingConfig(env: Env = process.env): AbsTrackingConfig
     absOnlySince: parseCairoDate(env.ABS_ONLY_SINCE, ABS_ONLY_SINCE_DEFAULT),
     missingAwbAlertDays: intFrom(env.ABS_MISSING_AWB_ALERT_DAYS, ABS_MISSING_AWB_ALERT_DAYS_DEFAULT),
     reverseWindowDays: Math.max(1, intFrom(env.ABS_REVERSE_WINDOW_DAYS, ABS_REVERSE_WINDOW_DAYS_DEFAULT)),
+    maxPagesPerTick: Math.min(ABS_MAX_PAGES_PER_TICK_LIMIT, Math.max(1, intFrom(env.ABS_MAX_PAGES_PER_TICK, ABS_MAX_PAGES_PER_TICK_DEFAULT))),
+    tickTimeoutMs: Math.max(ABS_TICK_TIMEOUT_MIN_MS, intFrom(env.ABS_TICK_TIMEOUT_MS, ABS_TICK_TIMEOUT_DEFAULT_MS)),
     missing,
     warnings,
   };

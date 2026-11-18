@@ -1,10 +1,12 @@
 import type { DatabaseClient } from "#root/shared/database/drizzle/db";
 import {
+  ABS_BACKOFF_MAX_MS,
   effectiveAbsTrackingMode,
   type AbsTrackingConfig,
   type AbsTrackingMode,
 } from "#root/shared/config/abs-tracking";
-import { createAbsClient, type AbsFetchLike, type ListChangedShipmentsInput } from "./client";
+
+import { AbsApiError, createAbsClient, type AbsFetchLike, type ListChangedShipmentsInput } from "./client";
 import { loadCandidateOrders, matchShipment } from "./matcher";
 import type { ParsedListPage } from "./parse";
 import { redact } from "./redact";
@@ -26,8 +28,12 @@ import type { CanonicalStatus, NormalizedShipment } from "./types";
  * ABS shadow poller. One tick:
  *   1. pg_try_advisory_lock on a dedicated connection (rolling deploys can
  *      briefly run two containers) — not acquired → `skipped_locked`;
- *   2. window = (watermark ?? ABS_BACKFILL_FROM) − overlap … now;
- *   3. page through /shipments/list (≤ 100 per page, ≤ 50 pages);
+ *   2. window = (watermark ?? ABS_BACKFILL_FROM) − overlap … now — or, when the
+ *      previous tick stopped at the page cap / time budget, the SAME window from
+ *      the stored resume point (abs_sync_state.resume_*);
+ *   3. page through /shipments/list (≤ 100 per page, ≤ ABS_MAX_PAGES_PER_TICK
+ *      pages, within ABS_TICK_TIMEOUT_MS), saving the resume point after every
+ *      page of a multi-page window;
  *   4. per shipment: upsert abs_shipment, append history, (re)match the link
  *      unless it is auto/confirmed/rejected, record the shadow decision;
  *   5. recompute decisions that changed without an ABS change: links a human
@@ -36,6 +42,11 @@ import type { CanonicalStatus, NormalizedShipment } from "./types";
  *   6. advance the watermark ONLY after a fully successful run.
  * Every write goes to an abs_* table; the order is only read. A tick never
  * throws: errors are redacted into abs_sync_run.error.
+ *
+ * A failed run stores backoff_until = finish + min(interval × 2^(n−1), 1 h)
+ * (n = consecutive failed runs; a 429 Retry-After is honoured if longer).
+ * Scheduled ticks skip until then (`skipped_backoff`, not stored); a manual
+ * "Check ABS now" ignores the backoff.
  */
 
 export const ABS_TICK_LOCK_KEY = 7_310_420_001;
@@ -72,6 +83,18 @@ export interface AbsTickDeps {
   acquireLock?: (db: DatabaseClient) => Promise<TickLock>;
   /** Injected into the default ABS client (tests). */
   clientOptions?: { sleep?: (ms: number) => Promise<void>; minGapMs?: number; timeoutMs?: number };
+  /** Total time budget for this tick (default config.tickTimeoutMs). */
+  tickTimeoutMs?: number;
+  /** Wall clock for the time budget (tests). */
+  clockMs?: () => number;
+}
+
+/** Exponential failure backoff: interval × 2^(n−1), at most 1 h; a longer Retry-After wins (also ≤ 1 h). */
+export function computeBackoffUntil(consecutiveFailures: number, finishedAt: Date, pollIntervalMs: number, retryAfterMs: number | null = null): Date {
+  const n = Math.max(1, consecutiveFailures);
+  const exp = Math.min(pollIntervalMs * 2 ** (n - 1), ABS_BACKOFF_MAX_MS);
+  const wait = Math.min(Math.max(exp, retryAfterMs ?? 0), ABS_BACKOFF_MAX_MS);
+  return new Date(finishedAt.getTime() + wait);
 }
 
 export interface AbsTickReport extends RunCounters {
@@ -84,6 +107,8 @@ export interface AbsTickReport extends RunCounters {
   linksUnmatched: number;
   /** Decisions recomputed from stored shipments (step 5). */
   recomputed: number;
+  /** Set when this run failed: scheduled ticks wait until then. */
+  backoffUntil?: Date | null;
   error: string | null;
   planned: PlannedWrite[];
 }
@@ -208,6 +233,16 @@ export async function runAbsTrackingTick(deps: AbsTickDeps): Promise<AbsTickRepo
       return finish(store);
     }
 
+    // Failure backoff: scheduled ticks wait; a person asking ("manual") does not.
+    if (deps.trigger !== "manual" && !deps.dryRun) {
+      const [latest] = await store.recentOutcomes(1);
+      if (latest?.outcome === "failed" && latest.backoffUntil && latest.backoffUntil.getTime() > now().getTime()) {
+        report.outcome = "skipped_backoff";
+        report.error = `backing off after failures until ${latest.backoffUntil.toISOString()}`;
+        return finish(store);
+      }
+    }
+
     const lock = await (deps.acquireLock ?? acquireAdvisoryLock)(deps.db);
     if (!lock.acquired) {
       report.outcome = "skipped_locked";
@@ -217,48 +252,63 @@ export async function runAbsTrackingTick(deps: AbsTickDeps): Promise<AbsTickRepo
 
     try {
       const watermark = await store.getWatermark();
+      const resume = deps.keepWatermark ? null : await store.getResume();
       report.trigger = deps.trigger === "manual" ? "manual" : watermark ? "schedule" : "backfill";
-      const to = now();
-      const from = new Date((watermark ?? deps.config.backfillFrom).getTime() - deps.config.overlapMs);
+      // Continue a window that hit the page cap / time budget, else start a new one.
+      const to = resume ? resume.to : now();
+      const from = resume ? resume.from : new Date((watermark ?? deps.config.backfillFrom).getTime() - deps.config.overlapMs);
       report.windowFrom = from;
       report.windowTo = to;
-      report.runId = await store.startRun(report.trigger, from, to, to);
+      report.runId = await store.startRun(report.trigger, from, to, now());
 
       let outcome: RunOutcome = "ok";
       let error: string | null = null;
-      let cursor: string | null = null;
-      let page = 1;
-      const maxPages = deps.maxPages ?? MAX_PAGES_PER_TICK;
+      let failure: unknown = null;
+      let cursor: string | null = resume?.cursor ?? null;
+      let page = resume?.page ?? 1;
+      const maxPages = deps.maxPages ?? deps.config.maxPagesPerTick ?? MAX_PAGES_PER_TICK;
+      const clockMs = deps.clockMs ?? Date.now;
+      const deadline = clockMs() + (deps.tickTimeoutMs ?? deps.config.tickTimeoutMs ?? Number.POSITIVE_INFINITY);
+      const overBudget = () => clockMs() >= deadline;
+      const pageDeps: AbsTickDeps = { ...deps, shouldStop: () => Boolean(deps.shouldStop?.()) || overBudget() };
+      const stopReason = () => (deps.shouldStop?.() ? "stopped (shutdown)" : "tick time budget reached; continuing next tick");
       let more = true;
       let shipmentErrors = 0;
 
       while (more) {
         if (counters.pages >= maxPages) {
           outcome = "partial";
-          error = `page cap reached (${maxPages} pages); watermark kept`;
+          error = `page cap reached (${maxPages} pages); continuing next tick`;
           break;
         }
-        if (deps.shouldStop?.()) {
+        if (pageDeps.shouldStop?.()) {
           outcome = "partial";
-          error = "stopped (shutdown)";
+          error = stopReason();
           break;
         }
         let res: ParsedListPage;
         try {
           res = await source.listChangedShipments({ from, to, cursor, page, limit: PAGE_LIMIT });
         } catch (err) {
+          failure = err;
           outcome = counters.pages > 0 ? "partial" : "failed";
           error = scrub(err);
+          // A resumed window whose cursor/page ABS now refuses (non-retryable 4xx): start the window again next time.
+          if (resume && counters.pages === 0 && err instanceof AbsApiError && err.status !== null && err.status >= 400 && err.status < 500 && err.status !== 429) {
+            if (!deps.keepWatermark) await store.clearResume();
+          }
           break;
         }
         counters.pages++;
         report.rowsSkipped += res.skipped;
 
+        // Shutdown may stop mid-page; the time budget only stops between pages (a fetched page is always processed).
         const result = await processPage(store, deps, res.rows, now, log, scrub);
         shipmentErrors += result.errors;
         if (result.stopped) {
+          // The page is re-read from the last saved resume point (idempotent).
           outcome = "partial";
-          error = "stopped (shutdown)";
+          error = stopReason();
           break;
         }
 
@@ -270,10 +320,13 @@ export async function runAbsTrackingTick(deps: AbsTickDeps): Promise<AbsTickRepo
           cursor = null;
           page++;
         }
+        // Multi-page window: remember where the next page starts, so a cap,
+        // time budget, failure or restart continues instead of starting over.
+        if (more && !deps.keepWatermark) await store.setResume({ from, to, page, cursor });
       }
 
       // Step 5 runs even when ABS failed: it only needs stored data.
-      if (!deps.shouldStop?.()) shipmentErrors += await recomputeDecisions(store, deps, now, log, scrub);
+      if (!pageDeps.shouldStop?.()) shipmentErrors += await recomputeDecisions(store, pageDeps, now, log, scrub);
 
       if (outcome === "ok" && shipmentErrors > 0) {
         outcome = "partial";
@@ -283,7 +336,19 @@ export async function runAbsTrackingTick(deps: AbsTickDeps): Promise<AbsTickRepo
       report.outcome = outcome;
       report.error = error;
       Object.assign(report, counters);
-      await store.finishRun(report.runId, outcome, counters, error, now());
+      let backoffUntil: Date | null = null;
+      if (outcome === "failed" && !deps.dryRun) {
+        const recent = await store.recentOutcomes(10);
+        let n = 1; // this run
+        for (const r of recent) {
+          if (r.outcome !== "failed") break;
+          n++;
+        }
+        const retryAfter = (failure as { retryAfterMs?: number | null } | null)?.retryAfterMs ?? null;
+        backoffUntil = computeBackoffUntil(n, now(), deps.config.pollIntervalMs, retryAfter);
+        report.backoffUntil = backoffUntil;
+      }
+      await store.finishRun(report.runId, outcome, counters, error, now(), backoffUntil);
     } finally {
       await lock.release();
     }
@@ -417,14 +482,15 @@ export function startAbsTrackingWorker(opts: StartAbsWorkerOptions): AbsTracking
       config: opts.config,
       fetchImpl: opts.fetchImpl,
       trigger: "schedule",
+      maxPages: opts.config.maxPagesPerTick,
       shouldStop: () => stopping,
       log: (m) => log.warn(m),
     });
     try {
       const report = await inFlight;
-      if (report.outcome !== lastOutcome || report.outcome !== "ok") {
+      if (report.outcome !== lastOutcome || (report.outcome !== "ok" && report.outcome !== "skipped_backoff")) {
         const summary = `outcome=${report.outcome} pages=${report.pages} seen=${report.shipmentsSeen} changed=${report.shipmentsChanged} auto=${report.linksAuto} review=${report.linksReview} newDecisions=${report.decisionsNew}`;
-        (report.outcome === "ok" || report.outcome === "skipped_locked" ? log.info : log.warn)(
+        (report.outcome === "ok" || report.outcome === "skipped_locked" || report.outcome === "skipped_backoff" ? log.info : log.warn)(
           `[ABS tracking] tick ${summary}${report.error ? ` error=${report.error}` : ""}`,
         );
       }

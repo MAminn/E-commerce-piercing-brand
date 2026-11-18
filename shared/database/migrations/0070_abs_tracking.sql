@@ -11,7 +11,20 @@
 --
 -- Rollback (documentation only, never run automatically):
 -- docs/ABS_TRACKING_ROLLBACK.sql
-CREATE TABLE "abs_order_link" (
+--
+-- Idempotent: CREATE … IF NOT EXISTS; an ADD CONSTRAINT re-run raises 42710
+-- (duplicate_object), which auto-migrate skips.
+--
+-- Locks (auto-migrate runs each statement on its own, autocommit):
+--   CREATE TABLE / CREATE INDEX — new, empty abs_* tables only.
+--   The two FOREIGN KEYs to "order"(id) (abs_order_link, abs_tracking_decision)
+--   take SHARE ROW EXCLUSIVE on "order" for the statement: reads of "order" go
+--   on, INSERT/UPDATE/DELETE on "order" wait. Validation scans the NEW, empty
+--   abs_* table, so each statement holds the lock for milliseconds regardless
+--   of the ~200 orders. lock_timeout 5 s: if a long transaction holds "order",
+--   the statement fails fast (logged; the file is retried on the next boot)
+--   instead of queueing checkout writes behind it.
+CREATE TABLE IF NOT EXISTS "abs_order_link" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"awb" text NOT NULL,
 	"order_id" uuid,
@@ -27,7 +40,7 @@ CREATE TABLE "abs_order_link" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "abs_shipment" (
+CREATE TABLE IF NOT EXISTS "abs_shipment" (
 	"awb" text PRIMARY KEY NOT NULL,
 	"reference" text,
 	"cmp_service" text,
@@ -53,7 +66,7 @@ CREATE TABLE "abs_shipment" (
 	"status_changed_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "abs_shipment_status_history" (
+CREATE TABLE IF NOT EXISTS "abs_shipment_status_history" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"awb" text NOT NULL,
 	"status" text NOT NULL,
@@ -63,7 +76,7 @@ CREATE TABLE "abs_shipment_status_history" (
 	"source" text NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "abs_sync_run" (
+CREATE TABLE IF NOT EXISTS "abs_sync_run" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"started_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"finished_at" timestamp with time zone,
@@ -80,14 +93,14 @@ CREATE TABLE "abs_sync_run" (
 	"error" text
 );
 --> statement-breakpoint
-CREATE TABLE "abs_sync_state" (
+CREATE TABLE IF NOT EXISTS "abs_sync_state" (
 	"id" integer PRIMARY KEY DEFAULT 1 NOT NULL,
 	"watermark" timestamp with time zone,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "abs_sync_state_singleton" CHECK ("abs_sync_state"."id" = 1)
 );
 --> statement-breakpoint
-CREATE TABLE "abs_tracking_decision" (
+CREATE TABLE IF NOT EXISTS "abs_tracking_decision" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"awb" text NOT NULL,
 	"order_id" uuid,
@@ -104,19 +117,21 @@ CREATE TABLE "abs_tracking_decision" (
 	"seen_count" integer DEFAULT 1 NOT NULL
 );
 --> statement-breakpoint
+SET lock_timeout = '5s';--> statement-breakpoint
 ALTER TABLE "abs_order_link" ADD CONSTRAINT "abs_order_link_awb_abs_shipment_awb_fk" FOREIGN KEY ("awb") REFERENCES "public"."abs_shipment"("awb") ON DELETE cascade ON UPDATE cascade;--> statement-breakpoint
 ALTER TABLE "abs_order_link" ADD CONSTRAINT "abs_order_link_order_id_order_id_fk" FOREIGN KEY ("order_id") REFERENCES "public"."order"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "abs_shipment_status_history" ADD CONSTRAINT "abs_shipment_status_history_awb_abs_shipment_awb_fk" FOREIGN KEY ("awb") REFERENCES "public"."abs_shipment"("awb") ON DELETE cascade ON UPDATE cascade;--> statement-breakpoint
 ALTER TABLE "abs_tracking_decision" ADD CONSTRAINT "abs_tracking_decision_awb_abs_shipment_awb_fk" FOREIGN KEY ("awb") REFERENCES "public"."abs_shipment"("awb") ON DELETE cascade ON UPDATE cascade;--> statement-breakpoint
 ALTER TABLE "abs_tracking_decision" ADD CONSTRAINT "abs_tracking_decision_order_id_order_id_fk" FOREIGN KEY ("order_id") REFERENCES "public"."order"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-CREATE UNIQUE INDEX "abs_order_link_awb_idx" ON "abs_order_link" USING btree ("awb");--> statement-breakpoint
-CREATE UNIQUE INDEX "abs_order_link_primary_order_idx" ON "abs_order_link" USING btree ("order_id") WHERE "abs_order_link"."link_role" = 'primary' and "abs_order_link"."state" in ('auto', 'confirmed');--> statement-breakpoint
-CREATE INDEX "abs_order_link_state_idx" ON "abs_order_link" USING btree ("state");--> statement-breakpoint
-CREATE INDEX "abs_order_link_order_idx" ON "abs_order_link" USING btree ("order_id");--> statement-breakpoint
-CREATE INDEX "abs_shipment_status_idx" ON "abs_shipment" USING btree ("status");--> statement-breakpoint
-CREATE INDEX "abs_shipment_phone_idx" ON "abs_shipment" USING btree ("consignee_phone_norm");--> statement-breakpoint
-CREATE UNIQUE INDEX "abs_shipment_status_history_dedupe_idx" ON "abs_shipment_status_history" USING btree ("awb","status",coalesce("occurred_at", '1970-01-01 00:00:00+00'::timestamptz));--> statement-breakpoint
-CREATE INDEX "abs_sync_run_started_idx" ON "abs_sync_run" USING btree ("started_at");--> statement-breakpoint
-CREATE UNIQUE INDEX "abs_tracking_decision_dedupe_idx" ON "abs_tracking_decision" USING btree ("dedupe_key");--> statement-breakpoint
-CREATE INDEX "abs_tracking_decision_created_idx" ON "abs_tracking_decision" USING btree ("created_at");--> statement-breakpoint
-CREATE INDEX "abs_tracking_decision_awb_idx" ON "abs_tracking_decision" USING btree ("awb");
+CREATE UNIQUE INDEX IF NOT EXISTS "abs_order_link_awb_idx" ON "abs_order_link" USING btree ("awb");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "abs_order_link_primary_order_idx" ON "abs_order_link" USING btree ("order_id") WHERE "abs_order_link"."link_role" = 'primary' and "abs_order_link"."state" in ('auto', 'confirmed');--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "abs_order_link_state_idx" ON "abs_order_link" USING btree ("state");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "abs_order_link_order_idx" ON "abs_order_link" USING btree ("order_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "abs_shipment_status_idx" ON "abs_shipment" USING btree ("status");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "abs_shipment_phone_idx" ON "abs_shipment" USING btree ("consignee_phone_norm");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "abs_shipment_status_history_dedupe_idx" ON "abs_shipment_status_history" USING btree ("awb","status",coalesce("occurred_at", '1970-01-01 00:00:00+00'::timestamptz));--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "abs_sync_run_started_idx" ON "abs_sync_run" USING btree ("started_at");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "abs_tracking_decision_dedupe_idx" ON "abs_tracking_decision" USING btree ("dedupe_key");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "abs_tracking_decision_created_idx" ON "abs_tracking_decision" USING btree ("created_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "abs_tracking_decision_awb_idx" ON "abs_tracking_decision" USING btree ("awb");--> statement-breakpoint
+RESET lock_timeout;

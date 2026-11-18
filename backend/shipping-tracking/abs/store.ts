@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull, lte, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import type { DatabaseClient } from "#root/shared/database/drizzle/db";
 import {
   absOrderLink,
@@ -21,7 +21,16 @@ import type { CanonicalStatus, DecisionKind, LinkRole, LinkState, NormalizedShip
  */
 
 export type RunTrigger = "schedule" | "manual" | "backfill";
-export type RunOutcome = "ok" | "partial" | "failed" | "skipped_locked" | "skipped_config";
+/** `skipped_backoff` is reported by a scheduled tick during a failure backoff; it is never stored. */
+export type RunOutcome = "ok" | "partial" | "failed" | "skipped_locked" | "skipped_config" | "skipped_backoff";
+
+/** Where a window that hit the page cap / time budget continues (abs_sync_state.resume_*). */
+export interface ResumePoint {
+  from: Date;
+  to: Date;
+  page: number;
+  cursor: string | null;
+}
 
 export interface ExistingShipment {
   awb: string;
@@ -92,9 +101,15 @@ export interface PlannedWrite {
 export interface AbsStore {
   readonly dryRun: boolean;
   getWatermark(): Promise<Date | null>;
+  /** Also clears any resume point: the window is complete. */
   setWatermark(at: Date): Promise<void>;
+  getResume(): Promise<ResumePoint | null>;
+  setResume(r: ResumePoint): Promise<void>;
+  clearResume(): Promise<void>;
+  /** Outcomes of the latest stored runs that were not skipped, newest first. */
+  recentOutcomes(limit: number): Promise<Array<{ outcome: string | null; backoffUntil: Date | null }>>;
   startRun(trigger: RunTrigger, windowFrom: Date | null, windowTo: Date | null, startedAt: Date): Promise<string>;
-  finishRun(id: string, outcome: RunOutcome, counters: RunCounters, error: string | null, finishedAt: Date): Promise<void>;
+  finishRun(id: string, outcome: RunOutcome, counters: RunCounters, error: string | null, finishedAt: Date, backoffUntil?: Date | null): Promise<void>;
   recordSkippedRun(trigger: RunTrigger, outcome: RunOutcome, error: string | null, at: Date): Promise<void>;
   loadExisting(awbs: string[]): Promise<{ shipments: Map<string, ExistingShipment>; links: Map<string, ExistingLink> }>;
   upsertShipment(s: NormalizedShipment, now: Date, statusChanged: boolean): Promise<void>;
@@ -130,6 +145,23 @@ async function readCommon(db: DatabaseClient) {
     async getWatermark(): Promise<Date | null> {
       const [row] = await db.select({ watermark: absSyncState.watermark }).from(absSyncState).where(eq(absSyncState.id, 1)).limit(1);
       return row?.watermark ?? null;
+    },
+    async getResume(): Promise<ResumePoint | null> {
+      const [row] = await db
+        .select({ from: absSyncState.resumeWindowFrom, to: absSyncState.resumeWindowTo, page: absSyncState.resumePage, cursor: absSyncState.resumeCursor })
+        .from(absSyncState)
+        .where(eq(absSyncState.id, 1))
+        .limit(1);
+      if (!row?.from || !row.to) return null;
+      return { from: row.from, to: row.to, page: row.page ?? 1, cursor: row.cursor ?? null };
+    },
+    async recentOutcomes(limit: number) {
+      return await db
+        .select({ outcome: absSyncRun.outcome, backoffUntil: absSyncRun.backoffUntil })
+        .from(absSyncRun)
+        .where(and(isNotNull(absSyncRun.outcome), sql`${absSyncRun.outcome} not like 'skipped%'`))
+        .orderBy(desc(absSyncRun.startedAt))
+        .limit(limit);
     },
     async loadExisting(awbs: string[]) {
       const shipments = new Map<string, ExistingShipment>();
@@ -297,10 +329,21 @@ export async function createDbStore(db: DatabaseClient): Promise<AbsStore> {
     dryRun: false,
     ...common,
     async setWatermark(at) {
+      const cleared = { resumeWindowFrom: null, resumeWindowTo: null, resumePage: null, resumeCursor: null };
       await db
         .insert(absSyncState)
-        .values({ id: 1, watermark: at, updatedAt: new Date() })
-        .onConflictDoUpdate({ target: absSyncState.id, set: { watermark: at, updatedAt: new Date() } });
+        .values({ id: 1, watermark: at, ...cleared, updatedAt: new Date() })
+        .onConflictDoUpdate({ target: absSyncState.id, set: { watermark: at, ...cleared, updatedAt: new Date() } });
+    },
+    async setResume(r) {
+      const values = { resumeWindowFrom: r.from, resumeWindowTo: r.to, resumePage: r.page, resumeCursor: r.cursor, updatedAt: new Date() };
+      await db.insert(absSyncState).values({ id: 1, ...values }).onConflictDoUpdate({ target: absSyncState.id, set: values });
+    },
+    async clearResume() {
+      await db
+        .update(absSyncState)
+        .set({ resumeWindowFrom: null, resumeWindowTo: null, resumePage: null, resumeCursor: null, updatedAt: new Date() })
+        .where(eq(absSyncState.id, 1));
     },
     async startRun(trigger, windowFrom, windowTo, startedAt) {
       const [row] = await db
@@ -309,10 +352,10 @@ export async function createDbStore(db: DatabaseClient): Promise<AbsStore> {
         .returning({ id: absSyncRun.id });
       return (row as { id: string }).id;
     },
-    async finishRun(id, outcome, counters, error, finishedAt) {
+    async finishRun(id, outcome, counters, error, finishedAt, backoffUntil = null) {
       await db
         .update(absSyncRun)
-        .set({ outcome, ...counters, error: error ? error.slice(0, 500) : null, finishedAt })
+        .set({ outcome, ...counters, error: error ? error.slice(0, 500) : null, finishedAt, backoffUntil })
         .where(eq(absSyncRun.id, id));
     },
     async recordSkippedRun(trigger, outcome, error, at) {
@@ -386,6 +429,12 @@ export async function createDryRunStore(db: DatabaseClient): Promise<AbsStore> {
     },
     async setWatermark(at) {
       plan.push({ table: "abs_sync_state", op: "upsert", key: "1", summary: { watermark: at.toISOString() } });
+    },
+    async setResume(r) {
+      plan.push({ table: "abs_sync_state", op: "upsert", key: "1", summary: { resumePage: r.page, resumeCursor: r.cursor ? "(cursor)" : null } });
+    },
+    async clearResume() {
+      plan.push({ table: "abs_sync_state", op: "update", key: "1", summary: { resume: null } });
     },
     async startRun(trigger, windowFrom, windowTo) {
       plan.push({ table: "abs_sync_run", op: "insert", key: "dry-run", summary: { trigger, windowFrom, windowTo } });
