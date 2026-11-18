@@ -289,6 +289,8 @@ export async function runAbsTrackingTick(deps: AbsTickDeps): Promise<AbsTickRepo
             decision: verdict.decision,
             reasonCode: verdict.reasonCode,
             dedupeKey: decisionDedupeKey(s.awb, s.status, o?.status ?? null, verdict.decision),
+            orderTotal: o?.total ?? null,
+            absDeliveryDate: s.deliveryDate,
             details: {
               orderNumber: o?.orderNumber ?? null,
               linkState: link?.state ?? null,

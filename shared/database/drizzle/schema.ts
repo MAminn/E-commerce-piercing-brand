@@ -1628,6 +1628,11 @@ export const absOrderLink = pgTable(
     candidates: jsonb("candidates").notNull().default([]),
     decidedBy: text("decided_by"),
     decidedAt: timestamp("decided_at", { withTimezone: true, mode: "date" }),
+    /**
+     * Set by a human link change (0071): the next tick recomputes this AWB's
+     * decision even if ABS reports no change for it, then clears it.
+     */
+    recomputeRequestedAt: timestamp("recompute_requested_at", { withTimezone: true, mode: "date" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
   },
@@ -1668,11 +1673,25 @@ export const absTrackingDecision = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
     seenCount: integer("seen_count").notNull().default(1),
+    /**
+     * Snapshot of what the decision was computed against (0071), refreshed on
+     * every sighting. Not used for writes in shadow mode; a future live
+     * writer compares-and-sets against these.
+     */
+    orderStatusAtDecision: text("order_status_at_decision"),
+    orderTotalAtDecision: decimal("order_total_at_decision", { precision: 10, scale: 2 }),
+    absDeliveryDate: timestamp("abs_delivery_date", { withTimezone: true, mode: "date" }),
+    /** Human acknowledgement (alerts / needs_return_confirmation only). */
+    acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true, mode: "date" }),
+    acknowledgedBy: text("acknowledged_by"),
+    ackNote: text("ack_note"),
   },
   (table) => [
     uniqueIndex("abs_tracking_decision_dedupe_idx").on(table.dedupeKey),
     index("abs_tracking_decision_created_idx").on(table.createdAt),
     index("abs_tracking_decision_awb_idx").on(table.awb),
+    index("abs_tracking_decision_awb_seen_idx").on(table.awb, table.lastSeenAt),
+    check("abs_tracking_decision_ack_note_len", sql`${table.ackNote} is null or char_length(${table.ackNote}) <= 500`),
   ],
 );
 
@@ -1699,8 +1718,10 @@ export const absSyncRun = pgTable(
     decisionsNew: integer("decisions_new").notNull().default(0),
     /** Redacted, ≤ 500 chars. */
     error: text("error"),
+    /** After a failed run (0071): scheduled ticks wait until then (exponential, ≤ 1 h; Retry-After honoured). */
+    backoffUntil: timestamp("backoff_until", { withTimezone: true, mode: "date" }),
   },
-  (table) => [index("abs_sync_run_started_idx").on(table.startedAt)],
+  (table) => [index("abs_sync_run_started_idx").on(table.startedAt), index("abs_sync_run_trigger_idx").on(table.trigger, table.startedAt)],
 );
 
 /** Single row (id = 1): end of the last fully successful poll window. */
@@ -1709,9 +1730,47 @@ export const absSyncState = pgTable(
   {
     id: integer("id").primaryKey().default(1),
     watermark: timestamp("watermark", { withTimezone: true, mode: "date" }),
+    /**
+     * Page-cap continuation (0071): a window that hit ABS_MAX_PAGES_PER_TICK
+     * is resumed by the next tick from here instead of being re-read from
+     * page 1. NULL when no window is in progress.
+     */
+    resumeWindowFrom: timestamp("resume_window_from", { withTimezone: true, mode: "date" }),
+    resumeWindowTo: timestamp("resume_window_to", { withTimezone: true, mode: "date" }),
+    resumePage: integer("resume_page"),
+    resumeCursor: text("resume_cursor"),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
   },
   (table) => [check("abs_sync_state_singleton", sql`${table.id} = 1`)],
+);
+
+/**
+ * One row per HUMAN action on the ABS review screen (0071), written in the
+ * same transaction as the change. No FK: the trail outlives the rows it
+ * describes. before / after hold link or decision state only (no PII).
+ */
+export const absAuditLog = pgTable(
+  "abs_audit_log",
+  {
+    id: uuid("id")
+      .$defaultFn(() => v7())
+      .primaryKey(),
+    at: timestamp("at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+    /** Admin email. */
+    actor: text("actor").notNull(),
+    /** link_confirm | link_reject | link_manual | link_unlink | alert_ack | poll_now */
+    action: text("action").notNull(),
+    awb: text("awb"),
+    orderId: uuid("order_id"),
+    before: jsonb("before"),
+    after: jsonb("after"),
+    note: text("note"),
+  },
+  (table) => [
+    index("abs_audit_log_at_idx").on(table.at),
+    index("abs_audit_log_awb_idx").on(table.awb),
+    index("abs_audit_log_order_idx").on(table.orderId),
+  ],
 );
 
 // ─── Custom Tracking Events ─────────────────────────────────────────────────

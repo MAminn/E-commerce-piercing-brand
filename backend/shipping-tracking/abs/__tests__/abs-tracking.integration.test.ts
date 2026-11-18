@@ -18,7 +18,7 @@ const TEST_DB_URL = process.env.TEST_DATABASE_URL;
 const describeIfDb = TEST_DB_URL ? describe : describe.skip;
 
 const ROOT = path.resolve(__dirname, "../../../..");
-const MIGRATION = path.join(ROOT, "shared/database/migrations/0070_abs_tracking.sql");
+const MIGRATIONS = ["0070_abs_tracking.sql", "0071_abs_tracking_review.sql"].map((f) => path.join(ROOT, "shared/database/migrations", f));
 const ROLLBACK = path.join(ROOT, "docs/ABS_TRACKING_ROLLBACK.sql");
 const ENV = {
   ABS_TRACKING_MODE: "shadow",
@@ -67,7 +67,7 @@ describeIfDb("ABS tracking Phase 1 (integration)", () => {
     });
 
   const resetAbs = async () => {
-    await db.execute(sql`TRUNCATE abs_tracking_decision, abs_order_link, abs_shipment_status_history, abs_shipment, abs_sync_run, abs_sync_state`);
+    await db.execute(sql`TRUNCATE abs_tracking_decision, abs_order_link, abs_shipment_status_history, abs_shipment, abs_sync_run, abs_sync_state, abs_audit_log`);
   };
 
   /** Every existing (non-abs_*) table: row count + md5 over all rows. */
@@ -143,11 +143,20 @@ describeIfDb("ABS tracking Phase 1 (integration)", () => {
     autoMigrate = await import("#root/shared/database/auto-migrate");
     helpers = await import("./fixture-helpers");
 
-    // The shared test DB is built by `drizzle-kit push`; if it predates 0070
-    // (i.e. it is "at 0069"), apply 0070 exactly as auto-migrate would.
+    // The shared test DB is built by `drizzle-kit push`; if it predates 0070 /
+    // 0071, apply them exactly as auto-migrate would (both are idempotent).
     const ready = await readiness.checkAbsTrackingReadiness(db);
     if (!ready.ready) {
-      for (const stmt of autoMigrate.splitMigrationStatements(readFileSync(MIGRATION, "utf8"))) await db.execute(sql.raw(stmt));
+      for (const file of MIGRATIONS) {
+        for (const stmt of autoMigrate.splitMigrationStatements(readFileSync(file, "utf8"))) {
+          try {
+            await db.execute(sql.raw(stmt));
+          } catch (err) {
+            // Same tolerance as auto-migrate: an object that already exists.
+            if (!/already exists/i.test(String((err as { cause?: { message?: string } })?.cause?.message ?? (err as Error)?.message))) throw err;
+          }
+        }
+      }
     }
     expect((await readiness.checkAbsTrackingReadiness(db)).ready).toBe(true);
 
@@ -240,22 +249,24 @@ describeIfDb("ABS tracking Phase 1 (integration)", () => {
 
         // Fresh DB: the whole chain as production boots it.
         await migrateQuietly(url);
-        const applied = await client.query("SELECT hash FROM __drizzle_migrations WHERE hash = '0070_abs_tracking.sql'");
-        expect(applied.rowCount).toBe(1);
+        const applied = await client.query("SELECT hash FROM __drizzle_migrations WHERE hash IN ('0070_abs_tracking.sql', '0071_abs_tracking_review.sql')");
+        expect(applied.rowCount).toBe(2);
         expect((await readiness.checkAbsTrackingReadiness(dbFresh)).ready).toBe(true);
 
         // Back to "at 0069" with the documented rollback, then forward again.
         await client.query(readFileSync(ROLLBACK, "utf8"));
-        await client.query("DELETE FROM __drizzle_migrations WHERE hash = '0070_abs_tracking.sql'");
+        // The rollback file is itself re-runnable.
+        await client.query(readFileSync(ROLLBACK, "utf8"));
+        await client.query("DELETE FROM __drizzle_migrations WHERE hash IN ('0070_abs_tracking.sql', '0071_abs_tracking_review.sql')");
         expect((await readiness.checkAbsTrackingReadiness(dbFresh)).ready).toBe(false);
         const shapeAt0069 = await nonAbsShape(client);
         await migrateQuietly(url);
-        expect((await client.query("SELECT 1 FROM __drizzle_migrations WHERE hash = '0070_abs_tracking.sql'")).rowCount).toBe(1);
+        expect((await client.query("SELECT 1 FROM __drizzle_migrations WHERE hash IN ('0070_abs_tracking.sql', '0071_abs_tracking_review.sql')")).rowCount).toBe(2);
         expect((await readiness.checkAbsTrackingReadiness(dbFresh)).ready).toBe(true);
         // Strictly additive: no existing column, index, constraint or enum changed.
         expect(await nonAbsShape(client)).toBe(shapeAt0069);
         const absTables = await client.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'abs\\_%'");
-        expect(absTables.rows[0]?.n).toBe(6);
+        expect(absTables.rows[0]?.n).toBe(7);
 
         // A third boot is a no-op.
         await migrateQuietly(url);

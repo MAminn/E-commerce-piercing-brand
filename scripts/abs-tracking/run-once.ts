@@ -37,7 +37,7 @@ async function main() {
   try {
     const ready = await checkAbsTrackingReadiness(db);
     if (!ready.ready) {
-      console.error(`abs_* tables missing (${ready.missing.join(", ")}). Apply migration 0070 first.`);
+      console.error(`abs_* tables missing (${ready.missing.join(", ")}). Apply migrations 0070 and 0071 first.`);
       process.exitCode = 1;
       return;
     }
@@ -74,7 +74,9 @@ async function main() {
       console.log("  would write:");
       for (const [k, n] of [...byTable].sort()) console.log(`    ${String(n).padStart(4)} × ${k}`);
       for (const w of report.planned.filter((p) => p.table === "abs_order_link" || p.table === "abs_tracking_decision")) {
-        console.log(`    ${w.table} ${w.key} ${JSON.stringify(w.summary)}`);
+        // Script output keeps AWBs to their last 4 characters (key = awb or awb|status|order|decision).
+        const [awb = "", ...rest] = w.key.split("|");
+        console.log(`    ${w.table} ${[`…${awb.slice(-4)}`, ...rest].join("|")} ${JSON.stringify(w.summary)}`);
       }
     }
     if (report.outcome === "failed") process.exitCode = 1;

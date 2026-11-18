@@ -52,6 +52,9 @@ export interface DecisionRow {
   reasonCode: string;
   details: Record<string, unknown>;
   dedupeKey: string;
+  /** Snapshot for a future compare-and-set writer (0071); refreshed on every sighting. */
+  orderTotal: number | null;
+  absDeliveryDate: Date | null;
 }
 export interface RunCounters {
   pages: number;
@@ -269,12 +272,14 @@ export async function createDbStore(db: DatabaseClient): Promise<AbsStore> {
       return links.get(awb) as ExistingLink;
     },
     async upsertDecision(row, now) {
+      const { orderTotal, absDeliveryDate, ...rest } = row;
+      const snapshot = { orderStatusAtDecision: row.orderStatusSeen, orderTotalAtDecision: money(orderTotal), absDeliveryDate };
       const [res] = await db
         .insert(absTrackingDecision)
-        .values({ ...row, mode: "shadow", applied: false, createdAt: now, lastSeenAt: now, seenCount: 1 })
+        .values({ ...rest, ...snapshot, mode: "shadow", applied: false, createdAt: now, lastSeenAt: now, seenCount: 1 })
         .onConflictDoUpdate({
           target: absTrackingDecision.dedupeKey,
-          set: { seenCount: sql`${absTrackingDecision.seenCount} + 1`, lastSeenAt: now },
+          set: { seenCount: sql`${absTrackingDecision.seenCount} + 1`, lastSeenAt: now, ...snapshot },
         })
         .returning({ inserted: sql<boolean>`(xmax = 0)` });
       return res?.inserted === true;
