@@ -40,6 +40,8 @@ import { bootstrapSuperadmin } from "#root/backend/auth/superadmin-bootstrap.js"
 import { startEmailAutomationWorker } from "#root/backend/email-automations/worker.js";
 import { initGa4PurchaseOwner } from "#root/backend/pixel-tracking/ga4-purchase/readiness.js";
 import { startGa4PurchaseWorker } from "#root/backend/pixel-tracking/ga4-purchase/worker.js";
+import { initAbsTracking } from "#root/backend/shipping-tracking/abs/readiness.js";
+import { startAbsTrackingWorker } from "#root/backend/shipping-tracking/abs/worker.js";
 import { db as createDb } from "#root/shared/database/drizzle/db.js";
 import { emailUnsubscribeApiPlugin } from "#root/backend/email-subscription/api.js";
 import { erpSyncApiPlugin } from "#root/backend/erp-sync/api.js";
@@ -567,6 +569,17 @@ async function main() {
     const ga4Db = createDb();
     await initGa4PurchaseOwner(ga4Db);
     startGa4PurchaseWorker({ db: ga4Db });
+
+    // ABS_TRACKING_MODE (default off): read-only ABS courier poller in shadow
+    // mode — writes abs_* tables only, never an order. Off, misconfigured or
+    // without migration 0070 it starts nothing and makes no query. Never
+    // allowed to stop the server from booting.
+    try {
+      const abs = await initAbsTracking(ga4Db);
+      startAbsTrackingWorker({ db: ga4Db, config: abs.config });
+    } catch (err) {
+      console.error(`[ABS tracking] off (boot error: ${String((err as Error)?.message ?? err).slice(0, 200)})`);
+    }
   }
 
   fastify.listen({ port: port, host: "0.0.0.0" }, (err) => {
