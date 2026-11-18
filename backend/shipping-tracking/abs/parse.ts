@@ -31,7 +31,8 @@ export const shipmentRowSchema = z
     paymentDate: nullableText,
     deliveryDate: nullableText,
     createdAt: nullableText,
-    consigneePhone: nullableText,
+    // Real ABS sends an array of strings (12-digit `20…` form); the docs show a string. Both accepted.
+    consigneePhone: z.union([strOrNum, z.array(strOrNum.nullable())]).nullish(),
     consigneeName: nullableText,
     noOfPieces: strOrNum.nullish(),
     originAwb: nullableText,
@@ -40,13 +41,91 @@ export const shipmentRowSchema = z
   .passthrough();
 export type ShipmentRow = z.infer<typeof shipmentRowSchema>;
 
-const listEnvelopeSchema = z
+/** The page object: rows plus paging. The docs show this as the whole body. */
+const listPageSchema = z
   .object({
     data: z.array(z.unknown()),
     hasMore: z.boolean().optional(),
     nextCursor: strOrNum.nullish(),
   })
   .passthrough();
+
+/**
+ * What ABS really returns (HTTP 201, verified 18 Nov 2026): the page object
+ * wrapped once more — `{ success, message, data: { data: [], hasMore, nextCursor } }`.
+ */
+const listNestedEnvelopeSchema = z
+  .object({
+    success: z.boolean().optional(),
+    message: z.string().nullish(),
+    data: listPageSchema,
+  })
+  .passthrough();
+
+export interface ListEnvelope {
+  shape: "nested" | "flat";
+  rows: unknown[];
+  hasMore: boolean;
+  nextCursor: string | null;
+  /** Keys of the outer body and (nested shape) of the page object — names only. */
+  outerKeys: string[];
+  pageKeys: string[];
+}
+
+/**
+ * Unwrap a /shipments/list body: the real nested envelope or the documented
+ * flat one. Throws AbsResponseShapeError for anything else, including an
+ * explicit `success: false` (an empty page there must not advance the
+ * watermark). Shared with the probe so both read the same contract.
+ */
+export function unwrapListEnvelope(json: unknown): ListEnvelope {
+  const body = json && typeof json === "object" && !Array.isArray(json) ? (json as Record<string, unknown>) : null;
+  const nested = body !== null && body.data !== null && typeof body.data === "object" && !Array.isArray(body.data);
+  if (nested) {
+    const env = listNestedEnvelopeSchema.safeParse(json);
+    if (!env.success) throw new AbsResponseShapeError("/shipments/list", issueSummary(env.error));
+    if (env.data.success === false) throw new AbsResponseShapeError("/shipments/list", "success: false");
+    return pageOf("nested", env.data.data, Object.keys(env.data), Object.keys(env.data.data));
+  }
+  const env = listPageSchema.safeParse(json);
+  if (!env.success) throw new AbsResponseShapeError("/shipments/list", issueSummary(env.error));
+  if ((body as { success?: unknown } | null)?.success === false) throw new AbsResponseShapeError("/shipments/list", "success: false");
+  return pageOf("flat", env.data, Object.keys(env.data), []);
+}
+
+function pageOf(shape: ListEnvelope["shape"], page: z.infer<typeof listPageSchema>, outerKeys: string[], pageKeys: string[]): ListEnvelope {
+  const cursor = page.nextCursor;
+  return {
+    shape,
+    rows: page.data,
+    hasMore: page.hasMore === true,
+    nextCursor: cursor === null || cursor === undefined || String(cursor) === "" ? null : String(cursor),
+    outerKeys: outerKeys.sort(),
+    pageKeys: pageKeys.sort(),
+  };
+}
+
+/**
+ * Consignee phone(s) → the first valid normalised phone, its last 4, and every
+ * distinct valid normalised phone. Accepts a string, a number, an array of
+ * either, or null. When no value is a valid Egyptian mobile, last 4 comes from
+ * the first non-empty value (as for a plain string before).
+ */
+export function normalizeConsigneePhones(raw: unknown): { norm: string | null; last4: string | null; all: string[] } {
+  const values = (Array.isArray(raw) ? raw : [raw]).filter(
+    (v): v is string | number => (typeof v === "string" && v.trim() !== "") || (typeof v === "number" && Number.isFinite(v)),
+  );
+  const all: string[] = [];
+  let last4: string | null = null;
+  for (const v of values) {
+    const n = normalizeEgyptPhone(v);
+    if (n === null) continue;
+    if (all.length === 0) last4 = phoneLast4(v);
+    if (!all.includes(n)) all.push(n);
+  }
+  if (all.length === 0) last4 = values.length ? phoneLast4(values[0]) : null;
+  return { norm: all[0] ?? null, last4, all };
+}
 
 function parseBool(v: unknown): boolean | null {
   if (typeof v === "boolean") return v;
@@ -68,6 +147,7 @@ function parseInt0(v: unknown): number | null {
 export function normalizeShipmentRow(row: ShipmentRow): NormalizedShipment {
   let status: CanonicalStatus = canonicalStatus(row.status, row.lastEventCode);
   if (status === "UNKNOWN" && row.displayStatus) status = canonicalStatus(row.displayStatus, row.lastEventCode);
+  const phones = normalizeConsigneePhones(row.consigneePhone);
   return {
     awb: row.awb,
     reference: row.reference,
@@ -84,8 +164,9 @@ export function normalizeShipmentRow(row: ShipmentRow): NormalizedShipment {
     paymentDate: parseAbsDate(row.paymentDate),
     deliveryDate: parseAbsDate(row.deliveryDate),
     absCreatedAt: parseAbsDate(row.createdAt),
-    consigneePhoneNorm: normalizeEgyptPhone(row.consigneePhone),
-    consigneePhoneLast4: phoneLast4(row.consigneePhone),
+    consigneePhoneNorm: phones.norm,
+    consigneePhoneLast4: phones.last4,
+    consigneePhonesNorm: phones.all,
     noOfPieces: parseInt0(row.noOfPieces),
     originAwb: row.originAwb,
     raw: row as Record<string, unknown>,
@@ -114,11 +195,10 @@ function issueSummary(error: z.ZodError): string {
 }
 
 export function parseListResponse(json: unknown, onDrift: (key: string, message: string) => void = () => {}): ParsedListPage {
-  const env = listEnvelopeSchema.safeParse(json);
-  if (!env.success) throw new AbsResponseShapeError("/shipments/list", issueSummary(env.error));
+  const env = unwrapListEnvelope(json);
   const rows: NormalizedShipment[] = [];
   let skipped = 0;
-  for (const item of env.data.data) {
+  for (const item of env.rows) {
     const parsed = shipmentRowSchema.safeParse(item);
     if (!parsed.success) {
       skipped++;
@@ -128,13 +208,7 @@ export function parseListResponse(json: unknown, onDrift: (key: string, message:
     }
     rows.push(normalizeShipmentRow(parsed.data));
   }
-  const cursor = env.data.nextCursor;
-  return {
-    rows,
-    skipped,
-    hasMore: env.data.hasMore === true,
-    nextCursor: cursor === null || cursor === undefined || String(cursor) === "" ? null : String(cursor),
-  };
+  return { rows, skipped, hasMore: env.hasMore, nextCursor: env.nextCursor };
 }
 
 const historyEntrySchema = z.object({ status: nullableText, date: nullableText.optional(), datetime: nullableText.optional() }).passthrough();

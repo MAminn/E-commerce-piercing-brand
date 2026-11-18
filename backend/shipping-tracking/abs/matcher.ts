@@ -97,16 +97,23 @@ function rank(list: Array<RankedCandidate>): RankedCandidate[] {
 export function matchShipment(shipment: NormalizedShipment, candidates: CandidateOrder[], opts: MatchOptions): MatchResult {
   const role = roleForService(shipment.cmpService);
   const phone = shipment.consigneePhoneNorm;
+  // ABS may send several consignee phones: an exact match on ANY of them is
+  // an exact phone match. Fuzzy matching uses the first valid phone only.
+  const phones = new Set<string>([...(phone ? [phone] : []), ...(shipment.consigneePhonesNorm ?? [])]);
   const cash = shipment.cash;
   const { from, to } = matchWindow(shipment, opts);
   const inWindow = (c: CandidateOrder) => c.createdAt.getTime() >= from.getTime() && c.createdAt.getTime() <= to.getTime();
   const amountOk = (c: CandidateOrder) => cash !== null && Math.abs(c.expectedCod - cash) <= opts.codToleranceEgp;
   const phoneOf = (c: CandidateOrder) => normalizeEgyptPhone(c.customerPhone);
+  const exactPhone = (c: CandidateOrder) => {
+    const p = phoneOf(c);
+    return p !== null && phones.has(p);
+  };
 
   const describe = (c: CandidateOrder, extra: string[] = []): RankedCandidate => {
     const reasons = [...extra];
     const p = phoneOf(c);
-    if (phone && p === phone) reasons.push("phone_exact");
+    if (exactPhone(c)) reasons.push("phone_exact");
     else if (isFuzzyPhoneMatch(phone, p)) reasons.push("phone_fuzzy");
     if (cash === null) reasons.push("no_cod_amount");
     else reasons.push(amountOk(c) ? "amount_ok" : `cod_mismatch:${c.expectedCod}vs${cash}`);
@@ -145,7 +152,7 @@ export function matchShipment(shipment: NormalizedShipment, candidates: Candidat
   const refNumbers = new Set(orderNumbersInReference(shipment.reference));
   const referenced = candidates.filter((c) => refNumbers.has(c.orderNumber));
   if (referenced.length > 0) {
-    const phoneMatched = referenced.filter((c) => phone && phoneOf(c) === phone);
+    const phoneMatched = referenced.filter(exactPhone);
     if (phoneMatched.length === 1) {
       const c = phoneMatched[0] as CandidateOrder;
       const listed = [describe(c, ["reference"])];
@@ -155,7 +162,7 @@ export function matchShipment(shipment: NormalizedShipment, candidates: Candidat
     // Reference names an order but the phone disagrees (or is missing): a human decides.
     const listed = rank([
       ...referenced.map((c) => describe(c, ["reference"])),
-      ...candidates.filter((c) => !refNumbers.has(c.orderNumber) && phone && phoneOf(c) === phone && inWindow(c)).map((c) => describe(c)),
+      ...candidates.filter((c) => !refNumbers.has(c.orderNumber) && exactPhone(c) && inWindow(c)).map((c) => describe(c)),
     ]);
     return result("needs_review", "reference", "reference_phone_mismatch", 50, null, listed);
   }
@@ -164,11 +171,11 @@ export function matchShipment(shipment: NormalizedShipment, candidates: Candidat
   // (Their COD is usually 0 or a fee, so there is no amount to make a fuzzy
   // phone safe — fuzzy candidates are not listed here.)
   if (role !== "primary") {
-    const related = candidates.filter((c) => inWindow(c) && phone !== null && phoneOf(c) === phone);
+    const related = candidates.filter((c) => inWindow(c) && exactPhone(c));
     return result(related.length ? "needs_review" : "unmatched", null, `${role}_shipment`, related.length ? 30 : 0, null, rank(related.map((c) => describe(c))));
   }
 
-  const exact = candidates.filter((c) => inWindow(c) && phone !== null && phoneOf(c) === phone);
+  const exact = candidates.filter((c) => inWindow(c) && exactPhone(c));
   const eligible = exact.filter((c) => amountOk(c) && c.status !== "cancelled");
 
   // 3. Exactly one exact-phone, amount-matching, open order.

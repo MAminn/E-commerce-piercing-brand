@@ -81,8 +81,17 @@ export interface NormalizedShipment {
   paymentDate: Date | null;
   deliveryDate: Date | null;
   absCreatedAt: Date | null;
+  /** First consignee phone that normalises to a valid Egyptian mobile (else null). */
   consigneePhoneNorm: string | null;
+  /** Last 4 of that same phone (or of the first non-empty value when none is valid). */
   consigneePhoneLast4: string | null;
+  /**
+   * Every distinct valid normalised consignee phone, `consigneePhoneNorm`
+   * first. ABS sends `consigneePhone` as an array; an exact match on any of
+   * them is an exact phone match. Not stored in its own column: the raw row
+   * keeps the original array. Absent → `[consigneePhoneNorm]`.
+   */
+  consigneePhonesNorm?: string[];
   noOfPieces: number | null;
   originAwb: string | null;
   raw: Record<string, unknown>;
