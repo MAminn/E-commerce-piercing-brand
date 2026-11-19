@@ -48,9 +48,10 @@ export default function HeadDefault() {
     pageContext.brandName ||
     layoutSettings?.siteTitle ||
     STORE_NAME;
-  // Site-level description, used for the WebSite structured data below.
-  const siteDescription = STORE_DESCRIPTION;
-  // Per-page description: the homepage's CMS meta when set, else the same
+  // Site-level description, used for the WebSite structured data below:
+  // the dashboard meta description when set, else STORE_DESCRIPTION.
+  const siteDescription = pageContext.siteDescription?.trim() || STORE_DESCRIPTION;
+  // Per-page description: the dashboard meta description when set, else
   // STORE_DESCRIPTION (pages/index/meta-description.ts).
   const pageDescription = resolveMetaDescription(pageContext);
   const cmsShareImageUrl = layoutSettings?.shareImageUrl?.trim();

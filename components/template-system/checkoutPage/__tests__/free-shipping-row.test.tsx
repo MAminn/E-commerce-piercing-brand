@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 vi.mock("#root/shared/trpc/client", () => ({ trpc: {} }));
 vi.mock("vike-react/usePageContext", () => ({
-  usePageContext: () => ({ urlPathname: "/checkout" }),
+  usePageContext: () => ({ urlPathname: "/checkout", shippingFeeRange: { min: 80, max: 150 } }),
 }));
 
 import { deriveShippingLine, summaryShippingAmount } from "#root/shared/shipping/checkout-shipping";
@@ -100,9 +100,11 @@ describe("cart / checkout summary renders a waived fee as Free", () => {
     ["Minimal (Percé) cart", (totals) => createElement(CartPageMinimalTemplate, { items: cartItems, totals, currency: "EGP" } as never)],
   ];
 
-  it.each(surfaces)("%s: free → 'Free', paid → the governorate amount", (_name, make) => {
+  it.each(surfaces)("%s: free → 'Free', paid → the governorate amount", (name, make) => {
     expect(shippingRow(html(make(freeTotals)))).toBe("Free");
-    expect(shippingRow(html(make(paidTotals)))).toMatch(/70/);
+    // The Modern cart states the live governorate range rather than the
+    // quoted amount (the fee is set at checkout); the other surfaces show it.
+    expect(shippingRow(html(make(paidTotals)))).toMatch(name === "Modern cart" ? /EGP 80–150/ : /70/);
   });
 
   it("Arabic storefront says مجاني", () => {

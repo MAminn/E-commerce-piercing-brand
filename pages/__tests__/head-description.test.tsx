@@ -52,16 +52,25 @@ describe("resolveMetaDescription", () => {
   });
 
   it("keeps the approved fallback text", () => {
-    expect(STORE_DESCRIPTION).toBe("Piercing jewellery, delivered across Egypt.");
+    expect(STORE_DESCRIPTION).toBe("Piercing jewellery, delivered to selected governorates across Egypt.");
   });
 
-  it("ignores the CMS description on every other route", () => {
-    // /contact and /about-us also load homepageContent into their data.
-    for (const path of ["/contact", "/about-us", "/shop", "/bundles"]) {
-      expect(resolveMetaDescription({ urlPathname: path, data: homepageData(CMS_DESCRIPTION) })).toBe(
-        STORE_DESCRIPTION,
+  it("uses the dashboard description (siteDescription) on every other route when it is set", () => {
+    for (const path of ["/privacy", "/return-policy", "/contact", "/shop", "/bundles"]) {
+      expect(resolveMetaDescription({ urlPathname: path, siteDescription: CMS_DESCRIPTION })).toBe(
+        CMS_DESCRIPTION,
       );
     }
+  });
+
+  it("falls back to STORE_DESCRIPTION on other routes when no dashboard description is set", () => {
+    for (const siteDescription of [null, undefined, "", "   "]) {
+      expect(resolveMetaDescription({ urlPathname: "/privacy", siteDescription })).toBe(STORE_DESCRIPTION);
+    }
+    // A page's own data (e.g. /contact loads homepageContent) is not the source.
+    expect(resolveMetaDescription({ urlPathname: "/contact", data: homepageData(CMS_DESCRIPTION) })).toBe(
+      STORE_DESCRIPTION,
+    );
   });
 });
 
@@ -80,10 +89,17 @@ describe("+Head description meta on the homepage", () => {
     expect(tags.twitter).toBe(STORE_DESCRIPTION);
   });
 
-  it("leaves other routes on STORE_DESCRIPTION even when their data carries homepage content", () => {
-    const tags = descriptionTags(renderHead({ urlPathname: "/contact", data: homepageData(CMS_DESCRIPTION) }));
+  it("emits the dashboard description on inner pages (e.g. /privacy) when it is set", () => {
+    const tags = descriptionTags(renderHead({ urlPathname: "/privacy", siteDescription: CMS_DESCRIPTION }));
+    expect(tags.description).toContain("hand-picked studs and rings");
+    expect(tags.og).toBe(tags.description);
+    expect(tags.twitter).toBe(tags.description);
+  });
+
+  it("emits STORE_DESCRIPTION on inner pages without a dashboard description — never the old claim", () => {
+    const html = renderHead({ urlPathname: "/return-policy", siteDescription: null });
+    const tags = descriptionTags(html);
     expect(tags.description).toBe(STORE_DESCRIPTION);
-    expect(tags.og).toBe(STORE_DESCRIPTION);
-    expect(tags.twitter).toBe(STORE_DESCRIPTION);
+    expect(html).not.toContain("delivered across Egypt.");
   });
 });

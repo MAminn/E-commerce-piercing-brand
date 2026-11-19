@@ -32,6 +32,7 @@
  * These are FALLBACKS ONLY. A value stored in the database always wins.
  */
 
+import type { ShippingFeeRange } from "#root/shared/shipping/shipping-policy";
 import type { NavbarStyle } from "#root/shared/types/layout-settings";
 import type { ShippingMode } from "#root/shared/shipping/rules";
 
@@ -46,18 +47,19 @@ import type { ShippingMode } from "#root/shared/shipping/rules";
 export const EXPECTED_SHIPPING_MODE: ShippingMode = "zones";
 
 /**
- * The span of Percé's per-governorate delivery fees, stated on the product
- * page and in the bag before a governorate is known. This is copy, not a
- * price source: the fee charged is always checkout's live quote from
- * `store_settings.shipping_rules`. Keep it in step with the governorate rates
- * in Dashboard > Settings > Shipping.
+ * "EGP 80–150" / "80–150 ج.م" (or one amount when every destination pays the
+ * same), in the same money style as formatMoney. The span itself is NOT a
+ * constant: it is resolved from the live `store_settings.shipping_rules` on
+ * the server (resolveShippingFeeRange) and read with useShippingFeeRange.
  */
-export const SHIPPING_FEE_RANGE_EGP = { min: 70, max: 150 } as const;
-
-/** "EGP 70–150" / "70–150 ج.م", in the same money style as formatMoney. */
-export function formatShippingFeeRange(locale: "en" | "ar" = "en"): string {
-  const { min, max } = SHIPPING_FEE_RANGE_EGP;
-  return locale === "ar" ? `${min}–${max} ج.م` : `EGP ${min}–${max}`;
+export function formatShippingFeeRange(
+  range: ShippingFeeRange,
+  locale: "en" | "ar" = "en",
+): string {
+  const amount = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
+  const span =
+    range.min === range.max ? amount(range.min) : `${amount(range.min)}–${amount(range.max)}`;
+  return locale === "ar" ? `${span} ج.م` : `EGP ${span}`;
 }
 
 /** Global shell used when `layoutSettings.header.navbarStyle` is unset. */

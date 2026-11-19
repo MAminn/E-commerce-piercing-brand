@@ -56,7 +56,7 @@ vi.mock("#root/shared/trpc/client", () => ({
 vi.mock("#root/frontend/contexts/TemplateContext", () => ({
   useTemplate: () => ({ getTemplateId: () => templateId }),
 }));
-vi.mock("vike-react/usePageContext", () => ({ usePageContext: () => ({ urlPathname: "/cart", urlParsed: { search: {} } }) }));
+vi.mock("vike-react/usePageContext", () => ({ usePageContext: () => ({ urlPathname: "/cart", urlParsed: { search: {} }, shippingFeeRange: { min: 80, max: 150 } }) }));
 vi.mock("vike/client/router", () => ({ navigate: () => {} }));
 vi.mock("#root/lib/hooks/useWishlist", () => ({ useWishlist: () => ({ items: [] }) }));
 
@@ -190,7 +190,7 @@ describe.each(["cart-minimal", "cart-modern"])("cart item count (%s)", (template
 describe.each(["cart-minimal", "cart-modern"])("cart shipping row (%s)", (template) => {
   // Before a governorate is chosen: cart-minimal says "Calculated at
   // checkout"; the Object Index cart states the governorate fee range.
-  const pendingCopy = template === "cart-modern" ? /EGP 70–150, set at checkout/ : /Calculated at checkout/;
+  const pendingCopy = template === "cart-modern" ? /EGP 80–150, set at checkout/ : /Calculated at checkout/;
   beforeEach(() => {
     templateId = template;
   });

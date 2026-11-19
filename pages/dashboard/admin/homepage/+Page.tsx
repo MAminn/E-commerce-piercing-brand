@@ -2241,7 +2241,7 @@ export default function HomepageAdminPage() {
                       },
                     }))
                   }
-                  placeholder='Delivery across Egypt · Cash on delivery'
+                  placeholder='e.g. Cash on delivery available'
                   disabled={!content.marquee?.enabled}
                 />
               </div>
@@ -2378,7 +2378,7 @@ export default function HomepageAdminPage() {
                       },
                     }))
                   }
-                  placeholder='Delivery across Egypt · Cash on delivery'
+                  placeholder='e.g. Cash on delivery available'
                 />
               </div>
               <div>

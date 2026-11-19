@@ -32,8 +32,27 @@ const STANDARD_LABELS: Record<string, string> = {
   // The brand's standard hero and footer lines. An owner's own wording is not
   // in this list, and stays as written (rule 3).
   "small pieces. made to mix.": "home.hero_title",
-  "piercing jewellery, delivered across egypt.": "home.hero_subtitle",
+  "piercing jewellery, delivered to selected governorates across egypt.": "home.hero_subtitle",
   "made to mix.": "home.brand_line",
+  // Navigation and footer chrome (Dashboard > Layout Settings links saved
+  // without an Arabic label).
+  shop: "nav.shop",
+  help: "footer.help",
+  contact: "footer.contact",
+  "contact us": "footer.contact",
+  "my account": "nav.account",
+  account: "nav.account",
+  policies: "footer.policies",
+  returns: "policy.returns",
+  refund: "policy.refunds",
+  refunds: "policy.refunds",
+  "returns & refunds": "policy.returns_refunds",
+  "returns and refunds": "policy.returns_refunds",
+  shipping: "policy.shipping",
+  privacy: "policy.privacy",
+  "privacy policy": "policy.privacy",
+  terms: "policy.terms",
+  "terms & conditions": "policy.terms",
 };
 
 export function standardLabelKey(text: string | null | undefined): string | null {

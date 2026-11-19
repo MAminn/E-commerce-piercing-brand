@@ -1,3 +1,4 @@
+import { localizeCmsLabel } from "#root/lib/i18n/cms-copy";
 import { useContext, useState, useRef, useEffect, useId, useMemo } from "react";
 import { Search, User, X, Menu, ChevronDown } from "lucide-react";
 import { usePageContext } from "vike-react/usePageContext";
@@ -212,12 +213,14 @@ export function MinimalNavbar() {
     cmsNavLinks.length > 0
       ? cmsNavLinks.map((l) => ({
           id: l.id,
-          label: locale === "ar" && l.labelAr ? l.labelAr : l.label,
+          // The admin's Arabic label, else the interface translation of a
+          // standard label ("Shop all", "New in", …), else the text as written.
+          label: localizeCmsLabel(locale, t, { en: l.label, ar: l.labelAr }),
           to: l.url,
           isDropdown: l.isDropdown ?? false,
           categoryIds: l.categoryIds ?? [],
         }))
-      : [{ id: "default-shop", label: "Shop", to: "/shop", isDropdown: false, categoryIds: [] }];
+      : [{ id: "default-shop", label: t("nav.shop"), to: "/shop", isDropdown: false, categoryIds: [] }];
   const cmsLinksToBundles = baseLinks.some((l) => l.to.split("?")[0]?.replace(/\/$/, "") === "/bundles");
   const links: NavLinkItem[] =
     hasLiveBundles && !cmsLinksToBundles

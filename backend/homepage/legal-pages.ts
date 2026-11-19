@@ -51,3 +51,23 @@ export async function getPublishedLegalPagesRaw(
 ): Promise<PublishedLegalPage[]> {
   return getPublishedLegalPages(await loadContent(database, templateSelection));
 }
+
+/**
+ * Everything the storefront shell needs from homepage_content, from ONE read
+ * per SSR request: the live legal pages (footer links) and the dashboard's
+ * meta description (Dashboard > Homepage > SEO / Meta), which every page
+ * other than the homepage uses in place of the STORE_DESCRIPTION fallback.
+ * `siteDescription` is null when the meta block is off or the text is blank.
+ */
+export async function getStorefrontShellContentRaw(
+  database: DatabaseClient,
+  templateSelection: TemplateSelection,
+): Promise<{ legalPages: PublishedLegalPage[]; siteDescription: string | null }> {
+  const content = await loadContent(database, templateSelection);
+  const meta = content.meta;
+  const description = meta?.enabled ? meta.pageDescription?.trim() : "";
+  return {
+    legalPages: getPublishedLegalPages(content),
+    siteDescription: description || null,
+  };
+}

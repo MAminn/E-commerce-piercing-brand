@@ -34,7 +34,7 @@ describe("PerceHero media", () => {
     expect(html).not.toContain("hero-video-a.mp4");
     // Copy and CTA are untouched.
     expect(html).toContain("Small pieces. Made to mix.");
-    expect(html).toContain("Piercing jewellery, delivered across Egypt.");
+    expect(html).toContain("Piercing jewellery, delivered to selected governorates across Egypt.");
     expect(html).toContain(">Shop all</a>");
   });
 

@@ -9,8 +9,9 @@ interface TrustItem {
 
 /**
  * Store facts, true today:
- *   • delivery across Egypt — every shipping destination is an Egyptian
- *     governorate (shared/shipping/egypt-governorates.ts)
+ *   • delivery to selected governorates — every shipping destination is an
+ *     Egyptian governorate the shipping rules enable; some are unavailable
+ *     (shared/shipping/egypt-governorates.ts, /shipping-policy)
  *   • cash on delivery — always offered (shared/config/payment.ts)
  *   • curated piercing jewellery — what the catalogue is
  * Deliberately NOT here: hypoallergenic, materials, lifetime quality, return

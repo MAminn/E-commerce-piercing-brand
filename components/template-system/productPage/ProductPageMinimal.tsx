@@ -785,9 +785,9 @@ export function ProductPageMinimal({
                     )}
 
                     {/* Shipping / Returns — admin-authored only. These two
-                        items used to fall back to "Free shipping with 2+
-                        items." and "Free exchanges for all orders."
-                        (and their Arabic equivalents) whenever the CMS was
+                        items used to fall back to invented free-shipping
+                        and free-exchange promises (in both languages)
+                        whenever the CMS was
                         empty, i.e. on a store that had never set a policy.
                         Each item now renders only when real copy exists. */}
                     {shippingCopy && (

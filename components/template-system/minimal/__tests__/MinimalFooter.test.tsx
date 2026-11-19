@@ -20,6 +20,7 @@ vi.mock("#root/shared/trpc/client", () => ({ trpc: {} }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 import { MinimalFooter } from "../MinimalFooter";
+import { MinimalI18nProvider } from "#root/lib/i18n/MinimalI18nContext";
 
 function render(overrides: Partial<LayoutSettings["footer"]> = {}, path = "/") {
   currentPath = path;
@@ -153,5 +154,83 @@ describe("MinimalFooter policy links", () => {
     const html = renderWith([returns, shipping], [help]);
     expect(html).toContain('href="/refund-policy"');
     expect(html).toContain('href="/return-policy"');
+  });
+});
+
+function renderIn(locale: "en" | "ar", overrides: Partial<LayoutSettings["footer"]> = {}) {
+  currentPath = "/";
+  const settings: LayoutSettings = {
+    ...DEFAULT_LAYOUT_SETTINGS,
+    footer: { ...DEFAULT_LAYOUT_SETTINGS.footer, ...overrides },
+  };
+  return renderToStaticMarkup(
+    <MinimalI18nProvider ssrLocale={locale}>
+      <LayoutSettingsContext.Provider value={settings}>
+        <MinimalFooter />
+      </LayoutSettingsContext.Provider>
+    </MinimalI18nProvider>,
+  );
+}
+const serviceLine = (html: string) =>
+  html.match(/data-testid="footer-service-line"[^>]*>([^<]*)</)?.[1];
+
+describe("MinimalFooter service line", () => {
+  it("English: delivery to selected governorates, never 'across Egypt'", () => {
+    const html = renderIn("en");
+    expect(serviceLine(html)).toBe("Delivery to selected governorates · Cash on delivery");
+    expect(html).not.toContain("Delivery across Egypt");
+  });
+
+  it("Arabic: the approved translation, never 'لكل مصر'", () => {
+    const html = renderIn("ar");
+    expect(serviceLine(html)).toBe("توصيل إلى محافظات مختارة · الدفع عند الاستلام");
+    expect(html).not.toContain("توصيل لكل مصر");
+  });
+});
+
+describe("MinimalFooter Arabic labels for CMS links saved without one", () => {
+  const groups = [
+    {
+      id: "shop",
+      title: "Shop",
+      links: [
+        { id: "a", label: "Shop all", url: "/shop" },
+        { id: "n", label: "New in", url: "/shop?section=newarrivals" },
+      ],
+    },
+    {
+      id: "help",
+      title: "Help",
+      links: [
+        { id: "c", label: "Contact", url: "/contact" },
+        { id: "m", label: "My account", url: "/account" },
+        { id: "w", label: "WhatsApp", url: "https://wa.me/201000000000" },
+      ],
+    },
+  ];
+
+  it("translates the standard labels in Arabic and keeps custom ones as written", () => {
+    const html = renderIn("ar", { footerLinkGroups: groups });
+    for (const ar of ["المتجر", "مساعدة", "تواصل معنا", "حسابي", "جديد"]) {
+      expect(html, ar).toContain(`>${ar}<`);
+    }
+    expect(html).not.toMatch(/>(Shop|Help|Contact|My account|New in)</);
+    // A brand / custom label is not machine-translated.
+    expect(html).toContain(">WhatsApp<");
+  });
+
+  it("an admin's own Arabic label wins", () => {
+    const html = renderIn("ar", {
+      footerLinkGroups: [{ id: "h", title: "Help", titleAr: "الدعم", links: [{ id: "c", label: "Contact", labelAr: "راسلنا", url: "/contact" }] }],
+    });
+    expect(html).toContain(">الدعم<");
+    expect(html).toContain(">راسلنا<");
+  });
+
+  it("English is unchanged", () => {
+    const html = renderIn("en", { footerLinkGroups: groups });
+    for (const en of ["Shop", "Help", "Contact", "My account", "New in"]) {
+      expect(html, en).toContain(`>${en}<`);
+    }
   });
 });

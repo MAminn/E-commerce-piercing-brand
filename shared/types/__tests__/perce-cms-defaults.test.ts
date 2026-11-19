@@ -43,8 +43,8 @@ describe("DEFAULT_HOMEPAGE_CONTENT", () => {
   const c = DEFAULT_HOMEPAGE_CONTENT;
 
   it("uses the approved homepage meta title and description", () => {
-    expect(c.meta.pageTitle).toBe("Percé — Piercing jewellery, delivered across Egypt");
-    expect(c.meta.pageDescription).toBe("Piercing jewellery, delivered across Egypt.");
+    expect(c.meta.pageTitle).toBe("Percé — Piercing jewellery, delivered to selected governorates across Egypt");
+    expect(c.meta.pageDescription).toBe("Piercing jewellery, delivered to selected governorates across Egypt.");
   });
 
   it("ships empty copy where the brand wording is not approved yet", () => {

@@ -4,7 +4,8 @@ import { createMiddleware } from "hono/factory";
 import { getTemplateSelectionRaw } from "#root/backend/settings/get-template-selection-raw.js";
 import { getStorefrontLayoutSettingsRaw } from "#root/backend/layout/get-layout-settings-raw.js";
 import { getLinkTreeConfigRaw } from "#root/backend/settings/get-link-tree-config.js";
-import { getPublishedLegalPagesRaw } from "#root/backend/homepage/legal-pages.js";
+import { getStorefrontShellContentRaw } from "#root/backend/homepage/legal-pages.js";
+import { getShippingFeeRangeRaw } from "#root/backend/shipping/shipping-policy.js";
 import { listStorefrontCategoriesRaw } from "#root/backend/categories/view-categories/service.js";
 import { getStoreOwnerId } from "#root/shared/config/store.js";
 import {
@@ -28,8 +29,11 @@ export const vikeHonoMiddleware = createMiddleware(
       getStoreOwnerId(),
       templateSelection,
     );
-    // Legal pages that are live, so the footer links only to published ones.
-    const legalPages = await getPublishedLegalPagesRaw(c.var.db, templateSelection);
+    // Legal pages that are live (the footer links only to published ones)
+    // and the dashboard meta description for inner pages — one read.
+    const { legalPages, siteDescription } = await getStorefrontShellContentRaw(c.var.db, templateSelection);
+    // Delivery-fee span from the live shipping rules; null hides the line.
+    const shippingFeeRange = await getShippingFeeRangeRaw(c.var.db);
     // Categories for the navbar placements, the homepage placement index
     // and the listing chips — in the first paint, not after hydration.
     const storefrontCategories = await listStorefrontCategoriesRaw(c.var.db).catch(() => undefined);
@@ -65,6 +69,8 @@ export const vikeHonoMiddleware = createMiddleware(
       templateSelection,
       layoutSettingsData,
       legalPages,
+      siteDescription,
+      shippingFeeRange,
       storefrontCategories,
       brandName,
       ssrLocale,

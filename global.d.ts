@@ -16,6 +16,10 @@ declare global {
       layoutSettingsData?: LayoutSettings;
       /** Legal pages that are live — drives the footer's policy links. */
       legalPages?: PublishedLegalPage[];
+      /** Dashboard homepage meta description, used as every inner page's description. Null when unset. */
+      siteDescription?: string | null;
+      /** Delivery-fee span from the live shipping rules (useShippingFeeRange). Null hides the line. */
+      shippingFeeRange?: import("./shared/shipping/shipping-policy").ShippingFeeRange | null;
       /** Storefront categories (tree order, hidden rows included) — see useStorefrontCategories. */
       storefrontCategories?: import("./hooks/useStorefrontCategories").StorefrontCategory[];
       brandName?: string;

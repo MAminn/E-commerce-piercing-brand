@@ -81,6 +81,16 @@ export const translations: Record<Locale, Record<string, string>> = {
     // Footer
     "footer.copyright": "All rights reserved",
     "footer.contact": "Contact Us",
+    // Standard footer / navigation labels — used in Arabic when a CMS link
+    // has no Arabic label of its own (lib/i18n/cms-copy.ts).
+    "footer.help": "Help",
+    "footer.policies": "Policies",
+    "policy.returns": "Returns",
+    "policy.refunds": "Refunds",
+    "policy.returns_refunds": "Returns & Refunds",
+    "policy.shipping": "Shipping",
+    "policy.privacy": "Privacy policy",
+    "policy.terms": "Terms & conditions",
     "footer.links": "Quick links",
 
     // Wishlist
@@ -99,7 +109,7 @@ export const translations: Record<Locale, Record<string, string>> = {
     "cart.title": "Bag",
     "cart.empty": "Your bag is empty.",
     "cart.have_code": "Have a code?",
-    // {range} is SHIPPING_FEE_RANGE_EGP, e.g. "EGP 70–150".
+    // {range} is the live delivery-fee span (useShippingFeeRange), e.g. "EGP 80–150".
     "cart.shipping_range": "{range}, set at checkout",
     "cart.empty_cta": "Add some items to get started!",
     "cart.continue_shopping": "Continue shopping",
@@ -302,7 +312,7 @@ export const translations: Record<Locale, Record<string, string>> = {
     "sets.build_this": "Build this set",
     "sets.plus_free_shipping": "+ free shipping",
     "trust.label": "Shopping with Percé",
-    "trust.delivery_egypt": "Delivery across Egypt",
+    "trust.delivery_egypt": "Delivery to selected governorates",
     "trust.cash_on_delivery": "Cash on delivery",
     "trust.curated": "Curated piercing jewellery",
     "offers.title": "Build your set.",
@@ -324,7 +334,7 @@ export const translations: Record<Locale, Record<string, string>> = {
     "product.summary_piercing": "Piercing",
     "product.no_piercing_needed": "No piercing needed",
     "product.reassure_cod": "Cash on delivery",
-    "product.reassure_delivery": "Delivery across Egypt",
+    "product.reassure_delivery": "Delivery to selected governorates",
     "product.delivery_fee_range": "Delivery {range} by governorate",
     "product.description": "Description",
     "product.specifications": "Specifications",
@@ -369,7 +379,7 @@ export const translations: Record<Locale, Record<string, string>> = {
     // (see lib/i18n/cms-copy.ts).
     "home.shop_all": "Shop all",
     "home.hero_title": "Small pieces. Made to mix.",
-    "home.hero_subtitle": "Piercing jewellery, delivered across Egypt.",
+    "home.hero_subtitle": "Piercing jewellery, delivered to selected governorates across Egypt.",
     "home.brand_line": "Made to mix.",
     "home.shop_all_pieces": "Shop all pieces",
     "home.shop_by_placement": "Shop by placement",
@@ -482,6 +492,14 @@ export const translations: Record<Locale, Record<string, string>> = {
     // Footer
     "footer.copyright": "الحقوق محفوظة",
     "footer.contact": "تواصل معنا",
+    "footer.help": "مساعدة",
+    "footer.policies": "السياسات",
+    "policy.returns": "الإرجاع",
+    "policy.refunds": "الاسترداد",
+    "policy.returns_refunds": "الإرجاع والاسترداد",
+    "policy.shipping": "الشحن",
+    "policy.privacy": "سياسة الخصوصية",
+    "policy.terms": "الشروط والأحكام",
     "footer.links": "روابط مهمة",
 
     // Wishlist
@@ -692,7 +710,7 @@ export const translations: Record<Locale, Record<string, string>> = {
     "sets.build_this": "كوّني هذا الطقم",
     "sets.plus_free_shipping": "+ شحن مجاني",
     "trust.label": "التسوق من Percé",
-    "trust.delivery_egypt": "توصيل لجميع أنحاء مصر",
+    "trust.delivery_egypt": "توصيل إلى محافظات مختارة",
     "trust.cash_on_delivery": "الدفع عند الاستلام",
     "trust.curated": "مجوهرات بيرسينج مختارة بعناية",
     "offers.title": "كوّني طقمك.",
@@ -714,7 +732,7 @@ export const translations: Record<Locale, Record<string, string>> = {
     "product.summary_piercing": "الثقب",
     "product.no_piercing_needed": "لا يحتاج إلى ثقب",
     "product.reassure_cod": "الدفع عند الاستلام",
-    "product.reassure_delivery": "توصيل لجميع أنحاء مصر",
+    "product.reassure_delivery": "توصيل إلى محافظات مختارة",
     "product.delivery_fee_range": "التوصيل {range} حسب المحافظة",
     "product.description": "الوصف",
     "product.specifications": "المواصفات",
@@ -757,7 +775,7 @@ export const translations: Record<Locale, Record<string, string>> = {
     "curated.unit_x": "×{count}",
     "home.shop_all": "تسوّقي الكل",
     "home.hero_title": "قطع صغيرة. صُمّمت لتتناسق معًا.",
-    "home.hero_subtitle": "مجوهرات بيرسينج، توصيل لجميع أنحاء مصر.",
+    "home.hero_subtitle": "مجوهرات بيرسينج، توصيل إلى محافظات مختارة في مصر.",
     "home.brand_line": "صُمّمت لتتناسق معًا.",
     "home.shop_all_pieces": "تسوّقي كل القطع",
     "home.shop_by_placement": "تسوّقي حسب مكان الثقب",

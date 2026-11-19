@@ -7,7 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 vi.mock("#root/shared/trpc/client", () => ({ trpc: {} }));
 // The Editorial template renders the site chrome, whose links read the page path.
 vi.mock("vike-react/usePageContext", () => ({
-  usePageContext: () => ({ urlPathname: "/checkout" }),
+  usePageContext: () => ({ urlPathname: "/checkout", shippingFeeRange: { min: 80, max: 150 } }),
 }));
 
 import { CheckoutPageModernTemplate, type CheckoutTotals } from "../CheckoutPageModernTemplate";
@@ -157,7 +157,7 @@ describe("cart page shipping line before a destination is known", () => {
       { subtotal: 300, shipping: 70, grandTotal: 370, shippingStatus: "quoted" as const },
     ]) {
       const html = renderToStaticMarkup(createElement(CartPageModernTemplate, { items: cartItems, totals }));
-      expect(html).toContain("EGP 70–150, set at checkout");
+      expect(html).toContain("EGP 80–150, set at checkout");
       expect(html).not.toContain("Calculated at checkout");
     }
   });

@@ -966,7 +966,7 @@ export default function LayoutSettingsPage() {
                     onChange={(e) =>
                       updateHeader("announcementBarText", e.target.value)
                     }
-                    placeholder='e.g. Delivery across Egypt · Cash on delivery'
+                    placeholder='e.g. Cash on delivery available'
                     className='mt-1'
                   />
                 </div>

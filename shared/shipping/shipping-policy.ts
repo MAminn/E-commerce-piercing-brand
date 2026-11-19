@@ -55,8 +55,23 @@ export interface ShippingPolicyInput {
   cashOnDelivery: boolean;
 }
 
-export function buildShippingPolicyFacts(input: ShippingPolicyInput): ShippingPolicyFacts {
-  const { rules } = input;
+/** EGP min/max of what a deliverable destination is charged — see resolveShippingFeeRange. */
+export interface ShippingFeeRange {
+  min: number;
+  max: number;
+}
+
+/**
+ * Every fee a deliverable destination can be charged, and the governorates
+ * that cannot be delivered to — resolved per governorate through the same
+ * `resolveZoneRate` the checkout quote and create-order use (so an explicit
+ * `null` is unavailable, an unlisted governorate pays the fallback fee or is
+ * unavailable when there is none). Flat mode: one fee, nowhere refused.
+ */
+function resolveDeliverableFees(
+  rules: ShippingRulesConfig,
+  flatFee: number,
+): { fees: Set<number>; unavailableGovernorates: ShippingPolicyGovernorate[] } {
   const unavailableGovernorates: ShippingPolicyGovernorate[] = [];
   const fees = new Set<number>();
 
@@ -71,8 +86,30 @@ export function buildShippingPolicyFacts(input: ShippingPolicyInput): ShippingPo
     }
   } else {
     // Flat mode prices every destination the same and refuses none.
-    fees.add(input.flatFee);
+    fees.add(flatFee);
   }
+  return { fees, unavailableGovernorates };
+}
+
+/**
+ * The delivery-fee span stated on the product page and in the bag before a
+ * governorate is chosen ("EGP 80–150"). Null — and the line is hidden —
+ * when no destination is deliverable or delivery costs nothing anywhere:
+ * the page never states a span the live rules do not charge.
+ */
+export function resolveShippingFeeRange(
+  rules: ShippingRulesConfig,
+  flatFee: number,
+): ShippingFeeRange | null {
+  const { fees } = resolveDeliverableFees(rules, flatFee);
+  if (fees.size === 0) return null;
+  const min = Math.min(...fees);
+  const max = Math.max(...fees);
+  return max > 0 ? { min, max } : null;
+}
+
+export function buildShippingPolicyFacts(input: ShippingPolicyInput): ShippingPolicyFacts {
+  const { fees, unavailableGovernorates } = resolveDeliverableFees(input.rules, input.flatFee);
 
   let fee: ShippingPolicyFee;
   const [only] = [...fees];
@@ -87,7 +124,7 @@ export function buildShippingPolicyFacts(input: ShippingPolicyInput): ShippingPo
 
   return {
     fee,
-    freeShippingMinimum: fee.kind === "free" ? null : resolveFreeShippingMinimum(rules),
+    freeShippingMinimum: fee.kind === "free" ? null : resolveFreeShippingMinimum(input.rules),
     unavailableGovernorates,
     deliveryText: en || ar ? { en: en || ar, ar: ar || en } : null,
     cashOnDelivery: input.cashOnDelivery,

@@ -69,7 +69,7 @@ export const BRAND_SLUG = "perce";
 export const BRAND_LINE =
   readEnv("VITE_BRAND_LINE", "BRAND_LINE") ?? "Made to mix.";
 
-/** Market. The store sells in and delivers across Egypt only. */
+/** Market. The store sells in Egypt and delivers only within it (to the governorates its shipping rules enable). */
 export const STORE_COUNTRY_CODE = "EG";
 export const STORE_COUNTRY_NAME = "Egypt";
 
@@ -82,15 +82,16 @@ export const STORE_LOCALE = "en-EG";
 /**
  * Default meta description / social preview copy.
  *
- * This is the Brand Source of Truth's *safer* subheading. The preferred one
- * ("Piercing jewellery, photographed properly, delivered across Egypt.")
- * claims photography coverage that has not been verified against the live
- * catalogue — switch to it via VITE_STORE_DESCRIPTION once it is. It makes
- * no claim about materials, returns, or hypoallergenic properties.
+ * The owner-approved wording (2026-11-19). Delivery is limited to the
+ * governorates the shipping rules enable, so it never claims all of Egypt.
+ * It makes no claim about materials, returns, or hypoallergenic properties.
+ * Pages other than the homepage use the dashboard's homepage meta
+ * description when one is set (pages/index/meta-description.ts); this is the
+ * fallback.
  */
 export const STORE_DESCRIPTION =
   readEnv("VITE_STORE_DESCRIPTION", "STORE_DESCRIPTION") ??
-  "Piercing jewellery, delivered across Egypt.";
+  "Piercing jewellery, delivered to selected governorates across Egypt.";
 
 /**
  * ISO 4217 currency code. Egyptian pound. Catalogue prices are stored and

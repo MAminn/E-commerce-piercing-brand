@@ -160,7 +160,7 @@ describe("Arabic homepage core UI", () => {
     const { container } = renderHome("ar");
     const h1 = container.querySelector("h1");
     expect(h1?.textContent).toBe("قطع صغيرة. صُمّمت لتتناسق معًا.");
-    expect(container.textContent).toContain("مجوهرات بيرسينج، توصيل لجميع أنحاء مصر.");
+    expect(container.textContent).toContain("مجوهرات بيرسينج، توصيل إلى محافظات مختارة في مصر.");
     expect(container.textContent).not.toContain(DEFAULT_HOMEPAGE_CONTENT.hero.title);
     expect(container.textContent).not.toContain(DEFAULT_HOMEPAGE_CONTENT.hero.subtitle);
   });

@@ -16,7 +16,11 @@ vi.mock("#root/shared/trpc/client", () => ({
     settings: { getProductPageContent: { query: async () => ({ success: true, result: {} }) } },
   },
 }));
-vi.mock("vike-react/usePageContext", () => ({ usePageContext: () => ({ urlPathname: "/" }) }));
+// The delivery-fee span the server resolves from the live shipping rules
+// (pageContext.shippingFeeRange). Production today: 80–150.
+const LIVE_RANGE = { min: 80, max: 150 };
+let feeRange: { min: number; max: number } | null = LIVE_RANGE;
+vi.mock("vike-react/usePageContext", () => ({ usePageContext: () => ({ urlPathname: "/", shippingFeeRange: feeRange }) }));
 vi.mock("#root/components/ui/cart-toast", () => ({ showCartToast: () => {}, flyToCart: () => {} }));
 vi.mock("#root/lib/hooks/useWishlist", () => ({ useWishlist: () => ({ toggle: () => {}, isWishlisted: () => false }) }));
 vi.mock("#root/lib/context/CartContext", () => ({ useCart: () => ({ addItem: () => true }) }));
@@ -104,9 +108,27 @@ describe("product page purchase block", () => {
       } as never),
     );
 
+  afterEach(() => {
+    feeRange = LIVE_RANGE;
+  });
+
+  it("hides the fee line (and its separator) when the live rules give no range", () => {
+    feeRange = null;
+    const markup = html();
+    expect(markup).toContain("Cash on delivery");
+    expect(markup).not.toContain("delivery-fee-range");
+    expect(markup).not.toMatch(/Delivery EGP/);
+    expect(markup).not.toContain(">·<");
+  });
+
+  it("states the range the rules give, not a constant", () => {
+    feeRange = { min: 95, max: 95 };
+    expect(html()).toContain("Delivery EGP 95 by governorate");
+  });
+
   it("states the delivery fee range and names the care row 'Care'", () => {
     expect(html()).toContain("Cash on delivery");
-    expect(html()).toContain("Delivery EGP 70–150 by governorate");
+    expect(html()).toContain("Delivery EGP 80–150 by governorate");
     expect(html()).toMatch(/>Care<svg/);
     expect(html()).not.toContain("Care Guide");
   });
@@ -132,10 +154,21 @@ const bagItems = [{ id: "a", href: "/shop/star-helix-stud", name: "Star Helix St
 const bagTotals = { subtotal: 180, grandTotal: 180, shippingStatus: "pending" as const };
 
 describe("bag (cart-modern)", () => {
+  it("says 'Calculated at checkout' when the live rules give no range", () => {
+    feeRange = null;
+    try {
+      render(createElement(CartPageModernTemplate, { items: bagItems, totals: bagTotals }));
+      expect(screen.getByTestId("shipping-line").textContent).toContain("Calculated at checkout");
+      expect(screen.getByTestId("shipping-line").textContent).not.toMatch(/EGP \d/);
+    } finally {
+      feeRange = LIVE_RANGE;
+    }
+  });
+
   it("is titled Bag and always shows the shipping range", () => {
     render(createElement(CartPageModernTemplate, { items: bagItems, totals: bagTotals }));
     expect(screen.getByRole("heading", { level: 1 }).textContent).toMatch(/^Bag/);
-    expect(screen.getByTestId("shipping-line").textContent).toContain("EGP 70–150, set at checkout");
+    expect(screen.getByTestId("shipping-line").textContent).toContain("EGP 80–150, set at checkout");
   });
 
   it("keeps the promo field behind 'Have a code?' until asked, then focuses it", () => {

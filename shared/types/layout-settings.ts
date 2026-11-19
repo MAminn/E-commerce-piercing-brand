@@ -203,7 +203,7 @@ export const DEFAULT_LAYOUT_SETTINGS: LayoutSettings = {
     logoSize: { ...DEFAULT_FOOTER_LOGO_SIZE },
     // Matches STORE_DESCRIPTION in shared/config/branding.ts — the safer
     // brand subheading, with no photography, material or policy claims.
-    description: "Piercing jewellery, delivered across Egypt.",
+    description: "Piercing jewellery, delivered to selected governorates across Egypt.",
     // No Arabic marketing description by default — an admin writes one from
     // Dashboard > Layout Settings once the Arabic copy is approved.
     descriptionAr: "",

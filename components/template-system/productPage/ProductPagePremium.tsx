@@ -16,6 +16,7 @@ import { formatMoney } from "#root/shared/pricing/format-money";
 import { fillTemplate as fill } from "#root/components/bundles/bundle-ui";
 import { cn } from "#root/lib/utils";
 import { formatShippingFeeRange } from "#root/shared/config/storefront";
+import { useShippingFeeRange } from "#root/hooks/useShippingFeeRange";
 import { productPlacement } from "#root/shared/categories/placements";
 import { useStorefrontCategories } from "#root/hooks/useStorefrontCategories";
 import { IndexLine } from "#root/components/storefront/IndexLine";
@@ -400,6 +401,8 @@ export function ProductPagePremium({
   const { t, locale } = useMinimalI18n();
   const upsell = useProductUpsells(upsells);
   const { categories: categoryRows } = useStorefrontCategories();
+  // Live delivery-fee span (SSR, from the shipping rules); null hides it.
+  const shippingFeeRange = useShippingFeeRange();
   const { toggle: toggleWishlist, isWishlisted } = useWishlist();
   // ── Image state
   const images: ProductImage[] = product.images?.length
@@ -681,12 +684,19 @@ export function ProductPagePremium({
 
               {/* 6. Service facts — store facts only: cash on delivery is
                   always offered (shared/config/payment.ts) and the delivery
-                  fee is priced per governorate (SHIPPING_FEE_RANGE_EGP). No
+                  fee span comes from the live shipping rules
+                  (useShippingFeeRange) — hidden when there is none. No
                   invented free shipping or return windows. */}
               <ul className='mt-4 flex flex-wrap gap-x-4 gap-y-1 t-small text-ink-2' data-testid='purchase-reassurance'>
                 <li>{t("product.reassure_cod")}</li>
-                <li aria-hidden='true'>·</li>
-                <li>{fill(t("product.delivery_fee_range"), { range: formatShippingFeeRange(moneyLocale) })}</li>
+                {shippingFeeRange && (
+                  <>
+                    <li aria-hidden='true'>·</li>
+                    <li data-testid='delivery-fee-range'>
+                      {fill(t("product.delivery_fee_range"), { range: formatShippingFeeRange(shippingFeeRange, moneyLocale) })}
+                    </li>
+                  </>
+                )}
               </ul>
 
               {/* Upsells (ported from Mach) — next to the decision they add

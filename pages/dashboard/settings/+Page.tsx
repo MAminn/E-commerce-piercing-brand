@@ -402,7 +402,7 @@ export default function SettingsPage() {
               id='returnsText'
               value={returnsText}
               onChange={(e) => setReturnsText(e.target.value)}
-              placeholder='Free exchanges for all orders.'
+              placeholder='e.g. Returns within 14 days of delivery — see the Returns & Refunds policy.'
               maxLength={2000}
               rows={4}
             />
@@ -415,7 +415,7 @@ export default function SettingsPage() {
               dir='rtl'
               value={returnsTextAr}
               onChange={(e) => setReturnsTextAr(e.target.value)}
-              placeholder='استبدال مجاني لجميع الطلبات.'
+              placeholder='مثال: الإرجاع خلال 14 يومًا من الاستلام — راجع سياسة الإرجاع والاسترداد.'
               maxLength={2000}
               rows={4}
             />

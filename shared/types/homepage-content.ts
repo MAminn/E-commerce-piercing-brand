@@ -399,20 +399,18 @@ export interface HomepageContent {
  * Default homepage content - safe fallback values
  */
 export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
-  // Homepage copy from the Percé Brand Source of Truth. The subheading is
-  // the SAFER of the two approved versions: the preferred one ("Piercing
-  // jewellery, photographed properly, delivered across Egypt.") claims
-  // photography coverage that has not been verified against the live
-  // catalogue. Switch it in Dashboard > Homepage once it has.
+  // Homepage copy: the owner-approved subheading (2026-11-19). Delivery is
+  // limited to the governorates the shipping rules enable, so the copy says
+  // "selected governorates" rather than claiming all of Egypt.
   meta: {
     enabled: true,
-    pageTitle: "Percé — Piercing jewellery, delivered across Egypt",
-    pageDescription: "Piercing jewellery, delivered across Egypt.",
+    pageTitle: "Percé — Piercing jewellery, delivered to selected governorates across Egypt",
+    pageDescription: "Piercing jewellery, delivered to selected governorates across Egypt.",
   },
   hero: {
     enabled: true,
     title: "Small pieces. Made to mix.",
-    subtitle: "Piercing jewellery, delivered across Egypt.",
+    subtitle: "Piercing jewellery, delivered to selected governorates across Egypt.",
     ctaText: "Shop all",
     ctaLink: "/shop",
     backgroundImage: undefined,

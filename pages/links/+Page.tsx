@@ -192,7 +192,7 @@ const SOCIAL_LABELS: Record<string, string> = {
 
 const FALLBACK_CONFIG: LinkTreeConfig = {
   brandName: STORE_NAME,
-  subtitle: "Piercing jewellery, delivered across Egypt.",
+  subtitle: "Piercing jewellery, delivered to selected governorates across Egypt.",
   links: [
     ...(isUsableUrl(STORE_URL)
       ? [{ label: "Shop", href: STORE_URL, icon: "shop", enabled: true }]

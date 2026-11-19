@@ -29,6 +29,8 @@ export default {
     "templateSelection",
     "layoutSettingsData",
     "legalPages",
+    "siteDescription",
+    "shippingFeeRange",
     "storefrontCategories",
     "brandName",
     "ssrLocale",

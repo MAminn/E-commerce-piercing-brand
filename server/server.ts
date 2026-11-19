@@ -20,7 +20,8 @@ import { backfillProductSlugs } from "#root/backend/products/slug.js";
 import { getTemplateSelectionRaw } from "#root/backend/settings/get-template-selection-raw.js";
 import { getStorefrontLayoutSettingsRaw } from "#root/backend/layout/get-layout-settings-raw.js";
 import { getLinkTreeConfigRaw } from "#root/backend/settings/get-link-tree-config.js";
-import { getPublishedLegalPagesRaw } from "#root/backend/homepage/legal-pages.js";
+import { getStorefrontShellContentRaw } from "#root/backend/homepage/legal-pages.js";
+import { getShippingFeeRangeRaw } from "#root/backend/shipping/shipping-policy.js";
 import { listStorefrontCategoriesRaw } from "#root/backend/categories/view-categories/service.js";
 import {
   getTypographySettingsRaw,
@@ -454,11 +455,15 @@ async function buildServer() {
         getStoreOwnerId(),
         templateSelection,
       );
-      // Legal pages that are live, so the footer links only to published ones.
-      const legalPages = await getPublishedLegalPagesRaw(
+      // Legal pages that are live (the footer links only to published ones)
+      // and the dashboard meta description for inner pages — one read.
+      const { legalPages, siteDescription } = await getStorefrontShellContentRaw(
         request.db,
         templateSelection,
       );
+      // Delivery-fee span from the live shipping rules, for the product page
+      // and the bag; null hides the line.
+      const shippingFeeRange = await getShippingFeeRangeRaw(request.db);
       // Categories for the navbar placements, the homepage placement index
       // and the listing chips — in the first paint, not after hydration.
       // An enhancement: a failure renders the page without them.
@@ -496,6 +501,8 @@ async function buildServer() {
         templateSelection,
         layoutSettingsData,
         legalPages,
+        siteDescription,
+        shippingFeeRange,
         storefrontCategories,
         brandName,
         ssrLocale,

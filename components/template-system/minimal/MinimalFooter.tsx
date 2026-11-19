@@ -246,14 +246,13 @@ export function MinimalFooter() {
               </p>
             )}
             {/* Practical facts only — both are true for every order: the
-                store delivers Egypt-wide and cash on delivery is always
-                offered (shared/config/payment.ts). The exchange window is
-                deliberately NOT stated here until a returns policy is
-                actually published on /return-policy. */}
-            <p className='mt-4 t-small text-ink-2'>
+                store delivers to the governorates enabled in the shipping
+                rules (not every one — see /shipping-policy) and cash on
+                delivery is always offered (shared/config/payment.ts). */}
+            <p className='mt-4 t-small text-ink-2' data-testid='footer-service-line'>
               {locale === "ar"
-                ? "توصيل لكل مصر · الدفع عند الاستلام"
-                : "Delivery across Egypt · Cash on delivery"}
+                ? "توصيل إلى محافظات مختارة · الدفع عند الاستلام"
+                : "Delivery to selected governorates · Cash on delivery"}
             </p>
           </div>
 
@@ -263,7 +262,7 @@ export function MinimalFooter() {
               key={group.id}
               className='md:col-span-2 flex flex-col items-start'>
               <h2 className='mb-2 t-label text-ink'>
-                {locale === "ar" && group.titleAr ? group.titleAr : group.title}
+                {localizeCmsLabel(locale, t, { en: group.title, ar: group.titleAr })}
               </h2>
               <ul>
                 {group.links.map((link) => (
@@ -271,7 +270,7 @@ export function MinimalFooter() {
                     <Link
                       href={link.url}
                       className='inline-flex min-h-11 items-center t-small text-ink-2 transition-colors hover:text-ink'>
-                      {locale === "ar" && link.labelAr ? link.labelAr : link.label}
+                      {localizeCmsLabel(locale, t, { en: link.label, ar: link.labelAr })}
                     </Link>
                   </li>
                 ))}

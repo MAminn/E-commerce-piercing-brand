@@ -19,6 +19,7 @@ import {
 } from "#root/components/template-system/minimal/sticky-bar";
 import { fillTemplate as fill } from "#root/components/bundles/bundle-ui";
 import { formatShippingFeeRange } from "#root/shared/config/storefront";
+import { useShippingFeeRange } from "#root/hooks/useShippingFeeRange";
 import { cn } from "#root/lib/utils";
 
 /** `bottom` of the mobile sticky checkout bar: the viewport edge (no bottom nav). */
@@ -188,9 +189,10 @@ export interface CartPageModernTemplateProps {
  * bottom edge repeats Total + checkout only while that button is not fully on
  * screen, so there is always exactly one usable checkout button.
  *
- * The Shipping row is always there and reads as the governorate range
- * (SHIPPING_FEE_RANGE_EGP) — the fee is set at checkout once a governorate is
- * chosen — or "Free" when a set, code or offer has already waived it. The
+ * The Shipping row is always there and reads as the governorate range from
+ * the live shipping rules (useShippingFeeRange; "Calculated at checkout" when
+ * there is none) — the fee is set at checkout once a governorate is chosen —
+ * or "Free" when a set, code or offer has already waived it. The
  * promo field sits behind "Have a code?".
  *
  * Presentation only: quantities, removal, sets, promo codes, offers and
@@ -218,6 +220,8 @@ export function CartPageModernTemplate({
   // Cleared automatically when CartContext drops the code (see the hook).
   const [couponFeedback, setCouponFeedback] = useCouponFeedback(appliedCoupon?.code, couponNotice);
   const { t, locale } = useMinimalI18n();
+  // Live delivery-fee span (SSR, from the shipping rules); null → "Calculated at checkout".
+  const shippingFeeRange = useShippingFeeRange();
   const money = (amount: number) =>
     formatMoney(amount, { locale, currency });
 
@@ -530,7 +534,9 @@ export function CartPageModernTemplate({
                   <dd className='text-end tabular-nums text-ink-2'>
                     {totals.shippingStatus !== "pending" && totals.shipping === 0
                       ? t("cart.free") || "Free"
-                      : fill(t("cart.shipping_range"), { range: formatShippingFeeRange(locale === "ar" ? "ar" : "en") })}
+                      : shippingFeeRange
+                        ? fill(t("cart.shipping_range"), { range: formatShippingFeeRange(shippingFeeRange, locale === "ar" ? "ar" : "en") })
+                        : t("cart.shipping_calculated_at_checkout")}
                   </dd>
                 </div>
 
