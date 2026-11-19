@@ -1,25 +1,38 @@
 /**
- * ABS_TRACKING_MODE — read-only ABS courier tracking (Phase 1: shadow only).
+ * ABS_TRACKING_MODE — ABS courier tracking.
  *
  *   off (DEFAULT, and any unknown value) — nothing starts; no ABS request,
  *          no query against the abs_* tables. The app behaves as before.
  *   shadow — the poller reads ABS shipments, links them to website orders and
  *          RECORDS what it would do in abs_tracking_decision. It never writes
  *          to any existing table (order, order_item, product, order_log, …).
- *   live   — NOT AVAILABLE in this build: treated as `shadow`, with one boot
- *          warning.
+ *   live   — shadow, plus ONE automatic transition: an order whose ABS shipment
+ *          is DELIVERED becomes Delivered through the admin status core
+ *          (backend/shipping-tracking/abs/live.ts), when every eligibility rule
+ *          passes. ABS_LIVE_REQUIRE_APPROVAL (default true) makes it wait for
+ *          the owner's "Mark these N Delivered" button. A DB pause flag
+ *          (abs_settings.live_paused) turns live back into shadow at runtime.
  *
- * Rollback: set ABS_TRACKING_MODE=off (or remove it) and restart.
+ * Rollback: pause on the screen; then ABS_TRACKING_MODE=shadow (or off) and
+ * restart.
  *
  * The REQUESTED mode comes from the env; the EFFECTIVE mode is what the app
  * actually runs. It stays `off` until the boot readiness check
  * (backend/shipping-tracking/abs/readiness.ts) has confirmed the abs_* tables
- * exist and ABS_API_BASE_URL / ABS_API_KEY are usable.
+ * exist and ABS_API_BASE_URL / ABS_API_KEY are usable; `live` additionally
+ * needs migration 0072 and a valid ABS_LIVE_TRANSITIONS, else it runs shadow.
  *
  * Dependency-free on purpose (like ga4-purchase-owner.ts).
  */
 export type AbsTrackingRequestedMode = "off" | "shadow" | "live";
-export type AbsTrackingMode = "off" | "shadow";
+export type AbsTrackingMode = "off" | "shadow" | "live";
+
+/** The only transition live mode may ever apply. Any other ABS_LIVE_TRANSITIONS value is rejected at boot. */
+export const ABS_LIVE_ALLOWED_TRANSITIONS = ["delivered"] as const;
+export const ABS_LIVE_SETTLE_MINUTES_DEFAULT = 30;
+export const ABS_LIVE_MAX_AGE_DAYS_DEFAULT = 14;
+export const ABS_LIVE_MAX_PER_TICK_DEFAULT = 10;
+export const ABS_LIVE_DAILY_CAP_DEFAULT = 40;
 
 export const ABS_POLL_INTERVAL_DEFAULT_MS = 600_000;
 export const ABS_POLL_INTERVAL_MIN_MS = 300_000;
@@ -41,10 +54,24 @@ export const ABS_TICK_TIMEOUT_MIN_MS = 30_000;
 /** Failure backoff ceiling. */
 export const ABS_BACKOFF_MAX_MS = 3_600_000;
 
+export interface AbsLiveConfig {
+  /** ABS_LIVE_TRANSITIONS, parsed. Always ["delivered"] when valid. */
+  transitions: string[];
+  /** Set when ABS_LIVE_TRANSITIONS holds anything but `delivered`: live is refused (runs shadow). */
+  transitionsError: string | null;
+  settleMinutes: number;
+  maxAgeDays: number;
+  maxPerTick: number;
+  dailyCap: number;
+  /** ABS_LIVE_REQUIRE_APPROVAL — default true (canary): eligible items wait for the owner's button. */
+  requireApproval: boolean;
+}
+
 export interface AbsTrackingConfig {
   requestedMode: AbsTrackingRequestedMode;
-  /** The mode this build can run for the request (`live` → `shadow`). */
+  /** The mode this config allows for the request (`live` → `shadow` when ABS_LIVE_TRANSITIONS is invalid). */
   mode: AbsTrackingMode;
+  live: AbsLiveConfig;
   /** Normalised https base URL without trailing slash, or null if unusable. */
   baseUrl: string | null;
   /** Never logged. Null when unset. */
@@ -125,14 +152,51 @@ export function parseCairoDate(raw: string | undefined, fallbackDay: string): Da
   return fallback;
 }
 
+/**
+ * ABS_LIVE_TRANSITIONS: comma-separated target statuses. Unset = `delivered`.
+ * Only `delivered` is valid; anything else (cancelled, shipped, returned, a
+ * typo) is an error that keeps live mode off.
+ */
+export function parseLiveTransitions(raw: string | undefined): { transitions: string[]; error: string | null } {
+  const v = (raw ?? "").trim();
+  if (!v) return { transitions: ["delivered"], error: null };
+  const parts = [...new Set(v.toLowerCase().split(/[\s,;]+/).filter(Boolean))];
+  const bad = parts.filter((p) => !(ABS_LIVE_ALLOWED_TRANSITIONS as readonly string[]).includes(p));
+  if (bad.length > 0 || parts.length === 0) {
+    return { transitions: [], error: `ABS_LIVE_TRANSITIONS may only be "delivered" (got ${parts.length} value(s), ${bad.length} not allowed)` };
+  }
+  return { transitions: parts, error: null };
+}
+
+/** true unless explicitly false / 0 / no / off. */
+function boolDefaultTrue(raw: string | undefined): boolean {
+  const v = (raw ?? "").trim().toLowerCase();
+  return !(v === "false" || v === "0" || v === "no" || v === "off");
+}
+
+export function readAbsLiveConfig(env: Env = process.env): AbsLiveConfig {
+  const t = parseLiveTransitions(env.ABS_LIVE_TRANSITIONS);
+  return {
+    transitions: t.transitions,
+    transitionsError: t.error,
+    settleMinutes: intFrom(env.ABS_LIVE_SETTLE_MINUTES, ABS_LIVE_SETTLE_MINUTES_DEFAULT),
+    maxAgeDays: Math.max(1, intFrom(env.ABS_LIVE_MAX_AGE_DAYS, ABS_LIVE_MAX_AGE_DAYS_DEFAULT)),
+    maxPerTick: Math.max(1, intFrom(env.ABS_LIVE_MAX_PER_TICK, ABS_LIVE_MAX_PER_TICK_DEFAULT)),
+    dailyCap: Math.max(1, intFrom(env.ABS_LIVE_DAILY_CAP, ABS_LIVE_DAILY_CAP_DEFAULT)),
+    requireApproval: boolDefaultTrue(env.ABS_LIVE_REQUIRE_APPROVAL),
+  };
+}
+
 export function readAbsTrackingConfig(env: Env = process.env): AbsTrackingConfig {
   const requestedMode = readAbsTrackingMode(env);
   const warnings: string[] = [];
   const missing: string[] = [];
-  if (requestedMode === "live") {
-    warnings.push("live requested but not available in this build; running shadow");
+  const live = readAbsLiveConfig(env);
+  let mode: AbsTrackingMode = requestedMode;
+  if (requestedMode === "live" && live.transitionsError) {
+    warnings.push(`live refused: ${live.transitionsError}; running shadow`);
+    mode = "shadow";
   }
-  const mode: AbsTrackingMode = requestedMode === "off" ? "off" : "shadow";
 
   const rawBase = env.ABS_API_BASE_URL;
   const baseUrl = parseAbsBaseUrl(rawBase);
@@ -152,6 +216,7 @@ export function readAbsTrackingConfig(env: Env = process.env): AbsTrackingConfig
   return {
     requestedMode,
     mode,
+    live,
     baseUrl,
     apiKey,
     pollIntervalMs,
@@ -191,6 +256,8 @@ export interface AbsTrackingBootStatus {
   ready: boolean | null;
   missing: string[];
   checkedAt: string;
+  /** Migration 0072 (live tables) present — lets Undo / "Done automatically" work after a rollback to shadow. */
+  liveTablesReady?: boolean | null;
 }
 let bootStatus: AbsTrackingBootStatus | null = null;
 export function setAbsTrackingBootStatus(status: AbsTrackingBootStatus | null): void {

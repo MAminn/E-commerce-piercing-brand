@@ -7,8 +7,10 @@ import {
 } from "#root/shared/config/abs-tracking";
 
 import { AbsApiError, createAbsClient, type AbsFetchLike, type ListChangedShipmentsInput } from "./client";
+import { liveConfigOf, runLivePass, type LivePassReport } from "./live";
+import { runLiveMonitoring } from "./live-monitor";
 import { loadCandidateOrders, matchShipment } from "./matcher";
-import type { ParsedListPage } from "./parse";
+import type { HistoryEvent, ParsedListPage } from "./parse";
 import { redact } from "./redact";
 import { decide, decisionDedupeKey } from "./rules";
 import {
@@ -39,8 +41,11 @@ import type { CanonicalStatus, NormalizedShipment } from "./types";
  *   5. recompute decisions that changed without an ABS change: links a human
  *      changed on the review screen, and linked AWBs whose order status or
  *      total changed on the website (read-only on "order");
- *   6. advance the watermark ONLY after a fully successful run.
- * Every write goes to an abs_* table; the order is only read. A tick never
+ *   6. advance the watermark ONLY after a fully successful run;
+ *   7. LIVE mode only (effective mode `live`, not paused): the live pass
+ *      (live.ts) — the one place an order changes, pending|processing|shipped
+ *      → delivered through the shared admin core, after every rule passed.
+ * Steps 1–6 write abs_* tables only; the order is only read. A tick never
  * throws: errors are redacted into abs_sync_run.error.
  *
  * A failed run stores backoff_until = finish + min(interval × 2^(n−1), 1 h)
@@ -58,6 +63,8 @@ const DELIVERED_FAMILY: ReadonlySet<CanonicalStatus> = new Set(["DELIVERED", "PA
 
 export interface ShipmentSource {
   listChangedShipments(input: ListChangedShipmentsInput): Promise<ParsedListPage>;
+  /** GET /tracking/:awb/history — the live pass's fresh check. Absent → live never applies. */
+  getHistory?(awb: string): Promise<HistoryEvent[]>;
 }
 
 export interface TickLock {
@@ -87,6 +94,8 @@ export interface AbsTickDeps {
   tickTimeoutMs?: number;
   /** Wall clock for the time budget (tests). */
   clockMs?: () => number;
+  /** Live pass on/off (default: effective mode is `live`). */
+  isLive?: () => boolean;
 }
 
 /** Exponential failure backoff: interval × 2^(n−1), at most 1 h; a longer Retry-After wins (also ≤ 1 h). */
@@ -111,6 +120,8 @@ export interface AbsTickReport extends RunCounters {
   backoffUntil?: Date | null;
   error: string | null;
   planned: PlannedWrite[];
+  /** Step 7 (live mode only); null when it did not run. */
+  live: LivePassReport | null;
 }
 
 /**
@@ -215,7 +226,9 @@ export async function runAbsTrackingTick(deps: AbsTickDeps): Promise<AbsTickRepo
     recomputed: 0,
     error: null,
     planned: [],
+    live: null,
   };
+  const isLive = deps.isLive ?? (() => effectiveAbsTrackingMode() === "live");
   const finish = (store: AbsStore | null) => {
     Object.assign(report, counters);
     report.planned = store?.planned() ?? [];
@@ -224,7 +237,7 @@ export async function runAbsTrackingTick(deps: AbsTickDeps): Promise<AbsTickRepo
 
   let store: AbsStore | null = null;
   try {
-    store = deps.dryRun ? await createDryRunStore(deps.db) : await createDbStore(deps.db);
+    store = deps.dryRun ? await createDryRunStore(deps.db) : await createDbStore(deps.db, { decisionMode: isLive() ? "live" : "shadow" });
     const source = deps.source === undefined ? defaultSource(deps, log) : deps.source;
     if (!source) {
       report.outcome = "skipped_config";
@@ -327,6 +340,26 @@ export async function runAbsTrackingTick(deps: AbsTickDeps): Promise<AbsTickRepo
 
       // Step 5 runs even when ABS failed: it only needs stored data.
       if (!pageDeps.shouldStop?.()) shipmentErrors += await recomputeDecisions(store, pageDeps, now, log, scrub);
+
+      // Step 7: live pass, on fresh decisions, still under the tick lock. Not
+      // when ABS itself failed (every history check would fail too), never in
+      // dry runs / offline replays.
+      if (!deps.dryRun && !deps.keepWatermark && outcome !== "failed" && !pageDeps.shouldStop?.() && isLive()) {
+        try {
+          report.live = await runLivePass({
+            db: deps.db,
+            config: liveConfigOf(deps.config),
+            fetchHistory: source.getHistory ? (awb) => (source.getHistory as (a: string) => Promise<HistoryEvent[]>)(awb) : null,
+            now,
+            isLive,
+            secrets: [deps.config.apiKey],
+            log,
+            shouldStop: pageDeps.shouldStop,
+          });
+        } catch (err) {
+          log(`[ABS live] pass failed: ${scrub(err)}`);
+        }
+      }
 
       if (outcome === "ok" && shipmentErrors > 0) {
         outcome = "partial";
@@ -488,6 +521,11 @@ export function startAbsTrackingWorker(opts: StartAbsWorkerOptions): AbsTracking
     });
     try {
       const report = await inFlight;
+      // Live mode: deduped alert emails + the 09:00 Cairo digest (never throws).
+      if (effectiveAbsTrackingMode() === "live") await runLiveMonitoring({ db: opts.db, log: (m) => log.warn(m) }, report.live);
+      if (report.live?.ran && (report.live.applied > 0 || report.live.failed > 0 || report.live.capHit)) {
+        log.info(`[ABS live] applied=${report.live.applied} ready=${report.live.ready} skipped=${report.live.skipped} failed=${report.live.failed}${report.live.capHit ? " (daily cap reached)" : ""}`);
+      }
       if (report.outcome !== lastOutcome || (report.outcome !== "ok" && report.outcome !== "skipped_backoff")) {
         const summary = `outcome=${report.outcome} pages=${report.pages} seen=${report.shipmentsSeen} changed=${report.shipmentsChanged} auto=${report.linksAuto} review=${report.linksReview} newDecisions=${report.decisionsNew}`;
         (report.outcome === "ok" || report.outcome === "skipped_locked" || report.outcome === "skipped_backoff" ? log.info : log.warn)(

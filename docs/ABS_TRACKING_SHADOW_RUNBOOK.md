@@ -8,6 +8,11 @@ shows **what it would do**. **It never changes an order, its stock,
 This runbook does not deploy anything by itself. Deploying the branch and
 setting variables are separate, approved steps.
 
+**Live mode** (automatic Delivered) has its own runbook:
+[ABS_TRACKING_LIVE_RUNBOOK.md](ABS_TRACKING_LIVE_RUNBOOK.md). Deploying the
+release that contains migration 0072 while staying in `shadow` changes
+nothing on the website.
+
 ---
 
 ## 1. Environment variables

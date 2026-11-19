@@ -24,6 +24,14 @@ const api = {
   unlink: { mutate: vi.fn(async () => ({ changed: true })) },
   acknowledgeDecision: { mutate: vi.fn(async () => ({ changed: true })) },
   pollNow: { mutate: vi.fn(async () => ({ outcome: "ok", shipmentsSeen: 3, decisionsNew: 1 })) },
+  liveReady: { query: q("liveReady") },
+  liveAttention: { query: q("liveAttention") },
+  liveDone: { query: q("liveDone") },
+  liveSetPaused: { mutate: vi.fn(async () => ({ changed: true })) },
+  liveApproveReady: { mutate: vi.fn(async () => ({ applied: 2, results: [{ outcome: "applied" }, { outcome: "applied" }] })) },
+  liveApproveOld: { mutate: vi.fn(async () => ({ outcome: "applied", orderNumber: 10150 })) },
+  liveUndo: { mutate: vi.fn(async () => ({ changed: true, status: "shipped" })) },
+  liveSuppress: { mutate: vi.fn(async () => ({ changed: true })) },
 };
 vi.mock("#root/shared/trpc/client", () => ({ trpc: { absTracking: api } }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -80,6 +88,9 @@ const shadowOverview = (counts: Partial<Record<string, number>> = {}) => ({
   counts: { linksByState: {}, reviewQueue: 0, needsReview: 0, unmatched: 0, openAlertsByReason: {}, openAlerts: 0, wouldMarkDelivered: 0, wouldMarkShipped: 0, missingAwb: 0, unknownStatuses: 0, ...counts },
   unknownStatusLabels: [],
   pollNow: { allowed: true, nextAllowedAt: null },
+  health: { consecutiveFailures: 0, lastOkAt: minutesAgo(4) },
+  live: null,
+  liveTablesReady: false,
   settings: { absOnlySince: new Date("2026-11-18T00:00:00+02:00"), missingAwbAlertDays: 2, matchWindowDays: 10, reverseWindowDays: 45 },
 });
 const validation = {
@@ -263,6 +274,17 @@ describe("ABS tracking page", () => {
     await waitFor(() => expect(api.pollNow.mutate).toHaveBeenCalledTimes(1));
   });
 
+  it("Shadow: no live query is made and no button that could change an order exists", async () => {
+    setFull();
+    render(<AbsTrackingPage />);
+    await screen.findByTestId("abs-review");
+    expect(api.liveReady.query).not.toHaveBeenCalled();
+    expect(api.liveAttention.query).not.toHaveBeenCalled();
+    expect(api.liveDone.query).not.toHaveBeenCalled();
+    for (const id of ["abs-pause", "abs-resume", "abs-approve-ready", "abs-live-ready", "abs-live-done", "abs-live-too-old"]) expect(screen.queryByTestId(id)).toBeNull();
+    expect(has(screen.getByTestId("abs-shadow-note"), "Shadow mode: nothing on the website changes.")).toBe(true);
+  });
+
   it("cooldown: the check button is disabled with a message", async () => {
     setFull();
     fixtures.overview = { ...shadowOverview(), pollNow: { allowed: false, nextAllowedAt: new Date(Date.now() + 90_000) } };
@@ -270,5 +292,111 @@ describe("ABS tracking page", () => {
     await screen.findByTestId("abs-review");
     expect((screen.getByTestId("abs-poll-now") as HTMLButtonElement).disabled).toBe(true);
     expect(has(screen.getByTestId("abs-status-bar"), /You can check again in \d+ s/)).toBe(true);
+  });
+
+  // ── Live mode ────────────────────────────────────────────────────────────
+  const liveBlock = (extra: Record<string, unknown> = {}) => ({ paused: false, pausedAt: null, pausedBy: null, pauseNote: null, appliedToday: 3, dailyCap: 40, maxPerTick: 10, requireApproval: true, settleMinutes: 30, maxAgeDays: 14, ...extra });
+  const liveOverview = (extra: Record<string, unknown> = {}) => ({ ...shadowOverview(), mode: "live", requestedMode: "live", liveTablesReady: true, live: liveBlock(extra) });
+  const READY = [
+    { decisionId: "dec-r1", awb: "ABS0000201", orderNumber: 10201, orderStatus: "shipped", total: 450, collected: 450, deliveryDate: minutesAgo(200), checkedAt: minutesAgo(5) },
+    { decisionId: "dec-r2", awb: "ABS0000202", orderNumber: 10202, orderStatus: "processing", total: 300, collected: 300, deliveryDate: minutesAgo(300), checkedAt: minutesAgo(5) },
+  ];
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const DONE = [{ id: "app-1", awbLast4: "0301", orderId: ORDER_A, orderNumber: 10301, orderStatus: "delivered", fromStatus: "shipped", trigger: "auto", actor: "system:abs", appliedAt: minutesAgo(30), cairoDay: today, undoneAt: null, undoneBy: null }];
+  const ATTENTION = [
+    { id: "la-1", awb: "ABS0000401", decisionId: "dec-old", outcome: "skipped", reason: "too_old", lastSeenAt: minutesAgo(10), orderId: ORDER_A, orderNumber: 10401, orderStatus: "shipped", alerts: [], deliveredDaysAgo: 20 },
+    { id: "la-2", awb: "ABS0000402", decisionId: "dec-alert", outcome: "skipped", reason: "open_alert", lastSeenAt: minutesAgo(10), orderId: ORDER_B, orderNumber: 10402, orderStatus: "shipped", alerts: [{ id: "alert-cod", reasonCode: "cod_mismatch" }], deliveredDaysAgo: null },
+    { id: "la-3", awb: "ABS0000403", decisionId: "dec-human", outcome: "skipped", reason: "human_changed", lastSeenAt: minutesAgo(10), orderId: ORDER_B, orderNumber: 10403, orderStatus: "processing", alerts: [], deliveredDaysAgo: null },
+  ];
+  const setLive = (extra: Record<string, unknown> = {}) => {
+    setFull();
+    fixtures.overview = liveOverview(extra);
+    fixtures.liveReady = READY;
+    fixtures.liveAttention = ATTENTION;
+    fixtures.liveDone = DONE;
+  };
+
+  it("Live – approval: badge and note; Ready lists the set; the button applies exactly that set after a confirm", async () => {
+    setLive();
+    render(<AbsTrackingPage />);
+    const ready = await screen.findByTestId("abs-live-ready");
+    expect(has(screen.getByTestId("abs-mode"), "Live – approval")).toBe(true);
+    expect(has(screen.getByTestId("abs-shadow-note"), "only when you press the button")).toBe(true);
+    expect(has(screen.getByTestId("abs-live-today"), "3")).toBe(true);
+    expect(has(ready, "#10201")).toBe(true);
+    expect(has(ready, "#10202")).toBe(true);
+    await userEvent.click(screen.getByTestId("abs-approve-ready"));
+    expect(api.liveApproveReady.mutate).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByTestId("abs-approve-ready-confirm"));
+    await waitFor(() => expect(api.liveApproveReady.mutate).toHaveBeenCalledWith({ decisionIds: ["dec-r1", "dec-r2"] }));
+  });
+
+  it("Live (automatic): no Ready section; Done automatically lists today's change; Undo needs a note", async () => {
+    setLive({ requireApproval: false });
+    render(<AbsTrackingPage />);
+    const done = await screen.findByTestId("abs-live-done");
+    expect(has(screen.getByTestId("abs-mode"), "Live")).toBe(true);
+    expect(has(screen.getByTestId("abs-mode"), "approval")).toBe(false);
+    expect(screen.queryByTestId("abs-live-ready")).toBeNull();
+    expect(has(done, "#10301")).toBe(true);
+    expect(has(done, "…0301")).toBe(true);
+    await userEvent.click(screen.getByTestId("abs-undo-app-1-open"));
+    const submit = screen.getByTestId("abs-undo-app-1-submit") as HTMLButtonElement;
+    expect(submit.disabled).toBe(true);
+    await userEvent.type(screen.getByTestId("abs-undo-app-1-note"), "customer refused");
+    await userEvent.click(submit);
+    await waitFor(() => expect(api.liveUndo.mutate).toHaveBeenCalledWith({ applicationId: "app-1", note: "customer refused" }));
+  });
+
+  it("Paused: badge, Resume button, and no approve button", async () => {
+    setLive({ paused: true, pausedBy: "owner@shop.test", pausedAt: minutesAgo(3) });
+    render(<AbsTrackingPage />);
+    await screen.findByTestId("abs-live-ready");
+    expect(has(screen.getByTestId("abs-mode"), "Paused")).toBe(true);
+    expect(screen.queryByTestId("abs-approve-ready")).toBeNull();
+    expect(screen.queryByTestId("abs-pause")).toBeNull();
+    await userEvent.click(screen.getByTestId("abs-resume"));
+    await waitFor(() => expect(api.liveSetPaused.mutate).toHaveBeenCalledWith({ paused: false }));
+  });
+
+  it("Pause is one click", async () => {
+    setLive();
+    render(<AbsTrackingPage />);
+    await userEvent.click(await screen.findByTestId("abs-pause"));
+    await waitFor(() => expect(api.liveSetPaused.mutate).toHaveBeenCalledWith({ paused: true }));
+  });
+
+  it("Needs your attention: old delivery approve, acknowledge the old alert, don't mark automatically", async () => {
+    setLive();
+    render(<AbsTrackingPage />);
+    const old = await screen.findByTestId("abs-live-too-old");
+    expect(has(old, "#10401")).toBe(true);
+    expect(has(old, "delivered 20 days ago")).toBe(true);
+    await userEvent.click(screen.getByTestId("abs-approve-old-dec-old"));
+    await waitFor(() => expect(api.liveApproveOld.mutate).toHaveBeenCalledWith({ decisionId: "dec-old" }));
+
+    expect(has(screen.getByTestId("abs-problems"), "There is an open problem on this order or shipment")).toBe(true);
+    await userEvent.click(screen.getByTestId("abs-live-ack-alert-cod-open"));
+    await userEvent.type(screen.getByTestId("abs-live-ack-alert-cod-note"), "ABS corrected the amount");
+    await userEvent.click(screen.getByTestId("abs-live-ack-alert-cod-submit"));
+    await waitFor(() => expect(api.acknowledgeDecision.mutate).toHaveBeenCalledWith({ decisionId: "alert-cod", note: "ABS corrected the amount" }));
+
+    const blocked = screen.getByTestId("abs-live-blocked");
+    expect(has(blocked, "Someone changed this order's status after ABS delivered it")).toBe(true);
+    await userEvent.click(screen.getByTestId("abs-suppress-dec-human-open"));
+    await userEvent.type(screen.getByTestId("abs-suppress-dec-human-note"), "I will handle it");
+    await userEvent.click(screen.getByTestId("abs-suppress-dec-human-submit"));
+    await waitFor(() => expect(api.liveSuppress.mutate).toHaveBeenCalledWith({ decisionId: "dec-human", note: "I will handle it" }));
+    // Attention count = review 1 + not linked 1 + ABS problem 1 + returned 1 + missing AWB 1 + live 3 = 8.
+    expect(has(screen.getByTestId("abs-attention"), "Needs your attention8")).toBe(true);
+  });
+
+  it("sync failing shows in Needs your attention and in the status bar", async () => {
+    setLive();
+    fixtures.overview = { ...liveOverview(), health: { consecutiveFailures: 4, lastOkAt: minutesAgo(90) } };
+    render(<AbsTrackingPage />);
+    const g = await screen.findByTestId("abs-sync-failing");
+    expect(has(g, "The last 4 ABS checks failed")).toBe(true);
+    expect(has(screen.getByTestId("abs-health"), "The last 4 ABS checks failed")).toBe(true);
   });
 });

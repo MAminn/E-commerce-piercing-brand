@@ -42,11 +42,21 @@ describe("config", () => {
     expect(readAbsTrackingConfig({ ABS_TRACKING_MODE: " Shadow " }).mode).toBe("shadow");
   });
 
-  it("live → shadow with one warning", () => {
+  it("live → live with the live defaults; an invalid ABS_LIVE_TRANSITIONS → shadow with one warning", () => {
     const c = readAbsTrackingConfig({ ...ENV_OK, ABS_TRACKING_MODE: "live" });
     expect(c.requestedMode).toBe("live");
-    expect(c.mode).toBe("shadow");
-    expect(c.warnings).toEqual(["live requested but not available in this build; running shadow"]);
+    expect(c.mode).toBe("live");
+    expect(c.warnings).toEqual([]);
+    expect(c.live).toEqual({ transitions: ["delivered"], transitionsError: null, settleMinutes: 30, maxAgeDays: 14, maxPerTick: 10, dailyCap: 40, requireApproval: true });
+    for (const bad of ["cancelled", "delivered,cancelled", "shipped", "returned", "deliverd", ","]) {
+      const b = readAbsTrackingConfig({ ...ENV_OK, ABS_TRACKING_MODE: "live", ABS_LIVE_TRANSITIONS: bad });
+      expect(b.mode).toBe("shadow");
+      expect(b.warnings[0]).toMatch(/^live refused: ABS_LIVE_TRANSITIONS may only be "delivered"/);
+    }
+    expect(readAbsTrackingConfig({ ...ENV_OK, ABS_TRACKING_MODE: "live", ABS_LIVE_TRANSITIONS: " Delivered " }).mode).toBe("live");
+    const tuned = readAbsTrackingConfig({ ...ENV_OK, ABS_TRACKING_MODE: "live", ABS_LIVE_REQUIRE_APPROVAL: "false", ABS_LIVE_DAILY_CAP: "5", ABS_LIVE_MAX_PER_TICK: "2", ABS_LIVE_SETTLE_MINUTES: "45", ABS_LIVE_MAX_AGE_DAYS: "7" }).live;
+    expect(tuned).toMatchObject({ requireApproval: false, dailyCap: 5, maxPerTick: 2, settleMinutes: 45, maxAgeDays: 7 });
+    for (const v of ["", "true", "yes", "maybe"]) expect(readAbsTrackingConfig({ ABS_LIVE_REQUIRE_APPROVAL: v }).live.requireApproval).toBe(true);
   });
 
   it("defaults and the interval floor", () => {
@@ -111,14 +121,32 @@ describe("boot: mode off / missing config → nothing starts, no query", () => {
     expect(lines.join()).toMatch(/not ready: table abs_shipment/);
   });
 
-  it("shadow, ready → shadow; live → shadow + warning", async () => {
+  it("shadow, ready → shadow; live (0072 ready) → live; live with invalid transitions → shadow + warning", async () => {
     const { lines, log } = quietLog();
     const db = { execute: vi.fn(async () => ({ rows: [{ missing_tables: [], missing_indexes: [] }] })) };
     expect((await initAbsTracking(db as never, ENV_OK, log)).effective).toBe("shadow");
     expect(effectiveAbsTrackingMode()).toBe("shadow");
-    expect((await initAbsTracking(db as never, { ...ENV_OK, ABS_TRACKING_MODE: "live" }, log)).effective).toBe("shadow");
-    expect(lines).toContain("[ABS tracking] live requested but not available in this build; running shadow");
+    expect((await initAbsTracking(db as never, { ...ENV_OK, ABS_TRACKING_MODE: "live" }, log)).effective).toBe("live");
+    expect(lines).toContain("[ABS tracking] mode=live (approval required; settle 30 min, max age 14 d, 10/tick, 40/day)");
+    expect((await initAbsTracking(db as never, { ...ENV_OK, ABS_TRACKING_MODE: "live", ABS_LIVE_TRANSITIONS: "cancelled" }, log)).effective).toBe("shadow");
+    expect(lines.some((l) => /live refused: ABS_LIVE_TRANSITIONS may only be "delivered"/.test(l))).toBe(true);
     for (const l of lines) expect(l).not.toContain(ENV_OK.ABS_API_KEY);
+  });
+
+  it("live requested but 0072 missing → shadow, saying why", async () => {
+    const { lines, log } = quietLog();
+    let call = 0;
+    const db = {
+      execute: vi.fn(async () => {
+        call++;
+        // 1st query: 0070/0071 readiness (ok); 2nd: 0072 readiness (missing).
+        return { rows: [call === 1 ? { missing_tables: [], missing_indexes: [] } : { missing_tables: ["abs_live_application"], missing_indexes: [] }] };
+      }),
+    };
+    const init = await initAbsTracking(db as never, { ...ENV_OK, ABS_TRACKING_MODE: "live" }, log);
+    expect(init.effective).toBe("shadow");
+    expect(init.reason).toMatch(/^live not ready: table abs_live_application; running shadow$/);
+    expect(lines.join()).toMatch(/live not ready: table abs_live_application/);
   });
 
   it("a failing readiness query → off, never throws", async () => {

@@ -7,6 +7,8 @@ import {
   type AbsTrackingConfig,
 } from "#root/shared/config/abs-tracking";
 import { absAuditLog, absOrderLink, absShipment, absSyncRun, absSyncState, order } from "#root/shared/database/drizzle/schema";
+import { getLiveOverview } from "./live";
+import { readSyncHealth } from "./live-monitor";
 import { phoneLast4, parseMoney } from "./normalize";
 import { pollNowCooldown } from "./review";
 
@@ -144,6 +146,8 @@ export async function getOverview(db: DatabaseClient | null, cfg: AbsTrackingCon
     .where(eq(absShipment.status, "UNKNOWN"))
     .groupBy(absShipment.statusRaw);
   const missing = await getMissingAwb(db, cfg, now);
+  const health = await readSyncHealth(db);
+  const live = mode === "live" ? await getLiveOverview(db, cfg, now) : null;
 
   const linksByState = Object.fromEntries(linkRows.map((r) => [r.state, Number(r.n)]));
   const openAlertsByReason: Record<string, number> = {};
@@ -183,6 +187,11 @@ export async function getOverview(db: DatabaseClient | null, cfg: AbsTrackingCon
     },
     unknownStatusLabels: unknown.map((u) => ({ label: (u.raw ?? "(empty)").slice(0, 60), count: Number(u.n) })),
     pollNow: { allowed: cooldown.allowed, nextAllowedAt: cooldown.nextAllowedAt },
+    health: { consecutiveFailures: health.consecutiveFailures, lastOkAt: health.lastOkAt },
+    /** Live mode only (null in shadow). */
+    live,
+    /** 0072 present: "Done automatically" and Undo work (also after a rollback to shadow). */
+    liveTablesReady: mode === "live" || boot?.liveTablesReady === true,
     settings: {
       absOnlySince: cfg.absOnlySince,
       missingAwbAlertDays: cfg.missingAwbAlertDays,

@@ -1,5 +1,5 @@
--- ABS tracking — MANUAL rollback of migrations 0071_abs_tracking_review.sql and
--- 0070_abs_tracking.sql.
+-- ABS tracking — MANUAL rollback of migrations 0072_abs_live.sql,
+-- 0071_abs_tracking_review.sql and 0070_abs_tracking.sql.
 --
 -- DOCUMENTATION ONLY. This file is not a migration, is not in
 -- shared/database/migrations/ and is never run by the app.
@@ -9,15 +9,31 @@
 --      fully inert and nothing reads or writes these tables;
 --   2. take a backup (pg_dump -t 'abs_*' …) if the shadow data, the review
 --      decisions or the audit log matter;
---   3. run PART 1 only (undo 0071, keep the Phase 1 tables) or PART 1 + PART 2
---      (remove everything);
---   4. DELETE FROM __drizzle_migrations WHERE hash IN ('0071_abs_tracking_review.sql'[, '0070_abs_tracking.sql']);
+--   3. run PART 0 only (undo 0072 = live mode; keep Shadow), PART 0 + PART 1
+--      (undo 0072 + 0071, keep the Phase 1 tables) or PART 0 + 1 + 2 (remove
+--      everything);
+--   4. DELETE FROM __drizzle_migrations WHERE hash IN ('0072_abs_live.sql'[, '0071_abs_tracking_review.sql'[, '0070_abs_tracking.sql']]);
 --      — otherwise auto-migrate will NOT re-create the objects on the next boot
 --      (only do this if you also want them back on the next deploy).
 --
--- Neither migration changed a non-abs table, column, index or enum, so there is
+-- PART 0 deletes the live-mode trail (abs_live_application) — back it up
+-- first: it is the record of every automatic Delivered. Orders that live mode
+-- set Delivered STAY Delivered (their order_log rows remain); removing the
+-- tables does not undo them — use the screen's Undo first if that is wanted.
+--
+-- No migration changed a non-abs table, column, index or enum, so there is
 -- nothing else to restore. Every statement is IF EXISTS, so the file can be
 -- re-run safely.
+
+-- ── PART 0: undo 0072 (live mode: application trail, pause flag, applied_at) ──
+DROP TABLE IF EXISTS "abs_live_application";
+DROP TABLE IF EXISTS "abs_settings";
+DO $$
+BEGIN
+  IF to_regclass('public.abs_tracking_decision') IS NOT NULL THEN
+    ALTER TABLE "abs_tracking_decision" DROP COLUMN IF EXISTS "applied_at";
+  END IF;
+END $$;
 
 -- ── PART 1: undo 0071 (review screen, audit log, snapshots, backoff/resume) ──
 DROP TABLE IF EXISTS "abs_audit_log";

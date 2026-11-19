@@ -1,4 +1,4 @@
-# ABS courier tracking — Shadow (Phases 1 + 2)
+# ABS courier tracking — Shadow and Live (Delivered only)
 
 ## Purpose
 
@@ -21,10 +21,23 @@ ERP sync.** Decisions are recorded with `applied = false`. Every write — the
 poller's and every button on the screen — goes to `abs_*` tables only. The
 screen says so: *"Shadow mode: nothing on the website changes."*
 
-Code: `backend/shipping-tracking/abs/`, config `shared/config/abs-tracking.ts`,
-migrations `0070_abs_tracking.sql` + `0071_abs_tracking_review.sql`, scripts
+**Live mode** (Phase 4, `ABS_TRACKING_MODE=live`) adds exactly one automatic
+change: when ABS reports a shipment DELIVERED and every rule in
+[Live mode](#live-mode-delivered-only) passes, the linked order goes
+`pending | processing | shipped → delivered` **through the same code the
+admin's status change uses** (`applyOrderStatusChange`). The ERP then records
+the sale, COGS, stock-out and courier receivable on its next sync, exactly as
+for an admin change. Nothing else is ever automated: no cancel, no restock, no
+returns, no totals, items, payment or customer data.
+
+Code: `backend/shipping-tracking/abs/` (live: `live-rules.ts`, `live.ts`,
+`live-monitor.ts`), the shared status core
+`backend/orders/update-order-status/apply-status-change.ts`, config
+`shared/config/abs-tracking.ts`, migrations `0070_abs_tracking.sql`,
+`0071_abs_tracking_review.sql`, `0072_abs_live.sql`, scripts
 `scripts/abs-tracking/`, page `pages/dashboard/abs-tracking/`. Operations:
-[ABS_TRACKING_SHADOW_RUNBOOK.md](ABS_TRACKING_SHADOW_RUNBOOK.md).
+[ABS_TRACKING_SHADOW_RUNBOOK.md](ABS_TRACKING_SHADOW_RUNBOOK.md) and
+[ABS_TRACKING_LIVE_RUNBOOK.md](ABS_TRACKING_LIVE_RUNBOOK.md).
 
 ## Modes
 
@@ -32,7 +45,7 @@ migrations `0070_abs_tracking.sql` + `0071_abs_tracking_review.sql`, scripts
 |---|---|
 | `off` (default, unset, or any unknown value) | Nothing starts. No ABS request, no query against `abs_*`. One boot line: `[ABS tracking] off (…)`. The screen says "ABS tracking is off"; every procedure except `overview` refuses; `overview` makes no query. |
 | `shadow` | Poller runs; writes `abs_*` only; decisions recorded, never applied. The screen works. |
-| `live` | **Not implemented.** Treated as `shadow`, with one boot warning. |
+| `live` | Shadow **plus** the live writer (Delivered only). Needs migration 0072 and a valid `ABS_LIVE_TRANSITIONS`; otherwise it runs `shadow` and the boot line / status bar say why. `ABS_LIVE_REQUIRE_APPROVAL=true` (default) = eligible orders wait for the owner's button. A DB pause flag turns it back into shadow at runtime. |
 
 The effective mode stays `off` unless, at boot, `ABS_API_BASE_URL` is a valid
 `https://` URL, `ABS_API_KEY` is set, **and** the readiness check finds all
@@ -46,7 +59,7 @@ readiness) is shown in the screen's status bar via `absTracking.overview`.
 
 | Name | Default | Notes |
 |---|---|---|
-| `ABS_TRACKING_MODE` | `off` | `off` \| `shadow` \| `live` (= shadow) |
+| `ABS_TRACKING_MODE` | `off` | `off` \| `shadow` \| `live` |
 | `ABS_API_BASE_URL` | — (required) | `https://` only; no credentials, query or fragment. No default. |
 | `ABS_API_KEY` | — (required) | **Secret.** Read-scope key; set by the owner as a Coolify secret. Never logged (redacted as `***`). |
 | `ABS_POLL_INTERVAL_MS` | `600000` | Floor `300000`. |
@@ -59,6 +72,13 @@ readiness) is shown in the screen's status bar via `absTracking.overview`.
 | `ABS_COD_TOLERANCE_EGP` | `1` | Allowed \|expected COD − ABS COD\|. |
 | `ABS_ONLY_SINCE` | `2026-11-18` | ABS-only policy start (Cairo date). Orders placed before it never raise "no ABS shipment". |
 | `ABS_MISSING_AWB_ALERT_DAYS` | `2` | A processing/shipped order with no ABS shipment is listed after this many days. |
+| `ABS_LIVE_TRANSITIONS` | `delivered` | Live only. The only valid value; anything else (e.g. `cancelled`, `delivered,cancelled`, a typo) keeps live off → shadow, with a boot warning. |
+| `ABS_LIVE_REQUIRE_APPROVAL` | `true` | Live only. `true`: eligible items are listed as "Ready to mark Delivered (N)" and applied only by the button. `false` / `0` / `no` / `off`: applied automatically each tick. |
+| `ABS_LIVE_SETTLE_MINUTES` | `30` | Live only. DELIVERED must be stable this long (from the later of ABS's last DELIVERED event and our first sighting). |
+| `ABS_LIVE_MAX_AGE_DAYS` | `14` | Live only. Older deliveries go to "Needs your attention" for a one-click approve. |
+| `ABS_LIVE_MAX_PER_TICK` | `10` | Live only. Automatic applications per tick. |
+| `ABS_LIVE_DAILY_CAP` | `40` | Live only. Applications per Cairo day (automatic + approved). Beyond it: stop and alert. |
+| `ABS_ALERT_EMAILS` | — | Live only. Alert + digest recipients (same parser as `ORDER_NOTIFICATION_EMAILS`); unset → `ORDER_NOTIFICATION_EMAILS`; neither → nothing is sent (logged once per alert window). |
 
 ## ABS-only policy and the Reference convention
 
@@ -83,7 +103,8 @@ readiness) is shown in the screen's status bar via `absTracking.overview`.
 3. **Window:** if `abs_sync_state.resume_*` is set, continue that window from
    the stored page / cursor; else `from = (watermark ?? ABS_BACKFILL_FROM) −
    overlap`, `to = now`.
-4. `POST /api/v1/shipments/list` page by page (100 per page), at most
+4. `POST /api/v1/shipments/list` page by page (100 per page; the real response
+   envelope is described in [the list contract](#the-real-shipmentslist-contract-verified-18-nov-2026)), at most
    `ABS_MAX_PAGES_PER_TICK` pages and within `ABS_TICK_TIMEOUT_MS` (checked
    between pages; a fetched page is always processed). After every page of a
    multi-page window the resume point is saved, so a cap, the time budget, a
@@ -100,20 +121,61 @@ readiness) is shown in the screen's status bar via `absTracking.overview`.
    AWBs whose latest decision saw a different website status or total than
    the order has now (SELECT on `order`). This is how a confirm/reject/unlink
    or an admin's status change shows up without a change at ABS.
-7. The watermark advances to `to` (and the resume point clears) **only** when
+7. **Live mode only** (effective mode `live`, not paused, ABS did not fail this
+   tick): the live pass (`live.ts`), on the fresh decisions, still under the
+   tick lock — see [Live mode](#live-mode-delivered-only).
+8. The watermark advances to `to` (and the resume point clears) **only** when
    the window is complete. A failed run stores `backoff_until = finish +
    min(interval × 2^(n−1), 1 h)` (n = consecutive failed runs; a longer
    429 `Retry-After` wins, still ≤ 1 h).
 
-Each decision row also stores a snapshot for a future compare-and-set
-writer: `order_status_at_decision`, `order_total_at_decision`,
-`abs_delivery_date`, refreshed on every sighting. Not used for writes.
+Each decision row also stores a snapshot for the live writer's
+compare-and-set: `order_status_at_decision`, `order_total_at_decision`,
+`abs_delivery_date`, refreshed on every sighting. `mode` records the effective
+mode the row was written in (`shadow` / `live`).
+
+### The real `/shipments/list` contract (verified 18 Nov 2026)
+
+ABS answers **HTTP 201** with the page object wrapped once more:
+
+```json
+{ "success": true, "message": "…", "data": { "data": [ …rows… ], "hasMore": true, "nextCursor": "…" } }
+```
+
+The documented flat body `{ data: [], hasMore, nextCursor }` is also accepted
+(`parse.ts`, `unwrapListEnvelope`). `success: false` or any other shape throws
+(an empty page there must never advance the watermark). `consigneePhone` is an
+**array** of 12-digit `20…` strings (an exact match on any of them counts);
+money comes as strings; `cmpService` is returned in every row but ABS rejects
+it as a requested column, so it is not requested. Extra fields (`subAccountId`,
+`isUnderRevision`, `currentBranchId`) are kept in `raw`; live mode reads
+`raw.isUnderRevision`.
 
 ## The review screen (`/dashboard/abs-tracking`)
 
 Sidebar: **Catalog → ABS Tracking**. Admin only (page guard + `adminProcedure`).
 Phone numbers appear as their last 4 digits; no customer names or addresses.
 Usable on a phone (stacked cards, inline note forms, no wide tables).
+
+Top of the page, in plain language (Phase 4 layout):
+
+1. **Status bar** — mode badge (**Off / Shadow / Live / Live – approval /
+   Paused**), last check, health (consecutive failures, last success),
+   "Marked Delivered automatically today: N / cap", **Pause** / **Resume**
+   (live only) and **Check ABS now**.
+2. **Needs your attention (N)** — one list, grouped: ABS sync failing;
+   ambiguous match (needs a decision); amount differs / delivered then
+   returned or disputed / problems at ABS; returned, waiting for you to
+   receive it; delivered more than 14 days ago (approve); could not mark
+   Delivered automatically (live); orders with no ABS shipment. Each row has its
+   action (confirm / reject / link / acknowledge / approve / don't mark
+   automatically).
+3. **Ready to mark Delivered (N)** — approval mode only, with **Mark these N
+   Delivered** (two-step confirm).
+4. **Done automatically** — today and the last 7 days: order number, AWB last
+   4, time, automatic or approved by whom, and **Undo**.
+5. **Details** (collapsed): Would mark Delivered, Shadow accuracy, All
+   shipments, History — the Phase 2 sections below, unchanged.
 
 | # | Section | What it shows |
 |---|---|---|
@@ -228,13 +290,15 @@ Default range: Shadow start (first ok/partial run) → now. SELECT-only on
 | `abs_tracking_decision` | Shadow audit trail, unique `dedupe_key = awb|shipment status|order status|decision`. 0071: snapshot columns and `acknowledged_at/by`, `ack_note` (CHECK ≤ 500). |
 | `abs_sync_run` | One row per tick (incl. skipped_locked / skipped_config). 0071: `backoff_until`. |
 | `abs_sync_state` | Single row: watermark; 0071: `resume_window_from/to`, `resume_page`, `resume_cursor`. |
-| `abs_audit_log` (0071) | One row per human action. No FKs (the trail outlives what it describes). |
+| `abs_audit_log` (0071) | One row per human action, and (0072) per live system action: `live_apply`, `live_undo`, `live_pause` / `live_resume`, `live_suppress`, `alert_email`, `digest_email`. No FKs (the trail outlives what it describes). |
+| `abs_live_application` (0072) | One row per live outcome: `applied` (with `order_log_id`, `from_status`, `actor`, `trigger`, undo columns), `skipped` / `failed` with `reason_code` (deduped per AWB × reason × Cairo day). Partial unique: one `applied` per decision and per (order, `to_status`). CHECK `to_status = 'delivered'`. No FKs. |
+| `abs_settings` (0072) | Single row: `live_paused` + who / when / note. |
 
 All status / state / role / decision / action values are `text` (no enums).
 
 ## Migrations, locks and rollback
 
-Both migrations are additive and touch `abs_*` objects only; both are
+All three migrations are additive and touch `abs_*` objects only; all are
 idempotent (`IF NOT EXISTS`; the ADD CONSTRAINT re-runs raise 42710, which
 auto-migrate skips) and set `lock_timeout = '5s'` while they run.
 Auto-migrate runs each statement on its own (autocommit) at server start.
@@ -253,9 +317,16 @@ Auto-migrate runs each statement on its own (autocommit) at server start.
   CHECK on `abs_tracking_decision`. **No lock on `order` or any website table.**
   ~48 ms.
 
-Rollback: `ABS_TRACKING_MODE=off` + restart makes everything inert. To remove
-the objects: `docs/ABS_TRACKING_ROLLBACK.sql` (PART 1 = 0071 only, PART 2 =
-everything), after a backup; documentation only, never run by the app.
+- **0072:** `abs_live_application` + `abs_settings` (new tables, new indexes,
+  the settings row), one nullable `ADD COLUMN applied_at` on
+  `abs_tracking_decision` (ACCESS EXCLUSIVE on that `abs_*` table, catalog
+  only). No FK, nothing references `"order"`: **no lock on `order` or any
+  website table.** No type change. `lock_timeout = '5s'`.
+
+Rollback: pause on the screen, then `ABS_TRACKING_MODE=shadow` (or `off`) +
+restart. To remove the objects: `docs/ABS_TRACKING_ROLLBACK.sql` (PART 0 = 0072,
+PART 1 = 0071, PART 2 = everything), after a backup; documentation only, never
+run by the app. Removing 0072 does **not** undo orders live mode delivered.
 
 ## Running locally (no ABS, no key)
 
@@ -279,14 +350,144 @@ adds the integration suites (migrations, ticks, resume / budget / backoff,
 every mutation and refusal, audit rows, recompute, pollNow lock + cooldown,
 and the no-write proof over every non-abs table).
 
-## Live mode (Phase 3 — not built; constraints the code keeps open)
+## Live mode (Delivered only)
 
-Only after the targets in the runbook are met and the owner approves: apply
-only `would_mark_delivered`, through the same transactional core as the admin
-status change (order_log entry, review email, no stock change on Delivered),
-actor `system:abs`; compare-and-set on `order_status_at_decision` and
-`order_total_at_decision`; idempotent per decision; kill switch and
-`ABS_LIVE_TRANSITIONS=delivered`; daily cap; never cancels or restocks.
+`ABS_TRACKING_MODE=live`. Operations, canary and rollback:
+[ABS_TRACKING_LIVE_RUNBOOK.md](ABS_TRACKING_LIVE_RUNBOOK.md).
+
+### The one transition and the one code path
+
+`pending | processing | shipped → delivered`, nothing else. `ABS_LIVE_TRANSITIONS`
+may only be `delivered`; any other value keeps live off at boot (runs shadow).
+The table enforces it too (`CHECK to_status = 'delivered'`).
+
+The write goes through `applyOrderStatusChange(tx, { orderId, newStatus,
+actor })` (`backend/orders/update-order-status/apply-status-change.ts`), the
+transactional core extracted unchanged from the admin's `updateOrderStatus`.
+The admin tRPC procedure calls the same function with a `user` actor, so both
+paths write identical rows (proved by a test that replays the pre-refactor
+code side by side):
+
+- `order.status` (and, only on a first cancel, `stock_restored` + the product
+  stock restore — never reached by live mode);
+- one `order_log` row: `action = status_changed`, old / new status. Live:
+  `user_id = NULL`, note `[ABS auto] Delivered at ABS (AWB …1234, decision
+  <id>).` (approval: `… Approved on the ABS screen.`). No phone, no full AWB;
+- the review-check email enqueue (`enqueueReviewCheckForOrder`, own
+  connection, dedupe key `review_check:<orderId>` — it may also create the
+  customer's `email_subscription` token row, exactly as the admin path does).
+
+The live writer itself writes only `abs_live_application`,
+`abs_tracking_decision` (`applied`, `applied_at`, `mode`), `abs_audit_log` and
+`abs_settings`. ABS stays read-only (same four-endpoint allow-list; the fresh
+history uses `GET /tracking/:awb/history`).
+
+### Eligibility — every rule, re-checked inside the transaction
+
+`live-rules.ts` (pure, unit-tested matrix). The writer runs the local rules
+before the ABS history call, then **all** rules again inside the transaction,
+with `abs_settings` and the order row locked (`SELECT … FOR UPDATE`) and
+decision, link, shipment and human activity re-read. First failing rule = the
+recorded reason.
+
+1. **Decision:** the AWB's latest decision is `would_mark_delivered`, not
+   applied, not suppressed by a person ("Don't mark automatically").
+2. **Order:** exists; `pending` / `processing` / `shipped` (delivered → nothing
+   to do; cancelled → attention).
+3. **Link:** primary; `auto` by `reference` or exact `phone_amount`, or
+   `confirmed` by a person (any method). Never `phone_amount_fuzzy` auto,
+   reverse / exchange / other roles, `needs_review` / `unmatched` /
+   `rejected`. Its order is the decision's order, it was not updated after the
+   decision's last sighting, and no recompute is pending.
+4. **Shipment:** DELIVERED; `lastEventCode` is not `SHP_PRTL_DLVD` /
+   `SHP_DLVD_RVRT`; `raw.isUnderRevision` is `false` (true or missing → skip);
+   service `DELIVERY` (or not sent).
+5. **Never overwrite a person:** no `order_log` status change (`status_changed`
+   / `cancelled`) not written by ABS since ABS **first** proposed Delivered for
+   this AWB and order; the order was never `delivered` before; no open blocking
+   alert on this AWB, the order, or another AWB of the order (`cod_mismatch`,
+   `returned_after_delivered`, `delivered_but_cancelled`, partial / reverted,
+   unknown / lost / damaged…, any reverse / exchange alert — a hold or failed
+   attempt *before* the delivery does not block); no other AWB linked to or
+   proposed for the order; no reject / unlink after the last confirmation.
+6. **Compare-and-set:** order status = `order_status_at_decision`, total =
+   `order_total_at_decision`, `stock_restored = false`.
+7. **Money:** COD — `collectedCash` present and within `ABS_COD_TOLERANCE_EGP`
+   of the total (`cash` alone is not enough). Prepaid — `payment_status = paid`
+   and ABS collected 0 / nothing.
+8. **Age:** ABS `deliveryDate` present and within `ABS_LIVE_MAX_AGE_DAYS`
+   (older → attention, one-click approve that waives only this rule).
+9. **Fresh history** (`GET /tracking/:awb/history`, same tick): contains
+   DELIVERED; every event dated; nothing after the last DELIVERED. DELIVERED
+   stable for `ABS_LIVE_SETTLE_MINUTES`, counted from the later of ABS's last
+   DELIVERED event and our first sighting. A failed call skips this tick.
+10. **Limits:** `ABS_LIVE_MAX_PER_TICK` per tick, `ABS_LIVE_DAILY_CAP` per
+    Cairo day (cap hit → stop + alert). At most 25 history calls per tick.
+
+Real-data shapes covered by the tests: #10053 returned after delivered,
+#10100 COD mismatch then corrected (blocked until the old alert is
+acknowledged), fuzzy phone, reverse shipment, cancelled order, prepaid,
+missing collectedCash, an event after DELIVERED, older than 14 days, inside
+the settle window.
+
+### Idempotency, concurrency, audit
+
+- `abs_live_application`: the `applied` row is inserted in the **same
+  transaction** as the status change, before it (`ON CONFLICT DO NOTHING` on
+  the partial unique indexes — one per decision, one per (order,
+  `delivered`)); nothing inserted → stop. The decision gets `applied = true`,
+  `applied_at` in the same transaction; `order_log_id` is filled after the core
+  call.
+- The tick runs under the existing advisory lock; every live write (tick,
+  button, approve) also locks the `abs_settings` row, which serialises them and
+  makes the pause flag and the daily cap exact.
+- The shared core is called **last** in the transaction: its review-email
+  enqueue uses its own connection, so nothing that can fail runs after it.
+- Every evaluated candidate that did not pass records a `skipped` row with its
+  reason (at most one per AWB × reason × Cairo day; repeats bump
+  `last_seen_at` / `seen_count`). A failed transaction records `failed /
+  apply_error` and alerts. These rows feed the screen, the digest and
+  validation.
+- `abs_audit_log`: `live_apply` per applied change; `live_undo`, `live_pause`,
+  `live_resume`, `live_suppress` per human action; `alert_email` /
+  `digest_email` per email.
+
+### Switches, approval mode, Undo
+
+| Switch | Effect |
+|---|---|
+| `ABS_TRACKING_MODE=live` | Live writer on (needs 0072). `shadow` / `off` behave exactly as before. |
+| **Pause** button (`abs_settings.live_paused`) | Runtime, no restart, audited, checked inside every live transaction. Paused = shadow (the poller keeps recording). The buttons that change orders refuse. |
+| `ABS_LIVE_REQUIRE_APPROVAL=true` (default) | The tick runs every check (incl. the history) and lists eligible items as **Ready to mark Delivered (N)**; nothing is applied until **Mark these N Delivered**, which applies exactly the previewed ids that are still Ready, re-running every check per item. An item already Ready is re-checked by the tick at most hourly. |
+| `ABS_LIVE_REQUIRE_APPROVAL=false` | Eligible items apply automatically each tick. |
+| **Approve** (delivered > 14 days) | One item; only the age rule is waived. |
+| **Don't mark automatically** | Suppresses that decision (`acknowledged_*` on it, note required). |
+| **Undo this automatic Delivered** | Only while the order is still Delivered and no status change happened after the automatic one. Sets the status back to `from_status` through the same core (admin user id, note `[ABS auto-undo] …`), records `undone_at / by / undo_order_log_id`. An undone order is never re-applied (it "was delivered before"). Works in live, and in shadow after a rollback while the 0072 tables exist. The review email queued on Delivered is **not** cancelled (same as an admin moving an order back). |
+
+**ERP after Undo:** if the ERP already recorded the sale for that order, the
+undo shows up there as a **status regression** issue on its next sync. That
+issue is handled in the ERP (reverse the SAL entry there); nothing on the
+website does it.
+
+### Alerts and the daily digest
+
+Existing SMTP mailer; recipients `ABS_ALERT_EMAILS`, else
+`ORDER_NOTIFICATION_EMAILS`. Live mode only (Shadow sends nothing).
+
+- **Immediate** (each type at most once per 6 h): 3 failed checks in a row; no
+  successful check for 60 min; the daily cap reached; an automatic Delivered
+  failed; an UNKNOWN ABS status present.
+- **Digest at 09:00 Cairo** (first tick at or after 09:00, once per Cairo
+  day): yesterday's automatic Delivered (count + order numbers), what needs
+  attention by type, sync health. No phones, names or addresses.
+- The status bar shows last success, consecutive failures, paused state and
+  applied today / cap.
+
+### Validation report in live mode
+
+The Shadow accuracy report counts any `order_log` change to delivered as
+"agreed", including live mode's own `[ABS auto]` rows. Read it as the
+pre-live gate; once live is on, use **Done automatically** and the digest.
 
 ## Not confirmed by ABS (open — the probe answers most)
 

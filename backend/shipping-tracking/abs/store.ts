@@ -298,8 +298,10 @@ function linkValues(match: MatchResult) {
   };
 }
 
-export async function createDbStore(db: DatabaseClient): Promise<AbsStore> {
+/** `decisionMode` = what new abs_tracking_decision rows record in `mode` (the effective mode). */
+export async function createDbStore(db: DatabaseClient, opts: { decisionMode?: "shadow" | "live" } = {}): Promise<AbsStore> {
   const common = await readCommon(db);
+  const decisionMode = opts.decisionMode ?? "shadow";
 
   const writeLink = async (awb: string, match: MatchResult, now: Date): Promise<ExistingLink | null> => {
     const values = linkValues(match);
@@ -395,7 +397,7 @@ export async function createDbStore(db: DatabaseClient): Promise<AbsStore> {
       const snapshot = { orderStatusAtDecision: row.orderStatusSeen, orderTotalAtDecision: money(orderTotal), absDeliveryDate };
       const [res] = await db
         .insert(absTrackingDecision)
-        .values({ ...rest, ...snapshot, mode: "shadow", applied: false, createdAt: now, lastSeenAt: now, seenCount: 1 })
+        .values({ ...rest, ...snapshot, mode: decisionMode, applied: false, createdAt: now, lastSeenAt: now, seenCount: 1 })
         .onConflictDoUpdate({
           target: absTrackingDecision.dedupeKey,
           set: { seenCount: sql`${absTrackingDecision.seenCount} + 1`, lastSeenAt: now, ...snapshot },

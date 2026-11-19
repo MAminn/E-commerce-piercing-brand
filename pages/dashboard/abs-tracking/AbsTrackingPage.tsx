@@ -15,6 +15,9 @@ import {
   candidateReasonLabel,
   FILTER_LABELS,
   fpReasonLabel,
+  LIVE_AMOUNT_REASONS,
+  LIVE_DISPUTE_REASONS,
+  liveReasonLabel,
   missReasonLabel,
   money,
   pct,
@@ -24,10 +27,13 @@ import {
 } from "./labels";
 
 /**
- * ABS tracking — Shadow review screen. Reads ABS shipments mirrored by the
- * poller and lets an admin confirm / reject / link matches and acknowledge
- * alerts. Every action writes ABS tracking tables only: NO button here
- * changes a website order (Shadow mode).
+ * ABS tracking screen. Reads ABS shipments mirrored by the poller and lets an
+ * admin confirm / reject / link matches and acknowledge alerts (abs_* writes
+ * only). In LIVE mode three more buttons exist, and they are the only ones
+ * that change a website order, always through the admin status core:
+ * "Mark these N Delivered" (approval mode), "Approve" for an old delivery,
+ * and "Undo" of an automatic Delivered. Pause / Resume stop and restart the
+ * automatic writer without a restart.
  */
 
 type Out = inferRouterOutputs<AppRouter>["absTracking"];
@@ -41,6 +47,30 @@ type Validation = Out["validation"];
 type ShipmentItem = Out["shipments"]["items"][number];
 type Run = Out["runs"][number];
 type AuditItem = Out["audit"][number];
+type LiveReadyItem = Out["liveReady"][number];
+type LiveAttentionItem = Out["liveAttention"][number];
+type LiveDoneItem = Out["liveDone"][number];
+
+const HOUR_MS = 3_600_000;
+
+/** Mode as the owner reads it. */
+function modeOf(o: Overview | null): { label: string; className: string; note: string } {
+  const on = o?.on === true ? (o as OnOverview) : null;
+  if (!on) return { label: "Off", className: "bg-slate-200 text-slate-700 hover:bg-slate-200", note: "Shadow mode: nothing on the website changes." };
+  if (on.mode !== "live" || !on.live) return { label: "Shadow", className: "bg-amber-100 text-amber-800 hover:bg-amber-100", note: "Shadow mode: nothing on the website changes." };
+  if (on.live.paused) return { label: "Paused", className: "bg-red-100 text-red-800 hover:bg-red-100", note: "Paused: nothing is marked Delivered automatically until you resume." };
+  if (on.live.requireApproval)
+    return { label: "Live – approval", className: "bg-sky-100 text-sky-800 hover:bg-sky-100", note: "Live – approval: orders ABS delivered are marked Delivered only when you press the button below." };
+  return { label: "Live", className: "bg-emerald-100 text-emerald-800 hover:bg-emerald-100", note: "Live: orders ABS delivered with the right amount and nothing unusual are marked Delivered automatically. Everything else waits for you." };
+}
+
+/** Sync health problem worth a line in "Needs your attention" (null = healthy). */
+function syncProblem(o: OnOverview, now = new Date()): string | null {
+  if (o.health.consecutiveFailures >= 3) return `The last ${o.health.consecutiveFailures} ABS checks failed. Nothing is marked Delivered while ABS cannot be read.`;
+  const okAt = o.health.lastOkAt ? new Date(o.health.lastOkAt) : null;
+  if (o.lastRun && (!okAt || now.getTime() - okAt.getTime() > HOUR_MS)) return `No successful ABS check since ${okAt ? ago(okAt) : "the start"}.`;
+  return null;
+}
 
 const FILTERS = ["all", "needs_review", "unmatched", "alerts", "would_change", "delivered_not_on_website", "returned_to_us"] as const;
 type Filter = (typeof FILTERS)[number];
@@ -138,17 +168,19 @@ function NoteAction({
 
 // ─── 1. Status bar ──────────────────────────────────────────────────────────
 
-function StatusBar({ overview, onPoll, polling }: { overview: Overview | null; onPoll: () => void; polling: boolean }) {
+function StatusBar({ overview, onPoll, polling, onPause, pausing }: { overview: Overview | null; onPoll: () => void; polling: boolean; onPause: (paused: boolean) => void; pausing: boolean }) {
   const on = overview?.on === true;
   const o = on ? (overview as OnOverview) : null;
   const next = o?.pollNow.nextAllowedAt ? new Date(o.pollNow.nextAllowedAt) : null;
   const waitS = next ? Math.max(0, Math.ceil((next.getTime() - Date.now()) / 1000)) : 0;
+  const mode = modeOf(overview);
+  const problem = o ? syncProblem(o) : null;
   return (
     <div className="flex flex-col gap-3 rounded-lg border p-4 md:flex-row md:items-center md:justify-between" data-testid="abs-status-bar">
       <div className="space-y-1">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge className={on ? "bg-amber-100 text-amber-800 hover:bg-amber-100" : "bg-slate-200 text-slate-700 hover:bg-slate-200"} data-testid="abs-mode">
-            {on ? "Shadow" : "Off"}
+          <Badge className={mode.className} data-testid="abs-mode">
+            {mode.label}
           </Badge>
           {o ? (
             <span className="text-sm">
@@ -159,6 +191,18 @@ function StatusBar({ overview, onPoll, polling }: { overview: Overview | null; o
             <span className="text-sm text-muted-foreground">ABS tracking is off{overview?.boot?.reason ? ` (${overview.boot.reason})` : ""}.</span>
           )}
         </div>
+        {o && (
+          <p className={`text-xs ${problem ? "text-red-700" : "text-muted-foreground"}`} data-testid="abs-health">
+            {problem ?? `Health: OK · last success ${ago(o.health.lastOkAt)}`}
+          </p>
+        )}
+        {o?.live && (
+          <p className="text-xs text-muted-foreground" data-testid="abs-live-today">
+            Marked Delivered automatically today: <strong>{o.live.appliedToday}</strong> / {o.live.dailyCap}
+            {o.live.paused && o.live.pausedBy ? ` · paused by ${o.live.pausedBy} ${ago(o.live.pausedAt)}` : ""}
+          </p>
+        )}
+        {o?.boot?.reason && o.mode !== "off" && <p className="text-xs text-amber-700">{o.boot.reason}</p>}
         {o?.backoffUntil && <p className="text-xs text-amber-700">ABS failed; automatic checks pause until {new Date(o.backoffUntil).toLocaleTimeString()}.</p>}
         {o?.resume && <p className="text-xs text-muted-foreground">Catching up: a large window is being read in parts.</p>}
         {o && o.counts.unknownStatuses > 0 && (
@@ -167,13 +211,247 @@ function StatusBar({ overview, onPoll, polling }: { overview: Overview | null; o
           </p>
         )}
       </div>
-      <div className="flex flex-col items-start gap-1 md:items-end">
-        <Button onClick={onPoll} disabled={!on || polling || !o?.pollNow.allowed} data-testid="abs-poll-now">
-          {polling ? "Checking…" : "Check ABS now"}
-        </Button>
+      <div className="flex flex-col items-start gap-2 md:items-end">
+        <div className="flex flex-wrap gap-2">
+          {o?.live &&
+            (o.live.paused ? (
+              <Button variant="primary" onClick={() => onPause(false)} disabled={pausing} data-testid="abs-resume">
+                Resume
+              </Button>
+            ) : (
+              <Button variant="destructive" onClick={() => onPause(true)} disabled={pausing} data-testid="abs-pause">
+                Pause
+              </Button>
+            ))}
+          <Button onClick={onPoll} disabled={!on || polling || !o?.pollNow.allowed} data-testid="abs-poll-now">
+            {polling ? "Checking…" : "Check ABS now"}
+          </Button>
+        </div>
         {on && !o?.pollNow.allowed && <span className="text-xs text-muted-foreground">You can check again in {waitS} s.</span>}
       </div>
     </div>
+  );
+}
+
+/** A group inside "Needs your attention". */
+function Group({ title, count, description, children, testId }: { title: string; count?: number; description?: string; children: ReactNode; testId: string }) {
+  return (
+    <div className="space-y-2 rounded-md border p-3" data-testid={testId}>
+      <h3 className="flex flex-wrap items-center gap-2 font-semibold">
+        {title}
+        {count !== undefined && <Badge variant={count > 0 ? "default" : "secondary"}>{count}</Badge>}
+      </h3>
+      {description && <p className="text-sm text-muted-foreground">{description}</p>}
+      {children}
+    </div>
+  );
+}
+
+// ─── Live: rows that need a person ──────────────────────────────────────────
+
+function LiveRows({ rows, onDone, emptyText, testId }: { rows: LiveAttentionItem[]; onDone: () => Promise<void>; emptyText?: string; testId: string }) {
+  const [busy, setBusy] = useState<string | null>(null);
+  if (rows.length === 0) return emptyText ? <Empty>{emptyText}</Empty> : null;
+  return (
+    <ul className="divide-y" data-testid={testId}>
+      {rows.map((r) => (
+        <li key={r.id} className="flex flex-col gap-2 py-2" data-testid={`abs-live-row-${r.decisionId}`}>
+          <div>
+            <strong>{r.orderNumber ? `#${r.orderNumber}` : "No order"}</strong> <span className="text-xs text-muted-foreground">AWB …{r.awb.slice(-4)}</span>
+            <div className="text-sm">{liveReasonLabel(r.reason)}</div>
+            <div className="text-xs text-muted-foreground">
+              Website: {websiteStatusLabel(r.orderStatus)} · checked {ago(r.lastSeenAt)}
+              {r.deliveredDaysAgo !== null ? ` · delivered ${r.deliveredDaysAgo} days ago` : ""}
+            </div>
+            {r.alerts.map((a, i) => (
+              <div key={a.id} className="text-xs text-amber-800">
+                Open problem{r.alerts.length > 1 ? ` ${i + 1}` : ""}: {reasonLabel(a.reasonCode)}
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {r.reason === "too_old" && (
+              <Button
+                size="sm"
+                variant="primary"
+                disabled={busy === r.decisionId}
+                data-testid={`abs-approve-old-${r.decisionId}`}
+                onClick={async () => {
+                  setBusy(r.decisionId);
+                  try {
+                    const out = await trpc.absTracking.liveApproveOld.mutate({ decisionId: r.decisionId });
+                    if (out.outcome === "applied") toast.success(`#${out.orderNumber} marked Delivered`);
+                    else toast.error(`Not marked: ${out.outcome === "skipped" ? liveReasonLabel(out.reason) : out.outcome}`);
+                    await onDone();
+                  } catch (err) {
+                    toast.error(errorText(err));
+                  } finally {
+                    setBusy(null);
+                  }
+                }}
+              >
+                Approve — mark Delivered
+              </Button>
+            )}
+            {r.alerts.map((a, i) => (
+              <NoteAction
+                key={a.id}
+                label={r.alerts.length > 1 ? `Acknowledge problem ${i + 1}` : "Acknowledge the problem"}
+                confirmLabel="Save"
+                placeholder="What did you check? (required)"
+                testId={`abs-live-ack-${a.id}`}
+                onSubmit={async (note) => {
+                  try {
+                    await trpc.absTracking.acknowledgeDecision.mutate({ decisionId: a.id, note });
+                    toast.success("Acknowledged");
+                    await onDone();
+                  } catch (err) {
+                    toast.error(errorText(err));
+                    throw err;
+                  }
+                }}
+              />
+            ))}
+            <NoteAction
+              label="Don't mark automatically"
+              confirmLabel="Save"
+              placeholder="Why? (required) — you can still change the order on the Orders page"
+              testId={`abs-suppress-${r.decisionId}`}
+              onSubmit={async (note) => {
+                try {
+                  await trpc.absTracking.liveSuppress.mutate({ decisionId: r.decisionId, note });
+                  toast.success("Live will not mark this one");
+                  await onDone();
+                } catch (err) {
+                  toast.error(errorText(err));
+                  throw err;
+                }
+              }}
+            />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// ─── Live: Ready to mark Delivered (approval mode) ──────────────────────────
+
+function ReadyToDeliver({ rows, paused, onDone }: { rows: LiveReadyItem[]; paused: boolean; onDone: () => Promise<void> }) {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const n = rows.length;
+  return (
+    <Section
+      title="Ready to mark Delivered"
+      count={n}
+      description="ABS delivered these, collected exactly the order total, and nothing unusual happened. Every check runs again when you press the button."
+      testId="abs-live-ready"
+    >
+      {n === 0 ? (
+        <Empty>Nothing waiting for your approval.</Empty>
+      ) : (
+        <>
+          <ul className="divide-y">
+            {rows.map((r) => (
+              <li key={r.decisionId} className="py-2 text-sm">
+                <strong>#{r.orderNumber}</strong> <span className="text-xs text-muted-foreground">AWB …{r.awb.slice(-4)}</span> · {websiteStatusLabel(r.orderStatus)} → Delivered · collected {money(r.collected)} of{" "}
+                {money(r.total)} · delivered {shortDate(r.deliveryDate)}
+              </li>
+            ))}
+          </ul>
+          {paused ? (
+            <p className="text-sm text-red-700">Paused — resume to mark these Delivered.</p>
+          ) : !confirming ? (
+            <Button variant="primary" onClick={() => setConfirming(true)} data-testid="abs-approve-ready">
+              Mark these {n} Delivered
+            </Button>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 p-3">
+              <span className="text-sm">Mark {n} order(s) Delivered on the website now?</span>
+              <Button
+                variant="primary"
+                disabled={busy}
+                data-testid="abs-approve-ready-confirm"
+                onClick={async () => {
+                  setBusy(true);
+                  try {
+                    const res = await trpc.absTracking.liveApproveReady.mutate({ decisionIds: rows.map((r) => r.decisionId) });
+                    const notDone = res.results.length - res.applied;
+                    toast.success(`${res.applied} marked Delivered${notDone ? `; ${notDone} not (see Needs your attention)` : ""}`);
+                    setConfirming(false);
+                    await onDone();
+                  } catch (err) {
+                    toast.error(errorText(err));
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                {busy ? "Marking…" : `Yes, mark ${n} Delivered`}
+              </Button>
+              <Button variant="ghost" onClick={() => setConfirming(false)}>
+                Cancel
+              </Button>
+            </div>
+          )}
+        </>
+      )}
+    </Section>
+  );
+}
+
+// ─── Live: Done automatically ───────────────────────────────────────────────
+
+function cairoDayOf(d: Date | string | null): string {
+  if (!d) return "";
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(d));
+}
+
+function DoneAutomatically({ rows, onDone }: { rows: LiveDoneItem[]; onDone: () => Promise<void> }) {
+  const today = cairoDayOf(new Date());
+  const todays = rows.filter((r) => r.cairoDay === today);
+  const earlier = rows.filter((r) => r.cairoDay !== today);
+  const list = (items: LiveDoneItem[]) => (
+    <ul className="divide-y">
+      {items.map((r) => (
+        <li key={r.id} className="flex flex-col gap-2 py-2 md:flex-row md:items-center md:justify-between" data-testid={`abs-done-${r.id}`}>
+          <div className="text-sm">
+            <strong>{r.orderNumber ? `#${r.orderNumber}` : "—"}</strong> <span className="text-xs text-muted-foreground">AWB …{r.awbLast4}</span> · {websiteStatusLabel(r.fromStatus)} → Delivered ·{" "}
+            {r.appliedAt ? new Date(r.appliedAt).toLocaleString("en-GB", { timeZone: "Africa/Cairo", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"} ·{" "}
+            {r.trigger === "auto" ? "automatic" : `approved by ${r.actor}`}
+            {r.undoneAt && <div className="text-xs text-amber-700">Undone by {r.undoneBy} {ago(r.undoneAt)}</div>}
+          </div>
+          {!r.undoneAt && r.orderStatus === "delivered" && (
+            <NoteAction
+              label="Undo"
+              confirmLabel="Undo this automatic Delivered"
+              variant="destructive"
+              placeholder="Why? (required)"
+              testId={`abs-undo-${r.id}`}
+              onSubmit={async (note) => {
+                try {
+                  const res = await trpc.absTracking.liveUndo.mutate({ applicationId: r.id, note });
+                  toast.success(res.changed ? `#${r.orderNumber} back to ${websiteStatusLabel(res.status ?? r.fromStatus)}` : "Already undone");
+                  await onDone();
+                } catch (err) {
+                  toast.error(errorText(err));
+                  throw err;
+                }
+              }}
+            />
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+  return (
+    <Section title="Done automatically" count={todays.length} description="Orders marked Delivered because ABS delivered them: today and the last 7 days. Undo puts one back to the status it had." testId="abs-live-done">
+      <h4 className="text-sm font-semibold">Today</h4>
+      {todays.length === 0 ? <Empty>Nothing yet today.</Empty> : list(todays)}
+      <h4 className="text-sm font-semibold">Last 7 days</h4>
+      {earlier.length === 0 ? <Empty>Nothing in the last 7 days.</Empty> : list(earlier)}
+    </Section>
   );
 }
 
@@ -353,7 +631,7 @@ function DecisionList({ rows, onDone, emptyText, ackLabel = "Acknowledge" }: { r
             <div className="text-sm">{reasonLabel(r.reasonCode ?? r.decision)}</div>
             <div className="text-sm text-muted-foreground">
               <Mismatch absStatus={r.absStatus} websiteStatus={r.websiteStatus} />
-              {r.cash !== null && ` · ABS COD ${money(r.cash)}`}
+              {r.collectedCash !== null ? ` · ABS collected ${money(r.collectedCash)}` : r.cash !== null && ` · ABS COD ${money(r.cash)}`}
               {r.orderTotal !== null && ` · order ${money(r.orderTotal)}`}
               {` · seen ${r.seenCount}×, first ${ago(r.firstSeenAt)}`}
             </div>
@@ -384,7 +662,7 @@ function DecisionList({ rows, onDone, emptyText, ackLabel = "Acknowledge" }: { r
 
 function MissingAwb({ rows, overview }: { rows: MissingItem[]; overview: OnOverview }) {
   return (
-    <Section
+    <Group
       title="Orders with no ABS shipment"
       count={rows.length}
       description={`ABS is our only courier for orders placed since ${shortDate(overview.settings.absOnlySince)}. These are Processing or Shipped for more than ${overview.settings.missingAwbAlertDays} days with no linked ABS shipment. Older orders (private courier) are not listed.`}
@@ -402,7 +680,7 @@ function MissingAwb({ rows, overview }: { rows: MissingItem[]; overview: OnOverv
           ))}
         </ul>
       )}
-    </Section>
+    </Group>
   );
 }
 
@@ -607,6 +885,9 @@ interface Data {
   validation: Validation | null;
   runs: Run[];
   audit: AuditItem[];
+  liveReady: LiveReadyItem[];
+  liveAttention: LiveAttentionItem[];
+  liveDone: LiveDoneItem[];
 }
 
 export default function AbsTrackingPage() {
@@ -614,6 +895,7 @@ export default function AbsTrackingPage() {
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [polling, setPolling] = useState(false);
+  const [pausing, setPausing] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const load = useCallback(async () => {
@@ -624,15 +906,19 @@ export default function AbsTrackingPage() {
         setData(null);
         return;
       }
-      const [groups, review, missing, validation, runs, audit] = await Promise.all([
+      const isLive = ov.mode === "live";
+      const [groups, review, missing, validation, runs, audit, liveReady, liveAttention, liveDone] = await Promise.all([
         trpc.absTracking.actionGroups.query(),
         trpc.absTracking.reviewQueue.query(),
         trpc.absTracking.missingAwb.query(),
         trpc.absTracking.validation.query().catch(() => null),
         trpc.absTracking.runs.query(),
         trpc.absTracking.audit.query(),
+        isLive ? trpc.absTracking.liveReady.query() : Promise.resolve([] as LiveReadyItem[]),
+        isLive ? trpc.absTracking.liveAttention.query() : Promise.resolve([] as LiveAttentionItem[]),
+        isLive || ov.liveTablesReady ? trpc.absTracking.liveDone.query().catch(() => [] as LiveDoneItem[]) : Promise.resolve([] as LiveDoneItem[]),
       ]);
-      setData({ groups, review, missing, validation, runs, audit });
+      setData({ groups, review, missing, validation, runs, audit, liveReady, liveAttention, liveDone });
       setError(null);
     } catch (err) {
       setError(errorText(err));
@@ -661,19 +947,52 @@ export default function AbsTrackingPage() {
     }
   };
 
+  const setPaused = async (paused: boolean) => {
+    setPausing(true);
+    try {
+      await trpc.absTracking.liveSetPaused.mutate({ paused });
+      toast.success(paused ? "Paused: nothing is marked Delivered automatically" : "Resumed");
+      await reload();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setPausing(false);
+    }
+  };
+
   const on = overview?.on === true ? (overview as OnOverview) : null;
+  const mode = modeOf(overview);
+  const isLive = on?.mode === "live" && on.live !== null;
+
+  // "Needs your attention": one list, grouped.
+  const liveRows = data?.liveAttention ?? [];
+  const liveAmount = liveRows.filter((r) => LIVE_AMOUNT_REASONS.includes(r.reason));
+  const liveDispute = liveRows.filter((r) => LIVE_DISPUTE_REASONS.includes(r.reason));
+  const liveOld = liveRows.filter((r) => r.reason === "too_old");
+  const liveOther = liveRows.filter((r) => !LIVE_AMOUNT_REASONS.includes(r.reason) && !LIVE_DISPUTE_REASONS.includes(r.reason) && r.reason !== "too_old");
+  const sync = on ? syncProblem(on) : null;
+  const attentionCount = data
+    ? data.review.length +
+      data.groups.amountDiffers.length +
+      data.groups.absProblems.length +
+      data.groups.notLinked.length +
+      data.groups.returnedToUs.length +
+      data.missing.length +
+      liveRows.length +
+      (sync ? 1 : 0)
+    : 0;
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-4 p-4 md:p-6">
       <div className="space-y-1">
         <h1 className="text-2xl font-bold">ABS tracking</h1>
-        <p className="text-sm text-muted-foreground">Follows our ABS shipments and shows what the website would do with each order.</p>
-        <p className="text-sm font-medium text-amber-800" data-testid="abs-shadow-note">
-          Shadow mode: nothing on the website changes.
+        <p className="text-sm text-muted-foreground">Follows our ABS shipments and keeps the website's orders in step with them.</p>
+        <p className={`text-sm font-medium ${isLive ? (on?.live?.paused ? "text-red-800" : "text-sky-800") : "text-amber-800"}`} data-testid="abs-shadow-note">
+          {mode.note}
         </p>
       </div>
 
-      <StatusBar overview={overview} onPoll={pollNow} polling={polling} />
+      <StatusBar overview={overview} onPoll={pollNow} polling={polling} onPause={setPaused} pausing={pausing} />
       {error && <p className="text-sm text-red-700">{error}</p>}
 
       {overview && !on && (
@@ -687,49 +1006,75 @@ export default function AbsTrackingPage() {
 
       {on && data && (
         <>
-          <div className="flex flex-wrap gap-2 text-sm" data-testid="abs-counts">
-            <Badge variant="outline">{on.counts.reviewQueue} need your decision</Badge>
-            <Badge variant="outline">{on.counts.wouldMarkDelivered} would mark Delivered</Badge>
-            <Badge variant="outline">{on.counts.openAlerts} problem(s)</Badge>
-            <Badge variant="outline">{on.counts.missingAwb} without ABS shipment</Badge>
-          </div>
+          <Section title="Needs your attention" count={attentionCount} description="Everything that needs a person. Normal deliveries never appear here." testId="abs-attention">
+            {sync && (
+              <Group title="ABS sync failing" testId="abs-sync-failing">
+                <p className="text-sm text-red-700">{sync}</p>
+              </Group>
+            )}
 
-          <WouldDeliver rows={data.groups.wouldDeliver} />
+            <Group title="Ambiguous match — needs a decision" count={data.review.length} description="Shipments we could not match to one order with certainty. Confirm the right order, or say it is not this one." testId="abs-review">
+              {data.review.length === 0 ? <Empty>Nothing is waiting for you.</Empty> : data.review.map((item) => <ReviewCard key={item.awb} item={item} onDone={reload} />)}
+            </Group>
 
-          <Section title="Needs your decision" count={data.review.length} description="Shipments we could not match to one order with certainty. Confirm the right order, or say it is not this one." testId="abs-review">
-            {data.review.length === 0 ? <Empty>Nothing is waiting for you.</Empty> : data.review.map((item) => <ReviewCard key={item.awb} item={item} onDone={reload} />)}
+            <Group
+              title="Amount differs, delivered then returned or disputed, problems at ABS"
+              count={data.groups.amountDiffers.length + data.groups.absProblems.length + data.groups.notLinked.length + liveAmount.length + liveDispute.length}
+              description="Things to check. Acknowledge one with a note once you have dealt with it."
+              testId="abs-problems"
+            >
+              <h4 className="text-sm font-semibold">Amount differs</h4>
+              <DecisionList rows={data.groups.amountDiffers} onDone={reload} emptyText="No amount differences." />
+              <LiveRows rows={liveAmount} onDone={reload} testId="abs-live-amount" />
+              <h4 className="text-sm font-semibold">Delivered then returned or disputed · problems at ABS (hold, not delivered, lost…)</h4>
+              <DecisionList rows={data.groups.absProblems} onDone={reload} emptyText="No problems reported by ABS." />
+              <LiveRows rows={liveDispute} onDone={reload} testId="abs-live-dispute" />
+              <h4 className="text-sm font-semibold">Delivered or returned, but not linked</h4>
+              <DecisionList rows={data.groups.notLinked} onDone={reload} emptyText="Every finished shipment is linked." />
+            </Group>
+
+            <Group
+              title="Returned — waiting for you to receive it"
+              count={data.groups.returnedToUs.length}
+              description="ABS says these came back. Nothing changes on the website; check the parcel physically, then acknowledge."
+              testId="abs-returned"
+            >
+              <DecisionList rows={data.groups.returnedToUs} onDone={reload} emptyText="No returns waiting." ackLabel="Acknowledge (seen)" />
+            </Group>
+
+            {isLive && (
+              <Group
+                title={`Delivered more than ${on.live?.maxAgeDays ?? 14} days ago — approve`}
+                count={liveOld.length}
+                description="Old deliveries are never marked automatically. Approve one to mark it Delivered (every other check still runs)."
+                testId="abs-live-too-old"
+              >
+                <LiveRows rows={liveOld} onDone={reload} emptyText="No old deliveries waiting." testId="abs-live-old-list" />
+              </Group>
+            )}
+
+            {isLive && liveOther.length > 0 && (
+              <Group title="Could not mark Delivered automatically" count={liveOther.length} description="ABS delivered these, but something needs a person first." testId="abs-live-blocked">
+                <LiveRows rows={liveOther} onDone={reload} testId="abs-live-blocked-list" />
+              </Group>
+            )}
+
+            <MissingAwb rows={data.missing} overview={on} />
           </Section>
 
-          <Section
-            title="Problems"
-            count={data.groups.amountDiffers.length + data.groups.absProblems.length + data.groups.notLinked.length}
-            description="Things to check. Acknowledge one with a note once you have dealt with it."
-            testId="abs-problems"
-          >
-            <h4 className="text-sm font-semibold">Amount differs</h4>
-            <DecisionList rows={data.groups.amountDiffers} onDone={reload} emptyText="No amount differences." />
-            <h4 className="text-sm font-semibold">Problems at ABS (hold, not delivered, lost…)</h4>
-            <DecisionList rows={data.groups.absProblems} onDone={reload} emptyText="No problems reported by ABS." />
-            <h4 className="text-sm font-semibold">Delivered or returned, but not linked</h4>
-            <DecisionList rows={data.groups.notLinked} onDone={reload} emptyText="Every finished shipment is linked." />
-          </Section>
+          {isLive && on.live?.requireApproval && <ReadyToDeliver rows={data.liveReady} paused={on.live.paused} onDone={reload} />}
 
-          <Section
-            title="Returned to us — confirm when the parcel is in your hands"
-            count={data.groups.returnedToUs.length}
-            description="ABS says these came back. Nothing changes on the website; check the parcel physically. (Confirming a return on the website comes in a later phase.)"
-            testId="abs-returned"
-          >
-            <DecisionList rows={data.groups.returnedToUs} onDone={reload} emptyText="No returns waiting." ackLabel="Acknowledge (seen)" />
-          </Section>
+          {(isLive || data.liveDone.length > 0) && <DoneAutomatically rows={data.liveDone} onDone={reload} />}
 
-          <MissingAwb rows={data.missing} overview={on} />
-
-          {data.validation && <Accuracy v={data.validation} />}
-
-          <Shipments refreshKey={refreshKey} onDone={reload} />
-
-          <History runs={data.runs} audit={data.audit} />
+          <details className="rounded-lg border p-3" data-testid="abs-details">
+            <summary className="cursor-pointer font-medium">Details: what ABS reports, Shadow accuracy, all shipments, history</summary>
+            <div className="mt-3 space-y-4">
+              <WouldDeliver rows={data.groups.wouldDeliver} />
+              {data.validation && <Accuracy v={data.validation} />}
+              <Shipments refreshKey={refreshKey} onDone={reload} />
+              <History runs={data.runs} audit={data.audit} />
+            </div>
+          </details>
         </>
       )}
     </div>

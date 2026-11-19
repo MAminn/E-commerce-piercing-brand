@@ -41,6 +41,15 @@ export const ABS_REQUIRED_COLUMNS = [
   "abs_sync_state.resume_cursor",
 ] as const;
 
+/** Live mode (0072) on top of the above: a `live` request without these runs `shadow`. */
+export const ABS_LIVE_TABLES = ["abs_live_application", "abs_settings"] as const;
+export const ABS_LIVE_UNIQUE_INDEXES = [
+  "abs_live_application_decision_applied_idx",
+  "abs_live_application_order_applied_idx",
+  "abs_live_application_skip_dedupe_idx",
+] as const;
+export const ABS_LIVE_REQUIRED_COLUMNS = ["abs_tracking_decision.applied_at"] as const;
+
 export interface AbsTrackingReadiness {
   ready: boolean;
   missing: string[];
@@ -49,6 +58,15 @@ export interface AbsTrackingReadiness {
 type Executor = Pick<DatabaseClient, "execute">;
 
 export async function checkAbsTrackingReadiness(db: Executor): Promise<AbsTrackingReadiness> {
+  return await checkObjects(db, ABS_TABLES, ABS_UNIQUE_INDEXES, ABS_REQUIRED_COLUMNS);
+}
+
+/** The 0072 objects live mode needs. */
+export async function checkAbsLiveReadiness(db: Executor): Promise<AbsTrackingReadiness> {
+  return await checkObjects(db, ABS_LIVE_TABLES, ABS_LIVE_UNIQUE_INDEXES, ABS_LIVE_REQUIRED_COLUMNS);
+}
+
+async function checkObjects(db: Executor, ABS_TABLES: readonly string[], ABS_UNIQUE_INDEXES: readonly string[], ABS_REQUIRED_COLUMNS: readonly string[]): Promise<AbsTrackingReadiness> {
   try {
     const result = await db.execute(sql`
       SELECT
@@ -94,7 +112,7 @@ export async function initAbsTracking(
 ): Promise<AbsTrackingInit> {
   const config = readAbsTrackingConfig(env);
   for (const w of config.warnings) log.warn(`[ABS tracking] ${w}`);
-  const publish = (effective: AbsTrackingMode, reason: string | null, readiness: AbsTrackingReadiness | null) =>
+  const publish = (effective: AbsTrackingMode, reason: string | null, readiness: AbsTrackingReadiness | null, liveTablesReady: boolean | null = null) =>
     setAbsTrackingBootStatus({
       requestedMode: config.requestedMode,
       effective,
@@ -102,6 +120,7 @@ export async function initAbsTracking(
       ready: readiness ? readiness.ready : null,
       missing: readiness?.missing ?? [],
       checkedAt: new Date().toISOString(),
+      liveTablesReady,
     });
   const off = (reason: string, readiness: AbsTrackingReadiness | null = null): AbsTrackingInit => {
     setEffectiveAbsTrackingMode("off");
@@ -113,8 +132,26 @@ export async function initAbsTracking(
   if (config.missing.length > 0) return off(config.missing.join(", "));
   const readiness = await checkAbsTrackingReadiness(db);
   if (!readiness.ready) return off(`not ready: ${readiness.missing.join(", ")}`, readiness);
-  setEffectiveAbsTrackingMode(config.mode);
-  publish(config.mode, null, readiness);
-  log.info(`[ABS tracking] mode=${config.mode}`);
-  return { config, effective: config.mode, reason: null, readiness };
+  let effective: AbsTrackingMode = config.mode;
+  let reason: string | null = null;
+  if (config.requestedMode === "live" && config.mode !== "live") {
+    // ABS_LIVE_TRANSITIONS invalid (readAbsTrackingConfig already warned).
+    reason = `live refused: ${config.live.transitionsError ?? "invalid live settings"}; running shadow`;
+  }
+  const liveReady = await checkAbsLiveReadiness(db);
+  if (effective === "live") {
+    if (!liveReady.ready) {
+      effective = "shadow";
+      reason = `live not ready: ${liveReady.missing.join(", ")}; running shadow`;
+      log.warn(`[ABS tracking] ${reason}`);
+    }
+  }
+  setEffectiveAbsTrackingMode(effective);
+  publish(effective, reason, readiness, liveReady.ready);
+  const liveNote =
+    effective === "live"
+      ? ` (${config.live.requireApproval ? "approval required" : "automatic"}; settle ${config.live.settleMinutes} min, max age ${config.live.maxAgeDays} d, ${config.live.maxPerTick}/tick, ${config.live.dailyCap}/day)`
+      : "";
+  log.info(`[ABS tracking] mode=${effective}${liveNote}`);
+  return { config, effective, reason, readiness };
 }

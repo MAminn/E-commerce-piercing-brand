@@ -3,7 +3,21 @@ import { z } from "zod";
 import { t, adminProcedure, provideDatabase } from "#root/shared/trpc/server";
 import { runBackendEffect, serializeBackendEffectResult } from "#root/shared/backend/effect";
 import { query } from "#root/shared/database/drizzle/db";
-import { effectiveAbsTrackingMode, readAbsTrackingConfig } from "#root/shared/config/abs-tracking";
+import { effectiveAbsTrackingMode, getAbsTrackingBootStatus, readAbsTrackingConfig } from "#root/shared/config/abs-tracking";
+import { createAbsClient } from "./client";
+import {
+  approveOld,
+  approveReady,
+  getLiveAttention,
+  getLiveDone,
+  getLiveReady,
+  liveConfigOf,
+  LiveError,
+  setLivePaused,
+  suppressDecision,
+  undoApplication,
+  type ApplyDeps,
+} from "./live";
 import { runPollNow } from "./poll-now";
 import { getActionGroups, getAudit, getDecisions, getMissingAwb, getOverview, getReviewQueue, getRuns, getShipments, SHIPMENT_FILTERS } from "./queries";
 import { AbsReviewError, acknowledgeDecision, confirmLink, manualLink, NOTE_MAX, rejectLink, unlink } from "./review";
@@ -16,11 +30,42 @@ import { getAbsValidationReport } from "./validation";
  * - `overview` answers in every mode; in `off` it makes NO query and only
  *   says why the mode is off.
  * - Every other procedure refuses while the effective mode is `off`.
- * - Queries are SELECT-only. Mutations write abs_* tables only, each in one
- *   transaction with one abs_audit_log row (backend/shipping-tracking/abs/review.ts).
- *   Nothing here changes a website order, its stock, order_log or emails.
+ * - Queries are SELECT-only. The review mutations write abs_* tables only, each
+ *   in one transaction with one abs_audit_log row (review.ts).
+ * - The `live*` procedures (live mode, live.ts) are the only ones that may
+ *   change a website order — Delivered (approve) and its Undo — and only
+ *   through the shared admin status core. They refuse outside live mode,
+ *   except Undo / "Done automatically", which also work after a rollback to
+ *   shadow so an automatic change can still be reverted.
  */
 export const ABS_OFF_MESSAGE = "ABS tracking is off";
+export const ABS_NOT_LIVE_MESSAGE = "Live mode is not on";
+
+export function assertAbsLive(): void {
+  assertAbsTrackingOn();
+  if (effectiveAbsTrackingMode() !== "live") throw new TRPCError({ code: "PRECONDITION_FAILED", message: ABS_NOT_LIVE_MESSAGE });
+}
+
+/** Undo and the "Done automatically" list: live, or shadow with the 0072 tables present. */
+export function assertAbsLiveTables(): void {
+  assertAbsTrackingOn();
+  if (effectiveAbsTrackingMode() !== "live" && getAbsTrackingBootStatus()?.liveTablesReady !== true) {
+    throw new TRPCError({ code: "PRECONDITION_FAILED", message: ABS_NOT_LIVE_MESSAGE });
+  }
+}
+
+/** The approve actions re-run every check, including the fresh ABS history (read-only client). */
+function liveActionDeps(db: ApplyDeps["db"], actor: string): ApplyDeps & { actor: string } {
+  const config = readAbsTrackingConfig();
+  const client = config.baseUrl && config.apiKey ? createAbsClient({ baseUrl: config.baseUrl, apiKey: config.apiKey, log: (m) => console.warn(m) }) : null;
+  return {
+    db,
+    actor,
+    config: liveConfigOf(config),
+    fetchHistory: client ? (awb) => client.getHistory(awb) : null,
+    secrets: [config.apiKey],
+  };
+}
 
 export function assertAbsTrackingOn(): void {
   if (effectiveAbsTrackingMode() === "off") {
@@ -33,6 +78,7 @@ async function guarded<T>(fn: () => Promise<T>): Promise<T> {
     return await fn();
   } catch (err) {
     if (err instanceof AbsReviewError) throw new TRPCError({ code: err.code, message: err.message });
+    if (err instanceof LiveError) throw new TRPCError({ code: err.code, message: err.message });
     throw err;
   }
 }
@@ -143,5 +189,53 @@ export const absTrackingRouter = t.router({
   pollNow: adminProcedure.mutation(async ({ ctx }) => {
     assertAbsTrackingOn();
     return await guarded(() => runPollNow({ db: ctx.db, actor: actorOf(ctx), config: readAbsTrackingConfig() }));
+  }),
+
+  // ── Live mode (Delivered only) ─────────────────────────────────────────
+  /** "Ready to mark Delivered (N)" — approval mode. */
+  liveReady: adminProcedure.query(async ({ ctx }) => {
+    assertAbsLive();
+    return await getLiveReady(ctx.db);
+  }),
+
+  /** Live candidates that need a person (the "Needs your attention" live rows). */
+  liveAttention: adminProcedure.query(async ({ ctx }) => {
+    assertAbsLive();
+    return await getLiveAttention(ctx.db);
+  }),
+
+  /** "Done automatically": today and the last 7 days. */
+  liveDone: adminProcedure.query(async ({ ctx }) => {
+    assertAbsLiveTables();
+    return await getLiveDone(ctx.db);
+  }),
+
+  liveSetPaused: adminProcedure.input(z.object({ paused: z.boolean(), note: z.string().trim().max(NOTE_MAX).optional().nullable() })).mutation(async ({ ctx, input }) => {
+    assertAbsLive();
+    return await guarded(() => setLivePaused({ db: ctx.db, actor: actorOf(ctx) }, { paused: input.paused, note: input.note?.trim() || null }));
+  }),
+
+  /** "Mark these N Delivered": exactly the previewed ids, each re-checked. */
+  liveApproveReady: adminProcedure.input(z.object({ decisionIds: z.array(z.string().uuid()).min(1).max(100) })).mutation(async ({ ctx, input }) => {
+    assertAbsLive();
+    return await guarded(() => approveReady(liveActionDeps(ctx.db, actorOf(ctx)), input.decisionIds));
+  }),
+
+  /** "Delivered more than N days ago — approve" (one item). */
+  liveApproveOld: adminProcedure.input(z.object({ decisionId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
+    assertAbsLive();
+    return await guarded(() => approveOld(liveActionDeps(ctx.db, actorOf(ctx)), input.decisionId));
+  }),
+
+  /** "Undo this automatic Delivered". */
+  liveUndo: adminProcedure.input(z.object({ applicationId: z.string().uuid(), note })).mutation(async ({ ctx, input }) => {
+    assertAbsLiveTables();
+    return await guarded(() => undoApplication({ db: ctx.db, actor: actorOf(ctx) }, input));
+  }),
+
+  /** "Don't mark this one automatically". */
+  liveSuppress: adminProcedure.input(z.object({ decisionId: z.string().uuid(), note })).mutation(async ({ ctx, input }) => {
+    assertAbsLive();
+    return await guarded(() => suppressDecision({ db: ctx.db, actor: actorOf(ctx) }, input));
   }),
 });

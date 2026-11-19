@@ -1,6 +1,7 @@
 import {
   boolean,
   check,
+  date,
   decimal,
   index,
   integer,
@@ -1685,6 +1686,8 @@ export const absTrackingDecision = pgTable(
     acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true, mode: "date" }),
     acknowledgedBy: text("acknowledged_by"),
     ackNote: text("ack_note"),
+    /** Live mode (0072): when the ABS live writer applied this decision (with `applied = true`). */
+    appliedAt: timestamp("applied_at", { withTimezone: true, mode: "date" }),
   },
   (table) => [
     uniqueIndex("abs_tracking_decision_dedupe_idx").on(table.dedupeKey),
@@ -1771,6 +1774,78 @@ export const absAuditLog = pgTable(
     index("abs_audit_log_awb_idx").on(table.awb),
     index("abs_audit_log_order_idx").on(table.orderId),
   ],
+);
+
+/**
+ * ABS Live (0072): one row per evaluation outcome of the live writer
+ * (backend/shipping-tracking/abs/live.ts).
+ *   applied  — the order was set Delivered through the shared admin core, in
+ *              the same transaction as this row. At most one per decision and
+ *              one per (order, to_status) (partial unique indexes).
+ *   skipped  — an eligible-looking candidate that did not pass, with its
+ *              reason (incl. `awaiting_approval` in approval mode); at most one
+ *              row per AWB × reason × Cairo day (repeats bump last_seen_at).
+ *   failed   — the apply transaction failed (rolled back), same dedupe.
+ * No FKs (the trail outlives what it describes). No PII in details.
+ */
+export const absLiveApplication = pgTable(
+  "abs_live_application",
+  {
+    id: uuid("id")
+      .$defaultFn(() => v7())
+      .primaryKey(),
+    decisionId: uuid("decision_id").notNull(),
+    awb: text("awb").notNull(),
+    orderId: uuid("order_id"),
+    fromStatus: text("from_status"),
+    /** Always `delivered` (CHECK): the only automatic transition. */
+    toStatus: text("to_status").notNull(),
+    /** applied | skipped | failed */
+    outcome: text("outcome").notNull(),
+    reasonCode: text("reason_code"),
+    /** auto | approval | approve_old */
+    trigger: text("trigger").notNull(),
+    /** system:abs, or the approving admin's email. */
+    actor: text("actor").notNull(),
+    orderLogId: uuid("order_log_id"),
+    details: jsonb("details"),
+    cairoDay: date("cairo_day", { mode: "string" }).notNull(),
+    appliedAt: timestamp("applied_at", { withTimezone: true, mode: "date" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+    seenCount: integer("seen_count").notNull().default(1),
+    undoneAt: timestamp("undone_at", { withTimezone: true, mode: "date" }),
+    undoneBy: text("undone_by"),
+    undoOrderLogId: uuid("undo_order_log_id"),
+  },
+  (table) => [
+    uniqueIndex("abs_live_application_decision_applied_idx").on(table.decisionId).where(sql`${table.outcome} = 'applied'`),
+    uniqueIndex("abs_live_application_order_applied_idx").on(table.orderId, table.toStatus).where(sql`${table.outcome} = 'applied'`),
+    uniqueIndex("abs_live_application_skip_dedupe_idx")
+      .on(table.awb, table.outcome, table.reasonCode, table.cairoDay)
+      .where(sql`${table.outcome} in ('skipped', 'failed')`),
+    index("abs_live_application_day_idx").on(table.cairoDay, table.outcome),
+    index("abs_live_application_awb_seen_idx").on(table.awb, table.lastSeenAt),
+    index("abs_live_application_applied_at_idx").on(table.appliedAt),
+    check("abs_live_application_to_status", sql`${table.toStatus} = 'delivered'`),
+    check("abs_live_application_outcome", sql`${table.outcome} in ('applied', 'skipped', 'failed')`),
+    check("abs_live_application_reason", sql`${table.outcome} = 'applied' or ${table.reasonCode} is not null`),
+  ],
+);
+
+/** ABS Live (0072): single row (id = 1) of runtime switches — the pause flag, toggled from the screen without a restart. */
+export const absSettings = pgTable(
+  "abs_settings",
+  {
+    id: integer("id").primaryKey().default(1),
+    livePaused: boolean("live_paused").notNull().default(false),
+    pausedAt: timestamp("paused_at", { withTimezone: true, mode: "date" }),
+    pausedBy: text("paused_by"),
+    pauseNote: text("pause_note"),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+    updatedBy: text("updated_by"),
+  },
+  (table) => [check("abs_settings_singleton", sql`${table.id} = 1`)],
 );
 
 // ─── Custom Tracking Events ─────────────────────────────────────────────────

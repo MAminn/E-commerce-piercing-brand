@@ -134,7 +134,46 @@ export const AUDIT_LABELS: Record<string, string> = {
   link_unlink: "Unlinked",
   alert_ack: "Acknowledged",
   poll_now: "Checked ABS now",
+  live_apply: "Marked Delivered (ABS)",
+  live_undo: "Undid an automatic Delivered",
+  live_pause: "Paused automatic Delivered",
+  live_resume: "Resumed automatic Delivered",
+  live_suppress: "Said: don't mark this one",
+  alert_email: "Alert email",
+  digest_email: "Daily summary email",
 };
+
+/** Why live mode did not mark an order Delivered (owner-facing). */
+export const LIVE_REASON: Record<string, string> = {
+  order_cancelled: "The order is cancelled on the website",
+  stock_restored: "The order's stock was already put back",
+  link_method_not_allowed: "Matched only by a similar phone number — please confirm the match",
+  partial_or_reverted_event: "ABS reports a partial or reverted delivery",
+  under_revision: "ABS has this shipment under revision",
+  under_revision_unknown: "ABS did not say whether this shipment is under revision",
+  reverse_service: "This is a return or exchange shipment",
+  human_changed: "Someone changed this order's status after ABS delivered it",
+  previously_delivered: "This order was Delivered before and then changed back",
+  open_alert: "There is an open problem on this order or shipment",
+  multiple_awbs: "More than one ABS shipment is tied to this order",
+  human_unlinked: "Someone unlinked this shipment",
+  cod_missing_collected: "ABS has not confirmed the collected amount yet",
+  cod_mismatch: "ABS collected a different amount than the order total",
+  prepaid_not_paid: "Paid-online order, but the website does not show it as paid",
+  prepaid_cash_collected: "Paid-online order, but ABS collected cash",
+  no_delivery_date: "ABS gave no delivery date",
+  too_old: "Delivered a while ago — approve to mark it Delivered",
+  history_no_delivered: "ABS's own history does not show a delivery",
+  history_event_after_delivered: "ABS's history shows something after the delivery (return or dispute)",
+  history_undated: "ABS's history has events without a date",
+  daily_cap: "Daily limit reached — will continue tomorrow",
+  apply_error: "Something went wrong; nothing was changed",
+};
+export const liveReasonLabel = (r: string) => LIVE_REASON[r] ?? r;
+
+/** Attention groups for live rows (the rest go to "Couldn't mark Delivered automatically"). */
+export const LIVE_AMOUNT_REASONS = ["cod_mismatch", "cod_missing_collected", "prepaid_not_paid", "prepaid_cash_collected"];
+export const LIVE_DISPUTE_REASONS = ["history_event_after_delivered", "partial_or_reverted_event", "previously_delivered", "open_alert", "under_revision", "under_revision_unknown"];
 
 export function money(n: number | null | undefined): string {
   if (n === null || n === undefined) return "—";
