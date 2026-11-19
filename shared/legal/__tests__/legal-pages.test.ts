@@ -10,6 +10,7 @@ import { getHomepageContentRaw } from "#root/backend/homepage/get-homepage-conte
 import type { DatabaseClient } from "#root/shared/database/drizzle/db";
 import {
   OWNER_INPUT_MARKER,
+  REFUND_POLICY_HREF,
   countOwnerInputPlaceholders,
   getPublishedLegalPages,
   isLegalPagePublished,
@@ -82,8 +83,10 @@ describe("shipped drafts", () => {
     expect(DEFAULT_HOMEPAGE_CONTENT.privacy).toBe(DEFAULT_PRIVACY_PAGE);
     // Terms and privacy stay unpublished drafts; the owner-approved returns
     // policy (shared/legal/returns-policy.ts) is the one page live by default.
+    // The shipping page is generated from live settings, so it is always on.
     expect(getPublishedLegalPages(DEFAULT_HOMEPAGE_CONTENT).map((p) => p.key)).toEqual([
       "returnPolicy",
+      "shippingPolicy",
     ]);
   });
 
@@ -176,6 +179,7 @@ describe("getPublishedLegalPages", () => {
     );
     expect(published).toEqual([
       { key: "returnPolicy", href: "/return-policy", title: "Returns", titleAr: "الإرجاع" },
+      { key: "shippingPolicy", href: "/shipping-policy", title: "Shipping", titleAr: "الشحن" },
       { key: "terms", href: "/terms", title: "Terms & conditions", titleAr: "الشروط والأحكام" },
       { key: "privacy", href: "/privacy", title: "Privacy policy", titleAr: "سياسة الخصوصية" },
     ]);
@@ -185,7 +189,7 @@ describe("getPublishedLegalPages", () => {
     const published = getPublishedLegalPages(
       content({ returnPolicy: { ...returnPolicy, enabled: false } }),
     );
-    expect(published).toEqual([]);
+    expect(published.map((p) => p.key)).toEqual(["shippingPolicy"]);
   });
 
   it("leaves out a switched-on draft", () => {
@@ -260,5 +264,73 @@ describe("withLegalFooterLinks", () => {
     };
     expect(withLegalFooterLinks([variants], [])).toEqual([]);
     expect(withLegalFooterLinks([variants], [terms, privacy])).toEqual([variants]);
+  });
+});
+
+describe("Returns & Refunds alias, shipping page and the Policies group", () => {
+  const returns = { key: "returnPolicy" as const, href: "/return-policy", title: "Returns", titleAr: "الإرجاع" };
+  const shipping = { key: "shippingPolicy" as const, href: "/shipping-policy", title: "Shipping", titleAr: "الشحن" };
+  const privacy = { key: "privacy" as const, href: "/privacy", title: "Privacy policy" };
+  const refundLink = { id: "r", label: "Refunds", url: REFUND_POLICY_HREF };
+
+  it("keeps an admin's /refund-policy link while the return policy is live", () => {
+    const help: FooterLinkGroup = { id: "help", title: "Help", links: [refundLink] };
+    const groups = withLegalFooterLinks([help], [returns, shipping]);
+    expect(groups[0]?.links.map((l) => l.url)).toEqual([REFUND_POLICY_HREF]);
+    // The existing Returns link is still added — the alias does not replace it.
+    expect(groups[1]?.links.map((l) => l.url)).toEqual(["/return-policy", "/shipping-policy"]);
+  });
+
+  it("drops the /refund-policy link when the return policy is switched off", () => {
+    const help: FooterLinkGroup = {
+      id: "help",
+      title: "Help",
+      links: [{ id: "c", label: "Contact", url: "/contact" }, refundLink],
+    };
+    const [group] = withLegalFooterLinks([help], [shipping]);
+    expect(group?.links.map((l) => l.url)).toEqual(["/contact"]);
+  });
+
+  it("never adds the refund alias on its own", () => {
+    const urls = withLegalFooterLinks([], [returns, shipping]).flatMap((g) => g.links.map((l) => l.url));
+    expect(urls).not.toContain(REFUND_POLICY_HREF);
+  });
+
+  it("drops a CMS /privacy link while privacy is unpublished", () => {
+    const legal: FooterLinkGroup = {
+      id: "legal",
+      title: "Legal",
+      links: [
+        { id: "p", label: "Privacy", url: "/privacy" },
+        { id: "s", label: "Shipping", url: "/shipping-policy" },
+      ],
+    };
+    const groups = withLegalFooterLinks([legal], [returns, shipping]);
+    expect(groups.flatMap((g) => g.links.map((l) => l.url))).not.toContain("/privacy");
+    // …and keeps it once privacy is published.
+    const live = withLegalFooterLinks([legal], [returns, shipping, privacy]);
+    expect(live.flatMap((g) => g.links.map((l) => l.url))).toContain("/privacy");
+  });
+
+  it("adds missing pages to the admin's own Policies group instead of a second one", () => {
+    const own: FooterLinkGroup = {
+      id: "cms-policies",
+      title: "Policies",
+      titleAr: "السياسات",
+      links: [{ id: "ret", label: "Returns", url: "/return-policy" }],
+    };
+    const groups = withLegalFooterLinks([own], [returns, shipping]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.id).toBe("cms-policies");
+    expect(groups[0]?.links.map((l) => [l.label, l.url])).toEqual([
+      ["Returns", "/return-policy"],
+      ["Shipping", "/shipping-policy"],
+    ]);
+  });
+
+  it("still creates a Policies group when no admin group holds policies", () => {
+    const help: FooterLinkGroup = { id: "help", title: "Help", links: [{ id: "c", label: "Contact", url: "/contact" }] };
+    const groups = withLegalFooterLinks([help], [returns, shipping]);
+    expect(groups.map((g) => g.id)).toEqual(["help", "policies"]);
   });
 });

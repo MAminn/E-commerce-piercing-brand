@@ -18,15 +18,18 @@ export type ProductPageContent = {
  */
 export const getProductPageContent = () =>
   Effect.gen(function* ($) {
-    const rows = yield* $(
-      query(async (db) =>
-        db
-          .select({ productPageContent: storeSettings.productPageContent })
-          .from(storeSettings)
-          .where(eq(storeSettings.key, "default"))
-          .limit(1),
-      ),
-    );
-
-    return (rows[0]?.productPageContent ?? {}) as ProductPageContent;
+    return yield* $(query(async (db) => getProductPageContentRaw(db)));
   });
+
+/** Any client that can `select` — the pool, a transaction or ctx.db in SSR. */
+type SelectableDb = Pick<Parameters<Parameters<typeof query>[0]>[0], "select">;
+
+/** The same read without Effect, for SSR `+data` (e.g. /shipping-policy). */
+export async function getProductPageContentRaw(db: SelectableDb): Promise<ProductPageContent> {
+  const rows = await db
+    .select({ productPageContent: storeSettings.productPageContent })
+    .from(storeSettings)
+    .where(eq(storeSettings.key, "default"))
+    .limit(1);
+  return (rows[0]?.productPageContent ?? {}) as ProductPageContent;
+}

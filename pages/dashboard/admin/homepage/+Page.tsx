@@ -4390,7 +4390,7 @@ export default function HomepageAdminPage() {
           <Card>
             <CardHeader>
               <div className='flex items-center justify-between'>
-                <CardTitle className='text-base'>Return Policy Page</CardTitle>
+                <CardTitle className='text-base'>Returns &amp; Refunds Page</CardTitle>
                 <Switch
                   checked={content.returnPolicy?.enabled ?? false}
                   onCheckedChange={(checked) =>
@@ -4407,6 +4407,12 @@ export default function HomepageAdminPage() {
               </div>
             </CardHeader>
             <CardContent className='space-y-6'>
+              <p className='text-sm text-muted-foreground'>
+                One policy, two addresses: <code>/return-policy</code> shows it
+                and <code>/refund-policy</code> redirects to it. Write approved
+                refund terms as a Detail Section (e.g. &quot;Refunds&quot;);
+                the footer link uses the English / Arabic title below.
+              </p>
               <div className='grid grid-cols-2 gap-4'>
                 <div>
                   <Label className='text-xs'>Title (English)</Label>
@@ -4423,7 +4429,7 @@ export default function HomepageAdminPage() {
                         },
                       }))
                     }
-                    placeholder='Return Policy'
+                    placeholder='Returns & Refunds'
                     disabled={!(content.returnPolicy?.enabled ?? false)}
                   />
                 </div>

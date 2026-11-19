@@ -8,6 +8,13 @@ export interface ReturnPolicyPageProps {
   dir: "ltr" | "rtl";
 }
 
+/**
+ * The Returns & Refunds policy — served at /return-policy and, through a
+ * permanent redirect, /refund-policy. Everything on it comes from the one CMS
+ * record (Dashboard > Homepage > Returns & Refunds): the title, the steps,
+ * and the detail sections where refund terms are written once the owner
+ * approves them. No refund wording is shipped by default.
+ */
 export function ReturnPolicyPage({ content, locale, dir }: ReturnPolicyPageProps) {
   const isAr = locale === "ar";
 
@@ -33,7 +40,7 @@ export function ReturnPolicyPage({ content, locale, dir }: ReturnPolicyPageProps
             {title}
           </h1>
           {intro && (
-            <p className='mt-6 text-sm sm:text-base text-perce-ink-secondary leading-relaxed max-w-3xl'>
+            <p className='mt-6 text-sm sm:text-base text-perce-ink-secondary leading-relaxed max-w-3xl whitespace-pre-line'>
               {intro}
             </p>
           )}
@@ -60,7 +67,7 @@ export function ReturnPolicyPage({ content, locale, dir }: ReturnPolicyPageProps
                     <h2 className='text-xs sm:text-sm font-medium text-perce-ink mb-3'>
                       {stepTitle}
                     </h2>
-                    <p className='text-sm text-perce-ink-secondary leading-relaxed'>
+                    <p className='text-sm text-perce-ink-secondary leading-relaxed whitespace-pre-line'>
                       {stepDescription}
                     </p>
                   </div>
@@ -87,7 +94,7 @@ export function ReturnPolicyPage({ content, locale, dir }: ReturnPolicyPageProps
                     <h2 className='text-xs sm:text-sm font-medium text-perce-ink mb-4'>
                       {sectionTitle}
                     </h2>
-                    <p className='text-sm text-perce-ink-secondary leading-relaxed'>
+                    <p className='text-sm text-perce-ink-secondary leading-relaxed whitespace-pre-line'>
                       {sectionBody}
                     </p>
                   </div>

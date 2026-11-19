@@ -56,7 +56,7 @@ const LogoSizeSchema = z.object({
   mobileMaxHeight: z.number().min(16).max(120),
 });
 
-const LayoutSettingsSchema = z.object({
+export const LayoutSettingsSchema = z.object({
   siteTitle: z.string().optional(),
   faviconUrl: z.string().optional(),
   shareImageUrl: z.string().optional(),
@@ -97,6 +97,8 @@ const LayoutSettingsSchema = z.object({
     socialLinks: z.array(SocialLinkSchema),
     contactPhone: z.string().optional(),
     contactEmail: z.string().optional(),
+    contactAddress: z.string().max(500).optional(),
+    contactAddressAr: z.string().max(500).optional(),
   }),
 });
 

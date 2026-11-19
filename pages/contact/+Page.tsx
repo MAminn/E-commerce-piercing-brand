@@ -3,6 +3,7 @@ import { useData } from "vike-react/useData";
 import { useLayoutSettings } from "#root/frontend/contexts/LayoutSettingsContext";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { trpc } from "#root/shared/trpc/client";
+import { hasStoreContact, resolveStoreContact } from "#root/shared/contact/store-contact";
 import { HeroCarousel } from "#root/components/ui/hero-carousel";
 import { Link } from "#root/components/utils/Link";
 import { ArrowUpRight, Loader2 } from "lucide-react";
@@ -42,6 +43,9 @@ function Page() {
     : (contactBanner?.description || "");
 
   const directionsUrl = contactBanner?.directionsUrl;
+  // The same details the footer shows (Dashboard > Layout Settings > Footer
+  // Contact Info). Each is absent when blank — no address is ever guessed.
+  const contact = resolveStoreContact(layoutSettings.footer ?? {}, locale);
 
   const bannerSlides = (contactBanner?.slides ?? [])
     .filter((s) => s.imageUrl)
@@ -113,6 +117,58 @@ function Page() {
                 {isAr ? "احصل على الاتجاهات" : "Get Directions"}
                 <ArrowUpRight className='w-3.5 h-3.5' />
               </a>
+            )}
+
+            {hasStoreContact(contact) && (
+              <address
+                className='not-italic mt-10'
+                aria-label={isAr ? "بيانات التواصل" : "Contact details"}
+                data-testid='contact-details'>
+                <dl className='space-y-5'>
+                  {contact.email && (
+                    <div>
+                      <dt className='text-xs text-perce-ink-secondary'>
+                        {isAr ? "البريد الإلكتروني" : "Email"}
+                      </dt>
+                      <dd className='mt-1'>
+                        <a
+                          href={contact.email.href}
+                          dir='ltr'
+                          className='inline-flex min-h-11 items-center text-sm underline underline-offset-2 hover:opacity-70 transition-opacity'>
+                          {contact.email.display}
+                        </a>
+                      </dd>
+                    </div>
+                  )}
+                  {contact.phone && (
+                    <div>
+                      <dt className='text-xs text-perce-ink-secondary'>
+                        {isAr ? "الهاتف" : "Phone"}
+                      </dt>
+                      <dd className='mt-1'>
+                        <a
+                          href={contact.phone.href}
+                          className='inline-flex min-h-11 items-center text-sm tabular-nums underline underline-offset-2 hover:opacity-70 transition-opacity'>
+                          <span dir='ltr'>{contact.phone.display}</span>
+                        </a>
+                      </dd>
+                    </div>
+                  )}
+                  {contact.address && (
+                    <div>
+                      <dt className='text-xs text-perce-ink-secondary'>
+                        {isAr ? "العنوان" : "Address"}
+                      </dt>
+                      {/* dir=auto: an English address stays LTR inside the
+                          Arabic page (and vice versa) instead of bidi-
+                          reordering "12 Example St" into "Example St 12". */}
+                      <dd dir='auto' className='mt-1 text-sm leading-relaxed whitespace-pre-line'>
+                        {contact.address}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              </address>
             )}
           </div>
 

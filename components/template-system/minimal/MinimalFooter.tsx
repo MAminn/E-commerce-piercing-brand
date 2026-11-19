@@ -13,6 +13,7 @@ import {
 } from "#root/shared/config/branding";
 import { isUsableHref } from "#root/shared/config/storefront";
 import { withLegalFooterLinks } from "#root/shared/legal/legal-pages";
+import { hasStoreContact, resolveStoreContact } from "#root/shared/contact/store-contact";
 import type { SocialPlatform } from "#root/shared/types/layout-settings";
 import { Loader2, Send } from "lucide-react";
 import { trpc } from "#root/shared/trpc/client";
@@ -126,6 +127,8 @@ export function MinimalFooter() {
     ? footer.copyrightAr
     : (footer.copyright || `${STORE_NAME} ${new Date().getFullYear()}`);
   const description = localizeCmsLabel(locale, t, { en: footer.description, ar: footer.descriptionAr });
+  // Phone, email and the optional address — each absent when blank.
+  const contact = resolveStoreContact(footer, locale);
 
   const [newsletterEmail, setNewsletterEmail] = useState("");
   const [isSubscribing, setIsSubscribing] = useState(false);
@@ -277,31 +280,41 @@ export function MinimalFooter() {
           ))}
 
           {/* ── Contact us column ── */}
-          {(footer.contactPhone || footer.contactEmail) && (
+          {hasStoreContact(contact) && (
             <div className='md:col-span-2 flex flex-col items-start'>
               <h2 className='mb-2 t-label text-ink'>
                 {t("footer.contact")}
               </h2>
-              <ul>
-                {footer.contactPhone && (
-                  <li>
-                    <a
-                      href={`tel:${footer.contactPhone}`}
-                      className='inline-flex min-h-11 items-center t-small tabular-nums text-ink-2 transition-colors hover:text-ink'>
-                      <span dir='ltr'>{footer.contactPhone}</span>
-                    </a>
-                  </li>
-                )}
-                {footer.contactEmail && (
-                  <li>
-                    <a
-                      href={`mailto:${footer.contactEmail}`}
-                      className='inline-flex min-h-11 items-center t-small tabular-nums text-ink-2 transition-colors hover:text-ink'>
-                      {footer.contactEmail}
-                    </a>
-                  </li>
-                )}
-              </ul>
+              <address className='not-italic'>
+                <ul>
+                  {contact.phone && (
+                    <li>
+                      <a
+                        href={contact.phone.href}
+                        className='inline-flex min-h-11 items-center t-small tabular-nums text-ink-2 transition-colors hover:text-ink'>
+                        <span dir='ltr'>{contact.phone.display}</span>
+                      </a>
+                    </li>
+                  )}
+                  {contact.email && (
+                    <li>
+                      <a
+                        href={contact.email.href}
+                        className='inline-flex min-h-11 items-center t-small tabular-nums text-ink-2 transition-colors hover:text-ink'>
+                        {contact.email.display}
+                      </a>
+                    </li>
+                  )}
+                  {contact.address && (
+                    <li
+                      data-testid='footer-address'
+                      dir='auto'
+                      className='py-3 t-small text-ink-2 whitespace-pre-line'>
+                      {contact.address}
+                    </li>
+                  )}
+                </ul>
+              </address>
             </div>
           )}
         </div>

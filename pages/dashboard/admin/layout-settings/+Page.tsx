@@ -1516,7 +1516,8 @@ export default function LayoutSettingsPage() {
               </CardHeader>
               <CardContent className='space-y-4'>
                 <p className='text-sm text-muted-foreground'>
-                  Phone number and email displayed in a "Contact us" column in the footer.
+                  Shown in a "Contact us" column in the footer and next to the
+                  form on the Contact page. Leave a field blank to hide it.
                 </p>
                 <div>
                   <Label htmlFor='footer-contact-phone'>Phone Number</Label>
@@ -1539,6 +1540,35 @@ export default function LayoutSettingsPage() {
                     placeholder='e.g. cs@yourstore.com'
                     className='mt-1'
                   />
+                </div>
+                <div>
+                  <Label htmlFor='footer-contact-address'>Address (English, optional)</Label>
+                  <Textarea
+                    id='footer-contact-address'
+                    value={settings.footer.contactAddress ?? ""}
+                    onChange={(e) => updateFooter("contactAddress", e.target.value)}
+                    maxLength={500}
+                    rows={3}
+                    className='mt-1'
+                  />
+                  <p className='mt-1 text-xs text-muted-foreground'>
+                    Only enter a verified business address. Hidden when blank.
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor='footer-contact-address-ar'>Address (Arabic, optional)</Label>
+                  <Textarea
+                    id='footer-contact-address-ar'
+                    dir='rtl'
+                    value={settings.footer.contactAddressAr ?? ""}
+                    onChange={(e) => updateFooter("contactAddressAr", e.target.value)}
+                    maxLength={500}
+                    rows={3}
+                    className='mt-1'
+                  />
+                  <p className='mt-1 text-xs text-muted-foreground'>
+                    Falls back to the English address when blank.
+                  </p>
                 </div>
               </CardContent>
             </Card>

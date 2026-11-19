@@ -126,6 +126,14 @@ export interface FooterSettings {
   contactPhone?: string;
   /** Contact email shown in footer (minimal template) */
   contactEmail?: string;
+  /**
+   * Postal / business address shown in the footer and on /contact (minimal
+   * template). Optional and empty by default: no address is ever seeded or
+   * guessed — when it is blank, nothing renders. Arabic falls back to the
+   * English text when left empty.
+   */
+  contactAddress?: string;
+  contactAddressAr?: string;
 }
 
 // ─── Combined Layout Settings ───────────────────────────────────────────────
@@ -210,7 +218,9 @@ export const DEFAULT_LAYOUT_SETTINGS: LayoutSettings = {
     // Policy pages (/return-policy, /terms, /privacy) are not seeded here:
     // the Percé footer adds a "Policies" link for each one only once it is
     // published (shared/legal/legal-pages.ts). Linking a policy that is not
-    // written is worse than the link being absent. No Delivery page exists.
+    // written is worse than the link being absent. /shipping-policy is built
+    // from the live shipping settings and is added the same way; the
+    // /refund-policy alias is kept only where an admin links it.
     // See docs/CURRENT_PROJECT.md.
     footerLinkGroups: [
       {
@@ -239,5 +249,8 @@ export const DEFAULT_LAYOUT_SETTINGS: LayoutSettings = {
     // Dashboard > Layout Settings, or set VITE_SOCIAL_* (see
     // shared/config/branding.ts) — until then no social row renders.
     socialLinks: [],
+    // No address until the owner supplies a real one — never seed or guess it.
+    contactAddress: "",
+    contactAddressAr: "",
   },
 };
