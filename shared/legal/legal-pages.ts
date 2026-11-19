@@ -20,7 +20,7 @@ export const LEGAL_PAGE_HREFS: Record<LegalPageKey, string> = {
 };
 
 /**
- * /refund-policy is not a second policy: it permanently redirects to the one
+ * /refund-policy is not a second policy: it redirects (302) to the one
  * Returns & Refunds page at /return-policy (pages/refund-policy/+guard.ts),
  * so the content is stored and edited once. It is live exactly when the
  * return policy is.

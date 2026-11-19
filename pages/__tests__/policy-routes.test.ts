@@ -28,7 +28,7 @@ describe("policy routes", () => {
     expect(existsSync(resolve(pagesDir, "return-policy", "+data.ts"))).toBe(true);
   });
 
-  it("/refund-policy permanently redirects to the one Returns & Refunds page", () => {
+  it("/refund-policy temporarily (302) redirects to the one Returns & Refunds page", () => {
     let thrown: unknown;
     try {
       refundGuard();
@@ -37,7 +37,7 @@ describe("policy routes", () => {
     }
     expect(thrown).toMatchObject({
       _isAbortError: true,
-      _pageContextAbort: { _urlRedirect: { url: "/return-policy", statusCode: 301 } },
+      _pageContextAbort: { _urlRedirect: { url: "/return-policy", statusCode: 302 } },
     });
   });
 
