@@ -339,6 +339,7 @@ export default function CheckoutPage() {
         paymentMethod: selectedPaymentMethod as "cod" | "stripe" | "paymob",
         buildingNumber: formValues.buildingNumber || undefined,
         apartment: formValues.apartment || undefined,
+        whatsappOptIn: formValues.whatsappOptIn === "true",
       });
 
       if (!result.success) {

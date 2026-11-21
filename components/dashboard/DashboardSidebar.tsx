@@ -21,6 +21,7 @@ import {
   Type,
   Layers,
   Truck,
+  MessageCircle,
 } from "lucide-react";
 
 import {
@@ -62,6 +63,7 @@ export function DashboardSidebar() {
     { label: "Products", href: "/dashboard/products", icon: Package },
     { label: "Orders", href: "/dashboard/orders", icon: ShoppingCart },
     { label: "ABS Tracking", href: "/dashboard/abs-tracking", icon: Truck },
+    { label: "WhatsApp Confirmations", href: "/dashboard/whatsapp-confirmations", icon: MessageCircle },
     { label: "Promo Codes", href: "/dashboard/promo-codes", icon: TicketPercent },
     { label: "Offers", href: "/dashboard/offers", icon: Tag },
     { label: "Bundles & Stacks", href: "/dashboard/bundles", icon: Layers },

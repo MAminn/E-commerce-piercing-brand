@@ -512,6 +512,13 @@
       "when": 1795103932244,
       "tag": "0072_abs_live",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1795252800000,
+      "tag": "0073_whatsapp_order_confirmation",
+      "breakpoints": true
     }
   ]
 }

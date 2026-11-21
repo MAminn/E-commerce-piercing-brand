@@ -3008,3 +3008,167 @@ export const viewedProduct = pgTable(
 );
 
 export type ViewedProductRow = typeof viewedProduct.$inferSelect;
+
+// ─── WhatsApp order confirmation (WHATSAPP_CONFIRM_MODE) ────────────────────
+//
+// See backend/whatsapp-confirmation/README.md. Migration 0073. Additive only:
+// order_id columns carry NO foreign key (no lock on "order"), and nothing here
+// is read by the ERP export. State / status / kind columns are plain text
+// (values in backend/whatsapp-confirmation/types.ts) so later phases never
+// need an enum migration.
+
+/** One row per order: the confirmation's whole lifecycle. */
+export const waOrderConfirmation = pgTable(
+  "wa_order_confirmation",
+  {
+    id: uuid("id")
+      .$defaultFn(() => v7())
+      .primaryKey(),
+    orderId: uuid("order_id").notNull(),
+    orderNumber: integer("order_number"),
+    state: text("state").notNull(),
+    /** Effective mode when the row was created: shadow | pilot | live. */
+    mode: text("mode").notNull(),
+    /** Normalised recipient (201xxxxxxxxx); null when the number is not a mobile. */
+    phoneE164: text("phone_e164"),
+    ineligibleReason: text("ineligible_reason"),
+    /** Random, unguessable; carried in the quick-reply button payloads. */
+    token: text("token").notNull(),
+    consentAt: timestamp("consent_at", { withTimezone: true, mode: "date" }),
+    consentSource: text("consent_source"),
+    consentTextVersion: text("consent_text_version"),
+    /** Business-scoped user id (BSUID) once a webhook reveals it. */
+    waUserId: text("wa_user_id"),
+    outboundWamid: text("outbound_wamid"),
+    reminderWamid: text("reminder_wamid"),
+    sentAt: timestamp("sent_at", { withTimezone: true, mode: "date" }),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true, mode: "date" }),
+    readAt: timestamp("read_at", { withTimezone: true, mode: "date" }),
+    failedAt: timestamp("failed_at", { withTimezone: true, mode: "date" }),
+    lastError: text("last_error"),
+    respondedAt: timestamp("responded_at", { withTimezone: true, mode: "date" }),
+    /** confirm | modify | cancel | free_text — the latest customer response. */
+    response: text("response"),
+    /** Shadow only: what a confirm WOULD have done (apply | skip:<reason>). */
+    wouldApply: text("would_apply"),
+    statusApplied: boolean("status_applied").notNull().default(false),
+    statusSkipReason: text("status_skip_reason"),
+    reminderSentAt: timestamp("reminder_sent_at", { withTimezone: true, mode: "date" }),
+    followUpAt: timestamp("follow_up_at", { withTimezone: true, mode: "date" }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true, mode: "date" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("wa_order_confirmation_order_idx").on(table.orderId),
+    uniqueIndex("wa_order_confirmation_token_idx").on(table.token),
+    index("wa_order_confirmation_state_idx").on(table.state, table.sentAt),
+    index("wa_order_confirmation_outbound_idx").on(table.outboundWamid),
+    index("wa_order_confirmation_reminder_idx").on(table.reminderWamid),
+  ],
+);
+
+export type WaOrderConfirmationRow = typeof waOrderConfirmation.$inferSelect;
+
+/**
+ * Send queue. dedupe_key (`wa:confirm:<orderId>`, `wa:reminder:<orderId>`)
+ * guarantees one confirmation and at most one reminder per order.
+ * status: pending | sending | sent | failed | shadow_skipped | cancelled
+ */
+export const waOutbox = pgTable(
+  "wa_outbox",
+  {
+    id: uuid("id")
+      .$defaultFn(() => v7())
+      .primaryKey(),
+    orderId: uuid("order_id").notNull(),
+    kind: text("kind").notNull(),
+    dedupeKey: text("dedupe_key").notNull(),
+    mode: text("mode").notNull(),
+    status: text("status").notNull(),
+    payload: jsonb("payload"),
+    attempts: integer("attempts").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+    lockedUntil: timestamp("locked_until", { withTimezone: true, mode: "date" }),
+    claimToken: uuid("claim_token"),
+    lastErrorCode: text("last_error_code"),
+    lastError: text("last_error"),
+    wamid: text("wamid"),
+    sentAt: timestamp("sent_at", { withTimezone: true, mode: "date" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("wa_outbox_dedupe_idx").on(table.dedupeKey),
+    index("wa_outbox_due_idx").on(table.status, table.nextAttemptAt),
+  ],
+);
+
+/** Every signed webhook event, once (event_key = wamid or wamid:status). */
+export const waInboundEvent = pgTable(
+  "wa_inbound_event",
+  {
+    id: uuid("id")
+      .$defaultFn(() => v7())
+      .primaryKey(),
+    eventKey: text("event_key").notNull(),
+    kind: text("kind").notNull(),
+    wamid: text("wamid"),
+    fromE164: text("from_e164"),
+    payload: jsonb("payload").notNull(),
+    orderId: uuid("order_id"),
+    result: text("result"),
+    processedAt: timestamp("processed_at", { withTimezone: true, mode: "date" }),
+    receivedAt: timestamp("received_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("wa_inbound_event_key_idx").on(table.eventKey),
+    index("wa_inbound_event_order_idx").on(table.orderId),
+  ],
+);
+
+/**
+ * Staff queue. type: modify | cancel | free_text | unmatched | failed_send |
+ * no_reply_48h | late_reply | ineligible. status: open | in_progress | done | dismissed.
+ * At most one OPEN item per (order, type).
+ */
+export const waReviewItem = pgTable(
+  "wa_review_item",
+  {
+    id: uuid("id")
+      .$defaultFn(() => v7())
+      .primaryKey(),
+    orderId: uuid("order_id"),
+    type: text("type").notNull(),
+    status: text("status").notNull(),
+    customerText: text("customer_text"),
+    detail: text("detail"),
+    assignedTo: text("assigned_to"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true, mode: "date" }),
+    resolvedBy: text("resolved_by"),
+    note: text("note"),
+  },
+  (table) => [
+    uniqueIndex("wa_review_item_open_idx")
+      .on(table.orderId, table.type)
+      .where(sql`${table.status} in ('open', 'in_progress')`),
+    index("wa_review_item_status_idx").on(table.status, table.createdAt),
+  ],
+);
+
+/** Single row (id = 1): runtime kill-switch and daily send cap. */
+export const waSettings = pgTable("wa_settings", {
+  id: integer("id").primaryKey(),
+  paused: boolean("paused").notNull().default(false),
+  dailySendCap: integer("daily_send_cap").notNull().default(200),
+  updatedBy: text("updated_by"),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+});
+
+/** Numbers that asked not to be messaged; never messaged automatically again. */
+export const waOptOut = pgTable("wa_opt_out", {
+  phoneE164: text("phone_e164").primaryKey(),
+  source: text("source").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+});

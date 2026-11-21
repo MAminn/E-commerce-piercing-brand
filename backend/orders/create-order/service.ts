@@ -1,4 +1,5 @@
 import { query } from "#root/shared/database/drizzle/db";
+import { queueWhatsAppConfirmation } from "#root/backend/whatsapp-confirmation/enqueue";
 import {
   order,
   orderItem,
@@ -180,6 +181,12 @@ export const createOrderSchema = z.object({
   bostaDistrictId: z.string().min(1).optional(),
   buildingNumber: z.string().trim().optional(),
   apartment: z.string().trim().optional(),
+  /**
+   * The shopper ticked "send my order confirmation on WhatsApp" (never
+   * pre-ticked). Consumed only by backend/whatsapp-confirmation after the
+   * order commits; not stored on the order row.
+   */
+  whatsappOptIn: z.boolean().optional().default(false),
 }).refine((data) => data.items.length + data.bundles.length > 0, {
   message: "An order needs at least one item",
   path: ["items"],
@@ -1312,6 +1319,17 @@ export const createOrder = (
             orderId: result.id,
             customerEmail: result.customerEmail,
             orderNumber: result.orderNumber,
+          }),
+        ),
+      );
+
+      // WhatsApp confirmation (WHATSAPP_CONFIRM_MODE, default off): writes
+      // wa_* rows only; never throws, never sends inline (the worker does).
+      yield* $(
+        Effect.promise(() =>
+          queueWhatsAppConfirmation({
+            orderId: result.id,
+            whatsappOptIn: input.whatsappOptIn === true,
           }),
         ),
       );

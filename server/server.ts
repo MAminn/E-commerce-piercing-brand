@@ -47,6 +47,9 @@ import { db as createDb } from "#root/shared/database/drizzle/db.js";
 import { emailUnsubscribeApiPlugin } from "#root/backend/email-subscription/api.js";
 import { erpSyncApiPlugin } from "#root/backend/erp-sync/api.js";
 import { ordersExportApiPlugin } from "#root/backend/orders/export-orders/api.js";
+import { whatsappWebhookPlugin } from "#root/backend/whatsapp-confirmation/webhook.js";
+import { initWhatsAppConfirm } from "#root/backend/whatsapp-confirmation/readiness.js";
+import { startWhatsAppConfirmWorker } from "#root/backend/whatsapp-confirmation/worker.js";
 
 // Normalize env vars — Coolify sometimes injects a leading '=' into values
 function normalizeEnv(key: string): string {
@@ -385,6 +388,12 @@ async function buildServer() {
     prefix: "/api/webhooks/paymob",
   });
 
+  // WhatsApp Cloud API webhook (WHATSAPP_CONFIRM_MODE). Answers 404 and
+  // touches nothing while the feature is off; signed (X-Hub-Signature-256).
+  await instance.register(whatsappWebhookPlugin, {
+    prefix: "/api/webhooks/whatsapp",
+  });
+
   // Register tracking beacon endpoint
   await instance.register(trackBeaconPlugin, {
     prefix: "/api/track",
@@ -586,6 +595,16 @@ async function main() {
       startAbsTrackingWorker({ db: ga4Db, config: abs.config });
     } catch (err) {
       console.error(`[ABS tracking] off (boot error: ${String((err as Error)?.message ?? err).slice(0, 200)})`);
+    }
+
+    // WHATSAPP_CONFIRM_MODE (default off): automatic WhatsApp order
+    // confirmation. Off, or without migration 0073, it starts nothing and
+    // makes no query. Never allowed to stop the server from booting.
+    try {
+      await initWhatsAppConfirm(ga4Db);
+      startWhatsAppConfirmWorker({ db: ga4Db });
+    } catch (err) {
+      console.error(`[WhatsApp confirm] off (boot error: ${String((err as Error)?.message ?? err).slice(0, 200)})`);
     }
   }
 

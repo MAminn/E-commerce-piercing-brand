@@ -142,6 +142,7 @@ feature rather than failing to boot.
 | Paymob | `PAYMOB_SECRET_KEY`, `PAYMOB_PUBLIC_KEY`, `PAYMOB_CARD_INTEGRATION_ID`, `PAYMOB_WALLET_INTEGRATION_ID`, `PAYMOB_HMAC_SECRET`, `PAYMOB_BASE_URL` | Paymob checkout hidden |
 | Fincart | `FINCART_ENABLED`, `FINCART_API_URL`, `FINCART_API_KEY`, `FINCART_WEBHOOK_SECRET`, `FINCART_PICKUP_ID`, `FINCART_MERCHANT_LOCATION` | Shipping integration off |
 | Bosta | `SYN_BOSTA_KEY`, `BOSTA_WEBHOOK_SECRET`, `BOSTA_EGYPT_COUNTRY_ID`, `BOSTA_PICKUP_*` | Shipping integration off |
+| WhatsApp confirmation | `WHATSAPP_CONFIRM_MODE` (`off`\|`shadow`\|`pilot`\|`live`), `WHATSAPP_GRAPH_API_VERSION`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_WABA_ID`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN`, `WHATSAPP_TEMPLATE_CONFIRM_NAME`, `WHATSAPP_TEMPLATE_REMINDER_NAME`, `WHATSAPP_TEMPLATE_LANG`, `WHATSAPP_PILOT_ALLOWLIST`, `WHATSAPP_REMINDER_AFTER_HOURS`, `WHATSAPP_FOLLOWUP_AFTER_HOURS`, `WHATSAPP_ACK_REPLY` | Off: nothing recorded or sent. See `backend/whatsapp-confirmation/README.md` |
 | Superadmin | `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD` | `/dashboard/superadmin/sync` (full DB export/import) not bootstrapped — recommended for production |
 | Social login | `GOOGLE_CLIENT_ID/SECRET`, `FACEBOOK_CLIENT_ID/SECRET` | Providers hidden |
 | Misc | `TRUSTED_ORIGINS`, `STORE_OWNER_ID`, `VITE_STORE_NAME`, `VITE_CURRENCY`, `PROD_ASSET_ORIGIN` | Sensible defaults |
@@ -166,6 +167,7 @@ are enabled:
 | Paymob | `https://<domain>/api/webhooks/paymob` |
 | Fincart | `https://<domain>/api/webhooks/fincart` |
 | Bosta | `https://<domain>/api/webhooks/bosta` |
+| WhatsApp Cloud API | `https://<domain>/api/webhooks/whatsapp` (GET verify + signed POST; 404 while `WHATSAPP_CONFIRM_MODE=off`) |
 
 ---
 

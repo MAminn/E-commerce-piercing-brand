@@ -106,6 +106,8 @@ export function CheckoutPageEditorialTemplate({
     country: "Egypt",
     paymentMethod: paymentMethods?.[0]?.id ?? "cod",
     notes: "",
+    // "true" only when the shopper ticks the box; never pre-ticked.
+    whatsappOptIn: "",
   });
 
   const updateField = (key: string, value: string) => {
@@ -416,6 +418,17 @@ export function CheckoutPageEditorialTemplate({
                             className={inputCls}
                             placeholder='Phone Number'
                           />
+                          <label htmlFor='checkout-whatsapp-opt-in' className='mt-3 flex cursor-pointer items-start gap-2 text-sm leading-snug'>
+                            <input
+                              id='checkout-whatsapp-opt-in'
+                              name='whatsappOptIn'
+                              type='checkbox'
+                              className='mt-0.5 h-4 w-4 shrink-0 accent-current'
+                              checked={formValues.whatsappOptIn === "true"}
+                              onChange={(e) => updateField("whatsappOptIn", e.target.checked ? "true" : "")}
+                            />
+                            <span>{t("checkout.whatsapp_opt_in") || "Send my order confirmation and updates to this number on WhatsApp"}</span>
+                          </label>
                         </div>
                       </div>
                     </div>

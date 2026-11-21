@@ -280,6 +280,8 @@ export function CheckoutPageModernTemplate({
     paymentMethod: "cod",
     buildingNumber: "",
     apartment: "",
+    // "true" only when the shopper ticks the box; never pre-ticked.
+    whatsappOptIn: "",
   });
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -681,6 +683,17 @@ export function CheckoutPageModernTemplate({
                     className='tabular-nums'
                   />
                   <FieldError id='phoneNumber-error' message={fieldErrors.phoneNumber} />
+                  <label htmlFor='whatsappOptIn' className='mt-3 flex cursor-pointer items-start gap-2 text-sm leading-snug'>
+                    <input
+                      id='whatsappOptIn'
+                      name='whatsappOptIn'
+                      type='checkbox'
+                      className='mt-0.5 h-4 w-4 shrink-0 accent-current'
+                      checked={form.whatsappOptIn === "true"}
+                      onChange={(e) => updateField("whatsappOptIn", e.target.checked ? "true" : "")}
+                    />
+                    <span>{t("checkout.whatsapp_opt_in") || "Send my order confirmation and updates to this number on WhatsApp"}</span>
+                  </label>
                 </div>
               </div>
             </CheckoutSection>
