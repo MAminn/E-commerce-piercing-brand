@@ -528,7 +528,11 @@ export async function reprocessStaleInbound(db: DatabaseClient, ctx: InboundCont
       await processInboundEvent(db, ev, ctx);
       n++;
     } catch (err) {
-      console.error(`[WhatsApp webhook] reprocess ${ev.kind} failed: ${String((err as Error)?.message ?? err).slice(0, 200)}`);
+      // Second failure: stop replaying it and hand it to staff once.
+      const msg = String((err as Error)?.message ?? err).slice(0, 150);
+      console.error(`[WhatsApp webhook] reprocess ${ev.kind} failed: ${msg}`);
+      await markEvent(db, ev.eventKey, `failed:${msg}`, null);
+      await openReviewItem(db, { orderId: null, type: "unmatched", detail: `A WhatsApp ${ev.kind} event could not be processed (${msg}) — check the chat` });
     }
   }
   return n;

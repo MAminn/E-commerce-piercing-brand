@@ -61,6 +61,11 @@ Every step marked **[APPROVAL]** needs the owner's explicit go-ahead first.
 - Samples: {{1}} منى · {{2}} #10045
 - Same three quick replies, same order.
 
+## Pause behaviour
+Orders placed while paused are queued, not dropped. On **Resume** the backlog is sent (only for orders still
+`pending` with no reply), so after a long pause the first messages can be hours old — consider checking the
+"Awaiting reply" tab before resuming.
+
 ## Rollback
 Dashboard **Pause** (instant) → `WHATSAPP_CONFIRM_MODE=shadow` or `off` + restart. Tables are additive;
 nothing to undo in orders, ERP or ABS.
