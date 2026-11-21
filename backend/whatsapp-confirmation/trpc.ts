@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { t, adminProcedure, superadminProcedure } from "#root/shared/trpc/server";
+import { t, adminProcedure, publicProcedure, superadminProcedure } from "#root/shared/trpc/server";
 import { effectiveWhatsAppConfirmMode, readWhatsAppConfirmConfig } from "#root/shared/config/whatsapp-confirmation";
 import { waOrderConfirmation } from "#root/shared/database/drizzle/schema";
 import { buttonPayload } from "./payload";
@@ -31,6 +31,9 @@ function assertOn(): void {
 const actorOf = (ctx: { clientSession: { email: string } }) => ctx.clientSession.email;
 
 export const whatsappConfirmationRouter = t.router({
+  /** Public: should checkout show the WhatsApp opt-in? Reveals nothing but on/off. */
+  checkoutOptIn: publicProcedure.query(() => ({ enabled: effectiveWhatsAppConfirmMode() !== "off" })),
+
   overview: adminProcedure.query(async ({ ctx }) => {
     return await getOverview(effectiveWhatsAppConfirmMode() === "off" ? null : ctx.db);
   }),

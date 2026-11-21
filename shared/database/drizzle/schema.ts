@@ -3049,7 +3049,7 @@ export const waOrderConfirmation = pgTable(
     respondedAt: timestamp("responded_at", { withTimezone: true, mode: "date" }),
     /** confirm | modify | cancel | free_text — the latest customer response. */
     response: text("response"),
-    /** Shadow only: what a confirm WOULD have done (apply | skip:<reason>). */
+    /** Shadow / not allow-listed: `apply` when a confirm WOULD have moved the order to processing. */
     wouldApply: text("would_apply"),
     statusApplied: boolean("status_applied").notNull().default(false),
     statusSkipReason: text("status_skip_reason"),

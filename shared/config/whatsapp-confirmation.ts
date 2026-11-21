@@ -52,7 +52,6 @@ export interface WhatsAppConfirmConfig {
   pilotAllowlist: ReadonlySet<string>;
   reminderAfterHours: number;
   followUpAfterHours: number;
-  ackReply: boolean;
 }
 
 type Env = Record<string, string | undefined>;
@@ -96,7 +95,6 @@ export function readWhatsAppConfirmConfig(env: Env = process.env): WhatsAppConfi
     pilotAllowlist: parsePilotAllowlist(env.WHATSAPP_PILOT_ALLOWLIST),
     reminderAfterHours: positiveInt(env, "WHATSAPP_REMINDER_AFTER_HOURS", WA_REMINDER_AFTER_HOURS_DEFAULT),
     followUpAfterHours: positiveInt(env, "WHATSAPP_FOLLOWUP_AFTER_HOURS", WA_FOLLOWUP_AFTER_HOURS_DEFAULT),
-    ackReply: (env.WHATSAPP_ACK_REPLY ?? "").trim().toLowerCase() === "on",
   };
 }
 

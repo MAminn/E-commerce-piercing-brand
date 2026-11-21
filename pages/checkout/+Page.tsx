@@ -107,6 +107,22 @@ export default function CheckoutPage() {
   >([]);
   const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true);
 
+  // WhatsApp opt-in is shown only while WHATSAPP_CONFIRM_MODE is not off.
+  // Any failure hides it (never blocks checkout).
+  const [showWhatsAppOptIn, setShowWhatsAppOptIn] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    trpc.whatsappConfirmation.checkoutOptIn
+      .query()
+      .then((r) => {
+        if (!cancelled) setShowWhatsAppOptIn(r.enabled === true);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -339,7 +355,7 @@ export default function CheckoutPage() {
         paymentMethod: selectedPaymentMethod as "cod" | "stripe" | "paymob",
         buildingNumber: formValues.buildingNumber || undefined,
         apartment: formValues.apartment || undefined,
-        whatsappOptIn: formValues.whatsappOptIn === "true",
+        whatsappOptIn: showWhatsAppOptIn && formValues.whatsappOptIn === "true",
       });
 
       if (!result.success) {
@@ -496,6 +512,7 @@ export default function CheckoutPage() {
     governorateCode: shippingDestination,
     onGovernorateChange: setShippingDestination,
     governorateRequired: shippingMode === "zones",
+    showWhatsAppOptIn,
   };
 
   return <Template.component {...templateProps} />;

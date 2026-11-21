@@ -215,9 +215,12 @@ describe("graph client", () => {
     expect(url).toBe("https://graph.facebook.com/v27.0/PNID/messages");
     expect(init.headers.Authorization).toBe("Bearer tok");
   });
-  it("5xx and throttling retry; bad number is permanent", async () => {
-    expect((await sendGraphMessage(cfg, {}, reply(500, {}))).kind).toBe("retry");
+  it("throttling retries; 5xx / generic errors are ambiguous (may have been accepted); bad number is permanent", async () => {
+    expect((await sendGraphMessage(cfg, {}, reply(500, {}))).kind).toBe("ambiguous");
+    expect((await sendGraphMessage(cfg, {}, reply(500, { error: { code: 131000 } }))).kind).toBe("ambiguous");
+    expect((await sendGraphMessage(cfg, {}, reply(429, {}))).kind).toBe("retry");
     expect((await sendGraphMessage(cfg, {}, reply(400, { error: { code: 131056 } }))).kind).toBe("retry");
+    expect((await sendGraphMessage(cfg, {}, reply(400, { error: { code: 130429 } }))).kind).toBe("retry");
     expect((await sendGraphMessage(cfg, {}, reply(400, { error: { code: 131026, message: "undeliverable" } })))).toMatchObject({ kind: "permanent", code: "131026" });
     expect(classifyGraphError(401, "190")).toBe("permanent");
   });

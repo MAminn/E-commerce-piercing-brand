@@ -10,7 +10,7 @@ import {
   type WhatsAppConfirmMode,
 } from "#root/shared/config/whatsapp-confirmation";
 import { sendGraphMessage, type FetchLike, type SendOutcome } from "./graph-client";
-import { openReviewItem, runScheduler, runtimeMode } from "./store";
+import { openReviewItem, reprocessStaleInbound, runScheduler, runtimeMode } from "./store";
 import { setWhatsAppWorkerKick } from "./enqueue";
 
 /**
@@ -28,7 +28,8 @@ import { setWhatsAppWorkerKick } from "./enqueue";
  */
 
 export const MAX_ATTEMPTS = 5;
-export const LEASE_MS = 120_000;
+/** Covers ONE send (15 s Graph timeout + DB calls) with a wide margin: rows are claimed one at a time. */
+export const LEASE_MS = 5 * 60_000;
 export const SEND_TICK_MS = 15_000;
 export const SCHEDULE_TICK_MS = 10 * 60_000;
 const BATCH_SIZE = 10;
@@ -88,7 +89,7 @@ export async function runSendTick(deps: WaWorkerDeps): Promise<SendTickReport> {
   const stale = await rows<{ id: string; order_id: string; kind: string }>(
     db,
     sql`UPDATE wa_outbox SET status = 'failed', last_error_code = 'ambiguous', last_error = 'worker lost the lease during send — outcome unknown',
-               locked_until = NULL, updated_at = ${now.toISOString()}::timestamptz
+               locked_until = NULL, claim_token = NULL, updated_at = ${now.toISOString()}::timestamptz
         WHERE status = 'sending' AND locked_until < ${now.toISOString()}::timestamptz
         RETURNING id, order_id, kind`,
   );
@@ -102,25 +103,35 @@ export async function runSendTick(deps: WaWorkerDeps): Promise<SendTickReport> {
   let budget = cap - (await sentToday(db));
   if (budget <= 0) return { ...report, skipped: "daily_cap" };
 
-  const token = v4();
-  const lease = new Date(now.getTime() + LEASE_MS);
-  const claimed = await rows<ClaimedRow>(
-    db,
-    sql`UPDATE wa_outbox o
-        SET status = 'sending', claim_token = ${token}::uuid, locked_until = ${lease.toISOString()}::timestamptz,
-            attempts = o.attempts + 1, updated_at = ${now.toISOString()}::timestamptz
-        WHERE o.id IN (
-          SELECT id FROM wa_outbox
-          WHERE status = 'pending' AND next_attempt_at <= ${now.toISOString()}::timestamptz
-          ORDER BY next_attempt_at
-          LIMIT ${Math.min(BATCH_SIZE, budget)}
-          FOR UPDATE SKIP LOCKED
-        )
-        RETURNING o.id, o.order_id, o.kind, o.payload, o.attempts`,
-  );
-  report.claimed = claimed.length;
+  // One row per claim: the lease only ever has to cover a single send, so a
+  // second container (rolling deploy) can never sweep a row this one is still
+  // working on.
+  const claimOne = async (): Promise<{ row: ClaimedRow; token: string } | null> => {
+    const token = v4();
+    const claimNow = new Date();
+    const lease = new Date(claimNow.getTime() + LEASE_MS);
+    const [row] = await rows<ClaimedRow>(
+      db,
+      sql`UPDATE wa_outbox o
+          SET status = 'sending', claim_token = ${token}::uuid, locked_until = ${lease.toISOString()}::timestamptz,
+              attempts = o.attempts + 1, updated_at = ${claimNow.toISOString()}::timestamptz
+          WHERE o.id IN (
+            SELECT id FROM wa_outbox
+            WHERE status = 'pending' AND next_attempt_at <= ${now.toISOString()}::timestamptz
+            ORDER BY next_attempt_at
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED
+          )
+          RETURNING o.id, o.order_id, o.kind, o.payload, o.attempts`,
+    );
+    return row ? { row, token } : null;
+  };
 
-  for (const row of claimed) {
+  for (let i = 0; i < BATCH_SIZE && budget > 0; i++) {
+    const claimed = await claimOne();
+    if (!claimed) break;
+    report.claimed++;
+    const { row, token } = claimed;
     const mine = and(eq(waOutbox.id, row.id), eq(waOutbox.claimToken, token));
     const finish = (set: Partial<typeof waOutbox.$inferInsert>) =>
       db.update(waOutbox).set({ ...set, lockedUntil: null, updatedAt: new Date() }).where(mine);
@@ -234,10 +245,10 @@ export function startWhatsAppConfirmWorker(deps: WaWorkerDeps): WaWorkerHandle |
   };
   const schedule = async (): Promise<void> => {
     try {
-      const r = await runScheduler(deps.db, {
-        mode: (deps.mode ?? effectiveWhatsAppConfirmMode)(),
-        config: (deps.config ?? readWhatsAppConfirmConfig)(),
-      });
+      const ctx = { mode: (deps.mode ?? effectiveWhatsAppConfirmMode)(), config: (deps.config ?? readWhatsAppConfirmConfig)() };
+      const replayed = await reprocessStaleInbound(deps.db, ctx);
+      if (replayed) console.info(`[WhatsApp confirm] re-processed ${replayed} stored webhook event(s)`);
+      const r = await runScheduler(deps.db, ctx);
       if (r.reminders || r.followUps || r.superseded) {
         console.info(`[WhatsApp confirm] scheduler reminders=${r.reminders} followUps=${r.followUps} superseded=${r.superseded}`);
         if (r.reminders) void tick();

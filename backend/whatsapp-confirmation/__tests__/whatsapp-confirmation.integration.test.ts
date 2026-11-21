@@ -200,7 +200,9 @@ describeIfDb("WhatsApp order confirmation (integration)", () => {
     expect(await enqueue(landline.id)).toEqual({ outcome: "ineligible", reason: "invalid_phone" });
     const online = await createOrder({ paymentMethod: "paymob" });
     expect(await enqueue(online.id)).toEqual({ outcome: "ineligible", reason: "not_cod" });
-    expect((await reviews(noConsent.id)).map((r) => r.type)).toEqual(["ineligible"]);
+    // no_consent is the normal case: listed, not queued for staff action.
+    expect(await reviews(noConsent.id)).toHaveLength(0);
+    expect((await reviews(landline.id)).map((r) => r.type)).toEqual(["ineligible"]);
     expect(await reviews(online.id)).toHaveLength(0);
     expect(await db.select().from(schema.waOutbox)).toHaveLength(0);
   });
@@ -331,7 +333,7 @@ describeIfDb("WhatsApp order confirmation (integration)", () => {
     const o = await createOrder();
     await enqueue(o.id);
     const now = new Date();
-    const r = await tick(vi.fn(async () => ({ status: 503, text: async () => "{}" })), "pilot", now);
+    const r = await tick(vi.fn(async () => ({ status: 429, text: async () => JSON.stringify({ error: { code: 130429 } }) })), "pilot", now);
     expect(r.retried).toBe(1);
     const [box] = await db.select().from(schema.waOutbox).where(eq(schema.waOutbox.orderId, o.id));
     expect(box?.status).toBe("pending");
@@ -384,5 +386,63 @@ describeIfDb("WhatsApp order confirmation (integration)", () => {
     for (const ev of evs) await store.processInboundEvent(db, ev, { mode: "pilot", config: config() });
     expect(await conf(o.id)).toMatchObject({ outboundWamid: "wamid.REC", state: "delivered" });
     expect(await press(o.id, "confirm")).toEqual(["button:confirm:applied"]);
+  });
+
+  it("events for the support number (or any other number) never act", async () => {
+    const o = await createOrder();
+    await enqueue(o.id);
+    await tick(okFetch());
+    const c = await conf(o.id);
+    const payload = (await import("../payload")).buttonPayload("confirm", c?.token as string);
+    for (const phoneNumberId of [cfgMod.SUPPORT_PHONE_NUMBER_ID, "123456789012345"]) {
+      const wamid = `wamid.SUP${phoneNumberId}${Date.now()}`;
+      const fresh = await store.recordInboundEvents(db, [
+        { kind: "button", eventKey: wamid, wamid, phoneNumberId, from: c?.phoneE164 ?? null, userId: null, contextId: c?.outboundWamid ?? null, payload, text: "x", raw: {} },
+      ]);
+      const [res] = await Promise.all(fresh.map((ev) => store.processInboundEvent(db, ev, { mode: "pilot", config: config() })));
+      expect(res).toMatch(/^ignored:/);
+    }
+    expect((await orderRow(o.id))?.status).toBe("pending");
+    expect(await reviews(o.id)).toHaveLength(0);
+  });
+
+  it("a stored event whose processing was lost is re-run once by the scheduler", async () => {
+    const o = await createOrder();
+    await enqueue(o.id);
+    await tick(okFetch());
+    const c = await conf(o.id);
+    const wamid = `wamid.LOST${Date.now()}`;
+    await store.recordInboundEvents(db, [
+      {
+        kind: "button",
+        eventKey: wamid,
+        wamid,
+        phoneNumberId: ENV.WHATSAPP_PHONE_NUMBER_ID,
+        from: c?.phoneE164 ?? null,
+        userId: null,
+        contextId: c?.outboundWamid ?? null,
+        payload: (await import("../payload")).buttonPayload("confirm", c?.token as string),
+        text: "تأكيد الطلب",
+        raw: {},
+      },
+    ]);
+    // Simulate the crash: never processed, received 2 minutes ago.
+    await db.execute(sql`UPDATE wa_inbound_event SET received_at = now() - interval '2 minutes' WHERE event_key = ${wamid}`);
+    const ctx = { mode: "pilot" as const, config: config() };
+    expect(await store.reprocessStaleInbound(db, ctx)).toBe(1);
+    expect(await store.reprocessStaleInbound(db, ctx)).toBe(0);
+    expect((await orderRow(o.id))?.status).toBe("processing");
+    expect(await statusLogs(o.id)).toHaveLength(1);
+  });
+
+  it("orders placed while paused wait and are sent after resume", async () => {
+    await db.execute(sql`UPDATE wa_settings SET paused = true WHERE id = 1`);
+    const o = await createOrder();
+    expect((await enqueue(o.id)).outcome).toBe("queued");
+    const f1 = okFetch();
+    await tick(f1);
+    expect(f1).not.toHaveBeenCalled();
+    await db.execute(sql`UPDATE wa_settings SET paused = false WHERE id = 1`);
+    expect((await tick(okFetch())).sent).toBe(1);
   });
 });

@@ -4,12 +4,13 @@
  *
  * Outcome classes (see classifyGraphError):
  *   sent       — 2xx with a message id
- *   retry      — transient: network error before the request was accepted
- *                (connection refused / DNS), HTTP 5xx, throttling codes
+ *   retry      — transient and provably not accepted: network error before
+ *                the request left (connection refused / DNS), HTTP 429,
+ *                throttling codes
  *   permanent  — will not succeed by retrying (bad number, template problem,
  *                auth/permission, invalid parameter)
  *   ambiguous  — the request may have reached Meta (timeout / reset after
- *                send). NEVER retried automatically: a retry could deliver a
+ *                send, HTTP 5xx, 2xx without a message id). NEVER retried automatically: a retry could deliver a
  *                second confirmation. Meta echoes `biz_opaque_callback_data`
  *                in status webhooks, which lets the webhook recover the wamid.
  */
@@ -30,12 +31,18 @@ export type SendOutcome =
  * https://developers.facebook.com/documentation/business-messaging/whatsapp/support/error-codes
  * when changing this list.
  */
-export const RETRYABLE_CODES = new Set(["1", "2", "4", "17", "341", "80007", "130429", "131000", "131016", "131056", "133004"]);
+export const RETRYABLE_CODES = new Set(["4", "80007", "130429", "131056"]);
 
-export function classifyGraphError(httpStatus: number, code: string | null): "retry" | "permanent" {
+/**
+ * Only explicit throttling / rate-limit answers are retried: Meta rejected the
+ * request outright, so a retry cannot duplicate a message. Any other 5xx (or
+ * a generic "something went wrong") may have been accepted → `ambiguous`,
+ * never retried automatically.
+ */
+export function classifyGraphError(httpStatus: number, code: string | null): "retry" | "permanent" | "ambiguous" {
   if (code && RETRYABLE_CODES.has(code)) return "retry";
-  if (httpStatus >= 500) return "retry";
   if (httpStatus === 429) return "retry";
+  if (httpStatus >= 500) return "ambiguous";
   return "permanent";
 }
 

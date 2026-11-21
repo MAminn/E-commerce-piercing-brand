@@ -64,7 +64,8 @@ export interface TemplateInput {
 }
 
 export function buildTemplateMessage(input: TemplateInput): Record<string, unknown> {
-  const orderRef = input.orderNumber ? `#${input.orderNumber}` : "";
+  // Meta rejects empty template parameters.
+  const orderRef = input.orderNumber ? `#${input.orderNumber}` : "—";
   const bodyParams =
     input.kind === "confirm"
       ? [firstName(input.customerName), orderRef, formatTotal(input.total)]

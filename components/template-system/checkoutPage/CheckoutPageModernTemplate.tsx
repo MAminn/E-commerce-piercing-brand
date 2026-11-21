@@ -122,6 +122,8 @@ export interface CheckoutPageModernTemplateProps {
   onGovernorateChange?: (code: GovernorateCode | null) => void;
   /** Zone shipping is on: a governorate must be chosen before the order can be placed. */
   governorateRequired?: boolean;
+  /** Show the WhatsApp opt-in under the phone field (WHATSAPP_CONFIRM_MODE is not off). */
+  showWhatsAppOptIn?: boolean;
 }
 
 
@@ -222,6 +224,7 @@ export function CheckoutPageModernTemplate({
   governorateCode = null,
   onGovernorateChange,
   governorateRequired = false,
+  showWhatsAppOptIn = false,
 }: CheckoutPageModernTemplateProps) {
   const { t, locale } = useMinimalI18n();
 
@@ -683,6 +686,7 @@ export function CheckoutPageModernTemplate({
                     className='tabular-nums'
                   />
                   <FieldError id='phoneNumber-error' message={fieldErrors.phoneNumber} />
+                  {showWhatsAppOptIn && (
                   <label htmlFor='whatsappOptIn' className='mt-3 flex cursor-pointer items-start gap-2 text-sm leading-snug'>
                     <input
                       id='whatsappOptIn'
@@ -694,6 +698,7 @@ export function CheckoutPageModernTemplate({
                     />
                     <span>{t("checkout.whatsapp_opt_in") || "Send my order confirmation and updates to this number on WhatsApp"}</span>
                   </label>
+                  )}
                 </div>
               </div>
             </CheckoutSection>

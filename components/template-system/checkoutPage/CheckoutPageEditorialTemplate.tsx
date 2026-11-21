@@ -54,6 +54,8 @@ export interface CheckoutPageEditorialTemplateProps {
   governorateCode?: GovernorateCode | null;
   onGovernorateChange?: (code: GovernorateCode | null) => void;
   governorateRequired?: boolean;
+  /** Show the WhatsApp opt-in under the phone field (WHATSAPP_CONFIRM_MODE is not off). */
+  showWhatsAppOptIn?: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -89,6 +91,7 @@ export function CheckoutPageEditorialTemplate({
   governorateCode = null,
   onGovernorateChange,
   governorateRequired = false,
+  showWhatsAppOptIn = false,
 }: CheckoutPageEditorialTemplateProps) {
   const { t, locale } = useMinimalI18n();
   /* Internal form state — field names match the Modern template so
@@ -418,6 +421,7 @@ export function CheckoutPageEditorialTemplate({
                             className={inputCls}
                             placeholder='Phone Number'
                           />
+                          {showWhatsAppOptIn && (
                           <label htmlFor='checkout-whatsapp-opt-in' className='mt-3 flex cursor-pointer items-start gap-2 text-sm leading-snug'>
                             <input
                               id='checkout-whatsapp-opt-in'
@@ -429,6 +433,7 @@ export function CheckoutPageEditorialTemplate({
                             />
                             <span>{t("checkout.whatsapp_opt_in") || "Send my order confirmation and updates to this number on WhatsApp"}</span>
                           </label>
+                          )}
                         </div>
                       </div>
                     </div>

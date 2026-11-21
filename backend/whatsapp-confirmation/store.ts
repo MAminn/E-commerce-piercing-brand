@@ -10,7 +10,7 @@ import {
   waReviewItem,
   waSettings,
 } from "#root/shared/database/drizzle/schema";
-import type { WhatsAppConfirmConfig, WhatsAppConfirmMode } from "#root/shared/config/whatsapp-confirmation";
+import { SUPPORT_PHONE_NUMBER_ID, type WhatsAppConfirmConfig, type WhatsAppConfirmMode } from "#root/shared/config/whatsapp-confirmation";
 import { toWhatsAppRecipient } from "#root/shared/whatsapp/phone";
 import { applyOrderStatusChange, type Tx } from "#root/backend/orders/update-order-status/apply-status-change";
 import { buildTemplateMessage, newConfirmationToken, parseButtonPayload } from "./payload";
@@ -98,7 +98,11 @@ export async function enqueueConfirmation(db: DatabaseClient, input: EnqueueInpu
     .where(eq(order.id, input.orderId));
   if (!o) return { outcome: "ineligible", reason: "order_missing" };
 
-  const mode = await runtimeMode(db, input.mode);
+  // The pause flag is NOT applied here: while paused the worker sends
+  // nothing, and these rows wait in the outbox (the scheduler retires any
+  // whose order staff handled meanwhile). Applying it here would turn every
+  // order placed during a pause into a permanent, never-sent shadow row.
+  const mode = input.mode;
   const phone = toWhatsAppRecipient(o.customerPhone);
   let ineligible: string | null = null;
   if (o.paymentMethod !== "cod") ineligible = "not_cod";
@@ -135,7 +139,9 @@ export async function enqueueConfirmation(db: DatabaseClient, input: EnqueueInpu
 
     if (ineligible) {
       // not_cod: online orders are paid; nothing for staff to do here.
-      if (ineligible !== "not_cod" && ineligible !== "not_pending") {
+      // no_consent is the normal case for most orders: staff already confirm
+      // those by hand, so it is listed (Not sent tab) but not queued for action.
+      if (ineligible === "invalid_phone" || ineligible === "opted_out") {
         await openReviewItem(tx, {
           orderId: o.id,
           type: "ineligible",
@@ -197,7 +203,9 @@ export async function recordInboundEvents(db: DatabaseClient, events: ParsedEven
         kind: ev.kind,
         wamid: "wamid" in ev ? ev.wamid : null,
         fromE164: from,
-        payload: ev.raw as object,
+        // The parsed event itself, so an event whose processing was lost
+        // (crash / restart after the 200) can be re-run by the scheduler.
+        payload: JSON.parse(JSON.stringify(ev)) as object,
       })
       .onConflictDoNothing()
       .returning({ id: waInboundEvent.id });
@@ -214,10 +222,18 @@ async function markEvent(db: Db, eventKey: string, result: string, orderId: stri
 }
 
 export async function processInboundEvent(db: DatabaseClient, ev: ParsedEvent, ctx: InboundContext): Promise<string> {
-  // Only events for OUR sender number. The support number is never acted on.
-  if (ev.phoneNumberId && ctx.config.phoneNumberId && ev.phoneNumberId !== ctx.config.phoneNumberId) {
-    await markEvent(db, ev.eventKey, "ignored:other_number", null);
-    return "ignored:other_number";
+  // Only events for OUR sender number. The support number is never acted on,
+  // whatever the config says. With no sender configured, real Meta events
+  // (which always carry a phone_number_id) are stored but not acted on; only
+  // shadow simulations (no phone_number_id) are processed.
+  if (ev.phoneNumberId === SUPPORT_PHONE_NUMBER_ID) {
+    await markEvent(db, ev.eventKey, "ignored:support_number", null);
+    return "ignored:support_number";
+  }
+  if (ev.phoneNumberId && ev.phoneNumberId !== ctx.config.phoneNumberId) {
+    const why = ctx.config.phoneNumberId ? "ignored:other_number" : "ignored:no_sender_configured";
+    await markEvent(db, ev.eventKey, why, null);
+    return why;
   }
   switch (ev.kind) {
     case "status":
@@ -266,7 +282,7 @@ async function applyStatusEvent(db: DatabaseClient, ev: Extract<ParsedEvent, { k
   } else if (ev.status === "failed") {
     set.failedAt = now;
     set.lastError = `${ev.errorCode ?? "?"} ${ev.errorTitle ?? ""}`.trim().slice(0, 300);
-    if (!answered) {
+    if (!answered && conf.state !== "superseded" && conf.state !== "follow_up") {
       set.state = "failed";
       await openReviewItem(db, { orderId: conf.orderId, type: "failed_send", detail: `WhatsApp could not deliver the message (${set.lastError}) — confirm manually` });
     }
@@ -489,4 +505,31 @@ export async function runScheduler(db: DatabaseClient, ctx: InboundContext): Pro
     report.followUps++;
   }
   return report;
+}
+
+/**
+ * Events stored (200 returned to Meta) whose processing never finished —
+ * process crash or restart between the insert and the async step. Meta will
+ * not resend them, so the scheduler re-runs them once they are a minute old.
+ */
+export async function reprocessStaleInbound(db: DatabaseClient, ctx: InboundContext): Promise<number> {
+  const stale = await db
+    .select({ payload: waInboundEvent.payload })
+    .from(waInboundEvent)
+    // Older than a day: left for staff (the 48 h follow-up already covers the order).
+    .where(sql`${waInboundEvent.processedAt} IS NULL AND ${waInboundEvent.receivedAt} < now() - interval '1 minute' AND ${waInboundEvent.receivedAt} > now() - interval '1 day'`)
+    .orderBy(waInboundEvent.receivedAt)
+    .limit(100);
+  let n = 0;
+  for (const row of stale) {
+    const ev = row.payload as ParsedEvent;
+    if (!ev || typeof ev !== "object" || !("kind" in ev) || !("eventKey" in ev)) continue;
+    try {
+      await processInboundEvent(db, ev, ctx);
+      n++;
+    } catch (err) {
+      console.error(`[WhatsApp webhook] reprocess ${ev.kind} failed: ${String((err as Error)?.message ?? err).slice(0, 200)}`);
+    }
+  }
+  return n;
 }
