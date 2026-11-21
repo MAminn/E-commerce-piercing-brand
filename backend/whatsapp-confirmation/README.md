@@ -52,9 +52,9 @@ any credential is missing. `wa_settings.paused` turns pilot/live into shadow at 
 | Outcome | Action |
 |---|---|
 | 2xx + message id | `sent` |
-| 5xx, 429, throttling codes | retry with backoff (1 m, 5 m, 30 m, 2 h), max 5 |
+| HTTP 429, throttling codes (4, 80007, 130429, 131056), DNS / connection refused before send | retry with backoff (1 m, 5 m, 30 m, 2 h), max 5 |
 | permanent (e.g. 131026, template/auth errors) | `failed` + staff item |
-| timeout / no response | `failed:ambiguous` + staff item; **never re-sent** (could duplicate). `biz_opaque_callback_data` lets a later status webhook recover the wamid |
+| timeout / no response, any other 5xx, 2xx without a message id | `failed:ambiguous` + staff item; **never re-sent** (could duplicate). `biz_opaque_callback_data` lets a later status webhook recover the wamid |
 
 ## Tests
 

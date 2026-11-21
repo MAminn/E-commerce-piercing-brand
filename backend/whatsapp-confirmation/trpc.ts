@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { t, adminProcedure, publicProcedure, superadminProcedure } from "#root/shared/trpc/server";
+import { t, adminProcedure, publicProcedure } from "#root/shared/trpc/server";
 import { effectiveWhatsAppConfirmMode, readWhatsAppConfirmConfig } from "#root/shared/config/whatsapp-confirmation";
 import { waOrderConfirmation } from "#root/shared/database/drizzle/schema";
 import { buttonPayload } from "./payload";
@@ -29,6 +29,18 @@ function assertOn(): void {
 }
 
 const actorOf = (ctx: { clientSession: { email: string } }) => ctx.clientSession.email;
+
+/**
+ * Superadmin-only, chained AFTER `.input()` on an adminProcedure: the shared
+ * admin gate runs first (the tRPC authorization contract requires it on every
+ * non-public procedure), then input validation, then this check. An admin who
+ * is not superadmin still gets FORBIDDEN before the resolver runs.
+ */
+const requireSuperadmin = t.middleware(({ ctx, next }) => {
+  const role = (ctx as { clientSession?: { role?: string } }).clientSession?.role;
+  if (role !== "superadmin") throw new TRPCError({ code: "FORBIDDEN", message: "Superadmin access required" });
+  return next();
+});
 
 export const whatsappConfirmationRouter = t.router({
   /** Public: should checkout show the WhatsApp opt-in? Reveals nothing but on/off. */
@@ -67,18 +79,22 @@ export const whatsappConfirmationRouter = t.router({
     return await setPaused(ctx.db, input.paused, actorOf(ctx));
   }),
 
-  setDailyCap: superadminProcedure.input(z.object({ cap: z.number().int().min(1).max(10_000) })).mutation(async ({ ctx, input }) => {
-    assertOn();
-    return await setDailyCap(ctx.db, input.cap, actorOf(ctx));
-  }),
+  setDailyCap: adminProcedure
+    .input(z.object({ cap: z.number().int().min(1).max(10_000) }))
+    .use(requireSuperadmin)
+    .mutation(async ({ ctx, input }) => {
+      assertOn();
+      return await setDailyCap(ctx.db, input.cap, actorOf(ctx));
+    }),
 
   /**
    * SHADOW ONLY — simulates the customer pressing a button, through the exact
    * webhook processing path. Shadow can never change an order, so this
    * exercises the decision, the review queue and the audit rows safely.
    */
-  simulateReply: superadminProcedure
+  simulateReply: adminProcedure
     .input(z.object({ orderId: z.string().uuid(), action: z.enum(["confirm", "modify", "cancel"]) }))
+    .use(requireSuperadmin)
     .mutation(async ({ ctx, input }) => {
       if (effectiveWhatsAppConfirmMode() !== "shadow") {
         throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Simulation is only available in shadow mode" });

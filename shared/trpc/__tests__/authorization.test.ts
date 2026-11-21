@@ -85,6 +85,8 @@ const PUBLIC = new Set([
   "cartCapture.recordProductView",
   "shipping.destinations",
   "shipping.quote",
+  // Checkout: whether to show the WhatsApp opt-in. Returns only { enabled }.
+  "whatsappConfirmation.checkoutOptIn",
 ]);
 
 /** Signed-in, any role — scoped to the caller's own data. */

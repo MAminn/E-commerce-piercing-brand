@@ -108,12 +108,14 @@ export default function CheckoutPage() {
   const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true);
 
   // WhatsApp opt-in is shown only while WHATSAPP_CONFIRM_MODE is not off.
-  // Any failure hides it (never blocks checkout).
+  // Any failure hides it (never blocks checkout) — including a synchronous
+  // throw while building the call, which the Promise.resolve() wrapper turns
+  // into a rejection the .catch() swallows instead of a render crash.
   const [showWhatsAppOptIn, setShowWhatsAppOptIn] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    trpc.whatsappConfirmation.checkoutOptIn
-      .query()
+    Promise.resolve()
+      .then(() => trpc.whatsappConfirmation.checkoutOptIn.query())
       .then((r) => {
         if (!cancelled) setShowWhatsAppOptIn(r.enabled === true);
       })

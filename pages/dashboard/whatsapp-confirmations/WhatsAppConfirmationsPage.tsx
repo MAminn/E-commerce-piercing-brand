@@ -149,7 +149,7 @@ export default function WhatsAppConfirmationsPage() {
         <div className='flex items-center gap-2'>
           <Badge className={mode.className}>{mode.label}</Badge>
           {overview && (overview.mode === "pilot" || overview.mode === "live") && (
-            <Button size='sm' variant={overview.paused ? "default" : "destructive"} disabled={busy} onClick={togglePause}>
+            <Button size='sm' variant={overview.paused ? "primary" : "destructive"} disabled={busy} onClick={togglePause}>
               {overview.paused ? "Resume" : "Pause"}
             </Button>
           )}
@@ -235,7 +235,7 @@ export default function WhatsAppConfirmationsPage() {
               <CardTitle>Confirmations</CardTitle>
               <div className='flex flex-wrap gap-2 pt-2'>
                 {FILTERS.map(([key, label]) => (
-                  <Button key={key} size='sm' variant={filter === key ? "default" : "outline"} onClick={() => setFilter(key)}>
+                  <Button key={key} size='sm' variant={filter === key ? "primary" : "outline"} onClick={() => setFilter(key)}>
                     {label}
                   </Button>
                 ))}
