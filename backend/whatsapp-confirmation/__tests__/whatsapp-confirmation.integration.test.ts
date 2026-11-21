@@ -170,6 +170,7 @@ describeIfDb("WhatsApp order confirmation (integration)", () => {
   afterAll(async () => {
     if (!db) return;
     await resetWa();
+    await db.execute(sql`DELETE FROM abs_shipment WHERE awb LIKE 'WAIT%'`).catch(() => undefined);
     if (createdOrders.length) {
       await db.delete(schema.scheduledEmail).where(inArray(schema.scheduledEmail.dedupeKey, createdOrders.map((id) => `review_check:${id}`)));
       await db.delete(schema.orderLog).where(inArray(schema.orderLog.orderId, createdOrders));
@@ -279,18 +280,37 @@ describeIfDb("WhatsApp order confirmation (integration)", () => {
   });
 
   it("ABS-linked orders and late replies never change the order", async () => {
-    const linked = await createOrder();
-    await enqueue(linked.id);
-    await tick(okFetch());
+    // The test DB has every migration (0070 included), so the ABS half must
+    // really run: no swallowed insert, no conditional assertions. (The
+    // abs_order_link / abs_tracking_decision AWBs reference abs_shipment.)
     const absReady = ((await db.execute(sql`SELECT to_regclass('public.abs_order_link') IS NOT NULL AS ok`)) as unknown as { rows: Array<{ ok: boolean }> }).rows[0]?.ok;
-    if (absReady) {
-      await db.execute(sql`INSERT INTO abs_order_link (id, awb, order_id, link_role, state, method) VALUES (gen_random_uuid(), ${`WAIT${linked.orderNumber}`}, ${linked.id}::uuid, 'primary', 'auto', 'reference')`).catch(() => undefined);
-      if (await store.hasAbsLink(db, linked.id)) {
-        await press(linked.id, "confirm");
-        expect((await orderRow(linked.id))?.status).toBe("pending");
-        expect(await conf(linked.id)).toMatchObject({ statusApplied: false, statusSkipReason: "abs_linked" });
+    expect(absReady, "ABS tables (migration 0070) missing from the test DB").toBe(true);
+    // Order numbers restart every run: clear fixtures an interrupted run left.
+    await db.execute(sql`DELETE FROM abs_shipment WHERE awb LIKE 'WAIT%'`);
+
+    const absCases = [
+      { kind: "link" as const, order: await createOrder() },
+      { kind: "decision" as const, order: await createOrder() },
+    ];
+    for (const { kind, order: o } of absCases) {
+      await enqueue(o.id);
+      await tick(okFetch());
+      const awb = `WAIT${kind[0]}${o.orderNumber}`;
+      await db.execute(sql`INSERT INTO abs_shipment (awb, status, raw) VALUES (${awb}, 'in_transit', '{}'::jsonb)`);
+      if (kind === "link") {
+        await db.execute(sql`INSERT INTO abs_order_link (id, awb, order_id, link_role, state, method) VALUES (gen_random_uuid(), ${awb}, ${o.id}::uuid, 'primary', 'auto', 'reference')`);
+      } else {
+        await db.execute(
+          sql`INSERT INTO abs_tracking_decision (id, awb, order_id, shipment_status, decision, mode, dedupe_key) VALUES (gen_random_uuid(), ${awb}, ${o.id}::uuid, 'in_transit', 'would_mark_shipped', 'shadow', ${`${TAG}${awb}`})`,
+        );
       }
-      await db.execute(sql`DELETE FROM abs_order_link WHERE order_id = ${linked.id}::uuid`);
+      expect(await store.hasAbsLink(db, o.id), kind).toBe(true);
+      expect(await press(o.id, "confirm"), kind).toEqual(["button:confirm:abs_linked"]);
+      expect((await orderRow(o.id))?.status, kind).toBe("pending");
+      expect(await statusLogs(o.id), kind).toHaveLength(0);
+      expect(await conf(o.id), kind).toMatchObject({ statusApplied: false, statusSkipReason: "abs_linked" });
+      await db.execute(sql`DELETE FROM abs_shipment WHERE awb = ${awb}`); // cascades to the link / decision
+      expect(await store.hasAbsLink(db, o.id), `${kind} cleaned up`).toBe(false);
     }
 
     const cancelled = await createOrder();
@@ -444,5 +464,74 @@ describeIfDb("WhatsApp order confirmation (integration)", () => {
     expect(f1).not.toHaveBeenCalled();
     await db.execute(sql`UPDATE wa_settings SET paused = false WHERE id = 1`);
     expect((await tick(okFetch())).sent).toBe(1);
+  });
+
+  it("checkout wiring: the real order.create procedure queues per mode and consent, and a WhatsApp failure never fails it", async () => {
+    // The real tRPC procedure + create-order service, so the input schema,
+    // the COD branch and queueWhatsAppConfirmation are all exercised. The mode
+    // is the in-process boot status (never WHATSAPP_CONFIRM_MODE).
+    const { t } = await import("#root/shared/trpc/server");
+    const { createOrderProcedure } = await import("#root/backend/orders/create-order/trpc");
+    const { queueWhatsAppConfirmation } = await import("../enqueue");
+    const caller = t.router({ create: createOrderProcedure }).createCaller({ db, clientSession: null, emailService: { sendEmail: async () => undefined } } as never);
+    const placed: string[] = [];
+    const place = async (whatsappOptIn?: boolean) => {
+      const res = (await caller.create({
+        customerName: "منى اختبار",
+        customerEmail: `${TAG}checkout-${Date.now()}-${Math.random().toString(16).slice(2)}@wa.test`,
+        customerPhone: PILOT_PHONE,
+        shippingAddress: "1 Fixture Street",
+        shippingCity: "Cairo",
+        shippingState: "Cairo",
+        shippingPostalCode: "11511",
+        shippingCountry: "Egypt",
+        items: [{ productId: seeded.productId, quantity: 1 }],
+        bundles: [],
+        paymentMethod: "cod",
+        ...(whatsappOptIn === undefined ? {} : { whatsappOptIn }),
+      } as never)) as { success: boolean; result?: { id: string; status: string }; error?: unknown };
+      expect(res.success, JSON.stringify(res.error ?? null)).toBe(true);
+      const id = res.result?.id as string;
+      placed.push(id);
+      createdOrders.push(id);
+      expect(res.result?.status).toBe("pending");
+      return id;
+    };
+    const boot = (mode: "off" | "shadow") =>
+      cfgMod.setWhatsAppConfirmBootStatus({ requestedMode: mode, effectiveMode: mode, tablesReady: true, problems: [], checkedAt: new Date().toISOString() });
+
+    try {
+      // off (the default): an opted-in order leaves no wa_* row at all.
+      cfgMod.setWhatsAppConfirmBootStatus(null);
+      const offId = await place(true);
+      expect(await conf(offId)).toBeUndefined();
+
+      boot("shadow");
+      // shadow + consent: a confirmation row and an outbox row that is never sent.
+      const optedIn = await place(true);
+      expect(await conf(optedIn)).toMatchObject({ state: "shadow", mode: "shadow", phoneE164: "201009990001", consentSource: "checkout" });
+      const [box] = await db.select().from(schema.waOutbox).where(eq(schema.waOutbox.orderId, optedIn));
+      expect(box).toMatchObject({ kind: "confirm", status: "shadow_skipped", dedupeKey: `wa:confirm:${optedIn}` });
+      expect((await orderRow(optedIn))?.status).toBe("pending");
+
+      // shadow, box not ticked (or field absent): recorded as no_consent, nothing queued.
+      const noConsent = await place();
+      expect(await conf(noConsent)).toMatchObject({ state: "ineligible", ineligibleReason: "no_consent", consentAt: null });
+      expect(await db.select().from(schema.waOutbox).where(eq(schema.waOutbox.orderId, noConsent))).toHaveLength(0);
+
+      // A database error inside the WhatsApp step is swallowed, never thrown.
+      await expect(queueWhatsAppConfirmation({ orderId: "not-a-uuid", whatsappOptIn: true })).resolves.toBeUndefined();
+    } finally {
+      cfgMod.setWhatsAppConfirmBootStatus(null);
+      // The service queued order emails for these orders; leave nothing due behind.
+      if (placed.length) {
+        await db.delete(schema.scheduledEmail).where(
+          inArray(
+            schema.scheduledEmail.dedupeKey,
+            placed.flatMap((id) => [`order_confirmation:${id}`, `order_admin_notification:${id}`]),
+          ),
+        );
+      }
+    }
   });
 });

@@ -89,7 +89,7 @@ describe("payload", () => {
   it("button payload round-trips and rejects anything else", () => {
     const token = newConfirmationToken();
     for (const action of BUTTON_ORDER) expect(parseButtonPayload(buttonPayload(action, token))).toEqual({ action, token });
-    expect(parseButtonPayload("wa1:z:" + token)).toBeNull();
+    expect(parseButtonPayload(`wa1:z:${token}`)).toBeNull();
     expect(parseButtonPayload("تأكيد الطلب")).toBeNull();
     expect(parseButtonPayload(`wa1:c:${token}; drop table`)).toBeNull();
     expect(parseButtonPayload(42)).toBeNull();
