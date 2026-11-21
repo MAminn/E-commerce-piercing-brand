@@ -15,9 +15,14 @@ vi.mock("nodemailer", () => ({
 }));
 
 // Import after the mock is registered so the module under test picks it up.
-const { makeEmailService, createDummyEmailService, resolveSmtpTransportSecurity } = await import(
-  "#root/shared/email/service"
-);
+const {
+  makeEmailService,
+  createDummyEmailService,
+  resolveSmtpTransportSecurity,
+  maskEmailAddress,
+  interpretSmtpResult,
+} = await import("#root/shared/email/service");
+const { describeSendingIdentity } = await import("#root/shared/email/from-env");
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -44,7 +49,7 @@ describe("makeEmailService", () => {
       service.sendEmail("to@example.com", "Subject", "<p>Body</p>"),
     );
 
-    expect(result).toEqual({ success: true });
+    expect(result).toEqual({ success: true, messageId: "msg-1" });
     expect(sendMailMock).toHaveBeenCalledWith(
       expect.objectContaining({
         from: "login@example.com",
@@ -248,5 +253,177 @@ describe("start-up SMTP verification", () => {
     expect(logged).not.toContain("secret");
     expect(logged).not.toContain("login@example.com");
     error.mockRestore();
+  });
+});
+
+// ─── Provider acceptance, timeouts, Message-ID, log hygiene ─────────────────
+// Ported from the Mach Supplements fix (02d544a / 2e68974).
+
+describe("provider acceptance is the only success", () => {
+  beforeEach(() => {
+    sendMailMock.mockReset();
+    createTransportMock.mockClear();
+    sendMailMock.mockResolvedValue({ messageId: "msg-1" });
+  });
+
+  it("reports success only when the SMTP server accepted the recipient, with its Message-ID and reply", async () => {
+    sendMailMock.mockResolvedValueOnce({
+      messageId: "<abc@perce.test>",
+      accepted: ["To@Example.com"],
+      rejected: [],
+      response: "250 2.0.0 OK 1700000000 x1-gsmtp",
+    });
+    const service = await Effect.runPromise(makeEmailService(baseInput()));
+    const result = await Effect.runPromise(service.sendEmail("to@example.com", "S", "<p>B</p>"));
+    expect(result).toEqual({
+      success: true,
+      messageId: "<abc@perce.test>",
+      response: "250 2.0.0 OK 1700000000 x1-gsmtp",
+    });
+  });
+
+  it("is a failure when sendMail resolves but the recipient was rejected", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    sendMailMock.mockResolvedValueOnce({
+      messageId: "<abc@perce.test>",
+      accepted: [],
+      rejected: ["to@example.com"],
+      response: "550 5.1.1 user unknown",
+    });
+    const service = await Effect.runPromise(makeEmailService(baseInput()));
+    const result = await Effect.runPromise(service.sendEmail("to@example.com", "S", "<p>B</p>"));
+    error.mockRestore();
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/not accepted.*550 5\.1\.1/);
+    expect(result.messageId).toBeUndefined();
+  });
+
+  it("is a failure when the accepted list does not contain this recipient", () => {
+    expect(interpretSmtpResult({ accepted: ["someone-else@example.com"], rejected: [] }, "to@example.com").success).toBe(false);
+    expect(interpretSmtpResult({ accepted: [{ address: "to@example.com" }], rejected: [] }, "to@example.com").success).toBe(true);
+  });
+
+  it("passes a stable Message-ID through (bracketed)", async () => {
+    const service = await Effect.runPromise(makeEmailService(baseInput()));
+    await Effect.runPromise(
+      service.sendEmail("to@example.com", "S", "<p>B</p>", { messageId: "order-confirmation.1@perce.test" }),
+    );
+    expect(sendMailMock).toHaveBeenCalledWith(
+      expect.objectContaining({ messageId: "<order-confirmation.1@perce.test>" }),
+    );
+  });
+
+  it("configures transport-level timeouts", async () => {
+    await Effect.runPromise(makeEmailService(baseInput()));
+    expect(createTransportMock).toHaveBeenCalledWith(
+      expect.objectContaining({ connectionTimeout: 15_000, greetingTimeout: 15_000, socketTimeout: 45_000 }),
+    );
+  });
+});
+
+describe("no false failure from the old 10-second race", () => {
+  beforeEach(() => {
+    sendMailMock.mockReset();
+    createTransportMock.mockClear();
+  });
+
+  it("a slow but successful SMTP session (30s) is reported as sent, not failed", async () => {
+    // Before: the 10s Promise.race reported "timed out" while sendMail kept
+    // going and delivered — the queue then retried and the customer got the
+    // confirmation twice.
+    vi.useFakeTimers();
+    try {
+      sendMailMock.mockImplementationOnce(
+        () => new Promise((resolve) => setTimeout(() => resolve({ messageId: "<slow@perce.test>", accepted: ["to@example.com"], rejected: [] }), 30_000)),
+      );
+      const service = await Effect.runPromise(makeEmailService(baseInput()));
+      const pending = Effect.runPromise(service.sendEmail("to@example.com", "S", "<p>B</p>"));
+      await vi.advanceTimersByTimeAsync(30_000);
+      await expect(pending).resolves.toEqual({ success: true, messageId: "<slow@perce.test>" });
+      // The guard timer is cleared — nothing left to fire later.
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a session with no SMTP reply at all is reported as an unknown outcome after the 120s guard", async () => {
+    vi.useFakeTimers();
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      sendMailMock.mockImplementationOnce(() => new Promise(() => {}));
+      const service = await Effect.runPromise(makeEmailService(baseInput()));
+      const pending = Effect.runPromise(service.sendEmail("to@example.com", "S", "<p>B</p>"));
+      await vi.advanceTimersByTimeAsync(120_000);
+      const result = await pending;
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/outcome unknown/);
+    } finally {
+      error.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("log hygiene", () => {
+  beforeEach(() => {
+    sendMailMock.mockReset();
+    createTransportMock.mockClear();
+  });
+
+  it("never writes the full recipient address or the message body to logs", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      sendMailMock.mockRejectedValueOnce(Object.assign(new Error("Invalid login"), { responseCode: 535 }));
+      const service = await Effect.runPromise(makeEmailService(baseInput()));
+      await Effect.runPromise(service.sendEmail("customer.private@example.com", "S", "<p>SECRET-ADDRESS-LINE</p>"));
+      const output = [...log.mock.calls, ...error.mock.calls].flat().map(String).join(" | ");
+      expect(output).not.toContain("customer.private@example.com");
+      expect(output).not.toContain("SECRET-ADDRESS-LINE");
+      expect(output).toContain("cu***@example.com");
+      expect(output).toContain("[535]");
+    } finally {
+      log.mockRestore();
+      error.mockRestore();
+    }
+  });
+});
+
+describe("maskEmailAddress", () => {
+  it("keeps only the first two characters of the local part", () => {
+    expect(maskEmailAddress("mohamed@example.com")).toBe("mo***@example.com");
+    expect(maskEmailAddress("a@b.co")).toBe("a***@b.co");
+    expect(maskEmailAddress("")).toBe("(none)");
+    expect(maskEmailAddress("not-an-address")).toBe("***");
+  });
+});
+
+describe("describeSendingIdentity", () => {
+  it("flags a custom From domain sent through a consumer Gmail mailbox (DMARC cannot align)", () => {
+    const id = describeSendingIdentity({
+      SMTP_HOST: "smtp.gmail.com",
+      SMTP_USER: "store.owner@gmail.com",
+      EMAIL_FROM_ADDRESS: "orders@perce-shop.test",
+    } as NodeJS.ProcessEnv);
+    expect(id.fromDomain).toBe("perce-shop.test");
+    expect(id.smtpUserDomain).toBe("gmail.com");
+    expect(id.warnings.join(" ")).toMatch(/cannot DKIM-sign.*perce-shop\.test/);
+  });
+
+  it("has no alignment warning when the SMTP login is on the From domain", () => {
+    const id = describeSendingIdentity({
+      SMTP_HOST: "smtp.hostinger.com",
+      SMTP_USER: "orders@perce-shop.test",
+      EMAIL_FROM_ADDRESS: "orders@perce-shop.test",
+    } as NodeJS.ProcessEnv);
+    expect(id.warnings).toEqual([]);
+  });
+
+  it("defaults From to the SMTP login, the name to the store and Reply-To to the support inbox", async () => {
+    const { STORE_NAME, SUPPORT_EMAIL } = await import("#root/shared/config/branding");
+    const id = describeSendingIdentity({ SMTP_HOST: "smtp.example.com", SMTP_USER: "a@example.com" } as NodeJS.ProcessEnv);
+    expect(id).toMatchObject({ fromAddress: "a@example.com", fromName: STORE_NAME, replyTo: SUPPORT_EMAIL });
+    expect(id.warnings).toEqual([]);
   });
 });

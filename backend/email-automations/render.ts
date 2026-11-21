@@ -11,6 +11,8 @@ export interface RenderedScheduledEmail {
    * accidentally omit them.
    */
   headers?: Record<string, string>;
+  /** Stable Message-ID for this logical send (transactional rows), reused by every retry. */
+  messageId?: string;
   /**
    * Set when the row must NOT be sent at all (e.g. an online-payment order
    * whose payment was never confirmed). The worker marks the row cancelled

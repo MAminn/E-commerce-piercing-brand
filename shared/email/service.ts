@@ -17,6 +17,20 @@ export interface SendEmailOptions {
   replyTo?: string;
   /** Raw headers merged into the message — used for List-Unsubscribe etc. */
   headers?: Record<string, string>;
+  /**
+   * Stable RFC 5322 Message-ID (with or without angle brackets). A retried
+   * transactional send reuses the same id so a duplicate delivery after a
+   * lost SMTP reply is recognisable as the same message.
+   */
+  messageId?: string;
+}
+
+/** "jo***@example.com" — enough to tell recipients apart in logs, not to identify them. */
+export function maskEmailAddress(address: string | null | undefined): string {
+  if (!address) return "(none)";
+  const at = address.lastIndexOf("@");
+  if (at <= 0) return "***";
+  return `${address.slice(0, Math.min(2, at))}***${address.slice(at)}`;
 }
 
 /**
@@ -32,6 +46,13 @@ export interface SendEmailOptions {
 export interface SendEmailResult {
   success: boolean;
   error?: string;
+  /**
+   * Provider acceptance evidence, set only when the SMTP server accepted the
+   * message for the recipient. Acceptance is not inbox delivery.
+   */
+  messageId?: string;
+  /** The SMTP server's final reply, e.g. "250 2.0.0 OK 1700000000 x1-...gsmtp". */
+  response?: string;
 }
 
 export interface EmailServiceInterface {
@@ -119,12 +140,9 @@ export const makeEmailService = (input: {
       sendEmail: (to: string, subject: string, body: string) =>
         Effect.succeed(
           (() => {
+            // No body preview: it carries the customer's name, address and order.
             console.warn(
-              `[DUMMY EMAIL] Not sending email to ${to}: ${subject}`
-            );
-            console.warn(
-              "Email body would have been:",
-              `${body.substring(0, 100)}...`
+              `[DUMMY EMAIL] Not sending email to ${maskEmailAddress(to)}: ${subject} (${body.length} bytes)`
             );
             return {
               success: false,
@@ -155,6 +173,14 @@ export const makeEmailService = (input: {
                 user: input.smtpUser,
                 pass: Redacted.value(input.smtpPassword),
               },
+              // Transport-level limits, so a slow or dead server aborts the
+              // SMTP session itself. A failure we report is then a real
+              // non-delivery — unlike the old outer 10s Promise.race, which
+              // gave up while sendMail kept going and could still deliver a
+              // message already recorded as failed (=> duplicate on retry).
+              connectionTimeout: 15_000,
+              greetingTimeout: 15_000,
+              socketTimeout: 45_000,
             });
           } catch (err) {
             console.warn(
@@ -197,16 +223,22 @@ export const makeEmailService = (input: {
           Effect.tryPromise({
             try: async (): Promise<SendEmailResult> => {
               try {
-                console.log(`Attempting to send email to ${to}: ${subject}`);
+                console.log(
+                  `Attempting to send email to ${maskEmailAddress(to)}: ${subject}`
+                );
 
-                // Wrap in timeout to prevent long hanging connections
+                // Last-resort guard only — the transport's own connection /
+                // greeting / socket timeouts (above) fire well before this.
+                let guardTimer: ReturnType<typeof setTimeout> | undefined;
                 const timeoutPromise = new Promise<never>((_, reject) => {
-                  setTimeout(
+                  guardTimer = setTimeout(
                     () =>
                       reject(
-                        new Error("Email sending timed out after 10 seconds")
+                        new Error(
+                          "Email send outcome unknown: no SMTP reply within 120 seconds"
+                        )
                       ),
-                    10000
+                    120_000
                   );
                 });
 
@@ -242,12 +274,20 @@ export const makeEmailService = (input: {
                   ? `"${fromName.replace(/"/g, "'")}" <${fromAddress}>`
                   : fromAddress;
 
+                const replyTo = options?.replyTo ?? defaultReplyTo;
+                const messageId = options?.messageId
+                  ? options.messageId.startsWith("<")
+                    ? options.messageId
+                    : `<${options.messageId}>`
+                  : undefined;
+
                 const sendPromise = transport.sendMail({
                   from,
                   to,
                   subject,
                   html: processedBody,
-                  replyTo: options?.replyTo ?? defaultReplyTo,
+                  ...(replyTo ? { replyTo } : {}),
+                  ...(messageId ? { messageId } : {}),
                   headers: options?.headers,
                   attachments:
                     inlineAttachments.length > 0
@@ -255,17 +295,39 @@ export const makeEmailService = (input: {
                       : undefined,
                 });
 
-                // Race between timeout and actual sending
-                await Promise.race([sendPromise, timeoutPromise]);
-                console.log(`Email sent successfully to ${to}`);
-                return { success: true };
+                let info: unknown;
+                try {
+                  info = await Promise.race([sendPromise, timeoutPromise]);
+                } finally {
+                  if (guardTimer) clearTimeout(guardTimer);
+                }
+
+                const verdict = interpretSmtpResult(info, to, messageId);
+                if (!verdict.success) {
+                  console.error(
+                    `Failed to send email to ${maskEmailAddress(to)}: ${verdict.error}`
+                  );
+                  return verdict;
+                }
+                console.log(
+                  `Email accepted by SMTP server for ${maskEmailAddress(to)}${verdict.messageId ? ` (${verdict.messageId})` : ""}`
+                );
+                return verdict;
               } catch (error) {
                 // Log but don't throw — a transactional send (order
                 // confirmation, password reset) must never block or roll
                 // back the operation that triggered it. Callers that need
                 // to know about the failure (the automation queue worker,
                 // for retry) inspect the returned `.success` instead.
-                console.error(`Failed to send email to ${to}:`, error);
+                // Message + SMTP code only: the raw error object can carry
+                // the envelope (addresses) and the server conversation.
+                const code =
+                  error && typeof error === "object" && "responseCode" in error
+                    ? ` [${String((error as { responseCode: unknown }).responseCode)}]`
+                    : "";
+                console.error(
+                  `Failed to send email to ${maskEmailAddress(to)}${code}: ${error instanceof Error ? error.message : String(error)}`
+                );
 
                 if (
                   error &&
@@ -304,6 +366,51 @@ export const makeEmailService = (input: {
     }
   });
 
+/**
+ * Turns nodemailer's resolved sendMail info into a verdict. A resolved
+ * promise is not proof the recipient was taken: the SMTP transport resolves
+ * with `accepted` / `rejected` lists. Success means THIS recipient is in
+ * `accepted` and nobody is in `rejected`. (Transports without those lists —
+ * stream/json test transports — are judged by resolution alone.)
+ */
+export function interpretSmtpResult(
+  info: unknown,
+  to: string,
+  requestedMessageId?: string,
+): SendEmailResult {
+  const sent = (info ?? {}) as {
+    messageId?: unknown;
+    response?: unknown;
+    accepted?: unknown;
+    rejected?: unknown;
+  };
+  const addressOf = (entry: unknown) =>
+    String(
+      entry && typeof entry === "object" && "address" in entry
+        ? (entry as { address: unknown }).address
+        : entry,
+    ).toLowerCase();
+  const accepted = Array.isArray(sent.accepted) ? sent.accepted.map(addressOf) : null;
+  const rejected = Array.isArray(sent.rejected) ? sent.rejected : [];
+  const response =
+    typeof sent.response === "string" ? sent.response.slice(0, 500) : undefined;
+
+  if (rejected.length > 0 || (accepted && !accepted.includes(to.trim().toLowerCase()))) {
+    return {
+      success: false,
+      error: `Recipient not accepted by the SMTP server${response ? `: ${response}` : ""}`,
+      response,
+    };
+  }
+  const messageId =
+    typeof sent.messageId === "string" && sent.messageId ? sent.messageId : requestedMessageId;
+  return {
+    success: true,
+    ...(messageId ? { messageId } : {}),
+    ...(response ? { response } : {}),
+  };
+}
+
 export const renderEmailTemplate = (
   input: ReactElement<unknown, string | JSXElementConstructor<unknown>>
 ) =>
@@ -324,7 +431,7 @@ export const createDummyEmailService = (
 ): EmailServiceInterface => {
   const sendEmail = (to: string, subject: string, body: string) => {
     logger.warn({
-      msg: `[DUMMY EMAIL] Not sending email to ${to}`,
+      msg: `[DUMMY EMAIL] Not sending email to ${maskEmailAddress(to)}`,
       subject,
     });
     return Effect.succeed({

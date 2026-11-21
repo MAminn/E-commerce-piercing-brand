@@ -6,8 +6,60 @@ import {
   type EmailServiceInterface,
   makeEmailService,
   createDummyEmailService,
+  maskEmailAddress,
   resolveSmtpTransportSecurity,
 } from "./service";
+
+const domainOf = (address: string | undefined) => {
+  const at = address?.lastIndexOf("@") ?? -1;
+  return address && at > 0 ? address.slice(at + 1).trim().toLowerCase() : undefined;
+};
+
+/** Consumer mailbox domains whose SMTP can only DKIM-sign as themselves. */
+const CONSUMER_MAILBOX_DOMAINS = new Set(["gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "yahoo.com"]);
+
+export interface SendingIdentity {
+  smtpHost: string;
+  smtpUserDomain: string | undefined;
+  /** EMAIL_FROM_ADDRESS, else the SMTP login. */
+  fromAddress: string | undefined;
+  fromDomain: string | undefined;
+  /** EMAIL_FROM_NAME, else the store name. */
+  fromName: string;
+  /** EMAIL_REPLY_TO, else the support inbox. */
+  replyTo: string;
+  /** Human-readable deliverability problems detectable from config alone. */
+  warnings: string[];
+}
+
+/**
+ * What every sender (order emails, marketing, auth emails) will claim to be,
+ * from env alone (no network). DMARC passes only when SPF or DKIM
+ * authenticates a domain ALIGNED with the From header domain. A consumer
+ * mailbox (smtp.gmail.com with an @gmail.com login) signs DKIM as gmail.com
+ * and uses a gmail.com envelope sender, so a From on any other domain can
+ * never align — Gmail either rewrites the From back to the login address or
+ * the message fails DMARC and lands in spam / is rejected.
+ */
+export function describeSendingIdentity(env: NodeJS.ProcessEnv): SendingIdentity {
+  const smtpHost = (env.SMTP_HOST || "").replace(/^https?:\/\//, "").trim().toLowerCase();
+  const smtpUser = (env.SMTP_USER || "").trim();
+  const fromAddress = (env.EMAIL_FROM_ADDRESS || "").trim() || smtpUser || undefined;
+  const fromName = (env.EMAIL_FROM_NAME || "").trim() || STORE_NAME;
+  const replyTo = (env.EMAIL_REPLY_TO || "").trim() || SUPPORT_EMAIL;
+  const smtpUserDomain = domainOf(smtpUser);
+  const fromDomain = domainOf(fromAddress);
+  const warnings: string[] = [];
+
+  if (fromDomain && smtpUserDomain && fromDomain !== smtpUserDomain && CONSUMER_MAILBOX_DOMAINS.has(smtpUserDomain)) {
+    warnings.push(
+      `From domain ${fromDomain} is sent through a consumer ${smtpUserDomain} mailbox (${smtpHost}). ` +
+        `It cannot DKIM-sign or provide an SPF-aligned envelope for ${fromDomain}, so DMARC alignment fails ` +
+        `(or the provider rewrites From to the login address). Use an SMTP service authorised for ${fromDomain}.`,
+    );
+  }
+  return { smtpHost, smtpUserDomain, fromAddress, fromDomain, fromName, replyTo, warnings };
+}
 
 /**
  * Minimal logger shape both FastifyBaseLogger and a plain console wrapper
@@ -48,7 +100,7 @@ type MakeEmailServiceResult =
  * two never drift out of sync with each other.
  */
 /** SMTP_SECURE=true|false forces the TLS mode; anything else derives it from the port. */
-function parseSmtpSecure(raw: string | undefined): boolean | undefined {
+export function parseSmtpSecure(raw: string | undefined): boolean | undefined {
   const v = raw?.trim().toLowerCase();
   if (v === "true" || v === "1") return true;
   if (v === "false" || v === "0") return false;
@@ -86,7 +138,9 @@ export async function createEmailServiceFromEnv(
       return createDummyEmailService(logger);
     }
 
-    // Host/port/TLS mode only — the login and password are never logged.
+    // Host/port/TLS mode and MASKED addresses only — the password is never
+    // logged, the login and From/Reply-To only as "ab***@domain".
+    const identity = describeSendingIdentity(process.env);
     logger.info({
       msg: "Setting up email service with configuration",
       host: validationResult.data.smtpHost,
@@ -95,16 +149,23 @@ export async function createEmailServiceFromEnv(
         validationResult.data.smtpPort,
         parseSmtpSecure(process.env.SMTP_SECURE),
       ).secure,
+      user: maskEmailAddress(validationResult.data.smtpUser),
+      from: maskEmailAddress(identity.fromAddress),
+      fromName: identity.fromName,
+      replyTo: maskEmailAddress(identity.replyTo),
     });
+    for (const warning of identity.warnings) {
+      logger.warn({ msg: `[Email identity] ${warning}` });
+    }
 
     const data = {
       ...validationResult.data,
       smtpPassword: Redacted.make(validationResult.data.smtpPassword),
       fromAddress: process.env.EMAIL_FROM_ADDRESS || undefined,
       // "Percé" unless EMAIL_FROM_NAME says otherwise.
-      fromName: process.env.EMAIL_FROM_NAME || STORE_NAME,
+      fromName: identity.fromName,
       // Replies reach the support inbox, not the SMTP login.
-      replyTo: process.env.EMAIL_REPLY_TO || SUPPORT_EMAIL,
+      replyTo: identity.replyTo,
       secure: parseSmtpSecure(process.env.SMTP_SECURE),
       verifyOnStart: true,
     };

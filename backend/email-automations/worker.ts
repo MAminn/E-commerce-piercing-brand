@@ -8,6 +8,7 @@ import {
   markScheduledEmailCancelled,
   isTransactionalEmailType,
   TRANSACTIONAL_EMAIL_TYPES,
+  TRANSACTIONAL_RETRY_POLICY,
   requeueStaleSendingEmails,
 } from "./queue/service";
 import { renderScheduledEmail } from "./render";
@@ -36,7 +37,9 @@ const CLAIM_BATCH_SIZE = 20;
 // thresholds are measured in hours/days, so a coarser scan interval is
 // both sufficient and lighter on the DB.
 const TRIGGER_SCAN_INTERVAL_MS = 10 * 60_000;
-// A transactional row still "sending" after this long was orphaned by a crash.
+// A transactional row still "sending" after this long was orphaned by a
+// crash/restart (a live send is bounded by the transport's own timeouts and
+// the 120s guard in shared/email/service.ts).
 const STALE_SENDING_MS = 15 * 60_000;
 
 const consoleLogger: EmailEnvLogger = {
@@ -50,7 +53,9 @@ const consoleLogger: EmailEnvLogger = {
  * share the queue's claim-locking, dedupe and retries, but none of the
  * marketing rules: no unsubscribe check (an order confirmation is not
  * marketing and goes to anyone who placed an order), no automation test
- * mode, no List-Unsubscribe headers or unsubscribe link.
+ * mode, no List-Unsubscribe headers or unsubscribe link. "Sent" is recorded
+ * only when the SMTP server accepted the recipient; failures retry with
+ * backoff (TRANSACTIONAL_RETRY_POLICY) under one stable Message-ID.
  */
 async function processTransactionalRow(
   row: ScheduledEmailRow,
@@ -66,25 +71,43 @@ async function processTransactionalRow(
     const result = await Effect.runPromise(
       emailService.sendEmail(row.recipientEmail, rendered.subject, rendered.html, {
         headers: rendered.headers,
+        messageId: rendered.messageId,
       }),
     );
     if (result.success) {
       await markScheduledEmailSent(row.id);
-      await recordOrderConfirmationOutcome(row, { status: "sent" });
+      await recordOrderConfirmationOutcome(row, {
+        status: "sent",
+        messageId: result.messageId,
+        response: result.response,
+      });
       return;
     }
     const error = result.error ?? "Unknown send failure";
-    const outcome = await markScheduledEmailFailed(row.id, row.attempts, error);
-    await recordOrderConfirmationOutcome(row, { status: "failed", error, ...outcome });
+    const { recorded, ...outcome } = await markScheduledEmailFailed(
+      row.id,
+      row.attempts,
+      error,
+      TRANSACTIONAL_RETRY_POLICY,
+    );
+    // Not recorded = the row was already marked sent; don't log a false failure.
+    if (recorded) await recordOrderConfirmationOutcome(row, { status: "failed", error, ...outcome });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    // Message only: the error object can carry the rendered order or address.
     console.error(
-      `[EmailWorker] Failed to process transactional email ${row.id} (${row.automationType}):`,
-      err,
+      `[EmailWorker] Failed to process transactional email ${row.id} (${row.automationType}): ${message}`,
     );
     try {
-      const outcome = await markScheduledEmailFailed(row.id, row.attempts, message);
-      await recordOrderConfirmationOutcome(row, { status: "failed", error: message, ...outcome });
+      const { recorded, ...outcome } = await markScheduledEmailFailed(
+        row.id,
+        row.attempts,
+        message,
+        TRANSACTIONAL_RETRY_POLICY,
+      );
+      if (recorded) {
+        await recordOrderConfirmationOutcome(row, { status: "failed", error: message, ...outcome });
+      }
     } catch (markErr) {
       console.error(`[EmailWorker] Failed to record failure for ${row.id}:`, markErr);
     }

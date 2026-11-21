@@ -6,7 +6,7 @@ import * as schema from "#root/shared/database/drizzle/schema.js";
 // db is a factory — call it once here to get the raw Drizzle instance
 const dbInstance = db();
 import { getEmailBranding } from "#root/backend/emails/branding.js";
-import { createTransport } from "nodemailer";
+import { sendAuthEmail } from "./auth-email.js";
 
 const BASE_URL =
   (process.env.BASE_URL || "http://localhost:3000").replace(/\/$/, "");
@@ -16,30 +16,9 @@ const BETTER_AUTH_SECRET =
   process.env.SESSION_SECRET ||
   "fallback-secret-change-in-production";
 
-/** Lazily send email via nodemailer (outside Effect context) */
-async function sendEmail(to: string, subject: string, html: string) {
-  try {
-    const smtpHost = (process.env.SMTP_HOST || "").replace(/^https?:\/\//, "");
-    const smtpUser = process.env.SMTP_USER || "";
-    const smtpPassword = process.env.SMTP_PASSWORD || "";
-    const smtpPort = Number.parseInt(process.env.SMTP_PORT || "465", 10);
-
-    if (!smtpHost || !smtpUser || !smtpPassword) {
-      console.warn(`[Email] SMTP not configured — skipping email to ${to}: ${subject}`);
-      return;
-    }
-
-    const transport = createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: true,
-      auth: { user: smtpUser, pass: smtpPassword },
-    });
-
-    await transport.sendMail({ from: smtpUser, to, subject, html });
-  } catch (err) {
-    console.error(`[Email] Failed to send email to ${to}:`, err);
-  }
+/** Lazily send email via nodemailer (outside Effect context) — see ./auth-email.ts. */
+async function sendEmail(to: string, subject: string, html: string): Promise<void> {
+  await sendAuthEmail(to, subject, html);
 }
 
 export const auth = betterAuth({

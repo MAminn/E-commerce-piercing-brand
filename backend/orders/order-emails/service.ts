@@ -12,9 +12,12 @@
  *   2. The email worker (backend/email-automations/worker.ts) is nudged to
  *      run immediately; it also polls every minute. It claims the row, loads
  *      the order FRESH from the database, renders it here and sends it,
- *      retrying a failed send up to MAX_ATTEMPTS times.
+ *      retrying a failed send with backoff (TRANSACTIONAL_RETRY_POLICY:
+ *      8 attempts over about a day) before marking it failed.
  *   3. The customer row's outcome is written to the order activity log as
- *      `confirmation_email_sent` / `confirmation_email_failed`.
+ *      `confirmation_email_sent` (the SMTP server ACCEPTED the recipient —
+ *      with its Message-ID and reply) / `confirmation_email_failed`. Every
+ *      retry of a row reuses one stable Message-ID (orderEmailMessageId).
  *
  * Nothing here can fail the order: every entry point resolves, never
  * rejects, and createOrder only calls it after the commit.
@@ -25,6 +28,7 @@
  * unpaid online order's row is cancelled, never sent.
  */
 
+import { createHash } from "node:crypto";
 import { db } from "#root/shared/database/drizzle/db";
 import {
   file,
@@ -38,6 +42,7 @@ import {
 } from "#root/shared/database/drizzle/schema";
 import { asc, eq } from "drizzle-orm";
 import { render } from "@react-email/components";
+import { maskEmailAddress } from "#root/shared/email/service";
 import { enqueueScheduledEmail } from "#root/backend/email-automations/queue/service";
 import {
   registerEmailRenderer,
@@ -211,33 +216,52 @@ export async function queueOrderPlacedEmails(
   }
 }
 
+export type OrderEmailOutcome =
+  | { status: "sent"; messageId?: string; response?: string }
+  | { status: "failed"; error: string; attempts: number; willRetry: boolean }
+  | { status: "cancelled"; reason: string };
+
 /**
- * The customer row's outcome → the order activity log. Called by the worker
- * after every attempt on an `order_confirmation` row. Never throws
+ * One attempt's outcome. Customer confirmations → the order activity log;
+ * store-notification failures → the server log (recipient masked). Called by
+ * the worker after every attempt on an order-email row. Never throws
  * (logOrderEvent swallows its own errors).
  */
 export async function recordOrderConfirmationOutcome(
   row: ScheduledEmailRow,
-  outcome:
-    | { status: "sent" }
-    | { status: "failed"; error: string; attempts: number; willRetry: boolean }
-    | { status: "cancelled"; reason: string },
+  outcome: OrderEmailOutcome,
 ): Promise<void> {
-  if (row.automationType !== ORDER_CONFIRMATION) return;
   const orderId = readOrderId(row);
   if (!orderId) return;
+  if (row.automationType !== ORDER_CONFIRMATION) {
+    // Store notifications have no activity-log entry; a failure still has
+    // to be visible somewhere other than the queue table.
+    if (row.automationType === ORDER_ADMIN_NOTIFICATION && outcome.status !== "sent") {
+      console.warn(
+        `[OrderEmails] Store notification for order ${orderId} to ${maskEmailAddress(row.recipientEmail)} ${outcome.status}: ${
+          outcome.status === "failed"
+            ? `${outcome.error.slice(0, 300)}${outcome.willRetry ? " — will retry" : " — retries exhausted"}`
+            : outcome.reason
+        }`,
+      );
+    }
+    return;
+  }
   if (outcome.status === "sent") {
+    const reply = outcome.response ? ` — SMTP reply: ${outcome.response.slice(0, 160)}` : "";
     await logOrderEvent({
       orderId,
       action: "confirmation_email_sent",
-      note: `Order confirmation email sent to ${row.recipientEmail}`,
+      note: `Order confirmation email accepted by the mail server for ${row.recipientEmail}${
+        outcome.messageId ? ` (Message-ID ${outcome.messageId})` : ""
+      }${reply}`,
     });
   } else if (outcome.status === "failed") {
     await logOrderEvent({
       orderId,
       action: "confirmation_email_failed",
-      note: `Order confirmation email to ${row.recipientEmail} failed (attempt ${outcome.attempts}): ${outcome.error}${
-        outcome.willRetry ? " — will retry" : " — giving up"
+      note: `Order confirmation email to ${row.recipientEmail} failed (attempt ${outcome.attempts}): ${outcome.error.slice(0, 300)}${
+        outcome.willRetry ? " — will retry automatically" : " — retries exhausted, NOT sent"
       }`,
     });
   } else {
@@ -249,10 +273,35 @@ export async function recordOrderConfirmationOutcome(
   }
 }
 
-function readOrderId(row: ScheduledEmailRow): string | null {
+function readOrderId(row: Pick<ScheduledEmailRow, "payload">): string | null {
   const payload = row.payload as Record<string, unknown> | null;
   const id = payload?.orderId;
   return typeof id === "string" && id.length > 0 ? id : null;
+}
+
+/** Domain for the stable Message-ID: the From domain the transport will use. */
+function messageIdDomain(): string {
+  const from = (process.env.EMAIL_FROM_ADDRESS || process.env.SMTP_USER || "").trim();
+  const at = from.lastIndexOf("@");
+  return at > 0 ? from.slice(at + 1).toLowerCase() : "localhost";
+}
+
+/**
+ * One Message-ID per order + recipient, identical on every retry, so if a
+ * send whose SMTP reply was lost did go out, the retry is recognisably the
+ * same message (and mail clients thread/collapse it). Store notifications
+ * carry a hash of the recipient, never the address itself.
+ */
+export function orderEmailMessageId(
+  row: Pick<ScheduledEmailRow, "automationType" | "recipientEmail">,
+  orderId: string,
+): string {
+  const kind = row.automationType === ORDER_CONFIRMATION ? "order-confirmation" : "order-notification";
+  const recipient =
+    row.automationType === ORDER_CONFIRMATION
+      ? ""
+      : `.${createHash("sha256").update(row.recipientEmail.trim().toLowerCase()).digest("hex").slice(0, 12)}`;
+  return `<${kind}.${orderId}${recipient}@${messageIdDomain()}>`;
 }
 
 // ─── Loading ────────────────────────────────────────────────────────────────
@@ -397,7 +446,11 @@ export async function renderOrderConfirmation(
       returns,
     }),
   );
-  return { subject: orderConfirmationSubject(model, branding.storeName), html };
+  return {
+    subject: orderConfirmationSubject(model, branding.storeName),
+    html,
+    messageId: orderEmailMessageId(row, model.orderId),
+  };
 }
 
 export async function renderOrderAdminNotification(
@@ -413,7 +466,11 @@ export async function renderOrderAdminNotification(
       dashboardUrl: `${branding.websiteUrl}/dashboard/orders`,
     }),
   );
-  return { subject: orderAdminNotificationSubject(model), html };
+  return {
+    subject: orderAdminNotificationSubject(model),
+    html,
+    messageId: orderEmailMessageId(row, model.orderId),
+  };
 }
 
 registerEmailRenderer(ORDER_CONFIRMATION, (row) => renderOrderConfirmation(row));

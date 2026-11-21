@@ -1,6 +1,6 @@
 import { db } from "#root/shared/database/drizzle/db";
 import { scheduledEmail } from "#root/shared/database/drizzle/schema";
-import { and, desc, eq, inArray, like, lte } from "drizzle-orm";
+import { and, desc, eq, inArray, like, lte, ne, sql } from "drizzle-orm";
 import { getOrCreateSubscriptionToken } from "#root/backend/email-subscription/service";
 
 export type EmailAutomationType =
@@ -147,9 +147,44 @@ export async function cancelScheduledEmailsByPrefix(
 export const MAX_ATTEMPTS = 5;
 
 /**
+ * Retry policy for transactional rows: bounded, with backoff, so a provider
+ * outage (rate limit, daily sending quota, DNS, an SMTP password change) is
+ * ridden out over about a day instead of burning every attempt in five
+ * minutes. Delay index = attempts already made (1 → wait 1 min before the
+ * 2nd attempt, ...). Marketing rows keep MAX_ATTEMPTS, retried every tick.
+ */
+export const TRANSACTIONAL_MAX_ATTEMPTS = 8;
+export const TRANSACTIONAL_RETRY_DELAYS_MS = [
+  60_000, // 1 min
+  5 * 60_000,
+  15 * 60_000,
+  60 * 60_000,
+  3 * 60 * 60_000,
+  6 * 60 * 60_000,
+  12 * 60 * 60_000,
+] as const;
+
+export function transactionalRetryDelayMs(attemptsMade: number): number {
+  const i = Math.max(0, Math.min(attemptsMade - 1, TRANSACTIONAL_RETRY_DELAYS_MS.length - 1));
+  return TRANSACTIONAL_RETRY_DELAYS_MS[i] ?? 60_000;
+}
+
+export interface RetryPolicy {
+  maxAttempts: number;
+  retryDelayMs: (attemptsMade: number) => number;
+}
+
+export const TRANSACTIONAL_RETRY_POLICY: RetryPolicy = {
+  maxAttempts: TRANSACTIONAL_MAX_ATTEMPTS,
+  retryDelayMs: transactionalRetryDelayMs,
+};
+
+/**
  * Atomically claims up to `limit` due rows and marks them "sending".
  * Uses SELECT ... FOR UPDATE SKIP LOCKED inside a transaction so multiple
  * app instances (or overlapping worker ticks) never claim the same row.
+ * Order emails are claimed first, so a backlog of marketing sends can never
+ * hold a customer's confirmation back.
  */
 export async function claimDueScheduledEmails(
   limit: number,
@@ -169,7 +204,10 @@ export async function claimDueScheduledEmails(
             : undefined,
         ),
       )
-      .orderBy(scheduledEmail.scheduledFor)
+      .orderBy(
+        sql`case when ${scheduledEmail.automationType} in ('order_confirmation', 'order_admin_notification') then 0 else 1 end`,
+        scheduledEmail.scheduledFor,
+      )
       .limit(limit)
       .for("update", { skipLocked: true });
 
@@ -179,7 +217,7 @@ export async function claimDueScheduledEmails(
     return tx
       .update(scheduledEmail)
       .set({ status: "sending", updatedAt: new Date() })
-      .where(inArray(scheduledEmail.id, ids))
+      .where(and(inArray(scheduledEmail.id, ids), eq(scheduledEmail.status, "pending")))
       .returning();
   });
 }
@@ -190,14 +228,25 @@ export async function claimDueScheduledEmails(
  * process died mid-send; for transactional order emails a possible duplicate
  * is better than a confirmation that silently never goes out. Marketing rows
  * are never passed here.
+ *
+ * The interrupted try counts as an attempt, so a row whose send crashes the
+ * process cannot loop forever: past `maxAttempts` it is marked "failed".
+ * Whether the interrupted send reached the provider is unknowable — the
+ * retry reuses the same Message-ID so a duplicate is recognisable.
  */
 export async function requeueStaleSendingEmails(
   types: readonly ScheduledEmailType[],
   olderThanMs: number,
+  maxAttempts: number = TRANSACTIONAL_MAX_ATTEMPTS,
 ): Promise<number> {
   const rows = await db()
     .update(scheduledEmail)
-    .set({ status: "pending", updatedAt: new Date() })
+    .set({
+      status: sql`case when ${scheduledEmail.attempts} + 1 >= ${maxAttempts} then 'failed'::scheduled_email_status else 'pending'::scheduled_email_status end`,
+      attempts: sql`${scheduledEmail.attempts} + 1`,
+      lastError: "Interrupted mid-send (process restart or crash) — provider outcome unknown",
+      updatedAt: new Date(),
+    })
     .where(
       and(
         eq(scheduledEmail.status, "sending"),
@@ -209,34 +258,54 @@ export async function requeueStaleSendingEmails(
   return rows.length;
 }
 
+/**
+ * Marks a claimed row sent (= the SMTP server accepted the recipient, not
+ * inbox delivery). Deliberately NOT guarded on status: an acceptance that
+ * arrives after the row was re-queued as stale must still win, or the retry
+ * would send a duplicate.
+ */
 export async function markScheduledEmailSent(id: string): Promise<void> {
+  const now = new Date();
   await db()
     .update(scheduledEmail)
-    .set({ status: "sent", sentAt: new Date(), updatedAt: new Date() })
+    .set({ status: "sent", sentAt: now, updatedAt: now, lastError: null })
     .where(eq(scheduledEmail.id, id));
 }
 
 /**
- * Records a failed send attempt. Retries (back to "pending" for the next
- * tick) until MAX_ATTEMPTS, then marks permanently "failed".
+ * Records a failed send attempt. Retries (back to "pending") until the
+ * attempt limit, then marks permanently "failed". Marketing rows keep the
+ * original policy (MAX_ATTEMPTS, next tick); transactional rows pass
+ * TRANSACTIONAL_RETRY_POLICY (more attempts, backoff via scheduled_for).
+ *
+ * Never downgrades a row that is already "sent" (a re-claimed copy of a
+ * stale row succeeded first) — flipping it back to pending would send a
+ * duplicate. `recorded: false` tells the caller nothing changed.
  */
 export async function markScheduledEmailFailed(
   id: string,
   attempts: number,
   error: string,
-): Promise<{ attempts: number; willRetry: boolean }> {
+  policy?: RetryPolicy,
+): Promise<{ attempts: number; willRetry: boolean; recorded: boolean }> {
   const nextAttempts = attempts + 1;
-  const willRetry = nextAttempts < MAX_ATTEMPTS;
-  await db()
+  const maxAttempts = policy?.maxAttempts ?? MAX_ATTEMPTS;
+  const willRetry = nextAttempts < maxAttempts;
+  const now = new Date();
+  const updated = await db()
     .update(scheduledEmail)
     .set({
       status: willRetry ? "pending" : "failed",
       attempts: nextAttempts,
-      lastError: error,
-      updatedAt: new Date(),
+      lastError: error.slice(0, 1000),
+      updatedAt: now,
+      ...(willRetry && policy
+        ? { scheduledFor: new Date(now.getTime() + policy.retryDelayMs(nextAttempts)) }
+        : {}),
     })
-    .where(eq(scheduledEmail.id, id));
-  return { attempts: nextAttempts, willRetry };
+    .where(and(eq(scheduledEmail.id, id), ne(scheduledEmail.status, "sent")))
+    .returning({ id: scheduledEmail.id });
+  return { attempts: nextAttempts, willRetry, recorded: updated.length > 0 };
 }
 
 /**

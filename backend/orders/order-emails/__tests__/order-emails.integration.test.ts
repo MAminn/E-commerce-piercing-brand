@@ -13,7 +13,11 @@ import { Effect } from "effect";
  *     variant and Set orders;
  *   • send outcomes land on the order activity log;
  *   • an email failure — queue, render or SMTP — never fails the order;
- *   • an online-payment order is confirmed only once payment is confirmed.
+ *   • an online-payment order is confirmed only once payment is confirmed;
+ *   • (ported from the Mach fix) sends carry one stable Message-ID across
+ *     retries, failures back off, a late failure never downgrades a sent
+ *     row (no duplicate), interrupted sends count as attempts, and order
+ *     emails are claimed ahead of marketing rows.
  *
  * No real email is sent: the worker is driven with a fake email service.
  * Skipped when TEST_DATABASE_URL is unset.
@@ -84,15 +88,22 @@ describeIfDb("order confirmation emails (integration)", () => {
 
   /** Captures what the worker would have sent. Never touches SMTP. */
   const fakeEmail = (succeed = true) => {
-    const sent: Array<{ to: string; subject: string; html: string; options?: unknown }> = [];
+    const sent: Array<{ to: string; subject: string; html: string; options?: { messageId?: string } & Record<string, unknown> }> = [];
     const service = {
-      sendEmail: (to: string, subject: string, html: string, options?: unknown) => {
+      sendEmail: (to: string, subject: string, html: string, options?: { messageId?: string }) => {
         sent.push({ to, subject, html, options });
-        return Effect.succeed(succeed ? { success: true } : { success: false, error: "SMTP 421 try later" });
+        return Effect.succeed(
+          succeed
+            ? { success: true, messageId: options?.messageId, response: "250 2.0.0 OK queued" }
+            : { success: false, error: "SMTP 421 try later" },
+        );
       },
     };
     return { service: service as never, sent };
   };
+
+  const rowById = async (id: string) =>
+    (await db.select().from(schema.scheduledEmail).where(eq(schema.scheduledEmail.id, id)))[0]!;
 
   const rowsFor = (orderId: string) =>
     db
@@ -437,5 +448,176 @@ describeIfDb("order confirmation emails (integration)", () => {
       .update(schema.scheduledEmail)
       .set({ status: "pending" })
       .where(and(inArray(schema.scheduledEmail.id, claimed.map((r) => r.id))));
+  });
+
+  // ── Reliability (ported from the Mach Supplements fix) ───────────────────
+
+  it("a retry reuses the same Message-ID, and the log records the provider's acceptance", async () => {
+    const placed = await run(createOrderModule.createOrder(order({ items: [{ productId: plain, quantity: 1 }] })));
+    const [row] = await confirmationRow(placed.id);
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const failing = fakeEmail(false);
+    await processRow(row!, failing.service);
+    error.mockRestore();
+    const ok = fakeEmail(true);
+    await processRow(await rowById(row!.id), ok.service);
+
+    const first = failing.sent[0]!.options?.messageId;
+    expect(first).toMatch(new RegExp(`^<order-confirmation\\.${placed.id}@[^>]+>$`));
+    expect(ok.sent[0]!.options?.messageId).toBe(first);
+
+    expect(await rowById(row!.id)).toMatchObject({ status: "sent", attempts: 1, lastError: null });
+    const sentLog = (await logFor(placed.id)).find((l) => l.action === "confirmation_email_sent");
+    expect(sentLog?.note).toContain("accepted by the mail server");
+    expect(sentLog?.note).toContain(`Message-ID ${first}`);
+    expect(sentLog?.note).toContain("250 2.0.0 OK");
+  });
+
+  it("store notifications carry their own per-recipient Message-ID without the address in it", async () => {
+    const placed = await run(createOrderModule.createOrder(order({ items: [{ productId: plain, quantity: 1 }] })));
+    await orderEmails.queueOrderPlacedEmails(
+      { orderId: placed.id, customerEmail: placed.customerEmail },
+      { listAdminEmails: async () => ["owner.one@example.test"] },
+    );
+    const [adminRow] = (await rowsFor(placed.id)).filter((r) => r.automationType === "order_admin_notification" && r.recipientEmail === "owner.one@example.test");
+    const email = fakeEmail(true);
+    await processRow(adminRow!, email.service);
+    const id = email.sent[0]!.options?.messageId ?? "";
+    expect(id).toMatch(new RegExp(`^<order-notification\\.${placed.id}\\.[0-9a-f]{12}@[^>]+>$`));
+    expect(id).not.toContain("owner.one");
+  });
+
+  it("a failed order email backs off instead of retrying every minute, and gives up only after the transactional limit", async () => {
+    const queue = await import("#root/backend/email-automations/queue/service");
+    const placed = await run(createOrderModule.createOrder(order({ items: [{ productId: plain, quantity: 1 }] })));
+    const [row] = await confirmationRow(placed.id);
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const before = Date.now();
+    await processRow(row!, fakeEmail(false).service);
+    let after = await rowById(row!.id);
+    expect(after).toMatchObject({ status: "pending", attempts: 1 });
+    expect(after.scheduledFor.getTime()).toBeGreaterThanOrEqual(before + 55_000);
+
+    // Second failure → 5 minutes.
+    const before2 = Date.now();
+    await processRow(after, fakeEmail(false).service);
+    after = await rowById(row!.id);
+    expect(after.attempts).toBe(2);
+    expect(after.scheduledFor.getTime()).toBeGreaterThanOrEqual(before2 + 5 * 60_000 - 5_000);
+
+    // At the limit the row fails for good and the log says so.
+    await db
+      .update(schema.scheduledEmail)
+      .set({ attempts: queue.TRANSACTIONAL_MAX_ATTEMPTS - 1 })
+      .where(eq(schema.scheduledEmail.id, row!.id));
+    await processRow(await rowById(row!.id), fakeEmail(false).service);
+    error.mockRestore();
+    expect(await rowById(row!.id)).toMatchObject({ status: "failed", attempts: queue.TRANSACTIONAL_MAX_ATTEMPTS });
+    const notes = (await logFor(placed.id)).filter((l) => l.action === "confirmation_email_failed").map((l) => l.note);
+    expect(notes.some((n) => n?.includes("retries exhausted, NOT sent"))).toBe(true);
+  });
+
+  it("a late failure never downgrades a row already marked sent (no duplicate, no false failure log)", async () => {
+    const placed = await run(createOrderModule.createOrder(order({ items: [{ productId: plain, quantity: 1 }] })));
+    const [row] = await confirmationRow(placed.id);
+    // Copy A succeeds first ...
+    await processRow(row!, fakeEmail(true).service);
+    expect((await rowById(row!.id)).status).toBe("sent");
+    // ... then a stale copy B of the same claimed row fails.
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    await processRow(row!, fakeEmail(false).service);
+    error.mockRestore();
+
+    expect(await rowById(row!.id)).toMatchObject({ status: "sent", attempts: 0 });
+    const actions = (await logFor(placed.id)).map((l) => l.action);
+    expect(actions).toContain("confirmation_email_sent");
+    expect(actions).not.toContain("confirmation_email_failed");
+    // Nothing left for the worker to claim → no second email.
+    const { claimDueScheduledEmails, TRANSACTIONAL_EMAIL_TYPES } = await import(
+      "#root/backend/email-automations/queue/service"
+    );
+    const claimed = await claimDueScheduledEmails(100, TRANSACTIONAL_EMAIL_TYPES);
+    expect(claimed.map((r) => r.id)).not.toContain(row!.id);
+    if (claimed.length > 0) {
+      await db
+        .update(schema.scheduledEmail)
+        .set({ status: "pending" })
+        .where(inArray(schema.scheduledEmail.id, claimed.map((r) => r.id)));
+    }
+  });
+
+  it("an interrupted send is re-queued as one attempt; past the limit it is failed, never looped forever", async () => {
+    const queue = await import("#root/backend/email-automations/queue/service");
+    const placed = await run(createOrderModule.createOrder(order({ items: [{ productId: plain, quantity: 1 }] })));
+    const [row] = await confirmationRow(placed.id);
+    const longAgo = new Date(Date.now() - 60 * 60_000);
+    await db
+      .update(schema.scheduledEmail)
+      .set({ status: "sending", updatedAt: longAgo })
+      .where(eq(schema.scheduledEmail.id, row!.id));
+
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await queue.requeueStaleSendingEmails(queue.TRANSACTIONAL_EMAIL_TYPES, 15 * 60_000);
+    let after = await rowById(row!.id);
+    expect(after).toMatchObject({ status: "pending", attempts: 1 });
+    expect(after.lastError).toMatch(/Interrupted mid-send/);
+
+    await db
+      .update(schema.scheduledEmail)
+      .set({ status: "sending", updatedAt: longAgo, attempts: queue.TRANSACTIONAL_MAX_ATTEMPTS - 1 })
+      .where(eq(schema.scheduledEmail.id, row!.id));
+    await queue.requeueStaleSendingEmails(queue.TRANSACTIONAL_EMAIL_TYPES, 15 * 60_000);
+    warn.mockRestore();
+    after = await rowById(row!.id);
+    expect(after).toMatchObject({ status: "failed", attempts: queue.TRANSACTIONAL_MAX_ATTEMPTS });
+
+    // A row that is only briefly "sending" (a live send) is left alone.
+    await db
+      .update(schema.scheduledEmail)
+      .set({ status: "sending", updatedAt: new Date(), attempts: 0 })
+      .where(eq(schema.scheduledEmail.id, row!.id));
+    await queue.requeueStaleSendingEmails(queue.TRANSACTIONAL_EMAIL_TYPES, 15 * 60_000);
+    expect((await rowById(row!.id)).status).toBe("sending");
+    await db.update(schema.scheduledEmail).set({ status: "cancelled" }).where(eq(schema.scheduledEmail.id, row!.id));
+  });
+
+  it("order emails are claimed ahead of an older marketing backlog", async () => {
+    const queue = await import("#root/backend/email-automations/queue/service");
+    // Park every other due row so this test controls the queue.
+    const parked = await db
+      .update(schema.scheduledEmail)
+      .set({ status: "cancelled" })
+      .where(eq(schema.scheduledEmail.status, "pending"))
+      .returning({ id: schema.scheduledEmail.id });
+    try {
+      const old = new Date(Date.now() - 24 * 60 * 60_000);
+      const marketing = await db
+        .insert(schema.scheduledEmail)
+        .values(
+          Array.from({ length: 3 }, (_, i) => ({
+            automationType: "win_back" as const,
+            recipientEmail: `${TAG}mkt${i}@example.test`,
+            payload: {},
+            scheduledFor: old,
+            dedupeKey: `${TAG}mkt:${Date.now()}:${i}`,
+          })),
+        )
+        .returning({ id: schema.scheduledEmail.id });
+      const placed = await run(createOrderModule.createOrder(order({ items: [{ productId: plain, quantity: 1 }] })));
+
+      const claimed = await queue.claimDueScheduledEmails(1);
+      expect(claimed).toHaveLength(1);
+      expect(queue.isTransactionalEmailType(claimed[0]!.automationType)).toBe(true);
+      expect(claimed[0]!.payload).toMatchObject({ orderId: placed.id });
+      await db.delete(schema.scheduledEmail).where(inArray(schema.scheduledEmail.id, marketing.map((m) => m.id)));
+      await db.update(schema.scheduledEmail).set({ status: "cancelled" }).where(like(schema.scheduledEmail.dedupeKey, `%${placed.id}%`));
+    } finally {
+      if (parked.length > 0) {
+        await db
+          .update(schema.scheduledEmail)
+          .set({ status: "pending" })
+          .where(inArray(schema.scheduledEmail.id, parked.map((r) => r.id)));
+      }
+    }
   });
 });
