@@ -107,23 +107,35 @@ export default function CheckoutPage() {
   >([]);
   const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true);
 
-  // WhatsApp opt-in is shown only while WHATSAPP_CONFIRM_MODE is not off.
-  // Any failure hides it (never blocks checkout) — including a synchronous
-  // throw while building the call, which the Promise.resolve() wrapper turns
-  // into a rejection the .catch() swallows instead of a render crash.
+  // WhatsApp opt-in: the server decides per mode (live: shown; pilot: shown
+  // only for an allow-listed number; off/shadow: hidden), so it is asked
+  // again (debounced) as the phone number changes. Any failure hides it
+  // (never blocks checkout) — including a synchronous throw while building
+  // the call, which the Promise.resolve() wrapper turns into a rejection the
+  // .catch() swallows instead of a render crash.
   const [showWhatsAppOptIn, setShowWhatsAppOptIn] = useState(false);
+  const [optInPhone, setOptInPhone] = useState("");
   useEffect(() => {
     let cancelled = false;
-    Promise.resolve()
-      .then(() => trpc.whatsappConfirmation.checkoutOptIn.query())
-      .then((r) => {
-        if (!cancelled) setShowWhatsAppOptIn(r.enabled === true);
-      })
-      .catch(() => {});
+    const phone = optInPhone.trim();
+    const timer = setTimeout(
+      () => {
+        Promise.resolve()
+          .then(() => trpc.whatsappConfirmation.checkoutOptIn.query(phone ? { phone } : undefined))
+          .then((r) => {
+            if (!cancelled) setShowWhatsAppOptIn(r?.enabled === true);
+          })
+          .catch(() => {
+            if (!cancelled) setShowWhatsAppOptIn(false);
+          });
+      },
+      phone ? 400 : 0,
+    );
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
-  }, []);
+  }, [optInPhone]);
 
   useEffect(() => {
     let cancelled = false;
@@ -515,6 +527,7 @@ export default function CheckoutPage() {
     onGovernorateChange: setShippingDestination,
     governorateRequired: shippingMode === "zones",
     showWhatsAppOptIn,
+    onPhoneChange: setOptInPhone,
   };
 
   return <Template.component {...templateProps} />;

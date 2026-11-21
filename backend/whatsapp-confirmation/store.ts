@@ -16,6 +16,7 @@ import { applyOrderStatusChange, type Tx } from "#root/backend/orders/update-ord
 import { buildTemplateMessage, newConfirmationToken, parseButtonPayload } from "./payload";
 import { decideResponse } from "./decide";
 import { isOptOutText, type ParsedEvent } from "./webhook-parse";
+import { CONSENT_SOURCE_CHECKOUT, CONSENT_SOURCE_SHADOW_NOT_ASKED, hasCheckoutConsent, maySendTo } from "./eligibility";
 import { CONSENT_TEXT_VERSION, WA_AWAITING_STATES, WA_STATUS_NOTE_PREFIX, type WaReviewType, type WaState } from "./types";
 
 /**
@@ -38,13 +39,7 @@ async function rows<T>(db: Db, q: ReturnType<typeof sql>): Promise<T[]> {
   return res.rows;
 }
 
-/** pilot sends only to allow-listed numbers; live to everyone; shadow/off never. */
-export function maySendTo(mode: WhatsAppConfirmMode, cfg: Pick<WhatsAppConfirmConfig, "pilotAllowlist">, phone: string | null): boolean {
-  if (!phone) return false;
-  if (mode === "live") return true;
-  if (mode === "pilot") return cfg.pilotAllowlist.has(phone);
-  return false;
-}
+export { maySendTo };
 
 export async function isPaused(db: Db): Promise<boolean> {
   const [row] = await db.select({ paused: waSettings.paused }).from(waSettings).where(eq(waSettings.id, 1));
@@ -104,19 +99,28 @@ export async function enqueueConfirmation(db: DatabaseClient, input: EnqueueInpu
   // order placed during a pause into a permanent, never-sent shadow row.
   const mode = input.mode;
   const phone = toWhatsAppRecipient(o.customerPhone);
+  // Could this order be messaged for real in this mode (live, or pilot +
+  // allow-listed)? Only those orders need — and are refused without — the
+  // shopper's tick. Every other order is a shadow record that is never sent,
+  // so it needs no consent (see eligibility.ts). The allow-list decides who
+  // MAY be messaged; it never counts as consent.
+  const realRecipient = maySendTo(mode, input.config, phone);
+  const consented = input.whatsappOptIn === true;
   let ineligible: string | null = null;
   if (o.paymentMethod !== "cod") ineligible = "not_cod";
   else if (o.status !== "pending") ineligible = "not_pending";
-  else if (!input.whatsappOptIn) ineligible = "no_consent";
+  else if (mode === "live" && !consented) ineligible = "no_consent";
   else if (!phone) ineligible = "invalid_phone";
+  else if (realRecipient && !consented) ineligible = "no_consent";
   else {
     const [opt] = await db.select({ p: waOptOut.phoneE164 }).from(waOptOut).where(eq(waOptOut.phoneE164, phone));
     if (opt) ineligible = "opted_out";
   }
 
   const token = newConfirmationToken();
-  const send = !ineligible && maySendTo(mode, input.config, phone);
+  const send = !ineligible && realRecipient && consented;
   const state: WaState = ineligible ? "ineligible" : send ? "queued" : "shadow";
+  const consentSource = consented ? CONSENT_SOURCE_CHECKOUT : state === "shadow" ? CONSENT_SOURCE_SHADOW_NOT_ASKED : null;
 
   return await db.transaction(async (tx) => {
     const inserted = await tx
@@ -129,9 +133,9 @@ export async function enqueueConfirmation(db: DatabaseClient, input: EnqueueInpu
         phoneE164: phone,
         ineligibleReason: ineligible,
         token,
-        consentAt: input.whatsappOptIn ? now : null,
-        consentSource: input.whatsappOptIn ? "checkout" : null,
-        consentTextVersion: input.whatsappOptIn ? CONSENT_TEXT_VERSION : null,
+        consentAt: consented ? now : null,
+        consentSource,
+        consentTextVersion: consented ? CONSENT_TEXT_VERSION : null,
       })
       .onConflictDoNothing()
       .returning({ id: waOrderConfirmation.id });
@@ -141,7 +145,10 @@ export async function enqueueConfirmation(db: DatabaseClient, input: EnqueueInpu
       // not_cod: online orders are paid; nothing for staff to do here.
       // no_consent is the normal case for most orders: staff already confirm
       // those by hand, so it is listed (Not sent tab) but not queued for action.
-      if (ineligible === "invalid_phone" || ineligible === "opted_out") {
+      // invalid_phone / opted_out need a staff item only when the shopper
+      // actually asked for WhatsApp (ticked the box) and will not get it; a
+      // shadow record made without asking is just listed.
+      if (consented && (ineligible === "invalid_phone" || ineligible === "opted_out")) {
         await openReviewItem(tx, {
           orderId: o.id,
           type: "ineligible",
@@ -323,7 +330,10 @@ async function applyButtonEvent(db: DatabaseClient, ev: Extract<ParsedEvent, { k
 
     const decision = decideResponse({
       action: parsed.action,
+      // A reply may change the order only for a number this mode may message
+      // AND whose row carries the shopper's own checkout consent.
       canAct: maySendTo(mode, ctx.config, conf.phoneE164),
+      consented: hasCheckoutConsent(conf),
       orderStatus: (o?.status as never) ?? null,
       archived: !!o?.archivedAt,
       absLinked,

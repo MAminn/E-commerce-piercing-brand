@@ -466,6 +466,40 @@ describeIfDb("WhatsApp order confirmation (integration)", () => {
     expect((await tick(okFetch())).sent).toBe(1);
   });
 
+  it("consent is enforced at send and at reply time: a row without a checkout tick is never sent and never changes the order", async () => {
+    // Two shadow records made without asking (the shadow rule).
+    const a = await createOrder();
+    const b = await createOrder({ phone: OTHER_PHONE });
+    expect(await enqueue(a.id, "shadow", false)).toEqual({ outcome: "shadow" });
+    expect(await enqueue(b.id, "shadow", false)).toEqual({ outcome: "shadow" });
+    expect(await conf(a.id)).toMatchObject({ consentSource: "shadow_not_asked", consentAt: null });
+
+    // Shadow simulation (the superadmin "Sim confirm" path) never changes the order.
+    expect(await press(a.id, "confirm", { mode: "shadow" })).toEqual(["button:confirm:shadow"]);
+    expect((await orderRow(a.id))?.status).toBe("pending");
+
+    // Forged: a shadow row made to look exactly like a queued send (outbox
+    // pending, confirmation queued). Only the consent check stands in the way.
+    await db.update(schema.waOutbox).set({ status: "pending" }).where(eq(schema.waOutbox.orderId, b.id));
+    await db.update(schema.waOrderConfirmation).set({ state: "queued" }).where(eq(schema.waOrderConfirmation.orderId, b.id));
+    const fetchImpl = okFetch();
+    expect((await tick(fetchImpl, "live")).cancelled).toBe(1);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect((await db.select().from(schema.waOutbox).where(eq(schema.waOutbox.orderId, b.id)))[0]?.status).toBe("cancelled");
+
+    // Forged: a live reply to a row that has no consent. Never applied.
+    await db.update(schema.waOrderConfirmation).set({ state: "sent", outboundWamid: "wamid.FORGED1" }).where(eq(schema.waOrderConfirmation.orderId, b.id));
+    expect(await press(b.id, "confirm", { mode: "live" })).toEqual(["button:confirm:no_consent"]);
+    expect((await orderRow(b.id))?.status).toBe("pending");
+    expect(await statusLogs(b.id)).toHaveLength(0);
+    expect(await conf(b.id)).toMatchObject({ statusApplied: false, statusSkipReason: "no_consent" });
+
+    // Shadow records do not open staff items, even for an invalid number.
+    const landline = await createOrder({ phone: "0225551234" });
+    expect(await enqueue(landline.id, "shadow", false)).toEqual({ outcome: "ineligible", reason: "invalid_phone" });
+    expect(await reviews(landline.id)).toHaveLength(0);
+  });
+
   it("checkout wiring: the real order.create procedure queues per mode and consent, and a WhatsApp failure never fails it", async () => {
     // The real tRPC procedure + create-order service, so the input schema,
     // the COD branch and queueWhatsAppConfirmation are all exercised. The mode
@@ -475,11 +509,11 @@ describeIfDb("WhatsApp order confirmation (integration)", () => {
     const { queueWhatsAppConfirmation } = await import("../enqueue");
     const caller = t.router({ create: createOrderProcedure }).createCaller({ db, clientSession: null, emailService: { sendEmail: async () => undefined } } as never);
     const placed: string[] = [];
-    const place = async (whatsappOptIn?: boolean) => {
+    const place = async (whatsappOptIn?: boolean, customerPhone = PILOT_PHONE) => {
       const res = (await caller.create({
         customerName: "منى اختبار",
         customerEmail: `${TAG}checkout-${Date.now()}-${Math.random().toString(16).slice(2)}@wa.test`,
-        customerPhone: PILOT_PHONE,
+        customerPhone,
         shippingAddress: "1 Fixture Street",
         shippingCity: "Cairo",
         shippingState: "Cairo",
@@ -497,32 +531,89 @@ describeIfDb("WhatsApp order confirmation (integration)", () => {
       expect(res.result?.status).toBe("pending");
       return id;
     };
-    const boot = (mode: "off" | "shadow") =>
+    const boot = (mode: "off" | "shadow" | "pilot" | "live") =>
       cfgMod.setWhatsAppConfirmBootStatus({ requestedMode: mode, effectiveMode: mode, tablesReady: true, problems: [], checkedAt: new Date().toISOString() });
+    const outbox = async (orderId: string) => db.select().from(schema.waOutbox).where(eq(schema.waOutbox.orderId, orderId));
+    // queueWhatsAppConfirmation reads the config from process.env: only the
+    // pilot allow-list is needed here (never WHATSAPP_CONFIRM_MODE).
+    const savedAllowlist = process.env.WHATSAPP_PILOT_ALLOWLIST;
+    process.env.WHATSAPP_PILOT_ALLOWLIST = ENV.WHATSAPP_PILOT_ALLOWLIST;
 
     try {
-      // off (the default): an opted-in order leaves no wa_* row at all.
+      // off (the default): even an opted-in order leaves no wa_* row at all.
       cfgMod.setWhatsAppConfirmBootStatus(null);
       const offId = await place(true);
       expect(await conf(offId)).toBeUndefined();
 
+      // shadow: every eligible COD order is recorded for simulation WITHOUT
+      // asking (the box is hidden) — never queued for sending.
       boot("shadow");
-      // shadow + consent: a confirmation row and an outbox row that is never sent.
-      const optedIn = await place(true);
-      expect(await conf(optedIn)).toMatchObject({ state: "shadow", mode: "shadow", phoneE164: "201009990001", consentSource: "checkout" });
-      const [box] = await db.select().from(schema.waOutbox).where(eq(schema.waOutbox.orderId, optedIn));
-      expect(box).toMatchObject({ kind: "confirm", status: "shadow_skipped", dedupeKey: `wa:confirm:${optedIn}` });
-      expect((await orderRow(optedIn))?.status).toBe("pending");
+      const shadowNotAsked = await place();
+      expect(await conf(shadowNotAsked)).toMatchObject({
+        state: "shadow",
+        mode: "shadow",
+        phoneE164: "201009990001",
+        consentSource: "shadow_not_asked",
+        consentAt: null,
+        consentTextVersion: null,
+      });
+      expect(await outbox(shadowNotAsked)).toMatchObject([{ kind: "confirm", status: "shadow_skipped", dedupeKey: `wa:confirm:${shadowNotAsked}` }]);
+      expect((await orderRow(shadowNotAsked))?.status).toBe("pending");
+      // Even if a client sent whatsappOptIn=true (the box is hidden in shadow), it stays a shadow record.
+      const shadowTicked = await place(true);
+      expect(await conf(shadowTicked)).toMatchObject({ state: "shadow", consentSource: "checkout" });
+      expect(await outbox(shadowTicked)).toMatchObject([{ status: "shadow_skipped" }]);
 
-      // shadow, box not ticked (or field absent): recorded as no_consent, nothing queued.
-      const noConsent = await place();
-      expect(await conf(noConsent)).toMatchObject({ state: "ineligible", ineligibleReason: "no_consent", consentAt: null });
-      expect(await db.select().from(schema.waOutbox).where(eq(schema.waOutbox.orderId, noConsent))).toHaveLength(0);
+      // pilot: the allow-list decides who MAY be messaged; only the tick is consent.
+      boot("pilot");
+      const pilotNoTick = await place(false, PILOT_PHONE);
+      expect(await conf(pilotNoTick)).toMatchObject({ state: "ineligible", ineligibleReason: "no_consent", consentSource: null, consentAt: null });
+      expect(await outbox(pilotNoTick)).toHaveLength(0);
+      expect(await reviews(pilotNoTick)).toHaveLength(0);
+      const pilotTicked = await place(true, PILOT_PHONE);
+      expect(await conf(pilotTicked)).toMatchObject({ state: "queued", mode: "pilot", consentSource: "checkout" });
+      expect((await conf(pilotTicked))?.consentAt).not.toBeNull();
+      expect(await outbox(pilotTicked)).toMatchObject([{ status: "pending" }]);
+      const pilotOther = await place(false, OTHER_PHONE);
+      expect(await conf(pilotOther)).toMatchObject({ state: "shadow", mode: "pilot", consentSource: "shadow_not_asked" });
+      expect(await outbox(pilotOther)).toMatchObject([{ status: "shadow_skipped" }]);
+
+      // live: the tick is required, for every number.
+      boot("live");
+      const liveNoTick = await place(false, OTHER_PHONE);
+      expect(await conf(liveNoTick)).toMatchObject({ state: "ineligible", ineligibleReason: "no_consent", consentSource: null });
+      expect(await outbox(liveNoTick)).toHaveLength(0);
+      expect(await reviews(liveNoTick)).toHaveLength(0);
+      const liveTicked = await place(true, OTHER_PHONE);
+      expect(await conf(liveTicked)).toMatchObject({ state: "queued", mode: "live", consentSource: "checkout" });
+
+      // The worker (mocked Graph API) sends exactly the two consented orders —
+      // nothing from shadow, nothing un-ticked. Running PILOT first: the
+      // live-queued order for a non-allow-listed number is deferred, not sent.
+      const recipients = (f: ReturnType<typeof okFetch>) => f.mock.calls.map((c) => JSON.parse((c as unknown as [string, { body: string }])[1].body).to).sort();
+      const pilotFetch = okFetch();
+      const pilotTick = await tick(pilotFetch, "pilot");
+      expect(recipients(pilotFetch)).toEqual(["201009990001"]);
+      expect(pilotTick.deferredNotRecipient).toBe(1);
+      expect((await conf(liveTicked))?.state).toBe("queued");
+      expect(await outbox(liveTicked)).toMatchObject([{ status: "pending", attempts: 0 }]);
+      // Back in live, the deferred order goes out once its retry time comes.
+      const liveFetch = okFetch();
+      await tick(liveFetch, "live", new Date(Date.now() + 16 * 60_000));
+      expect(recipients(liveFetch)).toEqual(["201009990002"]);
+      expect((await conf(pilotTicked))?.state).toBe("sent");
+      expect((await conf(liveTicked))?.state).toBe("sent");
+      for (const id of [shadowNotAsked, shadowTicked, pilotOther]) expect((await outbox(id))[0]?.status, id).toBe("shadow_skipped");
+      for (const id of [shadowNotAsked, shadowTicked, pilotNoTick, pilotTicked, pilotOther, liveNoTick, liveTicked]) {
+        expect((await orderRow(id))?.status, id).toBe("pending");
+      }
 
       // A database error inside the WhatsApp step is swallowed, never thrown.
       await expect(queueWhatsAppConfirmation({ orderId: "not-a-uuid", whatsappOptIn: true })).resolves.toBeUndefined();
     } finally {
       cfgMod.setWhatsAppConfirmBootStatus(null);
+      if (savedAllowlist === undefined) Reflect.deleteProperty(process.env, "WHATSAPP_PILOT_ALLOWLIST");
+      else process.env.WHATSAPP_PILOT_ALLOWLIST = savedAllowlist;
       // The service queued order emails for these orders; leave nothing due behind.
       if (placed.length) {
         await db.delete(schema.scheduledEmail).where(

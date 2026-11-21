@@ -12,6 +12,7 @@ import {
 import { sendGraphMessage, type FetchLike, type SendOutcome } from "./graph-client";
 import { openReviewItem, reprocessStaleInbound, runScheduler, runtimeMode } from "./store";
 import { setWhatsAppWorkerKick } from "./enqueue";
+import { hasCheckoutConsent, maySendTo } from "./eligibility";
 
 /**
  * Background delivery of wa_outbox + the reminder / follow-up scheduler.
@@ -57,6 +58,7 @@ export interface SendTickReport {
   ambiguous: number;
   cancelled: number;
   deferredByCap: number;
+  deferredNotRecipient: number;
 }
 
 type ClaimedRow = { id: string; order_id: string; kind: "confirm" | "reminder"; payload: Record<string, unknown>; attempts: number };
@@ -80,7 +82,7 @@ export async function runSendTick(deps: WaWorkerDeps): Promise<SendTickReport> {
   const now = (deps.now ?? (() => new Date()))();
   const config = (deps.config ?? readWhatsAppConfirmConfig)();
   const mode = await runtimeMode(db, (deps.mode ?? effectiveWhatsAppConfirmMode)());
-  const report: SendTickReport = { mode, claimed: 0, sent: 0, retried: 0, failed: 0, ambiguous: 0, cancelled: 0, deferredByCap: 0 };
+  const report: SendTickReport = { mode, claimed: 0, sent: 0, retried: 0, failed: 0, ambiguous: 0, cancelled: 0, deferredByCap: 0, deferredNotRecipient: 0 };
   if (mode !== "pilot" && mode !== "live") return { ...report, skipped: `mode_${mode}` };
   const problems = sendingConfigProblems(config);
   if (problems.length) return { ...report, skipped: `config:${problems.join(",")}` };
@@ -139,11 +141,27 @@ export async function runSendTick(deps: WaWorkerDeps): Promise<SendTickReport> {
     // Re-check right before sending: the order may have moved on.
     const [o] = await db.select({ status: order.status, archivedAt: order.archivedAt }).from(order).where(eq(order.id, row.order_id));
     const [conf] = await db.select().from(waOrderConfirmation).where(eq(waOrderConfirmation.orderId, row.order_id));
+    // Never send without the shopper's own checkout consent on the row (the
+    // enqueue rule already guarantees it; this is the last line of defence).
     const stillWanted =
-      o && o.status === "pending" && !o.archivedAt && conf && conf.response === null && (row.kind === "confirm" ? conf.state === "queued" : true);
+      o &&
+      o.status === "pending" &&
+      !o.archivedAt &&
+      conf &&
+      hasCheckoutConsent(conf) &&
+      conf.response === null &&
+      (row.kind === "confirm" ? conf.state === "queued" : true);
     if (!stillWanted) {
       await finish({ status: "cancelled", attempts: sql`${waOutbox.attempts} - 1` as never, lastError: "order no longer awaiting confirmation" });
       report.cancelled++;
+      continue;
+    }
+    // The CURRENT mode must still allow this recipient: a row queued in live
+    // is not sent while the app runs pilot for a number off the allow-list.
+    // Deferred (not cancelled), so it goes out if live is restored.
+    if (!maySendTo(mode, config, conf?.phoneE164 ?? null)) {
+      await finish({ status: "pending", attempts: sql`${waOutbox.attempts} - 1` as never, nextAttemptAt: new Date(now.getTime() + 15 * 60_000), lastError: `not a ${mode} recipient` });
+      report.deferredNotRecipient++;
       continue;
     }
     if (budget <= 0) {

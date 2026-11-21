@@ -12,14 +12,15 @@ for any other phone number id are ignored.
    order-email queue). Writes `wa_order_confirmation` + `wa_outbox` once
    (unique `order_id` / `dedupe_key`). Never throws, never calls Meta.
 2. Worker (`worker.ts`, every 15 s) claims due outbox rows with `FOR UPDATE SKIP LOCKED`,
-   re-checks the order is still `pending`, respects pause + daily cap, sends the
+   re-checks the order is still `pending`, the row's checkout consent and that the
+   current mode may message the number, respects pause + daily cap, sends the
    `order_confirmation_ar` template with three quick replies whose payloads are
    `wa1:<c|m|x>:<token>`.
 3. Webhook `POST /api/webhooks/whatsapp` (HMAC `X-Hub-Signature-256`) stores every event
    once in `wa_inbound_event`, answers 200, then processes it:
    - **confirm** → `pending → processing` through `applyOrderStatusChange` (system actor,
      note `[WA auto] …`) — only if still pending, not archived, no ABS link/decision,
-     and the mode may act on that number;
+     the mode may act on that number, and the row carries checkout consent;
    - **modify / cancel** → staff review item only (no order or stock change);
    - free text / unmatched / failed delivery → staff review item.
 4. Scheduler (every 10 min): one reminder after 24 h, follow-up item after 48 h,
@@ -27,15 +28,27 @@ for any other phone number id are ignored.
 
 ## Modes (`WHATSAPP_CONFIRM_MODE`)
 
-| Mode | Sends | Changes orders |
-|---|---|---|
-| `off` (default) | no (no query at all) | no |
-| `shadow` | no — payload stored as `shadow_skipped` | no (records `would_apply`) |
-| `pilot` | only to `WHATSAPP_PILOT_ALLOWLIST` | only for allow-listed numbers |
-| `live` | every eligible order | yes (confirm only) |
+| Mode | Checkout opt-in box | Recorded | Sends | Changes orders |
+|---|---|---|---|---|
+| `off` (default) | hidden | nothing (no query at all) | no | no |
+| `shadow` | hidden | every eligible COD order, without asking (`consent_source = 'shadow_not_asked'`), payload stored as `shadow_skipped` | no | no (records `would_apply`) |
+| `pilot` | shown only once the shopper types an allow-listed mobile number | allow-listed + ticked → queued; allow-listed + not ticked → `ineligible: no_consent`; any other number → shadow record | only to allow-listed numbers that **ticked** the box | only for those |
+| `live` | shown to everyone, never pre-ticked | ticked → queued; not ticked → `ineligible: no_consent` | only to orders whose box was **ticked** | yes (confirm only) |
+
+**Consent:** only the shopper's own tick at checkout (`consent_source = 'checkout'`,
+`consent_at` set) allows a real send. The pilot allow-list decides who *may* be
+messaged; it is never consent. The rule is enforced three times: at enqueue, by the
+worker right before sending, and when a reply arrives (a confirm on a row without
+consent is recorded with `status_skip_reason = 'no_consent'` and never changes the
+order). In pilot the worker also re-checks the allow-list, so a row queued under live
+is deferred, not sent, while the app runs pilot. Rules: `eligibility.ts`.
+
+Shadow records made without asking open no staff item (an invalid or opted-out number
+is just listed); those items are opened only when the shopper ticked the box.
 
 Effective mode is `off` without migration 0073; pilot/live fall back to `shadow` when
-any credential is missing. `wa_settings.paused` turns pilot/live into shadow at runtime.
+any credential is missing. `wa_settings.paused` turns pilot/live into shadow at runtime
+(the checkout box follows the effective mode, not the pause).
 
 ## Isolation guarantees
 

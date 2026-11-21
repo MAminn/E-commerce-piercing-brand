@@ -122,8 +122,10 @@ export interface CheckoutPageModernTemplateProps {
   onGovernorateChange?: (code: GovernorateCode | null) => void;
   /** Zone shipping is on: a governorate must be chosen before the order can be placed. */
   governorateRequired?: boolean;
-  /** Show the WhatsApp opt-in under the phone field (WHATSAPP_CONFIRM_MODE is not off). */
+  /** Show the WhatsApp opt-in under the phone field (decided server-side per mode and number). */
   showWhatsAppOptIn?: boolean;
+  /** Called with the phone field's value (initial and on every change), so the page can re-ask whether the opt-in applies. */
+  onPhoneChange?: (phone: string) => void;
 }
 
 
@@ -225,6 +227,7 @@ export function CheckoutPageModernTemplate({
   onGovernorateChange,
   governorateRequired = false,
   showWhatsAppOptIn = false,
+  onPhoneChange,
 }: CheckoutPageModernTemplateProps) {
   const { t, locale } = useMinimalI18n();
 
@@ -291,6 +294,16 @@ export function CheckoutPageModernTemplate({
   const emailRequired = form.paymentMethod !== "cod";
   const [notesOpen, setNotesOpen] = useState(false);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
+
+  // WhatsApp opt-in: report the phone so the page can ask whether the box
+  // applies to this number, and drop a tick the moment the box is hidden —
+  // consent is only ever a visible, explicit tick.
+  useEffect(() => {
+    onPhoneChange?.(form.phoneNumber);
+  }, [form.phoneNumber, onPhoneChange]);
+  useEffect(() => {
+    if (!showWhatsAppOptIn) setForm((prev) => (prev.whatsappOptIn ? { ...prev, whatsappOptIn: "" } : prev));
+  }, [showWhatsAppOptIn]);
 
   const updateField = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));

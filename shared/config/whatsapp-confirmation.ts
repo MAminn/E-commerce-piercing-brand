@@ -3,14 +3,19 @@
  *
  *   off (DEFAULT, and any unknown value) — nothing starts; no query against
  *          the wa_* tables, no Graph API request. The shop behaves as before.
- *   shadow — every eligible COD order gets a wa_order_confirmation row and an
- *          outbox row whose payload is prepared but NEVER sent
- *          (status `shadow_skipped`). The webhook receiver records inbound
- *          events and the decision it WOULD take; no order is changed.
- *   pilot  — real sends ONLY to numbers in WHATSAPP_PILOT_ALLOWLIST; every
- *          other order behaves exactly as in shadow. Replies from pilot
- *          numbers are applied (pending → processing on confirm).
- *   live   — real sends to every eligible order.
+ *   shadow — checkout shows NO opt-in box. Every eligible COD order gets a
+ *          wa_order_confirmation row (consent not asked) and an outbox row
+ *          whose payload is prepared but NEVER sent (status `shadow_skipped`).
+ *          The webhook receiver records inbound events and the decision it
+ *          WOULD take; no order is changed.
+ *   pilot  — the opt-in box is shown only for numbers in
+ *          WHATSAPP_PILOT_ALLOWLIST, and real sends go ONLY to those that
+ *          TICKED it (the allow-list is never consent); every other order
+ *          behaves exactly as in shadow. Replies from those orders are
+ *          applied (pending → processing on confirm).
+ *   live   — the opt-in box is shown to everyone; real sends only to orders
+ *          whose box was ticked.
+ * Rules: backend/whatsapp-confirmation/eligibility.ts.
  *
  * The REQUESTED mode comes from the env; the EFFECTIVE mode is what the app
  * runs. It stays `off` until the boot readiness check

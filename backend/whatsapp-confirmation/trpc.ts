@@ -5,6 +5,7 @@ import { t, adminProcedure, publicProcedure } from "#root/shared/trpc/server";
 import { effectiveWhatsAppConfirmMode, readWhatsAppConfirmConfig } from "#root/shared/config/whatsapp-confirmation";
 import { waOrderConfirmation } from "#root/shared/database/drizzle/schema";
 import { buttonPayload } from "./payload";
+import { checkoutOptInVisible } from "./eligibility";
 import { processInboundEvent, recordInboundEvents } from "./store";
 import {
   CONFIRMATION_FILTERS,
@@ -43,8 +44,18 @@ const requireSuperadmin = t.middleware(({ ctx, next }) => {
 });
 
 export const whatsappConfirmationRouter = t.router({
-  /** Public: should checkout show the WhatsApp opt-in? Reveals nothing but on/off. */
-  checkoutOptIn: publicProcedure.query(() => ({ enabled: effectiveWhatsAppConfirmMode() !== "off" })),
+  /**
+   * Public: should checkout show the WhatsApp opt-in for the phone typed so
+   * far? Returns only { enabled } and never touches the database.
+   * off / shadow → false; live → true; pilot → true only for an allow-listed
+   * mobile number (see eligibility.ts). Showing the box is not consent — only
+   * the shopper's tick is.
+   */
+  checkoutOptIn: publicProcedure
+    .input(z.object({ phone: z.string().max(40).optional() }).optional())
+    .query(({ input }) => ({
+      enabled: checkoutOptInVisible(effectiveWhatsAppConfirmMode(), readWhatsAppConfirmConfig(), input?.phone),
+    })),
 
   overview: adminProcedure.query(async ({ ctx }) => {
     return await getOverview(effectiveWhatsAppConfirmMode() === "off" ? null : ctx.db);

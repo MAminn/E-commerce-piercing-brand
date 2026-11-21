@@ -8,7 +8,8 @@ import type { WaButtonAction, WaReviewType, WaState } from "./types";
  * Hard rules:
  *   - The only order change ever produced is `pending → processing`, on
  *     `confirm`, when the order is still pending, not archived, has no ABS
- *     link / decision, and the mode may act on this number.
+ *     link / decision, the mode may act on this number, and the row carries
+ *     the shopper's own checkout consent.
  *   - `modify` and `cancel` NEVER change the order; they open a staff item.
  *   - A repeated press of the same button is a no-op.
  *   - A late or conflicting answer never reverts anything; staff decide.
@@ -18,6 +19,8 @@ export interface DecisionFacts {
   action: WaButtonAction;
   /** May this mode change orders for this recipient? (pilot+allow-listed, or live) */
   canAct: boolean;
+  /** Does the row carry the shopper's own checkout consent? (default true for callers that predate it) */
+  consented?: boolean;
   orderStatus: "pending" | "processing" | "shipped" | "delivered" | "cancelled" | null;
   archived: boolean;
   absLinked: boolean;
@@ -69,6 +72,9 @@ export function decideResponse(f: DecisionFacts): Decision {
           : null;
 
     if (skip) return { ...base, newState: "confirmed", skipReason: skip, review };
+    // A real recipient without checkout consent: never acted on (defence in
+    // depth — such a row is never messaged in the first place).
+    if (f.canAct && f.consented === false) return { ...base, newState: "confirmed", skipReason: "no_consent", review };
     if (!f.canAct) return { ...base, newState: "confirmed", skipReason: "shadow", wouldApply: "apply", review };
     return { ...base, newState: "confirmed", applyProcessing: true, review };
   }

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Button } from "#root/components/ui/button";
 import { Input } from "#root/components/ui/input";
 import { GovernorateSelect } from "#root/components/checkout/GovernorateSelect";
@@ -54,8 +54,10 @@ export interface CheckoutPageEditorialTemplateProps {
   governorateCode?: GovernorateCode | null;
   onGovernorateChange?: (code: GovernorateCode | null) => void;
   governorateRequired?: boolean;
-  /** Show the WhatsApp opt-in under the phone field (WHATSAPP_CONFIRM_MODE is not off). */
+  /** Show the WhatsApp opt-in under the phone field (decided server-side per mode and number). */
   showWhatsAppOptIn?: boolean;
+  /** Called with the phone field's value (initial and on every change), so the page can re-ask whether the opt-in applies. */
+  onPhoneChange?: (phone: string) => void;
 }
 
 /* ------------------------------------------------------------------ */
@@ -92,6 +94,7 @@ export function CheckoutPageEditorialTemplate({
   onGovernorateChange,
   governorateRequired = false,
   showWhatsAppOptIn = false,
+  onPhoneChange,
 }: CheckoutPageEditorialTemplateProps) {
   const { t, locale } = useMinimalI18n();
   /* Internal form state — field names match the Modern template so
@@ -118,6 +121,16 @@ export function CheckoutPageEditorialTemplate({
   };
 
   const [governorateError, setGovernorateError] = useState<string | null>(null);
+
+  // WhatsApp opt-in: report the phone so the page can ask whether the box
+  // applies to this number, and drop a tick the moment the box is hidden —
+  // consent is only ever a visible, explicit tick.
+  useEffect(() => {
+    onPhoneChange?.(formValues.phoneNumber ?? "");
+  }, [formValues.phoneNumber, onPhoneChange]);
+  useEffect(() => {
+    if (!showWhatsAppOptIn) setFormValues((prev) => (prev.whatsappOptIn ? { ...prev, whatsappOptIn: "" } : prev));
+  }, [showWhatsAppOptIn]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

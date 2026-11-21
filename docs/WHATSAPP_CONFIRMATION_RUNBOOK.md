@@ -29,8 +29,10 @@ Every step marked **[APPROVAL]** needs the owner's explicit go-ahead first.
 3. Boot log must show `[WhatsApp confirm] requested=shadow effective=shadow`.
 4. App dashboard → WhatsApp → Configuration → Callback URL `https://perce-eg.com/api/webhooks/whatsapp`,
    verify token = `WHATSAPP_WEBHOOK_VERIFY_TOKEN`; subscribe field `messages` (on the NEW WABA only).
-5. 3–5 days of real orders: `/dashboard/whatsapp-confirmations` → Shadow tab shows one row per eligible order;
-   use "Sim confirm/modify/cancel" (superadmin) to walk the flow. Check: no order status changed by WhatsApp
+5. 3–5 days of real orders. Checkout shows **no** WhatsApp box in shadow. Every eligible COD order is recorded
+   without asking (`consent_source = 'shadow_not_asked'`), so `/dashboard/whatsapp-confirmations` → Shadow tab
+   shows one row per eligible COD order (invalid / opted-out numbers are listed as ineligible, with no staff item).
+   Use "Sim confirm/modify/cancel" (superadmin) to walk the flow. Check: no order status changed by WhatsApp
    (`order_log` notes starting `[WA auto]` = 0), WhatsApp Manager insights = 0 messages.
 
 ## 3. Phone migration — **[FINAL APPROVAL]**
@@ -43,8 +45,12 @@ Every step marked **[APPROVAL]** needs the owner's explicit go-ahead first.
 
 ## 4. Pilot — **[APPROVAL]**
 1. `WHATSAPP_PILOT_ALLOWLIST=<team numbers>`, `WHATSAPP_CONFIRM_MODE=pilot`, daily cap ≤ 50. Restart.
-2. Team places real COD orders with the WhatsApp box ticked; test confirm, modify, cancel, no reply (24 h reminder,
-   48 h follow-up), a late reply after cancelling, and pressing the same button twice.
+2. The checkout box appears **only after an allow-listed number is typed** in the phone field; customers on other
+   numbers never see it, and their orders are recorded as shadow (never sent). The allow-list is **not** consent:
+   an allow-listed order is sent only if the box was ticked (not ticked → `ineligible: no_consent`).
+   Team places real COD orders with the box ticked; test confirm, modify, cancel, no reply (24 h reminder,
+   48 h follow-up), a late reply after cancelling, and pressing the same button twice. Also place one allow-listed
+   order with the box NOT ticked and check that nothing is sent.
 3. Check each: order status, single `[WA auto]` log row on confirm, staff items, ERP export unchanged except the
    status event, ABS untouched.
 

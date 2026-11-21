@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { appRouter } from "#root/shared/trpc/router";
 
 /**
@@ -62,5 +62,52 @@ describe("whatsappConfirmation superadmin-only procedures", () => {
 
   it("checkoutOptIn is public and reports off without a boot status", async () => {
     expect(await caller(null).whatsappConfirmation.checkoutOptIn()).toEqual({ enabled: false });
+  });
+});
+
+describe("whatsappConfirmation.checkoutOptIn — per effective mode (anonymous caller, no DB)", () => {
+  const ALLOWED = "01009990001";
+  const OTHER = "01009990002";
+  const saved = process.env.WHATSAPP_PILOT_ALLOWLIST;
+  let cfg: typeof import("#root/shared/config/whatsapp-confirmation");
+
+  const boot = (mode: "off" | "shadow" | "pilot" | "live") =>
+    cfg.setWhatsAppConfirmBootStatus({ requestedMode: mode, effectiveMode: mode, tablesReady: true, problems: [], checkedAt: new Date().toISOString() });
+  const ask = async (phone?: string) => (await caller(null).whatsappConfirmation.checkoutOptIn(phone === undefined ? undefined : { phone })).enabled;
+
+  beforeAll(async () => {
+    cfg = await import("#root/shared/config/whatsapp-confirmation");
+    process.env.WHATSAPP_PILOT_ALLOWLIST = "201009990001";
+  });
+  afterEach(() => cfg.setWhatsAppConfirmBootStatus(null));
+  afterAll(() => {
+    if (saved === undefined) Reflect.deleteProperty(process.env, "WHATSAPP_PILOT_ALLOWLIST");
+    else process.env.WHATSAPP_PILOT_ALLOWLIST = saved;
+  });
+
+  it("off: hidden, with or without a number", async () => {
+    boot("off");
+    expect([await ask(), await ask(ALLOWED), await ask(OTHER)]).toEqual([false, false, false]);
+  });
+
+  it("shadow: hidden, even for an allow-listed number", async () => {
+    boot("shadow");
+    expect([await ask(), await ask(ALLOWED), await ask(OTHER)]).toEqual([false, false, false]);
+  });
+
+  it("pilot: shown only for an allow-listed number", async () => {
+    boot("pilot");
+    expect([await ask(), await ask(ALLOWED), await ask("+20 100 999 0001"), await ask(OTHER)]).toEqual([false, true, true, false]);
+  });
+
+  it("live: shown for everyone", async () => {
+    boot("live");
+    expect([await ask(), await ask(ALLOWED), await ask(OTHER)]).toEqual([true, true, true]);
+  });
+
+  it("returns only { enabled } and rejects an oversized phone", async () => {
+    boot("live");
+    expect(Object.keys(await caller(null).whatsappConfirmation.checkoutOptIn({ phone: ALLOWED }))).toEqual(["enabled"]);
+    expect(await codeOf(caller(null).whatsappConfirmation.checkoutOptIn({ phone: "1".repeat(41) }))).toBe("BAD_REQUEST");
   });
 });
