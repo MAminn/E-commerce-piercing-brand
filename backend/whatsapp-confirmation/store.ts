@@ -471,7 +471,9 @@ export async function runScheduler(db: DatabaseClient, ctx: InboundContext): Pro
           LIMIT 50`,
     );
     for (const m of missing) {
-      const r = await enqueueConfirmation(db, { orderId: m.order_id, whatsappOptIn: true, mode: ctx.mode, config: ctx.config, now });
+      // whatsappOptIn false: consent comes from the evidence row alone, which
+      // enqueueConfirmation reads itself; nothing here can stand in for it.
+      const r = await enqueueConfirmation(db, { orderId: m.order_id, whatsappOptIn: false, mode: ctx.mode, config: ctx.config, now });
       if (r.outcome !== "exists") report.backfilled++;
     }
   }
