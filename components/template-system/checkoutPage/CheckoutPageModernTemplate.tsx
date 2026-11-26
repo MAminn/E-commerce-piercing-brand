@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { CURRENT_WHATSAPP_CONSENT_VERSION, whatsappConsentText } from "#root/shared/whatsapp/consent-text";
 import { ChevronDown } from "lucide-react";
 import { GovernorateSelect } from "#root/components/checkout/GovernorateSelect";
 import { getGovernorate, type GovernorateCode } from "#root/shared/shipping/egypt-governorates";
@@ -295,15 +296,18 @@ export function CheckoutPageModernTemplate({
   const [notesOpen, setNotesOpen] = useState(false);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
 
-  // WhatsApp opt-in: report the phone so the page can ask whether the box
-  // applies to this number, and drop a tick the moment the box is hidden —
-  // consent is only ever a visible, explicit tick.
+  // WhatsApp acknowledgment: report the phone so the page can ask whether
+  // the box applies to this number. It is shown for cash on delivery only
+  // (no WhatsApp confirmation is sent for a paid order) and, when shown, it
+  // must be ticked to order. A tick is dropped the moment the box is hidden:
+  // consent is only ever a visible, explicit tick, never pre-ticked.
+  const whatsAppConsentShown = showWhatsAppOptIn && form.paymentMethod === "cod";
   useEffect(() => {
     onPhoneChange?.(form.phoneNumber);
   }, [form.phoneNumber, onPhoneChange]);
   useEffect(() => {
-    if (!showWhatsAppOptIn) setForm((prev) => (prev.whatsappOptIn ? { ...prev, whatsappOptIn: "" } : prev));
-  }, [showWhatsAppOptIn]);
+    if (!whatsAppConsentShown) setForm((prev) => (prev.whatsappOptIn ? { ...prev, whatsappOptIn: "" } : prev));
+  }, [whatsAppConsentShown]);
 
   const updateField = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -333,6 +337,9 @@ export function CheckoutPageModernTemplate({
       errors.phoneNumber = t("validation.phone_required");
     } else if (!/^[\d\s+()-]{7,20}$/.test(form.phoneNumber.trim())) {
       errors.phoneNumber = t("validation.phone_invalid");
+    }
+    if (whatsAppConsentShown && form.whatsappOptIn !== "true") {
+      errors.whatsappOptIn = t("checkout.whatsapp_consent_required");
     }
     if (!form.address.trim()) errors.address = t("validation.address_required");
     else if (form.address.trim().length < 5) {
@@ -699,18 +706,24 @@ export function CheckoutPageModernTemplate({
                     className='tabular-nums'
                   />
                   <FieldError id='phoneNumber-error' message={fieldErrors.phoneNumber} />
-                  {showWhatsAppOptIn && (
+                  {whatsAppConsentShown && (
+                  <>
                   <label htmlFor='whatsappOptIn' className='mt-3 flex cursor-pointer items-start gap-2 text-sm leading-snug'>
                     <input
                       id='whatsappOptIn'
                       name='whatsappOptIn'
                       type='checkbox'
                       className='mt-0.5 h-4 w-4 shrink-0 accent-current'
+                      aria-required='true'
+                      aria-invalid={!!fieldErrors.whatsappOptIn || undefined}
+                      aria-describedby='whatsappOptIn-error'
                       checked={form.whatsappOptIn === "true"}
                       onChange={(e) => updateField("whatsappOptIn", e.target.checked ? "true" : "")}
                     />
-                    <span>{t("checkout.whatsapp_opt_in") || "Send my order confirmation and updates to this number on WhatsApp"}</span>
+                    <span>{whatsappConsentText(CURRENT_WHATSAPP_CONSENT_VERSION, locale)}</span>
                   </label>
+                  <FieldError id='whatsappOptIn-error' message={fieldErrors.whatsappOptIn} />
+                  </>
                   )}
                 </div>
               </div>

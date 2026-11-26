@@ -8,11 +8,11 @@ import {
   type WhatsAppConfirmBootStatus,
 } from "#root/shared/config/whatsapp-confirmation";
 
-export const WA_REQUIRED_TABLES = ["wa_order_confirmation", "wa_outbox", "wa_inbound_event", "wa_review_item", "wa_settings", "wa_opt_out"] as const;
+export const WA_REQUIRED_TABLES = ["wa_order_confirmation", "wa_outbox", "wa_inbound_event", "wa_review_item", "wa_settings", "wa_opt_out", "wa_checkout_consent"] as const;
 
 /**
  * Boot check. `off` requested → no query at all. Otherwise confirms
- * migration 0073 is applied and the sending config is complete, then fixes
+ * migrations 0073 and 0074 are applied and the sending config is complete, then fixes
  * the effective mode for the life of the process.
  */
 export async function initWhatsAppConfirm(db: DatabaseClient): Promise<WhatsAppConfirmBootStatus> {
@@ -27,7 +27,7 @@ export async function initWhatsAppConfirm(db: DatabaseClient): Promise<WhatsAppC
       )})`,
     )) as unknown as { rows: Array<{ n: number }> };
     tablesReady = (res.rows[0]?.n ?? 0) === WA_REQUIRED_TABLES.length;
-    if (!tablesReady) problems.push("migration 0073 not applied");
+    if (!tablesReady) problems.push("migration 0073/0074 not applied");
     if (config.requestedMode === "pilot" || config.requestedMode === "live") problems.push(...sendingConfigProblems(config));
   }
   const status: WhatsAppConfirmBootStatus = {

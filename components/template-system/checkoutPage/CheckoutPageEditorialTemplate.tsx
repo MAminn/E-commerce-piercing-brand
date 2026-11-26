@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { CURRENT_WHATSAPP_CONSENT_VERSION, whatsappConsentText } from "#root/shared/whatsapp/consent-text";
 import { Button } from "#root/components/ui/button";
 import { Input } from "#root/components/ui/input";
 import { GovernorateSelect } from "#root/components/checkout/GovernorateSelect";
@@ -121,16 +122,20 @@ export function CheckoutPageEditorialTemplate({
   };
 
   const [governorateError, setGovernorateError] = useState<string | null>(null);
+  const [whatsAppConsentError, setWhatsAppConsentError] = useState<string | null>(null);
 
-  // WhatsApp opt-in: report the phone so the page can ask whether the box
-  // applies to this number, and drop a tick the moment the box is hidden —
-  // consent is only ever a visible, explicit tick.
+  // WhatsApp acknowledgment: report the phone so the page can ask whether
+  // the box applies to this number. It is shown for cash on delivery only
+  // (no WhatsApp confirmation is sent for a paid order) and, when shown, it
+  // must be ticked to order. A tick is dropped the moment the box is hidden:
+  // consent is only ever a visible, explicit tick, never pre-ticked.
+  const whatsAppConsentShown = showWhatsAppOptIn && formValues.paymentMethod === "cod";
   useEffect(() => {
     onPhoneChange?.(formValues.phoneNumber ?? "");
   }, [formValues.phoneNumber, onPhoneChange]);
   useEffect(() => {
-    if (!showWhatsAppOptIn) setFormValues((prev) => (prev.whatsappOptIn ? { ...prev, whatsappOptIn: "" } : prev));
-  }, [showWhatsAppOptIn]);
+    if (!whatsAppConsentShown) setFormValues((prev) => (prev.whatsappOptIn ? { ...prev, whatsappOptIn: "" } : prev));
+  }, [whatsAppConsentShown]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -145,6 +150,12 @@ export function CheckoutPageEditorialTemplate({
       return;
     }
     setGovernorateError(null);
+    if (whatsAppConsentShown && formValues.whatsappOptIn !== "true") {
+      setWhatsAppConsentError(t("checkout.whatsapp_consent_required"));
+      document.getElementById("checkout-whatsapp-opt-in")?.focus();
+      return;
+    }
+    setWhatsAppConsentError(null);
     onSubmit?.(formValues);
   };
 
@@ -434,18 +445,31 @@ export function CheckoutPageEditorialTemplate({
                             className={inputCls}
                             placeholder='Phone Number'
                           />
-                          {showWhatsAppOptIn && (
+                          {whatsAppConsentShown && (
+                          <>
                           <label htmlFor='checkout-whatsapp-opt-in' className='mt-3 flex cursor-pointer items-start gap-2 text-sm leading-snug'>
                             <input
                               id='checkout-whatsapp-opt-in'
                               name='whatsappOptIn'
                               type='checkbox'
                               className='mt-0.5 h-4 w-4 shrink-0 accent-current'
+                              aria-required='true'
+                              aria-invalid={!!whatsAppConsentError || undefined}
+                              aria-describedby='checkout-whatsapp-opt-in-error'
                               checked={formValues.whatsappOptIn === "true"}
-                              onChange={(e) => updateField("whatsappOptIn", e.target.checked ? "true" : "")}
+                              onChange={(e) => {
+                                updateField("whatsappOptIn", e.target.checked ? "true" : "");
+                                if (e.target.checked) setWhatsAppConsentError(null);
+                              }}
                             />
-                            <span>{t("checkout.whatsapp_opt_in") || "Send my order confirmation and updates to this number on WhatsApp"}</span>
+                            <span>{whatsappConsentText(CURRENT_WHATSAPP_CONSENT_VERSION, locale)}</span>
                           </label>
+                          {whatsAppConsentError && (
+                            <p id='checkout-whatsapp-opt-in-error' role='alert' className='mt-1.5 text-xs text-red-600'>
+                              {whatsAppConsentError}
+                            </p>
+                          )}
+                          </>
                           )}
                         </div>
                       </div>

@@ -10,6 +10,8 @@ import { useTemplate } from "#root/frontend/contexts/TemplateContext";
 import { getTemplateComponent } from "#root/components/template-system/templateConfig";
 import { resolveTemplateId } from "#root/shared/config/storefront";
 import { trpc } from "#root/shared/trpc/client";
+import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
+import { CURRENT_WHATSAPP_CONSENT_VERSION, isWhatsAppConsentRequiredError } from "#root/shared/whatsapp/consent-text";
 import { formatSelectedOptionValues } from "#root/shared/products/options";
 import type {
   CheckoutPageModernTemplateProps,
@@ -107,13 +109,19 @@ export default function CheckoutPage() {
   >([]);
   const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true);
 
-  // WhatsApp opt-in: the server decides per mode (live: shown; pilot: shown
-  // only for an allow-listed number; off/shadow: hidden), so it is asked
-  // again (debounced) as the phone number changes. Any failure hides it
-  // (never blocks checkout) — including a synchronous throw while building
-  // the call, which the Promise.resolve() wrapper turns into a rejection the
-  // .catch() swallows instead of a render crash.
-  const [showWhatsAppOptIn, setShowWhatsAppOptIn] = useState(false);
+  // WhatsApp acknowledgment: the server decides per mode (live: shown;
+  // pilot: shown only for an allow-listed number; off/shadow: hidden), so it
+  // is asked again (debounced) as the phone number changes. Where it is shown
+  // for a cash-on-delivery order the tick is REQUIRED (the template will not
+  // submit without it, and the server refuses the order without it). A failed
+  // lookup hides it; if the server then refuses the order for a missing
+  // tick, the box is shown (forced) so the shopper can tick it and resubmit.
+  // A synchronous throw while building the call is turned into a rejection
+  // by the Promise.resolve() wrapper, never a render crash.
+  const { locale } = useMinimalI18n();
+  const [whatsAppOptInFromServer, setShowWhatsAppOptIn] = useState(false);
+  const [forceWhatsAppOptIn, setForceWhatsAppOptIn] = useState(false);
+  const showWhatsAppOptIn = whatsAppOptInFromServer || forceWhatsAppOptIn;
   const [optInPhone, setOptInPhone] = useState("");
   useEffect(() => {
     let cancelled = false;
@@ -369,7 +377,11 @@ export default function CheckoutPage() {
         paymentMethod: selectedPaymentMethod as "cod" | "stripe" | "paymob",
         buildingNumber: formValues.buildingNumber || undefined,
         apartment: formValues.apartment || undefined,
-        whatsappOptIn: showWhatsAppOptIn && formValues.whatsappOptIn === "true",
+        // Only a visible box the shopper ticked, on a COD order, is consent.
+        whatsappOptIn:
+          showWhatsAppOptIn && selectedPaymentMethod === "cod" && formValues.whatsappOptIn === "true",
+        whatsappConsentVersion: CURRENT_WHATSAPP_CONSENT_VERSION,
+        whatsappConsentLocale: locale === "ar" ? "ar" : "en",
       });
 
       if (!result.success) {
@@ -465,6 +477,9 @@ export default function CheckoutPage() {
       console.error("[Checkout] Order submission failed:", error);
       const message = parseOrderError(error);
       setErrorMessage(message);
+      // The server needs the WhatsApp tick for this order: make sure the box
+      // is on screen (even if the lookup failed) so it can be ticked.
+      if (isWhatsAppConsentRequiredError(message)) setForceWhatsAppOptIn(true);
       // The server refused because its shipping figure differs from the one
       // we showed (409). Re-quote so the summary now shows the current fee
       // and the next submit asserts the right number.

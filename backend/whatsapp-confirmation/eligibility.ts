@@ -17,6 +17,12 @@ import { toWhatsAppRecipient } from "#root/shared/whatsapp/phone";
  *   live   — checkbox shown to everyone, never pre-ticked; a send needs the
  *            tick.
  *
+ * Where the box is shown for a COD order (live, or pilot for an allow-listed
+ * number), the tick is REQUIRED: checkout will not submit without it and the
+ * server refuses the order without it (checkoutConsentRequired). It stays an
+ * explicit, unticked-by-default action of the shopper, recorded with the exact
+ * text in wa_checkout_consent; it is never assumed or filled in.
+ *
  * A runtime pause does not change any of this (it only stops the worker).
  */
 
@@ -36,6 +42,23 @@ export function checkoutOptInVisible(mode: WhatsAppConfirmMode, cfg: Pick<WhatsA
   if (mode === "live") return true;
   if (mode === "pilot") return maySendTo(mode, cfg, toWhatsAppRecipient(rawPhone));
   return false;
+}
+
+/**
+ * Must this order carry the shopper's WhatsApp acknowledgment before it is
+ * accepted? Yes exactly when it is a COD order this mode would really message:
+ * live, or pilot for an allow-listed number. Checkout shows the box in those
+ * cases and the server refuses the order without the tick. Never required for
+ * online payments (nothing is sent for them), in off or shadow, or for a
+ * number that cannot receive WhatsApp (a landline is confirmed by hand).
+ */
+export function checkoutConsentRequired(
+  mode: WhatsAppConfirmMode,
+  cfg: Pick<WhatsAppConfirmConfig, "pilotAllowlist">,
+  rawPhone: string | null | undefined,
+  paymentMethod: string,
+): boolean {
+  return paymentMethod === "cod" && maySendTo(mode, cfg, toWhatsAppRecipient(rawPhone));
 }
 
 /**

@@ -16,14 +16,17 @@ import { and, eq, inArray, like, sql } from "drizzle-orm";
  * changed; a late confirm on a cancelled order only opens a review item;
  * permanent / ambiguous send failures go to staff and are never re-sent;
  * reminder exactly once; follow-up after 48 h; the ERP export of an order
- * changes only by the single status_changed event of a confirm; and
- * migration 0073 is idempotent.
+ * changes only by the single status_changed event of a confirm; checkout
+ * refuses a COD order that must carry the WhatsApp tick without it and
+ * stores the consent evidence with the order; the scheduler backfills a
+ * consented order whose enqueue was lost (and never one without evidence);
+ * and migrations 0073 / 0074 are idempotent.
  */
 const TEST_DB_URL = process.env.TEST_DATABASE_URL;
 const describeIfDb = TEST_DB_URL ? describe : describe.skip;
 
 const ROOT = path.resolve(__dirname, "../../..");
-const MIGRATION = path.join(ROOT, "shared/database/migrations/0073_whatsapp_order_confirmation.sql");
+const MIGRATIONS = ["0073_whatsapp_order_confirmation.sql", "0074_whatsapp_checkout_consent.sql"].map((f) => path.join(ROOT, "shared/database/migrations", f));
 const TAG = "wa-it-";
 const HOUR = 3_600_000;
 const PILOT_PHONE = "01009990001";
@@ -56,7 +59,7 @@ describeIfDb("WhatsApp order confirmation (integration)", () => {
 
   const config = () => cfgMod.readWhatsAppConfirmConfig(ENV);
   const resetWa = async () => {
-    await db.execute(sql`TRUNCATE wa_order_confirmation, wa_outbox, wa_inbound_event, wa_review_item, wa_opt_out`);
+    await db.execute(sql`TRUNCATE wa_order_confirmation, wa_outbox, wa_inbound_event, wa_review_item, wa_opt_out, wa_checkout_consent`);
     await db.execute(sql`UPDATE wa_settings SET paused = false, daily_send_cap = 200 WHERE id = 1`);
   };
 
@@ -145,9 +148,11 @@ describeIfDb("WhatsApp order confirmation (integration)", () => {
     autoMigrate = await import("#root/shared/database/auto-migrate");
     erp = await import("#root/backend/erp-sync/export-service");
 
-    // Apply 0073 exactly as auto-migrate would — twice, to prove it is idempotent.
+    // Apply 0073 and 0074 exactly as auto-migrate would — twice, to prove they are idempotent.
     for (let i = 0; i < 2; i++) {
-      for (const stmt of autoMigrate.splitMigrationStatements(readFileSync(MIGRATION, "utf8"))) await db.execute(sql.raw(stmt));
+      for (const file of MIGRATIONS) {
+        for (const stmt of autoMigrate.splitMigrationStatements(readFileSync(file, "utf8"))) await db.execute(sql.raw(stmt));
+      }
     }
 
     const storeOwner = (await import("#root/shared/config/store")).getStoreOwnerId();
@@ -500,19 +505,27 @@ describeIfDb("WhatsApp order confirmation (integration)", () => {
     expect(await reviews(landline.id)).toHaveLength(0);
   });
 
-  it("checkout wiring: the real order.create procedure queues per mode and consent, and a WhatsApp failure never fails it", async () => {
+  it("checkout wiring: the real order.create procedure requires the tick where it applies, records the evidence and queues; a WhatsApp failure never fails an order", async () => {
     // The real tRPC procedure + create-order service, so the input schema,
-    // the COD branch and queueWhatsAppConfirmation are all exercised. The mode
-    // is the in-process boot status (never WHATSAPP_CONFIRM_MODE).
+    // the consent refusal, the in-transaction evidence, the COD branch and
+    // queueWhatsAppConfirmation are all exercised. The mode is the in-process
+    // boot status (never WHATSAPP_CONFIRM_MODE).
     const { t } = await import("#root/shared/trpc/server");
     const { createOrderProcedure } = await import("#root/backend/orders/create-order/trpc");
     const { queueWhatsAppConfirmation } = await import("../enqueue");
-    const caller = t.router({ create: createOrderProcedure }).createCaller({ db, clientSession: null, emailService: { sendEmail: async () => undefined } } as never);
+    const { WHATSAPP_CONSENT_REQUIRED_MESSAGE, WHATSAPP_CONSENT_TEXTS } = await import("#root/shared/whatsapp/consent-text");
+    const UA = "Mozilla/5.0 (integration test)";
+    const IP = "203.0.113.7";
+    const caller = t
+      .router({ create: createOrderProcedure })
+      .createCaller({ db, clientSession: null, emailService: { sendEmail: async () => undefined }, ipAddress: IP, userAgent: UA } as never);
     const placed: string[] = [];
-    const place = async (whatsappOptIn?: boolean, customerPhone = PILOT_PHONE) => {
+    type Extra = { paymentMethod?: "cod" | "paymob"; whatsappConsentVersion?: string; whatsappConsentLocale?: "en" | "ar" };
+    const attempt = async (whatsappOptIn: boolean | undefined, customerPhone: string, extra: Extra = {}) => {
+      const email = `${TAG}checkout-${Date.now()}-${Math.random().toString(16).slice(2)}@wa.test`;
       const res = (await caller.create({
         customerName: "منى اختبار",
-        customerEmail: `${TAG}checkout-${Date.now()}-${Math.random().toString(16).slice(2)}@wa.test`,
+        customerEmail: email,
         customerPhone,
         shippingAddress: "1 Fixture Street",
         shippingCity: "Cairo",
@@ -521,34 +534,55 @@ describeIfDb("WhatsApp order confirmation (integration)", () => {
         shippingCountry: "Egypt",
         items: [{ productId: seeded.productId, quantity: 1 }],
         bundles: [],
-        paymentMethod: "cod",
+        paymentMethod: extra.paymentMethod ?? "cod",
         ...(whatsappOptIn === undefined ? {} : { whatsappOptIn }),
+        ...(extra.whatsappConsentVersion === undefined ? {} : { whatsappConsentVersion: extra.whatsappConsentVersion }),
+        ...(extra.whatsappConsentLocale === undefined ? {} : { whatsappConsentLocale: extra.whatsappConsentLocale }),
       } as never)) as { success: boolean; result?: { id: string; status: string }; error?: unknown };
-      expect(res.success, JSON.stringify(res.error ?? null)).toBe(true);
-      const id = res.result?.id as string;
-      placed.push(id);
-      createdOrders.push(id);
-      expect(res.result?.status).toBe("pending");
-      return id;
+      if (res.success) {
+        placed.push(res.result?.id as string);
+        createdOrders.push(res.result?.id as string);
+      }
+      return { res, email };
     };
+    const place = async (whatsappOptIn: boolean | undefined, customerPhone = PILOT_PHONE, extra: Extra = { whatsappConsentVersion: "checkout-v2", whatsappConsentLocale: "en" }) => {
+      const { res } = await attempt(whatsappOptIn, customerPhone, extra);
+      expect(res.success, JSON.stringify(res.error ?? null)).toBe(true);
+      expect(res.result?.status).toBe("pending");
+      return res.result?.id as string;
+    };
+    /** Refused with the consent message, and NOTHING was written: no order, no wa_* row. */
+    const expectRefused = async (whatsappOptIn: boolean | undefined, customerPhone: string) => {
+      const waBefore = await db.execute(sql`SELECT (SELECT count(*) FROM wa_order_confirmation) + (SELECT count(*) FROM wa_checkout_consent) + (SELECT count(*) FROM wa_outbox) AS n`);
+      const { res, email } = await attempt(whatsappOptIn, customerPhone, { whatsappConsentVersion: "checkout-v2" });
+      expect(res).toEqual({ success: false, error: WHATSAPP_CONSENT_REQUIRED_MESSAGE });
+      expect(await db.select({ id: schema.order.id }).from(schema.order).where(eq(schema.order.customerEmail, email))).toHaveLength(0);
+      const waAfter = await db.execute(sql`SELECT (SELECT count(*) FROM wa_order_confirmation) + (SELECT count(*) FROM wa_checkout_consent) + (SELECT count(*) FROM wa_outbox) AS n`);
+      expect((waAfter as unknown as { rows: unknown[] }).rows).toEqual((waBefore as unknown as { rows: unknown[] }).rows);
+    };
+    const evidence = async (orderId: string) => (await db.select().from(schema.waCheckoutConsent).where(eq(schema.waCheckoutConsent.orderId, orderId)))[0];
     const boot = (mode: "off" | "shadow" | "pilot" | "live") =>
       cfgMod.setWhatsAppConfirmBootStatus({ requestedMode: mode, effectiveMode: mode, tablesReady: true, problems: [], checkedAt: new Date().toISOString() });
     const outbox = async (orderId: string) => db.select().from(schema.waOutbox).where(eq(schema.waOutbox.orderId, orderId));
-    // queueWhatsAppConfirmation reads the config from process.env: only the
-    // pilot allow-list is needed here (never WHATSAPP_CONFIRM_MODE).
+    // The service and queueWhatsAppConfirmation read the config from
+    // process.env: only the pilot allow-list is needed (never the mode).
     const savedAllowlist = process.env.WHATSAPP_PILOT_ALLOWLIST;
     process.env.WHATSAPP_PILOT_ALLOWLIST = ENV.WHATSAPP_PILOT_ALLOWLIST;
 
     try {
-      // off (the default): even an opted-in order leaves no wa_* row at all.
+      // off (the default): nothing required, nothing recorded, not even an opted-in order.
       cfgMod.setWhatsAppConfirmBootStatus(null);
+      const offNoTick = await place(undefined);
       const offId = await place(true);
-      expect(await conf(offId)).toBeUndefined();
+      for (const id of [offNoTick, offId]) {
+        expect(await conf(id)).toBeUndefined();
+        expect(await evidence(id)).toBeUndefined();
+      }
 
-      // shadow: every eligible COD order is recorded for simulation WITHOUT
-      // asking (the box is hidden) — never queued for sending.
+      // shadow: the box is hidden, so nothing is required; every eligible COD
+      // order is recorded for simulation WITHOUT asking — never queued.
       boot("shadow");
-      const shadowNotAsked = await place();
+      const shadowNotAsked = await place(undefined);
       expect(await conf(shadowNotAsked)).toMatchObject({
         state: "shadow",
         mode: "shadow",
@@ -557,54 +591,96 @@ describeIfDb("WhatsApp order confirmation (integration)", () => {
         consentAt: null,
         consentTextVersion: null,
       });
+      expect(await evidence(shadowNotAsked)).toBeUndefined();
       expect(await outbox(shadowNotAsked)).toMatchObject([{ kind: "confirm", status: "shadow_skipped", dedupeKey: `wa:confirm:${shadowNotAsked}` }]);
-      expect((await orderRow(shadowNotAsked))?.status).toBe("pending");
-      // Even if a client sent whatsappOptIn=true (the box is hidden in shadow), it stays a shadow record.
+      // Even a tick in shadow stays a shadow record (it is recorded as given, not required).
       const shadowTicked = await place(true);
       expect(await conf(shadowTicked)).toMatchObject({ state: "shadow", consentSource: "checkout" });
+      expect(await evidence(shadowTicked)).toMatchObject({ required: false, mode: "shadow" });
       expect(await outbox(shadowTicked)).toMatchObject([{ status: "shadow_skipped" }]);
 
-      // pilot: the allow-list decides who MAY be messaged; only the tick is consent.
+      // pilot: REQUIRED for an allow-listed number; not asked for any other.
       boot("pilot");
-      const pilotNoTick = await place(false, PILOT_PHONE);
-      expect(await conf(pilotNoTick)).toMatchObject({ state: "ineligible", ineligibleReason: "no_consent", consentSource: null, consentAt: null });
-      expect(await outbox(pilotNoTick)).toHaveLength(0);
-      expect(await reviews(pilotNoTick)).toHaveLength(0);
+      await expectRefused(false, PILOT_PHONE);
+      await expectRefused(undefined, "+20 100 999 0001");
       const pilotTicked = await place(true, PILOT_PHONE);
-      expect(await conf(pilotTicked)).toMatchObject({ state: "queued", mode: "pilot", consentSource: "checkout" });
-      expect((await conf(pilotTicked))?.consentAt).not.toBeNull();
+      expect(await conf(pilotTicked)).toMatchObject({ state: "queued", mode: "pilot", consentSource: "checkout", consentTextVersion: "checkout-v2" });
+      expect(await evidence(pilotTicked)).toMatchObject({ required: true, mode: "pilot", phoneE164: "201009990001" });
       expect(await outbox(pilotTicked)).toMatchObject([{ status: "pending" }]);
       const pilotOther = await place(false, OTHER_PHONE);
       expect(await conf(pilotOther)).toMatchObject({ state: "shadow", mode: "pilot", consentSource: "shadow_not_asked" });
+      expect(await evidence(pilotOther)).toBeUndefined();
       expect(await outbox(pilotOther)).toMatchObject([{ status: "shadow_skipped" }]);
 
-      // live: the tick is required, for every number.
+      // live: REQUIRED for every COD order to a mobile number.
       boot("live");
-      const liveNoTick = await place(false, OTHER_PHONE);
-      expect(await conf(liveNoTick)).toMatchObject({ state: "ineligible", ineligibleReason: "no_consent", consentSource: null });
-      expect(await outbox(liveNoTick)).toHaveLength(0);
-      expect(await reviews(liveNoTick)).toHaveLength(0);
-      const liveTicked = await place(true, OTHER_PHONE);
-      expect(await conf(liveTicked)).toMatchObject({ state: "queued", mode: "live", consentSource: "checkout" });
+      await expectRefused(false, OTHER_PHONE);
+      await expectRefused(undefined, OTHER_PHONE);
+      const liveTicked = await place(true, OTHER_PHONE, { whatsappConsentVersion: "checkout-v2", whatsappConsentLocale: "ar" });
+      const ev = await evidence(liveTicked);
+      expect(ev).toMatchObject({
+        phoneRaw: OTHER_PHONE,
+        phoneE164: "201009990002",
+        consentTextVersion: "checkout-v2",
+        consentLocale: "ar",
+        consentText: WHATSAPP_CONSENT_TEXTS["checkout-v2"].ar,
+        required: true,
+        mode: "live",
+        source: "checkout",
+        ipAddress: IP,
+        userAgent: UA,
+      });
+      expect(ev?.orderNumber).toBe((await orderRow(liveTicked))?.orderNumber);
+      const liveConf = await conf(liveTicked);
+      expect(liveConf).toMatchObject({ state: "queued", mode: "live", consentSource: "checkout", consentTextVersion: "checkout-v2" });
+      // The confirmation row carries the evidence's own time.
+      expect(liveConf?.consentAt?.toISOString()).toBe(ev?.consentedAt.toISOString());
+      // An older browser build (optional box, no version sent) that ticked: accepted, recorded as the text it showed.
+      const legacyTicked = await place(true, OTHER_PHONE, {});
+      expect(await evidence(legacyTicked)).toMatchObject({ consentTextVersion: "checkout-v1", consentLocale: "en", consentText: WHATSAPP_CONSENT_TEXTS["checkout-v1"].en });
+      expect(await conf(legacyTicked)).toMatchObject({ state: "queued", consentTextVersion: "checkout-v1" });
+      // Not required: a card payment (nothing is sent for it) and a landline.
+      const liveCard = await place(undefined, OTHER_PHONE, { paymentMethod: "paymob" });
+      expect(await conf(liveCard)).toBeUndefined();
+      expect(await evidence(liveCard)).toBeUndefined();
+      const liveCardTicked = await place(true, OTHER_PHONE, { paymentMethod: "paymob" });
+      expect(await evidence(liveCardTicked)).toBeUndefined();
+      const liveLandline = await place(false, "0225551234");
+      // Accepted without the tick (it cannot receive WhatsApp); listed for manual confirmation.
+      expect(await conf(liveLandline)).toMatchObject({ state: "ineligible", ineligibleReason: "no_consent" });
+      expect(await evidence(liveLandline)).toBeUndefined();
 
-      // The worker (mocked Graph API) sends exactly the two consented orders —
+      // The worker (mocked Graph API) sends exactly the consented orders —
       // nothing from shadow, nothing un-ticked. Running PILOT first: the
       // live-queued order for a non-allow-listed number is deferred, not sent.
       const recipients = (f: ReturnType<typeof okFetch>) => f.mock.calls.map((c) => JSON.parse((c as unknown as [string, { body: string }])[1].body).to).sort();
       const pilotFetch = okFetch();
       const pilotTick = await tick(pilotFetch, "pilot");
       expect(recipients(pilotFetch)).toEqual(["201009990001"]);
-      expect(pilotTick.deferredNotRecipient).toBe(1);
+      expect(pilotTick.deferredNotRecipient).toBe(2);
       expect((await conf(liveTicked))?.state).toBe("queued");
-      expect(await outbox(liveTicked)).toMatchObject([{ status: "pending", attempts: 0 }]);
-      // Back in live, the deferred order goes out once its retry time comes.
+      // Back in live, the deferred orders go out once their retry time comes.
       const liveFetch = okFetch();
       await tick(liveFetch, "live", new Date(Date.now() + 16 * 60_000));
-      expect(recipients(liveFetch)).toEqual(["201009990002"]);
-      expect((await conf(pilotTicked))?.state).toBe("sent");
-      expect((await conf(liveTicked))?.state).toBe("sent");
+      expect(recipients(liveFetch)).toEqual(["201009990002", "201009990002"]);
+      for (const id of [pilotTicked, liveTicked, legacyTicked]) expect((await conf(id))?.state, id).toBe("sent");
       for (const id of [shadowNotAsked, shadowTicked, pilotOther]) expect((await outbox(id))[0]?.status, id).toBe("shadow_skipped");
-      for (const id of [shadowNotAsked, shadowTicked, pilotNoTick, pilotTicked, pilotOther, liveNoTick, liveTicked]) {
+      // The approved template, with the three quick replies, went out.
+      const body = JSON.parse((liveFetch.mock.calls[0] as unknown as [string, { body: string }])[1].body);
+      expect(body).toMatchObject({ type: "template", template: { name: "order_confirmation_ar" } });
+      expect(JSON.stringify(body)).toContain("wa1:c:");
+      expect(JSON.stringify(body)).toContain("wa1:m:");
+      expect(JSON.stringify(body)).toContain("wa1:x:");
+
+      // End to end: the customer presses Confirm in live → pending → processing, once.
+      expect(await press(liveTicked, "confirm", { mode: "live" })).toEqual(["button:confirm:applied"]);
+      expect((await orderRow(liveTicked))?.status).toBe("processing");
+      expect(await statusLogs(liveTicked)).toHaveLength(1);
+      // Modify / Cancel on the other live order: staff items only, the order stays pending.
+      expect(await press(legacyTicked, "modify", { mode: "live" })).toEqual(["button:modify:recorded"]);
+      expect((await orderRow(legacyTicked))?.status).toBe("pending");
+      expect((await reviews(legacyTicked)).map((r) => r.type)).toEqual(["modify"]);
+      for (const id of [shadowNotAsked, shadowTicked, pilotTicked, pilotOther, liveLandline]) {
         expect((await orderRow(id))?.status, id).toBe("pending");
       }
 
@@ -624,5 +700,67 @@ describeIfDb("WhatsApp order confirmation (integration)", () => {
         );
       }
     }
+  });
+
+  it("an opted-out number that ticks the box is still never messaged; staff get an item", async () => {
+    const o = await createOrder({ phone: OTHER_PHONE });
+    await db.insert(schema.waOptOut).values({ phoneE164: "201009990002", source: "inbound_text" });
+    await db.insert(schema.waCheckoutConsent).values({
+      orderId: o.id, orderNumber: o.orderNumber, phoneRaw: OTHER_PHONE, phoneE164: "201009990002",
+      consentTextVersion: "checkout-v2", consentLocale: "en", consentText: "x", required: true, mode: "live", source: "checkout",
+    });
+    expect(await store.enqueueConfirmation(db, { orderId: o.id, whatsappOptIn: true, mode: "live", config: config() })).toEqual({ outcome: "ineligible", reason: "opted_out" });
+    expect((await reviews(o.id)).map((r) => r.type)).toEqual(["ineligible"]);
+    const f = okFetch();
+    await tick(f, "live");
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("backfill: a consented order whose enqueue was lost is queued by the scheduler; orders without evidence (e.g. #10280–#10282) never are", async () => {
+    const outbox = async (orderId: string) => db.select().from(schema.waOutbox).where(eq(schema.waOutbox.orderId, orderId));
+    const now = new Date();
+    const ago = (ms: number) => new Date(now.getTime() - ms);
+    const consent = (o: { id: string; orderNumber: number }, phone: string, at: Date) =>
+      db.insert(schema.waCheckoutConsent).values({
+        orderId: o.id, orderNumber: o.orderNumber, phoneRaw: phone, phoneE164: `20${phone.slice(1)}`,
+        consentTextVersion: "checkout-v2", consentLocale: "en", consentText: "x", required: true, mode: "live", source: "checkout", consentedAt: at,
+      });
+    // Lost enqueue: evidence, no confirmation row.
+    const lost = await createOrder({ phone: OTHER_PHONE });
+    await consent(lost, OTHER_PHONE, ago(5 * 60_000));
+    // Too fresh (the post-commit enqueue may still be running) and too old (staff have it).
+    const fresh = await createOrder({ phone: OTHER_PHONE });
+    await consent(fresh, OTHER_PHONE, ago(30_000));
+    const stale = await createOrder({ phone: OTHER_PHONE });
+    await consent(stale, OTHER_PHONE, ago(25 * HOUR));
+    // Like #10280–#10282: placed without the tick, already listed as no_consent.
+    const noConsent = await createOrder({ phone: OTHER_PHONE });
+    expect(await enqueue(noConsent.id, "live", false)).toEqual({ outcome: "ineligible", reason: "no_consent" });
+    // No tick and no row at all.
+    const bare = await createOrder({ phone: OTHER_PHONE });
+    const before = await conf(noConsent.id);
+
+    const report = await store.runScheduler(db, { mode: "live", config: config(), now });
+    expect(report.backfilled).toBe(1);
+    expect(await conf(lost.id)).toMatchObject({ state: "queued", consentSource: "checkout", consentTextVersion: "checkout-v2" });
+    expect((await conf(lost.id))?.consentAt?.toISOString()).toBe(ago(5 * 60_000).toISOString());
+    expect(await conf(fresh.id)).toBeUndefined();
+    expect(await conf(stale.id)).toBeUndefined();
+    expect(await conf(bare.id)).toBeUndefined();
+    expect(await conf(noConsent.id)).toEqual(before);
+    // Run again: nothing more (one confirmation per order).
+    expect((await store.runScheduler(db, { mode: "live", config: config(), now })).backfilled).toBe(0);
+    // The worker sends exactly the backfilled one.
+    const f = okFetch();
+    await tick(f, "live", now);
+    expect(f).toHaveBeenCalledTimes(1);
+    expect((await conf(lost.id))?.state).toBe("sent");
+    expect(await outbox(noConsent.id)).toHaveLength(0);
+    expect(await outbox(bare.id)).toHaveLength(0);
+    // In shadow, a backfilled order is a shadow record, never sent.
+    const lostShadow = await createOrder({ phone: OTHER_PHONE });
+    await consent(lostShadow, OTHER_PHONE, ago(5 * 60_000));
+    expect((await store.runScheduler(db, { mode: "shadow", config: config(), now })).backfilled).toBe(1);
+    expect(await conf(lostShadow.id)).toMatchObject({ state: "shadow" });
   });
 });
