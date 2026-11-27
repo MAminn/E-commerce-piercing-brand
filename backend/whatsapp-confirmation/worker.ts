@@ -13,6 +13,7 @@ import { sendGraphMessage, type FetchLike, type SendOutcome } from "./graph-clie
 import { openReviewItem, reprocessStaleInbound, runScheduler, runtimeMode } from "./store";
 import { setWhatsAppWorkerKick } from "./enqueue";
 import { hasCheckoutConsent, maySendTo } from "./eligibility";
+import { isOptedOut, lockRecipient } from "./opt-out";
 
 /**
  * Background delivery of wa_outbox + the reminder / follow-up scheduler.
@@ -26,6 +27,10 @@ import { hasCheckoutConsent, maySendTo } from "./eligibility";
  *
  * Sends only in pilot/live, when not paused, when the config is complete and
  * while today's (Cairo) send count is below wa_settings.daily_send_cap.
+ *
+ * Opt-out (STOP) is checked for EVERY send, confirmation and reminder alike,
+ * under the recipient lock that STOP also takes (opt-out.ts), and the lock is
+ * held until Meta has answered: no send starts after a STOP was recorded.
  */
 
 export const MAX_ATTEMPTS = 5;
@@ -59,6 +64,8 @@ export interface SendTickReport {
   cancelled: number;
   deferredByCap: number;
   deferredNotRecipient: number;
+  /** Claimed rows not sent because the recipient opted out. */
+  optedOut: number;
 }
 
 type ClaimedRow = { id: string; order_id: string; kind: "confirm" | "reminder"; payload: Record<string, unknown>; attempts: number };
@@ -82,7 +89,7 @@ export async function runSendTick(deps: WaWorkerDeps): Promise<SendTickReport> {
   const now = (deps.now ?? (() => new Date()))();
   const config = (deps.config ?? readWhatsAppConfirmConfig)();
   const mode = await runtimeMode(db, (deps.mode ?? effectiveWhatsAppConfirmMode)());
-  const report: SendTickReport = { mode, claimed: 0, sent: 0, retried: 0, failed: 0, ambiguous: 0, cancelled: 0, deferredByCap: 0, deferredNotRecipient: 0 };
+  const report: SendTickReport = { mode, claimed: 0, sent: 0, retried: 0, failed: 0, ambiguous: 0, cancelled: 0, deferredByCap: 0, deferredNotRecipient: 0, optedOut: 0 };
   if (mode !== "pilot" && mode !== "live") return { ...report, skipped: `mode_${mode}` };
   const problems = sendingConfigProblems(config);
   if (problems.length) return { ...report, skipped: `config:${problems.join(",")}` };
@@ -170,11 +177,34 @@ export async function runSendTick(deps: WaWorkerDeps): Promise<SendTickReport> {
       continue;
     }
 
-    const outcome: SendOutcome = await sendGraphMessage(
-      { apiVersion: config.graphApiVersion as string, phoneNumberId: config.phoneNumberId as string, accessToken: config.accessToken as string },
-      row.payload,
-      deps.fetchImpl,
-    );
+    // The number Meta would be asked to message (the payload's own `to`).
+    const recipient = typeof row.payload.to === "string" && row.payload.to ? row.payload.to : (conf?.phoneE164 ?? null);
+    // Last opt-out check and the send itself, under the recipient lock: a
+    // STOP recorded before this point is seen here; a STOP arriving during the
+    // send waits until Meta has answered (see opt-out.ts).
+    const outcome: SendOutcome | "opted_out" = recipient
+      ? await db.transaction(async (tx) => {
+          await lockRecipient(tx, recipient);
+          if ((await isOptedOut(tx, recipient)) || (await isOptedOut(tx, conf?.phoneE164))) return "opted_out" as const;
+          return await sendGraphMessage(
+            { apiVersion: config.graphApiVersion as string, phoneNumberId: config.phoneNumberId as string, accessToken: config.accessToken as string },
+            row.payload,
+            deps.fetchImpl,
+          );
+        })
+      : "opted_out";
+    if (outcome === "opted_out") {
+      await finish({ status: "cancelled", attempts: sql`${waOutbox.attempts} - 1` as never, lastError: "recipient opted out (STOP)" });
+      if (row.kind === "confirm") {
+        await db
+          .update(waOrderConfirmation)
+          .set({ state: "ineligible", ineligibleReason: "opted_out", updatedAt: now })
+          .where(and(eq(waOrderConfirmation.orderId, row.order_id), eq(waOrderConfirmation.state, "queued")));
+        await openReviewItem(db, { orderId: row.order_id, type: "ineligible", detail: "Customer opted out of WhatsApp (STOP) — confirm manually" });
+      }
+      report.optedOut++;
+      continue;
+    }
     budget--;
 
     if (outcome.kind === "sent") {
