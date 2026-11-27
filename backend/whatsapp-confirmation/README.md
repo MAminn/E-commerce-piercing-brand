@@ -50,6 +50,23 @@ Effective mode is `off` without migration 0073; pilot/live fall back to `shadow`
 any credential is missing. `wa_settings.paused` turns pilot/live into shadow at runtime
 (the checkout box follows the effective mode, not the pause).
 
+## Opt-out (STOP)
+
+A customer who replies **STOP** / **unsubscribe** / **إيقاف** / **توقف** / **إلغاء الاشتراك**
+(any case; surrounding spaces, punctuation, quotation marks, emoji, tatweel and alef-hamza
+variants ignored; the WHOLE message must be the word, so "stop sending the wrong size"
+is not an opt-out) is never sent another automatic message (`opt-out.ts`):
+
+- STOP records `wa_opt_out`, cancels every unsent outbox row addressed to the number
+  (confirmations and reminders), closes unsent confirmations as `ineligible: opted_out`
+  and opens a staff item for each affected order (confirm by hand).
+- The scheduler never queues a reminder for an opted-out number; enqueue never queues a
+  later order from it.
+- The worker checks opt-out before **every** send, under a per-recipient transaction
+  lock (`pg_advisory_xact_lock`) held until Meta answers; STOP takes the same lock. A
+  send either started before the STOP was recorded, or it is never made.
+- A button press after STOP is still honoured (it is the customer's own answer).
+
 ## Isolation guarantees
 
 - No foreign keys from `wa_*` to `order` (no locks on website tables).
