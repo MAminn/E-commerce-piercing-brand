@@ -46,6 +46,12 @@ const ZONE_RULES: ShippingRulesConfig = {
   fallbackFee: 90,
 };
 
+/**
+ * A due time older than anything another suite can leave queued in the shared
+ * test database, used to make this file's claim tests take only their own rows.
+ */
+const ISOLATED_DUE_AT = new Date("2000-01-02T00:00:00Z");
+
 describeIfDb("order confirmation emails (integration)", () => {
   let db: ReturnType<typeof import("drizzle-orm/node-postgres").drizzle>;
   let schema: typeof import("#root/shared/database/drizzle/schema");
@@ -440,14 +446,27 @@ describeIfDb("order confirmation emails (integration)", () => {
     const { claimDueScheduledEmails, TRANSACTIONAL_EMAIL_TYPES } = await import(
       "#root/backend/email-automations/queue/service"
     );
-    const claimed = await claimDueScheduledEmails(100, TRANSACTIONAL_EMAIL_TYPES);
-    expect(claimed.map((r) => r.dedupeKey)).toContain(`order_confirmation:${placed.id}`);
-    expect(claimed.every((r) => TRANSACTIONAL_EMAIL_TYPES.includes(r.automationType as never))).toBe(true);
-    // Put them back so other rows are not left "sending".
-    await db
+    // Isolation: this test's rows are made the oldest due rows, so the claim
+    // takes exactly them whatever other suites left queued in the shared
+    // database, and no other row is ever claimed or touched.
+    const mine = await db
       .update(schema.scheduledEmail)
-      .set({ status: "pending" })
-      .where(and(inArray(schema.scheduledEmail.id, claimed.map((r) => r.id))));
+      .set({ scheduledFor: ISOLATED_DUE_AT })
+      .where(like(schema.scheduledEmail.dedupeKey, `%${placed.id}%`))
+      .returning({ id: schema.scheduledEmail.id });
+    expect(mine.length).toBeGreaterThan(0);
+    const claimed = await claimDueScheduledEmails(mine.length, TRANSACTIONAL_EMAIL_TYPES);
+    try {
+      expect(claimed.map((r) => r.id).sort()).toEqual(mine.map((r) => r.id).sort());
+      expect(claimed.map((r) => r.dedupeKey)).toContain(`order_confirmation:${placed.id}`);
+      expect(claimed.every((r) => TRANSACTIONAL_EMAIL_TYPES.includes(r.automationType as never))).toBe(true);
+    } finally {
+      // Never leave a row "sending"; this test's own rows are then retired.
+      await db
+        .update(schema.scheduledEmail)
+        .set({ status: "cancelled" })
+        .where(inArray(schema.scheduledEmail.id, [...new Set([...mine, ...claimed].map((r) => r.id))]));
+    }
   });
 
   // ── Reliability (ported from the Mach Supplements fix) ───────────────────
@@ -583,14 +602,12 @@ describeIfDb("order confirmation emails (integration)", () => {
 
   it("order emails are claimed ahead of an older marketing backlog", async () => {
     const queue = await import("#root/backend/email-automations/queue/service");
-    // Park every other due row so this test controls the queue.
-    const parked = await db
-      .update(schema.scheduledEmail)
-      .set({ status: "cancelled" })
-      .where(eq(schema.scheduledEmail.status, "pending"))
-      .returning({ id: schema.scheduledEmail.id });
-    try {
-      const old = new Date(Date.now() - 24 * 60 * 60_000);
+    // Isolation without touching anyone else's rows: the marketing backlog is
+    // OLDER than this order's emails, which are older than anything another
+    // suite can have left due. So claim(1) returns this order's email exactly
+    // when transactional rows go ahead of older marketing ones.
+    {
+      const old = new Date(ISOLATED_DUE_AT.getTime() - 24 * 60 * 60_000);
       const marketing = await db
         .insert(schema.scheduledEmail)
         .values(
@@ -604,19 +621,19 @@ describeIfDb("order confirmation emails (integration)", () => {
         )
         .returning({ id: schema.scheduledEmail.id });
       const placed = await run(createOrderModule.createOrder(order({ items: [{ productId: plain, quantity: 1 }] })));
+      await db
+        .update(schema.scheduledEmail)
+        .set({ scheduledFor: ISOLATED_DUE_AT })
+        .where(like(schema.scheduledEmail.dedupeKey, `%${placed.id}%`));
 
-      const claimed = await queue.claimDueScheduledEmails(1);
-      expect(claimed).toHaveLength(1);
-      expect(queue.isTransactionalEmailType(claimed[0]!.automationType)).toBe(true);
-      expect(claimed[0]!.payload).toMatchObject({ orderId: placed.id });
-      await db.delete(schema.scheduledEmail).where(inArray(schema.scheduledEmail.id, marketing.map((m) => m.id)));
-      await db.update(schema.scheduledEmail).set({ status: "cancelled" }).where(like(schema.scheduledEmail.dedupeKey, `%${placed.id}%`));
-    } finally {
-      if (parked.length > 0) {
-        await db
-          .update(schema.scheduledEmail)
-          .set({ status: "pending" })
-          .where(inArray(schema.scheduledEmail.id, parked.map((r) => r.id)));
+      try {
+        const claimed = await queue.claimDueScheduledEmails(1);
+        expect(claimed).toHaveLength(1);
+        expect(queue.isTransactionalEmailType(claimed[0]!.automationType)).toBe(true);
+        expect(claimed[0]!.payload).toMatchObject({ orderId: placed.id });
+      } finally {
+        await db.delete(schema.scheduledEmail).where(inArray(schema.scheduledEmail.id, marketing.map((m) => m.id)));
+        await db.update(schema.scheduledEmail).set({ status: "cancelled" }).where(like(schema.scheduledEmail.dedupeKey, `%${placed.id}%`));
       }
     }
   });
