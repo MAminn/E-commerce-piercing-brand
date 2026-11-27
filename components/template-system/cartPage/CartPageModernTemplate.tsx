@@ -11,6 +11,8 @@ import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { formatItemCount } from "#root/lib/i18n/item-count";
 import { cartUnitCount } from "#root/shared/bundles/cart-instance";
 import { formatMoney } from "#root/shared/pricing/format-money";
+import { compareAtDisplay } from "#root/shared/pricing/sale-display";
+import { Price } from "#root/components/storefront/Price";
 import { useCouponFeedback } from "#root/components/template-system/useCouponFeedback";
 import {
   STICKY_BAR_BOTTOM,
@@ -344,9 +346,23 @@ export function CartPageModernTemplate({
                           {item.variant && (
                             <p className='mt-1 t-small text-ink-2'>{item.variant}</p>
                           )}
-                          <p className='mt-1 t-small tabular-nums text-ink-2'>
-                            {money(item.price)} {t("checkout.each") || "each"}
-                          </p>
+                          {compareAtDisplay(item.price, item.originalPrice).compareAt !== null ? (
+                            // A sale line: the paid unit price, the struck
+                            // regular price and the percent off.
+                            <p className='mt-1 flex flex-wrap items-baseline gap-x-1.5 t-small tabular-nums text-ink-2' data-cart-unit-sale=''>
+                              <Price
+                                amount={item.price}
+                                compareAt={item.originalPrice}
+                                locale={locale === "ar" ? "ar" : "en"}
+                                size='line'
+                                paidSuffix={t("checkout.each") || "each"}
+                              />
+                            </p>
+                          ) : (
+                            <p className='mt-1 t-small tabular-nums text-ink-2'>
+                              {money(item.price)} {t("checkout.each") || "each"}
+                            </p>
+                          )}
                         </div>
 
                         {/* Line total */}
@@ -364,6 +380,17 @@ export function CartPageModernTemplate({
                                 </p>
                               )}
                             </>
+                          ) : compareAtDisplay(item.price, item.originalPrice).compareAt !== null ? (
+                            <p className='t-label tabular-nums text-ink'>
+                              <Price
+                                amount={item.price * item.quantity}
+                                compareAt={(item.originalPrice ?? 0) * item.quantity}
+                                locale={locale === "ar" ? "ar" : "en"}
+                                size='line'
+                                showBadge={false}
+                                className='justify-end'
+                              />
+                            </p>
                           ) : (
                             <p className='t-label tabular-nums text-ink'>{money(item.price * item.quantity)}</p>
                           )}

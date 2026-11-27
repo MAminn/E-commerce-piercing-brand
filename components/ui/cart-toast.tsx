@@ -2,11 +2,14 @@ import { useState, useEffect, useCallback } from "react";
 import { Check, X } from "lucide-react";
 import { buttonClass } from "#root/components/storefront/Button";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
-import { formatMoney } from "#root/shared/pricing/format-money";
+import { Price } from "#root/components/storefront/Price";
 
 interface CartToastItem {
   name: string;
+  /** The price paid for one unit. */
   price: number;
+  /** The regular unit price, struck through when above `price`. */
+  originalPrice?: number | null;
   imageUrl?: string;
 }
 
@@ -78,7 +81,7 @@ export function flyToCart(sourceEl: HTMLElement | null, imageUrl?: string) {
 export function CartToastContainer() {
   const [item, setItem] = useState<CartToastItem | null>(null);
   const [visible, setVisible] = useState(false);
-  const { t } = useMinimalI18n();
+  const { t, locale } = useMinimalI18n();
 
   const show = useCallback((newItem: CartToastItem) => {
     setItem(newItem);
@@ -136,7 +139,9 @@ export function CartToastContainer() {
           )}
           <div className="min-w-0 flex-1">
             <p className="truncate t-small text-ink">{item.name}</p>
-            <p className="t-label tabular-nums text-ink">{formatMoney(item.price)}</p>
+            <p className="t-label tabular-nums text-ink">
+              <Price amount={item.price} compareAt={item.originalPrice} locale={locale === "ar" ? "ar" : "en"} size="line" />
+            </p>
           </div>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-2">

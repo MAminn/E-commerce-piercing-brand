@@ -228,12 +228,13 @@ async function click(el: Element) {
 }
 
 describe("product-page upsell block", () => {
-  it("renders the configured number of recommendations, at the price paid", async () => {
+  it("renders the configured number of recommendations, at the price paid with the struck regular price", async () => {
     await render(<Page initialUpsells={upsellsOf([up("chain"), up("stud"), up("cuff")])} />);
     expect(blockIds()).toEqual(["chain", "stud"]);
-    // Percé cards show the price paid only — the discount price here.
-    expect(block()!.textContent).toMatch(/EGP\s350/);
-    expect(block()!.textContent).not.toMatch(/EGP\s400/);
+    // The price paid (the discount price here), then the struck regular price and the percent off.
+    expect(block()?.querySelector("[data-price-paid]")?.textContent).toMatch(/EGP\s350/);
+    expect(block()?.querySelector("s[data-price-compare]")?.textContent).toMatch(/EGP\s400/);
+    expect(block()?.querySelector("[data-price-badge]")?.textContent).toBe("−13%");
     // Storefront `sm` buttons: 36px drawn, 44px hit area.
     expect(button(block(), /Add/)!.className).toContain("before:-inset-y-1");
   });

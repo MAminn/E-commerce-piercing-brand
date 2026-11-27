@@ -91,7 +91,15 @@ export default function CheckoutPage() {
     shippingDestination,
     setShippingDestination,
     isShippingQuoteLoading,
+    isHydrated,
+    pricesUpdating,
+    refreshPrices,
   } = useCart();
+  // The order summary must show what will be charged: re-read the saved
+  // lines' live prices on arrival; ordering waits for it (pricesUpdating).
+  useEffect(() => {
+    if (isHydrated) void refreshPrices();
+  }, [isHydrated, refreshPrices]);
   const { getTemplateId } = useTemplate();
   const { trackEvent } = useTracking();
   const hasTrackedCheckoutStart = useRef(false);
@@ -285,6 +293,7 @@ export default function CheckoutPage() {
       shipping: summaryShippingAmount(shippingLine, shippingMode),
       shippingStatus: shippingLine.status,
       shippingLoading: isShippingQuoteLoading,
+      pricesUpdating,
       grandTotal: total,
       appliedOffers: appliedOffers.length > 0 ? appliedOffers : undefined,
     };
@@ -297,6 +306,7 @@ export default function CheckoutPage() {
     shippingLine,
     shippingMode,
     isShippingQuoteLoading,
+    pricesUpdating,
     total,
     appliedOffers,
   ]);

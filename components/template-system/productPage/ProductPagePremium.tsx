@@ -12,7 +12,7 @@ import { showCartToast } from "#root/components/ui/cart-toast";
 import { trpc } from "#root/shared/trpc/client";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { useWishlist } from "#root/lib/hooks/useWishlist";
-import { formatMoney } from "#root/shared/pricing/format-money";
+import { saleDisplay } from "#root/shared/pricing/sale-display";
 import { fillTemplate as fill } from "#root/components/bundles/bundle-ui";
 import { cn } from "#root/lib/utils";
 import { formatShippingFeeRange } from "#root/shared/config/storefront";
@@ -452,15 +452,11 @@ export function ProductPagePremium({
   // Re-observe when the button remounts (skeleton → product, product → product).
   const showSticky = !useFullyUsable(addToBagRef, [product.id, isLoading]);
 
-  // ── Price computation
-  const hasDiscount =
-    product.discountPrice != null &&
-    typeof product.discountPrice === "number" &&
-    product.discountPrice < product.price;
-
-  const displayPrice = hasDiscount
-    ? Number(product.discountPrice)
-    : product.price;
+  // ── Price computation: the paid price and, on a real sale, the struck
+  // regular price and percent off — from the live fields (see sale-display).
+  const sale = saleDisplay(product.price, product.discountPrice);
+  const displayPrice = sale.paid;
+  const compareAtPrice = sale.compareAt;
   const moneyLocale = locale === "ar" ? "ar" : "en";
 
   const [selectedVariants, setSelectedVariants] = useState<
@@ -500,6 +496,12 @@ export function ProductPagePremium({
         price: resolved.ok
           ? resolvePurchasableLinePrice(displayPrice, resolved.priceModifier)
           : displayPrice,
+        originalPrice:
+          compareAtPrice === null
+            ? null
+            : resolved.ok
+              ? resolvePurchasableLinePrice(compareAtPrice, resolved.priceModifier)
+              : compareAtPrice,
         quantity,
         imageUrl: addedImage,
         selectedOptions: selectedVariants,
@@ -508,6 +510,7 @@ export function ProductPagePremium({
       showCartToast({
         name: product.name,
         price: displayPrice,
+        originalPrice: compareAtPrice,
         imageUrl: addedImage,
       });
     }
@@ -615,7 +618,7 @@ export function ProductPagePremium({
 
               {/* 2. Price + availability */}
               <div className='mt-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1' style={{ fontFamily: "var(--font-price)" }}>
-                <Price amount={displayPrice} locale={moneyLocale} size='pdp' />
+                <Price amount={displayPrice} compareAt={compareAtPrice} locale={moneyLocale} size='pdp' />
                 <p className='t-small text-ink-2'>{inStock ? t("in_stock") : t("out_of_stock")}</p>
               </div>
 
@@ -833,9 +836,9 @@ export function ProductPagePremium({
           <div className='flex items-center gap-3'>
             <div className='min-w-0 flex-1'>
               <p className='truncate t-small text-ink-2'>{product.name}</p>
-              <p className='t-card-price text-ink'>
-                {formatMoney(displayPrice, { locale: moneyLocale })}
-                {quantity > 1 && <span className='ms-2 font-normal text-ink-2'>× {quantity}</span>}
+              <p className='flex flex-wrap items-baseline gap-x-2 t-card-price text-ink'>
+                <Price amount={displayPrice} compareAt={compareAtPrice} locale={moneyLocale} size='card' />
+                {quantity > 1 && <span className='font-normal text-ink-2'>× {quantity}</span>}
               </p>
             </div>
             <Button

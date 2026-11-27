@@ -13,6 +13,8 @@ import {
   AppliedOffersSavings,
 } from "#root/components/template-system/cartPage/AppliedOffersSavings";
 import { formatMoney } from "#root/shared/pricing/format-money";
+import { compareAtDisplay } from "#root/shared/pricing/sale-display";
+import { Price } from "#root/components/storefront/Price";
 import { useCouponFeedback } from "#root/components/template-system/useCouponFeedback";
 
 /**
@@ -66,6 +68,12 @@ export interface CheckoutTotals {
   shippingStatus?: ShippingLineStatus;
   /** True while a fresh quote is in flight after a governorate change. */
   shippingLoading?: boolean;
+  /**
+   * True while the bag's prices are being re-read from the catalogue (a bag
+   * saved before a price change). Ordering waits so the shopper never places
+   * an order against a total the server would not charge.
+   */
+  pricesUpdating?: boolean;
   grandTotal: number;
   appliedOffers?: Array<{
     name: string;
@@ -398,7 +406,7 @@ export function CheckoutPageModernTemplate({
   // quote is still in flight — never on "pending", so the shopper can press
   // the button and be pointed at the governorate field by validation.
   const shippingBlocksOrder =
-    totals.shippingStatus === "unavailable" || totals.shippingLoading === true;
+    totals.shippingStatus === "unavailable" || totals.shippingLoading === true || totals.pricesUpdating === true;
   const money = (amount: number) => formatMoney(amount, { currency, locale });
   const placeOrderDisabled = isSubmitting || items.length === 0 || shippingBlocksOrder;
   const placeOrderLabel = isSubmitting
@@ -424,7 +432,19 @@ export function CheckoutPageModernTemplate({
               <p className='t-micro font-normal tabular-nums text-ink-2'>Qty: {item.quantity}</p>
             </div>
             <div className='shrink-0 text-end'>
-              <p className='t-label tabular-nums text-ink'>{money(item.price * item.quantity)}</p>
+              {compareAtDisplay(item.price, item.originalPrice).compareAt !== null ? (
+                <p className='t-label tabular-nums text-ink' data-checkout-line-sale=''>
+                  <Price
+                    amount={item.price * item.quantity}
+                    compareAt={(item.originalPrice ?? 0) * item.quantity}
+                    locale={locale === "ar" ? "ar" : "en"}
+                    size='line'
+                    className='justify-end'
+                  />
+                </p>
+              ) : (
+                <p className='t-label tabular-nums text-ink'>{money(item.price * item.quantity)}</p>
+              )}
             </div>
           </li>
         ))}

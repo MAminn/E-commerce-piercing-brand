@@ -1,7 +1,8 @@
 import { cn } from "#root/lib/utils";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { getProductUrl } from "#root/lib/utils/route-helpers";
-import { formatMoney } from "#root/shared/pricing/format-money";
+import { saleDisplay } from "#root/shared/pricing/sale-display";
+import { Price } from "./Price";
 import { productPlacement } from "#root/shared/categories/placements";
 import { useStorefrontCategories } from "#root/hooks/useStorefrontCategories";
 import { buttonClass } from "./Button";
@@ -26,10 +27,9 @@ function resolveImageUrl(url?: string | null): string | null {
   return `/uploads/${url}`;
 }
 
-/** The price paid: the discount price when it is real, else the price. */
-function paidPrice(p: Pick<FeaturedObjectProduct, "price" | "discountPrice">): number {
-  const d = p.discountPrice === null || p.discountPrice === undefined || p.discountPrice === "" ? Number.NaN : Number(p.discountPrice);
-  return Number.isFinite(d) && d < p.price ? d : p.price;
+/** The price paid and, on a real sale, the struck regular price (see sale-display). */
+function salePrice(p: Pick<FeaturedObjectProduct, "price" | "discountPrice">) {
+  return saleDisplay(p.price, p.discountPrice);
 }
 
 /**
@@ -86,7 +86,13 @@ export function FeaturedObject({
             </a>
           </Heading>
           <p className='mt-3 t-h3 tabular-nums text-bg' style={{ fontFamily: "var(--font-price)" }}>
-            {formatMoney(paidPrice(product), { locale })}
+            <Price
+              amount={salePrice(product).paid}
+              compareAt={salePrice(product).compareAt}
+              locale={locale}
+              size='inline'
+              tone='inverse'
+            />
           </p>
           <a
             href={href}
@@ -133,7 +139,13 @@ export function FeaturedObject({
           showPrice
           locale={locale}
           className='mt-3'
-          product={{ name: product.name, catalogueNo: product.catalogueNo, price: paidPrice(product), placement }}
+          product={{
+            name: product.name,
+            catalogueNo: product.catalogueNo,
+            price: salePrice(product).paid,
+            compareAtPrice: salePrice(product).compareAt,
+            placement,
+          }}
         />
         <a href={href} className={buttonClass({ variant: "text", size: "md", className: "mt-6" })}>
           {t("home.view_piece")}

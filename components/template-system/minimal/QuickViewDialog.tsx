@@ -8,7 +8,8 @@ import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { cn } from "#root/lib/utils";
 import { showCartToast } from "#root/components/ui/cart-toast";
 import type { MinimalProduct } from "./MinimalProductCard";
-import { formatMoney } from "#root/shared/pricing/format-money";
+import { saleDisplay } from "#root/shared/pricing/sale-display";
+import { Price } from "#root/components/storefront/Price";
 
 interface QuickViewDialogProps {
   product: MinimalProduct | null;
@@ -38,18 +39,10 @@ export function QuickViewDialog({ product, open, onClose }: QuickViewDialogProps
     return [resolveImageUrl(product.imageUrl)];
   }, [product]);
 
-  const hasDiscount =
-    product &&
-    product.discountPrice !== undefined &&
-    product.discountPrice !== null &&
-    product.discountPrice !== "" &&
-    Number(product.discountPrice) < product.price;
-
-  const displayPrice = product
-    ? hasDiscount
-      ? Number(product.discountPrice)
-      : product.price
-    : 0;
+  // Paid price, struck regular price and percent off from the live fields.
+  const sale = product ? saleDisplay(product.price, product.discountPrice) : null;
+  const displayPrice = sale ? sale.paid : 0;
+  const compareAt = sale?.compareAt ?? null;
 
   const handleAddToCart = useCallback(() => {
     if (!product || !product.available) return;
@@ -61,6 +54,7 @@ export function QuickViewDialog({ product, open, onClose }: QuickViewDialogProps
         imageUrl: images[0] || "",
         stock: product.stock,
         categoryName: product.categoryName ?? undefined,
+        originalPrice: compareAt ?? undefined,
       },
       quantity,
       {},
@@ -77,10 +71,11 @@ export function QuickViewDialog({ product, open, onClose }: QuickViewDialogProps
     showCartToast({
       name: product.name,
       price: displayPrice,
+      originalPrice: compareAt,
       imageUrl: images[0] || "",
     });
     onClose();
-  }, [product, displayPrice, images, quantity, addItem, trackEvent, onClose]);
+  }, [product, displayPrice, compareAt, images, quantity, addItem, trackEvent, onClose]);
 
   if (!open || !product) return null;
 
@@ -176,10 +171,8 @@ export function QuickViewDialog({ product, open, onClose }: QuickViewDialogProps
 
             {/* Price */}
             <div className='flex items-center gap-2 mb-4'>
-              {/* One price, the price paid: no struck compare-at price, no sale colour. */}
-              <span className='text-base font-medium text-perce-ink'>
-                {formatMoney(displayPrice, { locale })}
-              </span>
+              {/* The price paid; on a real sale also the struck regular price and percent off. */}
+              <Price amount={displayPrice} compareAt={compareAt} locale={locale} size='pdp' />
             </div>
 
             {/* Availability */}

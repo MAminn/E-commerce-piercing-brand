@@ -73,30 +73,56 @@ const discounted = {
 };
 
 describe("price rule", () => {
-  it("Price renders one number — the price paid", () => {
+  it("Price without a compare-at price renders one number — the price paid", () => {
     const html = plain(renderToStaticMarkup(createElement(Price, { amount: 180 })));
     expect(html).toContain("EGP 180");
-    expect(html).not.toMatch(/<s[ >]|line-through/);
+    expect(html).not.toMatch(/<s[ >]|line-through|data-price-badge/);
   });
 
-  it("a discounted card shows only what you pay: no strikethrough, no Sale / New", () => {
+  it("Price on a real sale: paid price, struck regular price, whole-percent badge", () => {
+    const html = plain(renderToStaticMarkup(createElement(Price, { amount: 96, compareAt: 120 })));
+    expect(html).toMatch(/data-price-paid[^>]*>EGP 96</);
+    expect(html).toMatch(/<s[^>]*data-price-compare[^>]*>EGP 120<\/s>/);
+    expect(html).toMatch(/data-price-badge[^>]*>−20%</);
+    expect(html).toContain("Now EGP 96, was EGP 120, 20% off"); // screen readers
+  });
+
+  it("Price ignores a compare-at price that is not above the paid price", () => {
+    for (const compareAt of [96, 80, null, undefined]) {
+      const html = plain(renderToStaticMarkup(createElement(Price, { amount: 96, compareAt })));
+      expect(html).not.toMatch(/<s[ >]|data-price-badge/);
+    }
+  });
+
+  it("a discounted card shows the price paid, the struck regular price and the percent off — no Sale / New", () => {
     const html = plain(renderToStaticMarkup(createElement(MinimalProductCard, { product: discounted })));
-    expect(html).toContain("EGP 180");
-    expect(html).not.toContain("EGP 240");
-    expect(html).not.toMatch(/<s[ >]|line-through/);
+    expect(html).toMatch(/data-price-paid[^>]*>EGP 180</);
+    expect(html).toMatch(/<s[^>]*>EGP 240<\/s>/);
+    expect(html).toMatch(/data-price-badge[^>]*>−25%</);
     expect(html).not.toMatch(/>\s*(Sale|New)\s*</i);
   });
 
+  it("a card without a valid discount shows its regular price only", () => {
+    for (const discountPrice of [null, 240, 260]) {
+      const html = plain(renderToStaticMarkup(createElement(MinimalProductCard, { product: { ...discounted, discountPrice } })));
+      expect(html).toContain("EGP 240");
+      expect(html).not.toMatch(/<s[ >]|line-through|data-price-badge/);
+    }
+  });
+
   it("the PDP price and its related rail follow the same rule", () => {
-    const html = renderToStaticMarkup(
-      createElement(ProductPagePremium, {
-        product: { ...discounted, images: [{ url: "/uploads/stud.webp", isPrimary: true }] },
-        relatedProducts: [{ ...discounted, id: "22222222-2222-4222-8222-222222222222", name: "Related Hoop" }],
-      } as never),
+    const html = plain(
+      renderToStaticMarkup(
+        createElement(ProductPagePremium, {
+          product: { ...discounted, images: [{ url: "/uploads/stud.webp", isPrimary: true }] },
+          relatedProducts: [{ ...discounted, id: "22222222-2222-4222-8222-222222222222", name: "Related Hoop" }],
+        } as never),
+      ),
     );
     expect(html).toContain("Related Hoop");
-    expect(html).not.toContain("EGP 240");
-    expect(html).not.toMatch(/<s[ >]|line-through/);
+    expect(html).toMatch(/<s[^>]*>EGP 240<\/s>/);
+    expect(html).toMatch(/data-price-badge[^>]*>−25%</);
+    expect(html).not.toMatch(/line-through/); // the strike is the <s> element, not a sale colour/utility
   });
 });
 

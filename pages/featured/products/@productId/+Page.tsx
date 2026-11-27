@@ -11,6 +11,7 @@ import { useTracking } from "#root/frontend/contexts/TrackingContext";
 import { TrackingEventName } from "#root/shared/types/pixel-tracking";
 import { STORE_CURRENCY } from "#root/shared/config/branding";
 import { ProductJsonLd } from "#root/components/shop/ProductJsonLd";
+import { saleDisplay } from "#root/shared/pricing/sale-display";
 import type { ProductPageProduct } from "#root/components/template-system/productPage/ProductPageModernSplit";
 import {
   resolvePurchasableLinePrice,
@@ -329,18 +330,30 @@ export default function ProductDetailPage() {
         // selection here. A selection that does not resolve (a template that
         // lets a group stay unchosen) falls back to the base price and is
         // refused at checkout with a "choose an option" message.
-        const base = Number(product.discountPrice ?? product.price);
+        // Base = the price paid per the shared sale rule (a valid discount
+        // strictly below the price — what checkout charges); the regular
+        // price, with the same modifiers, is kept on the line so the bag and
+        // checkout can show it struck through.
+        const sale = saleDisplay(product.price, product.discountPrice);
+        const base = sale.paid;
         const resolved = resolveSelectedOptions(
           toPurchasableOptionGroups(product.variants ?? []),
           selectedOptions,
         );
         const linePrice = resolved.ok ? resolvePurchasableLinePrice(base, resolved.priceModifier) : base;
+        const lineOriginal =
+          sale.compareAt === null
+            ? undefined
+            : resolved.ok
+              ? resolvePurchasableLinePrice(sale.compareAt, resolved.priceModifier)
+              : sale.compareAt;
         const success = addItem(
           {
             id: product.id,
             slug: product.slug,
             name: product.name,
             price: linePrice,
+            originalPrice: lineOriginal,
             stock: product.stock,
             imageUrl: product.imageUrl,
             categoryName: product.categoryName ?? undefined,

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { trpc } from "#root/shared/trpc/client";
 import { useTemplate } from "#root/frontend/contexts/TemplateContext";
+import { useLayoutSettings } from "#root/frontend/contexts/LayoutSettingsContext";
 import { getTemplateComponent } from "#root/components/template-system/templateConfig";
 import { resolveTemplateId } from "#root/shared/config/storefront";
 import type { SearchResultProduct } from "#root/components/template-system";
@@ -25,6 +26,10 @@ export default function SearchPage() {
   const [sortBy, setSortBy] = useState("newest");
   const [isLoading, setIsLoading] = useState(false);
   const { getTemplateId } = useTemplate();
+  // The Minimal storefront renders its own results grid (the Percé product
+  // card, with sale pricing) — the same rule /shop applies to categories —
+  // instead of a legacy template that may still be stored in the settings.
+  const isMinimal = useLayoutSettings().header.navbarStyle === "minimal";
 
   const fetchResults = useCallback(
     async (query: string, page: number, sort: string) => {
@@ -104,7 +109,7 @@ export default function SearchPage() {
   const totalPages = Math.ceil(totalResults / PAGE_SIZE);
 
   // Get template component
-  const templateId = getTemplateId("searchResults");
+  const templateId = isMinimal ? "search-results-minimal" : getTemplateId("searchResults");
   const Template = getTemplateComponent(
     "searchResults",
     resolveTemplateId("searchResults", templateId),

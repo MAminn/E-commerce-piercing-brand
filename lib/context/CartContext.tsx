@@ -30,6 +30,12 @@ import {
 } from "#root/shared/bundles/cart-pricing";
 import { eligibilityFromProductIds } from "#root/shared/pricing/eligible-units";
 import { formatMoney } from "#root/shared/pricing/format-money";
+import { saleDisplay } from "#root/shared/pricing/sale-display";
+import {
+  resolvePurchasableLinePrice,
+  resolveSelectedOptions,
+  toPurchasableOptionGroups,
+} from "#root/shared/products/options";
 
 const CART_STORAGE_KEY = "cart";
 /** Separate key from the legacy "cart" array so pre-Phase-2 carts parse unchanged. */
@@ -92,6 +98,15 @@ interface CartContextType {
    * because the cart is empty — never render an empty-cart state off them.
    */
   isHydrated: boolean;
+  /**
+   * True while saved lines are being re-priced from the live catalogue. A
+   * bag kept in the browser holds the prices from when each piece was added;
+   * checkout always charges the live price, so the bag re-reads them (on
+   * load, and when the bag or checkout opens) and ordering waits for it.
+   */
+  pricesUpdating: boolean;
+  /** Re-read every line's live price and sale price (see `pricesUpdating`). */
+  refreshPrices: () => Promise<void>;
   addItem: (
     item: Product,
     quantity: number,
@@ -477,6 +492,96 @@ export function CartProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
   }, [items]);
 
+  // ── Live re-pricing of saved lines ──────────────────────────────────────
+  // Each line stores the unit price (and regular price) from the moment it
+  // was added. When a sale starts, ends or changes, the server charges the
+  // live price at checkout, so the bag re-reads it here and the figures the
+  // shopper sees match the order. A line whose product is gone, or whose
+  // options no longer resolve, is left as it is: checkout refuses it with
+  // its own message, exactly as before.
+  const [pricesUpdating, setPricesUpdating] = useState(false);
+  const repriceSeq = useRef(0);
+  const repriceInFlight = useRef<Promise<void> | null>(null);
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+
+  // Callers that ask while a re-price is running share it (the provider and
+  // the bag/checkout page both ask on a fresh page load).
+  const refreshPrices = useCallback((): Promise<void> => {
+    if (repriceInFlight.current) return repriceInFlight.current;
+    const run = repriceNow().finally(() => {
+      repriceInFlight.current = null;
+    });
+    repriceInFlight.current = run;
+    return run;
+  }, []);
+
+  async function repriceNow(): Promise<void> {
+    const lines = itemsRef.current;
+    const ids = [...new Set(lines.map((i) => i.id))].slice(0, 100);
+    if (ids.length === 0) return;
+    const seq = ++repriceSeq.current;
+    setPricesUpdating(true);
+    try {
+      const res = await trpc.product.getByIds.query({ ids });
+      if (!res.success || !Array.isArray(res.result)) return;
+      const live = new Map(res.result.map((r) => [r.id, r]));
+
+      // Lines with chosen options need the option modifiers (product page data).
+      const optionIds = [
+        ...new Set(lines.filter((i) => Object.keys(i.selectedOptions ?? {}).length > 0).map((i) => i.id)),
+      ];
+      const groupsById = new Map<string, ReturnType<typeof toPurchasableOptionGroups>>();
+      await Promise.all(
+        optionIds.map(async (productId) => {
+          try {
+            const r = await trpc.product.getById.query({ productId });
+            if (r.success && r.result) {
+              groupsById.set(productId, toPurchasableOptionGroups(r.result.variants ?? []));
+            }
+          } catch {
+            // leave this line as it is
+          }
+        }),
+      );
+      if (seq !== repriceSeq.current) return;
+
+      setItems((prev) => {
+        let changed = false;
+        const next = prev.map((item) => {
+          const row = live.get(item.id);
+          if (!row) return item;
+          const sale = saleDisplay(row.price as number | string, row.discountPrice as number | string | null);
+          let paid = sale.paid;
+          let original: number | null = sale.compareAt;
+          if (Object.keys(item.selectedOptions ?? {}).length > 0) {
+            const groups = groupsById.get(item.id);
+            if (!groups) return item;
+            const resolved = resolveSelectedOptions(groups, item.selectedOptions);
+            if (!resolved.ok) return item;
+            paid = resolvePurchasableLinePrice(paid, resolved.priceModifier);
+            original = original === null ? null : resolvePurchasableLinePrice(original, resolved.priceModifier);
+          }
+          const nextOriginal = original ?? undefined;
+          if (item.price === paid && (item.originalPrice ?? undefined) === nextOriginal) return item;
+          changed = true;
+          return { ...item, price: paid, originalPrice: nextOriginal };
+        });
+        return changed ? next : prev;
+      });
+    } catch {
+      // Offline or the request failed: keep the saved lines. Checkout still
+      // charges the live price server-side.
+    } finally {
+      if (seq === repriceSeq.current) setPricesUpdating(false);
+    }
+  }
+
+  // Once per page load, as soon as the saved bag has been read.
+  useEffect(() => {
+    if (bundlesHydrated) void refreshPrices();
+  }, [bundlesHydrated, refreshPrices]);
+
   // Re-check the applied promo code against the new cart. Editing the cart
   // can invalidate a code (dropping below its minimum, removing the only
   // eligible product, or leaving a set code's exact quantity — PICK6 with 5 or
@@ -843,6 +948,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         items,
         // Set in the same effect, after both the lines and the stacks are read.
         isHydrated: bundlesHydrated,
+        pricesUpdating,
+        refreshPrices,
         addItem,
         removeItem,
         updateQuantity,

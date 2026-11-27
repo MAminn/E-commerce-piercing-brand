@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useTemplate } from "#root/frontend/contexts/TemplateContext";
 import { useCart } from "#root/lib/context/CartContext";
 import { getTemplateComponent } from "#root/components/template-system/templateConfig";
@@ -20,6 +20,7 @@ export default function CartPage() {
   const {
     items,
     isHydrated,
+    refreshPrices,
     removeItem,
     updateQuantity,
     totalItems,
@@ -47,6 +48,11 @@ export default function CartPage() {
   // empty `items` here means "not read yet", so the template shows its
   // loading skeleton instead of a false "Your cart is empty".
   const isLoading = !isHydrated;
+  // Re-read the live prices of the saved lines whenever the bag opens, so a
+  // sale that started or ended since a piece was added shows correctly.
+  useEffect(() => {
+    if (isHydrated) void refreshPrices();
+  }, [isHydrated, refreshPrices]);
   const [isUpdating, setIsUpdating] = useState(false);
 
   // Create a stable key for each cart item (product ID + selected options)

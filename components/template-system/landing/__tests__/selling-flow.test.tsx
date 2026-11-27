@@ -175,7 +175,7 @@ describe("Homepage", () => {
     expect(tile).toContain("Nose");
   });
 
-  it("New in: whole rows of in-stock pieces, the photo then the name and one price", () => {
+  it("New in: whole rows of in-stock pieces, the photo then the name and the price (sale: struck price + percent)", () => {
     const html = plain(render());
     const block = html.slice(html.indexOf('data-home-section="home-new-in"'), html.indexOf('data-home-section="home-object"'));
     expect(block.match(/<article/g)).toHaveLength(4);
@@ -184,8 +184,12 @@ describe("Homepage", () => {
     expect(text).toContain("Clicker 10mm");
     expect(text).toContain("EGP 210");
     expect(text).not.toContain("014");
-    expect(block).not.toContain("EGP 240");
-    expect(block).not.toMatch(/<s[ >]|line-through/);
+    // The one discounted piece (240 → 210) shows its struck price and badge;
+    // the others show one regular price and no badge.
+    expect(block.match(/<s[ >]/g)).toHaveLength(1);
+    expect(block).toMatch(/<s[^>]*>EGP 240<\/s>/);
+    expect(block.match(/data-price-badge/g)).toHaveLength(1);
+    expect(block).toMatch(/data-price-badge[^>]*>−13%</);
   });
 
   it("New in runs to two full rows at most", () => {

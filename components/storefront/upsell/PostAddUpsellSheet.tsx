@@ -9,7 +9,7 @@ import {
 import { cn } from "#root/lib/utils";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { fillTemplate } from "#root/components/bundles/bundle-ui";
-import { formatMoney } from "#root/shared/pricing/format-money";
+import { Price } from "#root/components/storefront/Price";
 import { buttonClass } from "#root/components/storefront/Button";
 import { UpsellList } from "./UpsellList";
 import type { PostAddMainItem, UpsellProduct } from "./types";
@@ -91,9 +91,9 @@ export function PostAddUpsellSheet({
                   {options.map(([k, v]) => `${k}: ${v}`).join(" · ")}
                 </p>
               )}
-              <p className='mt-0.5 t-label tabular-nums text-ink'>
-                {main.quantity > 1 ? `${main.quantity} × ` : ""}
-                {formatMoney(main.price, { locale: moneyLocale })}
+              <p className='mt-0.5 flex flex-wrap items-baseline gap-x-1 t-label tabular-nums text-ink'>
+                {main.quantity > 1 && <span>{main.quantity} ×</span>}
+                <Price amount={main.price} compareAt={main.originalPrice} locale={moneyLocale} size='line' />
               </p>
             </div>
           </div>

@@ -72,7 +72,7 @@ describe("IndexLine", () => {
 });
 
 describe("FeaturedObject", () => {
-  it("one large object: name, full index line with the price paid, View piece", () => {
+  it("one large object: name, full index line with the sale price (paid, struck regular, percent off), View piece", () => {
     const html = renderToStaticMarkup(
       createElement(FeaturedObject, {
         product: {
@@ -87,9 +87,11 @@ describe("FeaturedObject", () => {
         },
       }),
     );
-    expect(text(html)).toBe("Crescent hoop007 · 8 mm · Ear · EGP 210View piece");
+    // Visible: paid price, struck regular price, badge. Spoken: one sentence.
+    expect(text(html)).toBe("Crescent hoop007 · 8 mm · Ear · Now EGP 210, was EGP 240, 13% offEGP 210EGP 240−13%View piece");
     expect(html).toContain('href="/shop/crescent-hoop-8mm"');
-    expect(html).not.toMatch(/EGP 240|<s[ >]|line-through/);
+    expect(html).toMatch(/<s[^>]*data-price-compare[^>]*>EGP.240<\/s>/);
+    expect(html).toMatch(/data-price-badge[^>]*>−13%</);
   });
 });
 

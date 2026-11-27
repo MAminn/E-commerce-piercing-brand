@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { cn } from "#root/lib/utils";
-import { formatMoney, type MoneyLocale } from "#root/shared/pricing/format-money";
+import type { MoneyLocale } from "#root/shared/pricing/format-money";
+import { compareAtDisplay } from "#root/shared/pricing/sale-display";
+import { Price } from "./Price";
 import { formatCatalogueNo, splitMeasures } from "#root/shared/products/index-line";
 
 /**
@@ -39,8 +41,10 @@ function Parts({ parts }: { parts: Part[] }) {
 export interface IndexLineProduct {
   name: string;
   catalogueNo?: number | null;
-  /** The price paid (already resolved; never a compare-at price). */
+  /** The price paid (already resolved). */
   price?: number | null;
+  /** The regular price, struck through beside `price` when it is a real sale. */
+  compareAtPrice?: number | null;
   /** Extra verified attributes, e.g. material. Rendered as given. */
   attributes?: (string | null | undefined)[];
   /** Placement names, e.g. ["Ear", "Daith"]. */
@@ -107,9 +111,17 @@ export function IndexLine(props: IndexLineProps) {
 
   const { product, locale = "en" } = props;
   const { no, title, measures } = indexFields(product);
-  const price = typeof product.price === "number" && Number.isFinite(product.price)
-    ? formatMoney(product.price, { locale })
-    : null;
+  // The price part: the paid price, plus the struck regular price and the
+  // percent off when the product is on a real sale.
+  const price =
+    typeof product.price === "number" && Number.isFinite(product.price) ? (
+      <Price
+        amount={product.price}
+        compareAt={compareAtDisplay(product.price, product.compareAtPrice).compareAt}
+        locale={locale}
+        size='inline'
+      />
+    ) : null;
   const attributes = clean(product.attributes);
   const placement = clean(product.placement);
 

@@ -9,7 +9,8 @@ import { getProductUrl } from "#root/lib/utils/route-helpers";
 import { cn } from "#root/lib/utils";
 import { showCartToast, flyToCart } from "#root/components/ui/cart-toast";
 import { needsNoPiercing } from "#root/shared/products/no-piercing";
-import { formatMoney } from "#root/shared/pricing/format-money";
+import { saleDisplay } from "#root/shared/pricing/sale-display";
+import { Price } from "#root/components/storefront/Price";
 
 interface ProductImage {
   url: string;
@@ -100,13 +101,11 @@ export function MinimalProductCard({ product, className }: MinimalProductCardPro
     return other ? resolveImageUrl(other.url) : null;
   }, [product.images, displayImageUrl]);
 
-  const hasDiscount =
-    product.discountPrice !== undefined &&
-    product.discountPrice !== null &&
-    product.discountPrice !== "" &&
-    Number(product.discountPrice) < product.price;
-
-  const displayPrice = hasDiscount ? Number(product.discountPrice) : product.price;
+  // Sale display from the live price fields: paid price, struck regular
+  // price and percent off only when the discount is valid (see sale-display).
+  const sale = saleDisplay(product.price, product.discountPrice);
+  const hasDiscount = sale.compareAt !== null;
+  const displayPrice = sale.paid;
 
   const handleAddToCart = useCallback(
     (e: React.MouseEvent) => {
@@ -141,6 +140,7 @@ export function MinimalProductCard({ product, className }: MinimalProductCardPro
         showCartToast({
           name: product.name,
           price: displayPrice,
+          originalPrice: sale.compareAt,
           imageUrl: displayImageUrl,
         });
       } catch {
@@ -149,12 +149,12 @@ export function MinimalProductCard({ product, className }: MinimalProductCardPro
         setIsAdding(false);
       }
     },
-    [product, displayPrice, displayImageUrl, addItem, trackEvent, hasDiscount],
+    [product, displayPrice, displayImageUrl, addItem, trackEvent, hasDiscount, sale.compareAt],
   );
 
   // One short line of product fact, from real data only: an explicit tag,
-  // else "No piercing needed" when the product's category says so. No New /
-  // Sale badges and no struck-through price — the card shows what you pay.
+  // else "No piercing needed" when the product's category says so. A sale
+  // shows in the price line itself (paid price, struck price, percent off).
   const factText = product.tag || (needsNoPiercing(product) ? t("product.no_piercing_needed") : null);
 
   const wishlisted = isWishlisted(product.id);
@@ -256,7 +256,7 @@ export function MinimalProductCard({ product, className }: MinimalProductCardPro
           </a>
         </h3>
         <p className='mt-1 t-card-price text-ink' style={{ fontFamily: "var(--font-price)" }}>
-          {formatMoney(displayPrice, { locale })}
+          <Price amount={displayPrice} compareAt={sale.compareAt} locale={locale} size='card' />
         </p>
         {soldOut && <p className="mt-1 t-micro text-ink-2">{t("sold_out")}</p>}
         {!soldOut && factText && <p className='mt-1 t-micro text-ink-2'>{factText}</p>}

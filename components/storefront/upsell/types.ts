@@ -32,6 +32,8 @@ export interface PostAddMainItem {
   name: string;
   /** Unit price actually charged (option modifiers included). */
   price: number;
+  /** Regular unit price (same modifiers), struck through when above `price`. */
+  originalPrice?: number | null;
   quantity: number;
   imageUrl?: string | null;
   selectedOptions?: Record<string, string>;

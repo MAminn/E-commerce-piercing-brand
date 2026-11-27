@@ -6,7 +6,8 @@ import { trackAddToCartEvent } from "#root/frontend/tracking/add-to-cart-event";
 import { showCartToast } from "#root/components/ui/cart-toast";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
 import { fillTemplate } from "#root/components/bundles/bundle-ui";
-import { formatMoney } from "#root/shared/pricing/format-money";
+import { saleDisplay } from "#root/shared/pricing/sale-display";
+import { Price } from "#root/components/storefront/Price";
 import { buttonClass } from "#root/components/storefront/Button";
 import { getProductUrl } from "#root/lib/utils/route-helpers";
 import type { UpsellProduct } from "./types";
@@ -47,16 +48,16 @@ function imageOf(p: UpsellProduct): string | undefined {
   return raw.startsWith("http") || raw.startsWith("/") ? raw : `/uploads/${raw}`;
 }
 
-/** What the shopper pays per unit: the discount price when it is lower. */
+/**
+ * What the shopper pays per unit, and the regular price when it is a real
+ * sale — the shared sale-display rule (a valid discount strictly below price).
+ */
 export function upsellUnitPrice(p: Pick<UpsellProduct, "price" | "discountPrice">): {
   price: number;
   originalPrice?: number;
 } {
-  const price = toNumber(p.price) ?? 0;
-  const discount = toNumber(p.discountPrice);
-  return discount != null && discount < price
-    ? { price: discount, originalPrice: price }
-    : { price };
+  const sale = saleDisplay(toNumber(p.price) ?? 0, toNumber(p.discountPrice));
+  return sale.compareAt !== null ? { price: sale.paid, originalPrice: sale.compareAt } : { price: sale.paid };
 }
 
 export function UpsellAddButton({
@@ -155,7 +156,7 @@ export function UpsellAddButton({
       categoryName: product.categoryName,
     });
     if (toast) {
-      showCartToast({ name: product.name, price, imageUrl: imageUrl ?? "" });
+      showCartToast({ name: product.name, price, originalPrice, imageUrl: imageUrl ?? "" });
     }
   };
 
@@ -197,7 +198,7 @@ export function UpsellList({
     <ul className={`border-t border-line ${className}`}>
       {products.map((p) => {
         const src = imageOf(p);
-        const { price } = upsellUnitPrice(p);
+        const { price, originalPrice } = upsellUnitPrice(p);
         return (
           <li
             key={p.id}
@@ -216,7 +217,7 @@ export function UpsellList({
                 {p.name}
               </a>
               <p className='mt-1 t-card-price text-ink'>
-                {formatMoney(price, { locale: moneyLocale })}
+                <Price amount={price} compareAt={originalPrice} locale={moneyLocale} size='card' />
               </p>
             </div>
             <UpsellAddButton product={p} toast={toast} onNavigate={onNavigate} />
