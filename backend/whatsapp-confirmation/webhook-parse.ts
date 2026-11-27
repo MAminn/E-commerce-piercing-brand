@@ -127,9 +127,40 @@ export function parseWebhookBody(body: unknown, fallbackKey: string): ParsedEven
   return out;
 }
 
+/**
+ * The whole message, after normalisation, must be one of these. Matching the
+ * WHOLE message (never a word inside a sentence) keeps "stop sending the
+ * wrong size" a question for staff, not an opt-out. Arabic forms are stored
+ * normalised (hamza-free alef), see normaliseOptOutText.
+ */
+const OPT_OUT_PHRASES = new Set([
+  "stop",
+  "unsubscribe",
+  // إيقاف — the word shown at checkout — and its common spellings.
+  "ايقاف",
+  "ايقاف الرسائل",
+  "توقف",
+  "الغاء الاشتراك",
+]);
+
+/**
+ * Case, surrounding whitespace / punctuation / quotation marks / emoji,
+ * invisible direction marks, tatweel, diacritics and alef-hamza variants do
+ * not matter: «إيقاف», "STOP.", ' Stop! ' and ايـقاف all count.
+ */
+export function normaliseOptOutText(text: string): string {
+  return text
+    .normalize("NFKC")
+    .replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g, "")
+    .replace(/[\u0640\u064B-\u065F\u0670]/g, "")
+    .replace(/[\u0622\u0623\u0625\u0671]/g, "\u0627")
+    .toLowerCase()
+    .replace(/^[\s\p{P}\p{S}]+|[\s\p{P}\p{S}]+$/gu, "")
+    .replace(/\s+/g, " ");
+}
+
 /** Inbound text that means "stop messaging me" (Arabic / English). */
 export function isOptOutText(text: string | null): boolean {
   if (!text) return false;
-  const t = text.trim().toLowerCase();
-  return ["stop", "unsubscribe", "الغاء الاشتراك", "إلغاء الاشتراك", "ايقاف", "إيقاف", "توقف"].includes(t);
+  return OPT_OUT_PHRASES.has(normaliseOptOutText(text));
 }
