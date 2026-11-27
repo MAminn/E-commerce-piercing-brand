@@ -197,10 +197,20 @@ describe("webhook parse", () => {
     expect(parseWebhookBody({ entry: [{ changes: [{ field: "messages", value: { messages: [{ type: "text" }] } }] }] }, "k")).toEqual([]);
   });
 
-  it("opt-out words", () => {
-    expect(isOptOutText(" STOP ")).toBe(true);
-    expect(isOptOutText("إيقاف")).toBe(true);
-    expect(isOptOutText("stop sending me the wrong size")).toBe(false);
+  it("opt-out words: English and Arabic, any case, with surrounding spaces, punctuation, quotation marks and emoji", () => {
+    const yes = [
+      "STOP", "stop", "Stop", " STOP ", "\tstop\n", "STOP.", "stop!", "STOP!!!", "Stop?", '"STOP"', "'stop'", "“STOP”", "(stop)", "STOP 🙏", "🛑 stop",
+      "unsubscribe", "UNSUBSCRIBE.",
+      // إيقاف is the word the checkout text tells shoppers to send.
+      "إيقاف", "«إيقاف»", " إيقاف ", "إيقاف.", "إيقاف!", '"إيقاف"', "ايقاف", "إيـقاف", "إِيقاف", "\u200fإيقاف\u200f", "إيقاف الرسائل",
+      "توقف", "توقف.", "إلغاء الاشتراك", "الغاء الاشتراك", "إلغاء  الاشتراك",
+    ];
+    for (const t of yes) expect(isOptOutText(t), JSON.stringify(t)).toBe(true);
+    const no = [
+      null, "", "   ", "...", "stop sending me the wrong size", "please don't stop my order", "stopp", "stops", "non-stop", "st op",
+      "cancel", "الغاء", "إلغاء الطلب", "تأكيد", "confirm", "لا تتوقف", "ايقاف الطلب", "STOP2",
+    ];
+    for (const t of no) expect(isOptOutText(t as string | null), JSON.stringify(t)).toBe(false);
   });
 });
 

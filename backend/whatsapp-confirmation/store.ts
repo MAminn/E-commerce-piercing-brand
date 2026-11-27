@@ -18,6 +18,7 @@ import { buildTemplateMessage, newConfirmationToken, parseButtonPayload } from "
 import { decideResponse } from "./decide";
 import { isOptOutText, type ParsedEvent } from "./webhook-parse";
 import { CONSENT_SOURCE_CHECKOUT, CONSENT_SOURCE_SHADOW_NOT_ASKED, hasCheckoutConsent, maySendTo } from "./eligibility";
+import { isOptedOut, recordOptOut } from "./opt-out";
 import { CONSENT_TEXT_VERSION, WA_AWAITING_STATES, WA_STATUS_NOTE_PREFIX, type WaReviewType, type WaState } from "./types";
 
 /**
@@ -409,13 +410,24 @@ async function applyMessageEvent(db: DatabaseClient, ev: Extract<ParsedEvent, { 
     [conf] = await db.select().from(waOrderConfirmation).where(eq(waOrderConfirmation.phoneE164, ev.from)).orderBy(desc(waOrderConfirmation.createdAt)).limit(1);
   }
 
-  if (ev.from && isOptOutText(ev.text)) {
-    await db.insert(waOptOut).values({ phoneE164: ev.from, source: "inbound_text" }).onConflictDoNothing();
+  const optOut = ev.from !== null && ev.from !== undefined && isOptOutText(ev.text);
+  if (optOut) {
+    // Recorded and everything queued for the number cancelled, in one step
+    // under the recipient lock (opt-out.ts): nothing is sent after this.
+    const r = await recordOptOut(db, ev.from as string, "inbound_text");
+    for (const orderId of r.orderIds) {
+      if (orderId === conf?.orderId) continue;
+      await openReviewItem(db, { orderId, type: "ineligible", detail: "Customer opted out of WhatsApp (STOP) — confirm manually", customerText: ev.text });
+    }
   }
   await openReviewItem(db, {
     orderId: conf?.orderId ?? null,
     type: conf ? "free_text" : "unmatched",
-    detail: conf ? `Customer wrote (${ev.messageType}) instead of using the buttons` : `Message (${ev.messageType}) from a number with no confirmation on file`,
+    detail: optOut
+      ? "Customer opted out of WhatsApp (STOP) — no further WhatsApp messages will be sent; confirm manually"
+      : conf
+        ? `Customer wrote (${ev.messageType}) instead of using the buttons`
+        : `Message (${ev.messageType}) from a number with no confirmation on file`,
     customerText: ev.text,
   });
   await markEvent(db, ev.eventKey, conf ? "message:review" : "message:unmatched", conf?.orderId ?? null);
@@ -509,6 +521,8 @@ export async function runScheduler(db: DatabaseClient, ctx: InboundContext): Pro
     .limit(50);
   for (const c of due) {
     if (!maySendTo(mode, ctx.config, c.phoneE164)) continue;
+    // Never a reminder to a number that sent STOP (the worker checks again).
+    if (await isOptedOut(db, c.phoneE164)) continue;
     const [o] = await db.select({ customerName: order.customerName, total: order.total }).from(order).where(eq(order.id, c.orderId));
     if (!o) continue;
     const outboxId = randomUUID();

@@ -763,4 +763,180 @@ describeIfDb("WhatsApp order confirmation (integration)", () => {
     expect((await store.runScheduler(db, { mode: "shadow", config: config(), now })).backfilled).toBe(1);
     expect(await conf(lostShadow.id)).toMatchObject({ state: "shadow" });
   });
+
+  // ─── STOP / opt-out: nothing is ever sent after a STOP (hotfix) ────────────
+
+  /** A customer's free-text WhatsApp message, through the real inbound path. */
+  const say = async (fromE164: string, text: string, mode: "shadow" | "pilot" | "live" = "pilot") => {
+    const wamid = `wamid.TXT${wamidSeq++}`;
+    const fresh = await store.recordInboundEvents(db, [
+      { kind: "message", eventKey: wamid, wamid, phoneNumberId: ENV.WHATSAPP_PHONE_NUMBER_ID, from: fromE164, userId: null, contextId: null, messageType: "text", text, raw: {} },
+    ]);
+    const out: string[] = [];
+    for (const ev of fresh) out.push(await store.processInboundEvent(db, ev, { mode, config: config() }));
+    return out;
+  };
+  const optedOut = async (phone: string) => (await db.select().from(schema.waOptOut).where(eq(schema.waOptOut.phoneE164, phone))).length === 1;
+  const outboxOf = async (orderId: string) => db.select().from(schema.waOutbox).where(eq(schema.waOutbox.orderId, orderId));
+  const ALLOWED_E164 = "201009990001";
+
+  it("STOP after the confirmation: the 24 h reminder is never queued and never sent (zero Meta calls)", async () => {
+    const o = await createOrder();
+    expect((await enqueue(o.id)).outcome).toBe("queued");
+    const t0 = new Date();
+    const first = okFetch();
+    await tick(first, "pilot", t0);
+    expect(first).toHaveBeenCalledTimes(1);
+    expect((await conf(o.id))?.state).toBe("sent");
+
+    expect(await say(ALLOWED_E164, "STOP")).toEqual(["message:review"]);
+    expect(await optedOut(ALLOWED_E164)).toBe(true);
+    // Staff are told to confirm by hand.
+    expect((await reviews(o.id)).map((r) => [r.type, r.detail])).toEqual([["free_text", expect.stringMatching(/opted out.*confirm manually/i)]]);
+
+    // 25 h later: no reminder row at all, and no call to Meta.
+    const later = new Date(t0.getTime() + 25 * HOUR);
+    const r = await store.runScheduler(db, { mode: "pilot", config: config(), now: later });
+    expect(r.reminders).toBe(0);
+    expect((await outboxOf(o.id)).map((b) => b.kind)).toEqual(["confirm"]);
+    const after = okFetch();
+    await tick(after, "pilot", later);
+    expect(after).not.toHaveBeenCalled();
+    // A button press after STOP is still honoured (it is the customer's own answer).
+    expect(await press(o.id, "confirm")).toEqual(["button:confirm:applied"]);
+  });
+
+  it("STOP while a reminder is already queued: the reminder is cancelled and never sent", async () => {
+    const o = await createOrder();
+    await enqueue(o.id);
+    const t0 = new Date();
+    await tick(okFetch(), "pilot", t0);
+    const later = new Date(t0.getTime() + 25 * HOUR);
+    expect((await store.runScheduler(db, { mode: "pilot", config: config(), now: later })).reminders).toBe(1);
+    expect((await outboxOf(o.id)).find((b) => b.kind === "reminder")?.status).toBe("pending");
+
+    await say(ALLOWED_E164, "«إيقاف»");
+    expect((await outboxOf(o.id)).find((b) => b.kind === "reminder")).toMatchObject({ status: "cancelled", lastError: "recipient opted out (STOP)" });
+    const f = okFetch();
+    await tick(f, "pilot", later);
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("STOP before the confirmation went out: it is cancelled, the order goes to staff, zero Meta calls", async () => {
+    const o = await createOrder();
+    expect((await enqueue(o.id)).outcome).toBe("queued");
+    await say(ALLOWED_E164, "  Stop!  ");
+    expect(await conf(o.id)).toMatchObject({ state: "ineligible", ineligibleReason: "opted_out" });
+    expect(await outboxOf(o.id)).toMatchObject([{ kind: "confirm", status: "cancelled" }]);
+    const f = okFetch();
+    await tick(f, "pilot");
+    expect(f).not.toHaveBeenCalled();
+    // A later order from the same number is never queued either.
+    const next = await createOrder();
+    expect(await enqueue(next.id)).toEqual({ outcome: "ineligible", reason: "opted_out" });
+    expect((await reviews(next.id)).map((r) => r.type)).toEqual(["ineligible"]);
+  });
+
+  it("the worker checks opt-out before EVERY send, even for a row nothing cancelled (confirmation and reminder)", async () => {
+    // Opt-out written directly (as if by another path), leaving the rows pending.
+    const a = await createOrder();
+    await enqueue(a.id);
+    await db.insert(schema.waOptOut).values({ phoneE164: ALLOWED_E164, source: "test_direct" });
+    const f = okFetch();
+    const rep = await tick(f, "pilot");
+    expect(f).not.toHaveBeenCalled();
+    expect(rep.optedOut).toBe(1);
+    expect(await outboxOf(a.id)).toMatchObject([{ status: "cancelled", lastError: "recipient opted out (STOP)" }]);
+    expect(await conf(a.id)).toMatchObject({ state: "ineligible", ineligibleReason: "opted_out" });
+    expect((await reviews(a.id)).map((r) => r.type)).toEqual(["ineligible"]);
+
+    // A reminder row inserted by hand for a sent confirmation: still not sent.
+    await db.delete(schema.waOptOut);
+    const b = await createOrder();
+    await enqueue(b.id);
+    const t0 = new Date();
+    await tick(okFetch(), "pilot", t0);
+    const later = new Date(t0.getTime() + 25 * HOUR);
+    await store.runScheduler(db, { mode: "pilot", config: config(), now: later });
+    await db.insert(schema.waOptOut).values({ phoneE164: ALLOWED_E164, source: "test_direct" });
+    const g = okFetch();
+    await tick(g, "pilot", later);
+    expect(g).not.toHaveBeenCalled();
+    expect((await outboxOf(b.id)).find((x) => x.kind === "reminder")?.status).toBe("cancelled");
+  });
+
+  it("a STOP that arrives while a message is being sent waits for it; nothing is sent after the STOP is recorded", async () => {
+    const o = await createOrder();
+    await enqueue(o.id);
+    let stopDone = false;
+    let stopPromise: Promise<unknown> | null = null;
+    let optOutsAtCall = -1;
+    const slowFetch = vi.fn(async () => {
+      const [{ n }] = ((await db.execute(sql`SELECT count(*)::int AS n FROM wa_opt_out WHERE phone_e164 = ${ALLOWED_E164}`)) as unknown as { rows: Array<{ n: number }> }).rows as [{ n: number }];
+      optOutsAtCall = n;
+      // STOP arrives mid-send: it must wait for this send's lock.
+      stopPromise = say(ALLOWED_E164, "STOP").then((r) => {
+        stopDone = true;
+        return r;
+      });
+      await new Promise((r) => setTimeout(r, 400));
+      expect(stopDone).toBe(false);
+      return { status: 200, text: async () => JSON.stringify({ messages: [{ id: `wamid.SLOW${wamidSeq++}` }] }) };
+    });
+    const t0 = new Date();
+    await tick(slowFetch, "pilot", t0);
+    await stopPromise;
+    expect(stopDone).toBe(true);
+    expect(optOutsAtCall).toBe(0);
+    expect(slowFetch).toHaveBeenCalledTimes(1);
+    expect(await optedOut(ALLOWED_E164)).toBe(true);
+    // ...and from then on, nothing: no reminder, no call.
+    const later = new Date(t0.getTime() + 25 * HOUR);
+    await store.runScheduler(db, { mode: "pilot", config: config(), now: later });
+    const f = okFetch();
+    await tick(f, "pilot", later);
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("STOP and sends racing on many orders: Meta is never called once the opt-out exists", async () => {
+    const orders = [] as Array<{ id: string }>;
+    for (let i = 0; i < 6; i++) {
+      const o = await createOrder();
+      await enqueue(o.id);
+      orders.push(o);
+    }
+    const seenOptOuts: number[] = [];
+    const watchingFetch = vi.fn(async () => {
+      const res = (await db.execute(sql`SELECT count(*)::int AS n FROM wa_opt_out WHERE phone_e164 = ${ALLOWED_E164}`)) as unknown as { rows: Array<{ n: number }> };
+      seenOptOuts.push(res.rows[0]?.n ?? -1);
+      return { status: 200, text: async () => JSON.stringify({ messages: [{ id: `wamid.RACE${wamidSeq++}` }] }) };
+    });
+    await Promise.all([tick(watchingFetch, "pilot"), say(ALLOWED_E164, "STOP"), tick(watchingFetch, "pilot")]);
+    // Every call that happened saw no opt-out; every order not sent is cancelled.
+    expect(seenOptOuts.every((n) => n === 0)).toBe(true);
+    for (const o of orders) {
+      const box = await outboxOf(o.id);
+      expect(["sent", "cancelled"], o.id).toContain(box[0]?.status);
+    }
+    const f = okFetch();
+    await tick(f, "pilot", new Date(Date.now() + 26 * HOUR));
+    await store.runScheduler(db, { mode: "pilot", config: config(), now: new Date(Date.now() + 26 * HOUR) });
+    await tick(f, "pilot", new Date(Date.now() + 26 * HOUR));
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("a sentence that merely contains 'stop' is not an opt-out: it goes to staff and messages continue", async () => {
+    const o = await createOrder();
+    await enqueue(o.id);
+    const t0 = new Date();
+    await tick(okFetch(), "pilot", t0);
+    await say(ALLOWED_E164, "please stop sending the wrong size");
+    expect(await optedOut(ALLOWED_E164)).toBe(false);
+    expect((await reviews(o.id)).map((r) => r.detail)).toEqual([expect.stringMatching(/instead of using the buttons/)]);
+    const later = new Date(t0.getTime() + 25 * HOUR);
+    expect((await store.runScheduler(db, { mode: "pilot", config: config(), now: later })).reminders).toBe(1);
+    const f = okFetch();
+    await tick(f, "pilot", later);
+    expect(f).toHaveBeenCalledTimes(1);
+  });
 });
