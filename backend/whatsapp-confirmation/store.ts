@@ -19,6 +19,7 @@ import { decideResponse } from "./decide";
 import { isOptOutText, type ParsedEvent } from "./webhook-parse";
 import { CONSENT_SOURCE_CHECKOUT, CONSENT_SOURCE_SHADOW_NOT_ASKED, hasCheckoutConsent, maySendTo } from "./eligibility";
 import { isOptedOut, recordOptOut } from "./opt-out";
+import { purgeExpiredConsentEvidence } from "./consent";
 import { CONSENT_TEXT_VERSION, WA_AWAITING_STATES, WA_STATUS_NOTE_PREFIX, type WaReviewType, type WaState } from "./types";
 
 /**
@@ -454,6 +455,8 @@ export interface ScheduleReport {
   followUps: number;
   /** Consented orders whose confirmation row was missing, now enqueued. */
   backfilled: number;
+  /** Consent evidence rows deleted (only with WHATSAPP_CONSENT_RETENTION_DAYS set). */
+  consentPurged: number;
 }
 
 /** Evidence older than this with no confirmation row is backfilled... */
@@ -463,7 +466,7 @@ const BACKFILL_MAX_AGE_MS = 24 * 3_600_000;
 
 export async function runScheduler(db: DatabaseClient, ctx: InboundContext): Promise<ScheduleReport> {
   const now = ctx.now ?? new Date();
-  const report: ScheduleReport = { superseded: 0, reminders: 0, followUps: 0, backfilled: 0 };
+  const report: ScheduleReport = { superseded: 0, reminders: 0, followUps: 0, backfilled: 0, consentPurged: 0 };
   const mode = await runtimeMode(db, ctx.mode);
 
   // 0. Every consented order gets its confirmation: an order whose
@@ -571,6 +574,13 @@ export async function runScheduler(db: DatabaseClient, ctx: InboundContext): Pro
     await db.update(waOrderConfirmation).set({ state: "follow_up", followUpAt: now, updatedAt: now }).where(eq(waOrderConfirmation.id, c.id));
     await openReviewItem(db, { orderId: c.orderId, type: "no_reply_48h", detail: "No reply on WhatsApp — follow up manually" });
     report.followUps++;
+  }
+
+  // 4. Consent evidence past its retention period. Only when
+  //    WHATSAPP_CONSENT_RETENTION_DAYS is set (unset by default): nothing is
+  //    deleted until an approved period is configured.
+  if (ctx.config.consentRetentionDays !== null) {
+    report.consentPurged = (await purgeExpiredConsentEvidence(db, { retentionDays: ctx.config.consentRetentionDays, now })).deleted;
   }
   return report;
 }

@@ -42,6 +42,14 @@ export async function initWhatsAppConfirm(db: DatabaseClient): Promise<WhatsAppC
     console.info(
       `[WhatsApp confirm] requested=${status.requestedMode} effective=${status.effectiveMode}${problems.length ? ` (${problems.join("; ")})` : ""}`,
     );
+    console.info(
+      `[WhatsApp confirm] checkout consent=${config.checkoutConsent} requestDetails=${config.consentRequestDetails} retention=${config.consentRetentionDays === null ? "keep (no purge)" : `${config.consentRetentionDays}d`}`,
+    );
+    if (config.consentRetentionRejected !== null) {
+      console.warn(
+        `[WhatsApp confirm] WHATSAPP_CONSENT_RETENTION_DAYS="${config.consentRetentionRejected.slice(0, 20)}" ignored (needs a whole number ≥ 30); consent evidence is kept`,
+      );
+    }
   }
   return status;
 }

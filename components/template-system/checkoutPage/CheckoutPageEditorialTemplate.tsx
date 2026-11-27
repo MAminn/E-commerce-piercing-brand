@@ -57,6 +57,8 @@ export interface CheckoutPageEditorialTemplateProps {
   governorateRequired?: boolean;
   /** Show the WhatsApp opt-in under the phone field (decided server-side per mode and number). */
   showWhatsAppOptIn?: boolean;
+  /** The shown box must be ticked to order (WHATSAPP_CHECKOUT_CONSENT_REQUIRED=true); otherwise it is optional. */
+  whatsAppConsentRequired?: boolean;
   /** Called with the phone field's value (initial and on every change), so the page can re-ask whether the opt-in applies. */
   onPhoneChange?: (phone: string) => void;
 }
@@ -95,6 +97,7 @@ export function CheckoutPageEditorialTemplate({
   onGovernorateChange,
   governorateRequired = false,
   showWhatsAppOptIn = false,
+  whatsAppConsentRequired = false,
   onPhoneChange,
 }: CheckoutPageEditorialTemplateProps) {
   const { t, locale } = useMinimalI18n();
@@ -127,7 +130,8 @@ export function CheckoutPageEditorialTemplate({
   // WhatsApp acknowledgment: report the phone so the page can ask whether
   // the box applies to this number. It is shown for cash on delivery only
   // (no WhatsApp confirmation is sent for a paid order) and, when shown, it
-  // must be ticked to order. A tick is dropped the moment the box is hidden:
+  // must be ticked to order only if the server says it is required
+  // (WHATSAPP_CHECKOUT_CONSENT_REQUIRED); otherwise it is optional. A tick is dropped the moment the box is hidden:
   // consent is only ever a visible, explicit tick, never pre-ticked.
   const whatsAppConsentShown = showWhatsAppOptIn && formValues.paymentMethod === "cod";
   useEffect(() => {
@@ -150,7 +154,7 @@ export function CheckoutPageEditorialTemplate({
       return;
     }
     setGovernorateError(null);
-    if (whatsAppConsentShown && formValues.whatsappOptIn !== "true") {
+    if (whatsAppConsentShown && whatsAppConsentRequired && formValues.whatsappOptIn !== "true") {
       setWhatsAppConsentError(t("checkout.whatsapp_consent_required"));
       document.getElementById("checkout-whatsapp-opt-in")?.focus();
       return;
@@ -453,7 +457,7 @@ export function CheckoutPageEditorialTemplate({
                               name='whatsappOptIn'
                               type='checkbox'
                               className='mt-0.5 h-4 w-4 shrink-0 accent-current'
-                              aria-required='true'
+                              aria-required={whatsAppConsentRequired ? "true" : undefined}
                               aria-invalid={!!whatsAppConsentError || undefined}
                               aria-describedby='checkout-whatsapp-opt-in-error'
                               checked={formValues.whatsappOptIn === "true"}

@@ -71,7 +71,13 @@ const ALLOWED = "01009990001";
 const OTHER = "01009990002";
 const COD_ONLY = { methods: [{ id: "cod", label: "Cash on Delivery", description: "" }] };
 /** What a pilot server answers: only the allow-listed number gets the box. */
-const pilotServer = (input?: { phone?: string }) => Promise.resolve({ enabled: (input?.phone ?? "").replace(/\D/g, "").endsWith("1009990001") });
+const pilotServer = (input?: { phone?: string }) => {
+  const enabled = (input?.phone ?? "").replace(/\D/g, "").endsWith("1009990001");
+  return Promise.resolve({ enabled, required: enabled });
+};
+/** What the server answers in live with WHATSAPP_CHECKOUT_CONSENT_REQUIRED=true / unset. */
+const LIVE_REQUIRED = { enabled: true, required: true };
+const LIVE_OPTIONAL = { enabled: true, required: false };
 
 type Sent = { whatsappOptIn?: boolean; whatsappConsentVersion?: string; whatsappConsentLocale?: string; customerPhone?: string; paymentMethod?: string };
 
@@ -165,7 +171,7 @@ describe("checkout — required WhatsApp acknowledgment (checkout-modern)", () =
   });
 
   it("live: shown under the phone with the exact consent text, NOT pre-ticked, and an unticked box blocks the order", async () => {
-    optIn.mockResolvedValue({ enabled: true });
+    optIn.mockResolvedValue(LIVE_REQUIRED);
     render(tree());
     await waitFor(() => expect(optInBox()).not.toBeNull());
     expect(optInBox()?.checked).toBe(false);
@@ -191,7 +197,7 @@ describe("checkout — required WhatsApp acknowledgment (checkout-modern)", () =
   });
 
   it("live, Arabic: the Arabic consent text is shown and its language is sent", async () => {
-    optIn.mockResolvedValue({ enabled: true });
+    optIn.mockResolvedValue(LIVE_REQUIRED);
     render(tree("ar"));
     await waitFor(() => expect(optInBox()).not.toBeNull());
     expect(screen.getByText(WHATSAPP_CONSENT_TEXTS[CURRENT_WHATSAPP_CONSENT_VERSION].ar)).toBeTruthy();
@@ -201,7 +207,7 @@ describe("checkout — required WhatsApp acknowledgment (checkout-modern)", () =
   });
 
   it("card payment: the box is hidden (nothing is sent on WhatsApp for a paid order), a tick is dropped, and it does not block", async () => {
-    optIn.mockResolvedValue({ enabled: true });
+    optIn.mockResolvedValue(LIVE_REQUIRED);
     methods.mockResolvedValue({ methods: [...COD_ONLY.methods, { id: "paymob", label: "Card", description: "" }] });
     render(tree());
     await fill(OTHER);
@@ -262,9 +268,108 @@ describe("checkout — required WhatsApp acknowledgment (checkout-modern)", () =
     expect((await submit()).whatsappOptIn).toBe(false);
     await waitFor(() => expect(optInBox()).not.toBeNull());
     expect(optInBox()?.checked).toBe(false);
-    expect(screen.getAllByText(WHATSAPP_CONSENT_REQUIRED_MESSAGE).length).toBeGreaterThan(0);
+    // The checkout's own (English) message, not the server's raw wording.
+    expect(screen.getAllByText(/Please tick this box to place your order/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(WHATSAPP_CONSENT_REQUIRED_MESSAGE)).toBeNull();
     fireEvent.click(optInBox() as HTMLInputElement);
     expect(await submit()).toMatchObject({ whatsappOptIn: true, whatsappConsentVersion: CURRENT_WHATSAPP_CONSENT_VERSION });
+  });
+});
+
+describe("checkout — rollout switch off (WHATSAPP_CHECKOUT_CONSENT_REQUIRED unset): optional, as before", () => {
+  it("modern: shown, never pre-ticked, NOT required — an unticked order goes through with false; a tick sends true", async () => {
+    optIn.mockResolvedValue(LIVE_OPTIONAL);
+    render(tree());
+    await fill(OTHER);
+    await waitFor(() => expect(optInBox()).not.toBeNull());
+    expect(optInBox()?.checked).toBe(false);
+    expect(optInBox()?.getAttribute("aria-required")).toBeNull();
+    expect(await submit()).toMatchObject({ whatsappOptIn: false });
+    expect(screen.queryByText(/tick this box/i)).toBeNull();
+    fireEvent.click(optInBox() as HTMLInputElement);
+    expect(await submit()).toMatchObject({ whatsappOptIn: true, whatsappConsentVersion: CURRENT_WHATSAPP_CONSENT_VERSION });
+  });
+
+  it("editorial: shown, NOT required — an unticked order goes through", async () => {
+    templateId = "checkout-editorial";
+    optIn.mockResolvedValue(LIVE_OPTIONAL);
+    render(tree());
+    const box = () => document.getElementById("checkout-whatsapp-opt-in") as HTMLInputElement | null;
+    await waitFor(() => expect(box()).not.toBeNull());
+    type("checkout-name", "Mona Test");
+    type("checkout-phone", OTHER);
+    type("checkout-address1", "12 Road 9, Maadi");
+    type("checkout-city", "Cairo");
+    await act(async () => {
+      fireEvent.submit(box()?.form as HTMLFormElement);
+    });
+    await waitFor(() => expect(createOrder).toHaveBeenCalledTimes(1));
+    expect(createOrder.mock.calls[0]?.[0]).toMatchObject({ whatsappOptIn: false });
+  });
+});
+
+describe("checkout — Arabic: a consent refusal is shown in Arabic (C3)", () => {
+  it("modern, Arabic, cached-page recovery: the lookup failed, the server refuses, the Arabic error and the box appear; ticking places the order", async () => {
+    optIn.mockRejectedValue(new Error("network down"));
+    createOrder.mockResolvedValueOnce({ success: false, error: WHATSAPP_CONSENT_REQUIRED_MESSAGE });
+    render(tree("ar"));
+    await fill(OTHER);
+    await waitFor(() => expect(optIn).toHaveBeenCalled());
+    expect(optInBox()).toBeNull();
+    expect((await submit()).whatsappOptIn).toBe(false);
+    await waitFor(() => expect(optInBox()).not.toBeNull());
+    expect(screen.getAllByText(/يرجى تحديد هذا المربع لإتمام طلبك/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Please tick/)).toBeNull();
+    expect(screen.getByText(WHATSAPP_CONSENT_TEXTS[CURRENT_WHATSAPP_CONSENT_VERSION].ar)).toBeTruthy();
+    // Forced box is required: an unticked retry is blocked in Arabic, a tick goes through.
+    expect(await pressPlaceOrder()).toBeNull();
+    fireEvent.click(optInBox() as HTMLInputElement);
+    expect(await submit()).toMatchObject({ whatsappOptIn: true, whatsappConsentLocale: "ar" });
+  });
+
+  it("modern, Arabic: the inline error for an unticked required box is Arabic", async () => {
+    optIn.mockResolvedValue(LIVE_REQUIRED);
+    render(tree("ar"));
+    await fill(OTHER);
+    await waitFor(() => expect(optInBox()).not.toBeNull());
+    expect(await pressPlaceOrder()).toBeNull();
+    expect(await screen.findByText(/يرجى تحديد هذا المربع لإتمام طلبك/)).toBeTruthy();
+  });
+
+  it("editorial, Arabic: inline error and server refusal are Arabic", async () => {
+    templateId = "checkout-editorial";
+    optIn.mockRejectedValue(new Error("network down"));
+    createOrder.mockResolvedValueOnce({ success: false, error: WHATSAPP_CONSENT_REQUIRED_MESSAGE });
+    render(tree("ar"));
+    const box = () => document.getElementById("checkout-whatsapp-opt-in") as HTMLInputElement | null;
+    await waitFor(() => expect(document.getElementById("checkout-phone")).not.toBeNull());
+    type("checkout-name", "Mona Test");
+    type("checkout-phone", OTHER);
+    type("checkout-address1", "12 Road 9, Maadi");
+    type("checkout-city", "Cairo");
+    await waitFor(() => expect(optIn).toHaveBeenCalled());
+    const form = document.getElementById("checkout-phone")?.closest("form") as HTMLFormElement;
+    await act(async () => {
+      fireEvent.submit(form);
+    });
+    await waitFor(() => expect(createOrder).toHaveBeenCalledTimes(1));
+    // Server refusal → Arabic page error + the box.
+    await waitFor(() => expect(box()).not.toBeNull());
+    expect(screen.getAllByText(/يرجى تحديد هذا المربع لإتمام طلبك/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Please tick/)).toBeNull();
+    // Unticked retry → the template's inline Arabic error, no order.
+    await act(async () => {
+      fireEvent.submit(form);
+    });
+    expect(createOrder).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(document.getElementById("checkout-whatsapp-opt-in-error")).not.toBeNull());
+    expect(document.getElementById("checkout-whatsapp-opt-in-error")?.textContent).toMatch(/يرجى تحديد هذا المربع لإتمام طلبك/);
+    fireEvent.click(box() as HTMLInputElement);
+    await act(async () => {
+      fireEvent.submit(form);
+    });
+    await waitFor(() => expect(createOrder).toHaveBeenCalledTimes(2));
+    expect(createOrder.mock.calls[1]?.[0]).toMatchObject({ whatsappOptIn: true, whatsappConsentLocale: "ar" });
   });
 });
 
@@ -283,7 +388,7 @@ describe("checkout — required WhatsApp acknowledgment (checkout-editorial)", (
 
   it("live: unticked blocks with an inline error; ticked sends the consent", async () => {
     templateId = "checkout-editorial";
-    optIn.mockResolvedValue({ enabled: true });
+    optIn.mockResolvedValue(LIVE_REQUIRED);
     render(tree());
     await waitFor(() => expect(box()).not.toBeNull());
     expect(box()?.checked).toBe(false);

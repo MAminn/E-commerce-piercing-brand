@@ -111,17 +111,20 @@ export default function CheckoutPage() {
 
   // WhatsApp acknowledgment: the server decides per mode (live: shown;
   // pilot: shown only for an allow-listed number; off/shadow: hidden), so it
-  // is asked again (debounced) as the phone number changes. Where it is shown
-  // for a cash-on-delivery order the tick is REQUIRED (the template will not
-  // submit without it, and the server refuses the order without it). A failed
-  // lookup hides it; if the server then refuses the order for a missing
-  // tick, the box is shown (forced) so the shopper can tick it and resubmit.
+  // is asked again (debounced) as the phone number changes. It also says
+  // whether the tick is REQUIRED (WHATSAPP_CHECKOUT_CONSENT_REQUIRED): then
+  // the template will not submit a cash-on-delivery order without it, and the
+  // server refuses one. A failed lookup hides it; if the server then refuses
+  // the order for a missing tick, the box is shown (forced, required) so the
+  // shopper can tick it and resubmit, with the error in their language.
   // A synchronous throw while building the call is turned into a rejection
   // by the Promise.resolve() wrapper, never a render crash.
-  const { locale } = useMinimalI18n();
+  const { locale, t } = useMinimalI18n();
   const [whatsAppOptInFromServer, setShowWhatsAppOptIn] = useState(false);
+  const [whatsAppRequiredFromServer, setWhatsAppRequiredFromServer] = useState(false);
   const [forceWhatsAppOptIn, setForceWhatsAppOptIn] = useState(false);
   const showWhatsAppOptIn = whatsAppOptInFromServer || forceWhatsAppOptIn;
+  const whatsAppConsentRequired = (whatsAppOptInFromServer && whatsAppRequiredFromServer) || forceWhatsAppOptIn;
   const [optInPhone, setOptInPhone] = useState("");
   useEffect(() => {
     let cancelled = false;
@@ -131,7 +134,10 @@ export default function CheckoutPage() {
         Promise.resolve()
           .then(() => trpc.whatsappConfirmation.checkoutOptIn.query(phone ? { phone } : undefined))
           .then((r) => {
-            if (!cancelled) setShowWhatsAppOptIn(r?.enabled === true);
+            if (!cancelled) {
+              setShowWhatsAppOptIn(r?.enabled === true);
+              setWhatsAppRequiredFromServer(r?.enabled === true && (r as { required?: boolean }).required === true);
+            }
           })
           .catch(() => {
             if (!cancelled) setShowWhatsAppOptIn(false);
@@ -476,10 +482,15 @@ export default function CheckoutPage() {
     } catch (error) {
       console.error("[Checkout] Order submission failed:", error);
       const message = parseOrderError(error);
-      setErrorMessage(message);
       // The server needs the WhatsApp tick for this order: make sure the box
-      // is on screen (even if the lookup failed) so it can be ticked.
-      if (isWhatsAppConsentRequiredError(message)) setForceWhatsAppOptIn(true);
+      // is on screen (even if the lookup failed) so it can be ticked, and say
+      // so in the checkout's own language rather than the server's wording.
+      if (isWhatsAppConsentRequiredError(message)) {
+        setForceWhatsAppOptIn(true);
+        setErrorMessage(t("checkout.whatsapp_consent_required"));
+      } else {
+        setErrorMessage(message);
+      }
       // The server refused because its shipping figure differs from the one
       // we showed (409). Re-quote so the summary now shows the current fee
       // and the next submit asserts the right number.
@@ -542,6 +553,7 @@ export default function CheckoutPage() {
     onGovernorateChange: setShippingDestination,
     governorateRequired: shippingMode === "zones",
     showWhatsAppOptIn,
+    whatsAppConsentRequired,
     onPhoneChange: setOptInPhone,
   };
 

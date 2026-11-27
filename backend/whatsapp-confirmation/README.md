@@ -8,11 +8,12 @@ for any other phone number id are ignored.
 
 ## Flow
 
-0. Checkout (COD, live — or pilot for an allow-listed number): the WhatsApp
-   acknowledgment is **required**. The box is never pre-ticked; checkout will not submit
-   without the tick, and `order.create` refuses the order without it (nothing written).
-   The tick is stored as consent evidence in `wa_checkout_consent`, in the order's own
-   transaction (`consent.ts`).
+0. Checkout (COD, live — or pilot for an allow-listed number): the WhatsApp box is shown,
+   never pre-ticked. With `WHATSAPP_CHECKOUT_CONSENT_REQUIRED=true` the tick is
+   **required**: checkout will not submit without it, and `order.create` refuses the order
+   without it (nothing written). Otherwise (the default) it is optional, as before. A tick
+   is stored as consent evidence in `wa_checkout_consent`, in the order's own transaction
+   (`consent.ts`).
 1. Order committed (COD) → `queueWhatsAppConfirmation` (create-order service, after the
    order-email queue). Writes `wa_order_confirmation` + `wa_outbox` once
    (unique `order_id` / `dedupe_key`). Never throws, never calls Meta. If this step is
@@ -39,23 +40,35 @@ for any other phone number id are ignored.
 |---|---|---|---|---|
 | `off` (default) | hidden | nothing (no query at all) | no | no |
 | `shadow` | hidden | every eligible COD order, without asking (`consent_source = 'shadow_not_asked'`), payload stored as `shadow_skipped` | no | no (records `would_apply`) |
-| `pilot` | shown (COD only) once the shopper types an allow-listed mobile number, and then **required** | allow-listed → must tick → queued (an un-ticked order is refused); any other number → shadow record | only to allow-listed numbers that **ticked** the box | only for those |
-| `live` | shown to everyone paying COD, never pre-ticked, **required** | ticked → queued; an un-ticked COD order to a mobile number is refused | only to orders whose box was **ticked** | yes (confirm only) |
+| `pilot` | shown (COD only) once the shopper types an allow-listed mobile number; **required** only with the switch on | allow-listed + ticked → queued; not ticked → refused (switch on) or `ineligible: no_consent` (switch off); any other number → shadow record | only to allow-listed numbers that **ticked** the box | only for those |
+| `live` | shown to everyone paying COD, never pre-ticked; **required** only with the switch on | ticked → queued; not ticked → refused (switch on) or `ineligible: no_consent` (switch off) | only to orders whose box was **ticked** | yes (confirm only) |
 
-**Required acknowledgment (owner decision 2026-11-26):** wherever the box is shown for a
+**Required acknowledgment — rollout switch `WHATSAPP_CHECKOUT_CONSENT_REQUIRED`**
+(default off; only the exact value `true` turns it on). On: wherever the box is shown for a
 cash-on-delivery order, the order cannot be placed without the tick
-(`checkoutConsentRequired`). Not required, and not shown, for card payments (no message
-is sent for them) or in off / shadow. A landline is never refused (staff confirm it by
-hand). An old browser build that sends no tick gets the server's refusal message and can
-tick its (then optional) box and resubmit.
+(`checkoutConsentRequired`). Off: the box is optional exactly as before. The switch never
+turns the confirmation system off (that is `WHATSAPP_CONFIRM_MODE`). Never required, and
+not shown, for card payments (no message is sent for them) or in off / shadow. A landline
+is never refused (staff confirm it by hand). The server's refusal text is bilingual; current
+checkout replaces it with its own message in the checkout language (EN/AR) and shows the
+box; an older cached page shows the bilingual text next to its own box.
+**Turning the switch on needs owner approval** (legal basis for bundled consent).
 
 **Consent evidence (`wa_checkout_consent`, migration 0074):** one row per ticked order,
 written in the order's transaction and never updated. It holds the phone number as typed,
 the normalised recipient, the text version, the language, **the exact sentence shown**
 (the server's own copy from `shared/whatsapp/consent-text.ts`, never text from the
-client), whether it was required, the mode, the request IP and user agent, and the time.
-A wording change is a new version in that file. Orders placed before 0074, or without the
-tick, have no evidence row and are never messaged or backfilled.
+client), whether it was required, the mode, the time and, per
+`WHATSAPP_CONSENT_REQUEST_DETAILS`, request details: `anonymized` (default: IP with the
+host part zeroed, no user agent), `none`, or `full` (IP + user agent). A wording change is
+a new version in that file. Orders placed before 0074, or without the tick, have no
+evidence row and are never messaged or backfilled.
+
+**Retention (`WHATSAPP_CONSENT_RETENTION_DAYS`):** unset by default, and then nothing is
+ever deleted. Set to a whole number of days ≥ 30 (smaller or malformed values are ignored
+with a boot warning), the scheduler deletes evidence rows older than that, in batches
+(`purgeExpiredConsentEvidence`, which also has a dry-run mode). Orders are never touched.
+Set it only once the owner has approved a retention period.
 
 **Consent:** only the shopper's own tick at checkout (`consent_source = 'checkout'`,
 `consent_at` set) allows a real send. The pilot allow-list decides who *may* be

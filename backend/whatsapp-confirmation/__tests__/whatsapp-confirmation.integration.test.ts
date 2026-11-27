@@ -568,6 +568,12 @@ describeIfDb("WhatsApp order confirmation (integration)", () => {
     // process.env: only the pilot allow-list is needed (never the mode).
     const savedAllowlist = process.env.WHATSAPP_PILOT_ALLOWLIST;
     process.env.WHATSAPP_PILOT_ALLOWLIST = ENV.WHATSAPP_PILOT_ALLOWLIST;
+    // Mandatory consent ON for the first part (the rollout switch); the
+    // optional (switch off) behaviour is checked at the end.
+    const savedRequired = process.env.WHATSAPP_CHECKOUT_CONSENT_REQUIRED;
+    const savedDetails = process.env.WHATSAPP_CONSENT_REQUEST_DETAILS;
+    process.env.WHATSAPP_CHECKOUT_CONSENT_REQUIRED = "true";
+    Reflect.deleteProperty(process.env, "WHATSAPP_CONSENT_REQUEST_DETAILS");
 
     try {
       // off (the default): nothing required, nothing recorded, not even an opted-in order.
@@ -627,8 +633,9 @@ describeIfDb("WhatsApp order confirmation (integration)", () => {
         required: true,
         mode: "live",
         source: "checkout",
-        ipAddress: IP,
-        userAgent: UA,
+        // Default WHATSAPP_CONSENT_REQUEST_DETAILS=anonymized: host octet zeroed, no user agent.
+        ipAddress: "203.0.113.0",
+        userAgent: null,
       });
       expect(ev?.orderNumber).toBe((await orderRow(liveTicked))?.orderNumber);
       const liveConf = await conf(liveTicked);
@@ -684,12 +691,36 @@ describeIfDb("WhatsApp order confirmation (integration)", () => {
         expect((await orderRow(id))?.status, id).toBe("pending");
       }
 
+      // ── Rollout switch OFF (WHATSAPP_CHECKOUT_CONSENT_REQUIRED unset): the
+      // box is optional again, exactly as before, and confirmations still run.
+      Reflect.deleteProperty(process.env, "WHATSAPP_CHECKOUT_CONSENT_REQUIRED");
+      boot("live");
+      const optNoTick = await place(false, OTHER_PHONE);
+      expect(await conf(optNoTick)).toMatchObject({ state: "ineligible", ineligibleReason: "no_consent", consentSource: null });
+      expect(await evidence(optNoTick)).toBeUndefined();
+      const optAbsent = await place(undefined, OTHER_PHONE);
+      expect(await conf(optAbsent)).toMatchObject({ state: "ineligible", ineligibleReason: "no_consent" });
+      process.env.WHATSAPP_CONSENT_REQUEST_DETAILS = "full";
+      const optTicked = await place(true, OTHER_PHONE);
+      expect(await evidence(optTicked)).toMatchObject({ required: false, mode: "live", ipAddress: IP, userAgent: UA });
+      expect(await conf(optTicked)).toMatchObject({ state: "queued", consentSource: "checkout" });
+      process.env.WHATSAPP_CONSENT_REQUEST_DETAILS = "none";
+      const optTickedNone = await place(true, OTHER_PHONE);
+      expect(await evidence(optTickedNone)).toMatchObject({ ipAddress: null, userAgent: null });
+      const optFetch = okFetch();
+      await tick(optFetch, "live", new Date(Date.now() + 16 * 60_000));
+      expect(recipients(optFetch)).toEqual(["201009990002", "201009990002"]);
+
       // A database error inside the WhatsApp step is swallowed, never thrown.
       await expect(queueWhatsAppConfirmation({ orderId: "not-a-uuid", whatsappOptIn: true })).resolves.toBeUndefined();
     } finally {
       cfgMod.setWhatsAppConfirmBootStatus(null);
       if (savedAllowlist === undefined) Reflect.deleteProperty(process.env, "WHATSAPP_PILOT_ALLOWLIST");
       else process.env.WHATSAPP_PILOT_ALLOWLIST = savedAllowlist;
+      if (savedRequired === undefined) Reflect.deleteProperty(process.env, "WHATSAPP_CHECKOUT_CONSENT_REQUIRED");
+      else process.env.WHATSAPP_CHECKOUT_CONSENT_REQUIRED = savedRequired;
+      if (savedDetails === undefined) Reflect.deleteProperty(process.env, "WHATSAPP_CONSENT_REQUEST_DETAILS");
+      else process.env.WHATSAPP_CONSENT_REQUEST_DETAILS = savedDetails;
       // The service queued order emails for these orders; leave nothing due behind.
       if (placed.length) {
         await db.delete(schema.scheduledEmail).where(
@@ -762,6 +793,73 @@ describeIfDb("WhatsApp order confirmation (integration)", () => {
     await consent(lostShadow, OTHER_PHONE, ago(5 * 60_000));
     expect((await store.runScheduler(db, { mode: "shadow", config: config(), now })).backfilled).toBe(1);
     expect(await conf(lostShadow.id)).toMatchObject({ state: "shadow" });
+  });
+
+  it("retention: nothing is deleted unless a period is configured; then only evidence older than it (dry run first)", async () => {
+    const { purgeExpiredConsentEvidence } = await import("../consent");
+    const now = new Date();
+    const day = 86_400_000;
+    const ev = async (ageDays: number) => {
+      const o = await createOrder({ phone: OTHER_PHONE });
+      await db.insert(schema.waCheckoutConsent).values({
+        orderId: o.id, orderNumber: o.orderNumber, phoneRaw: OTHER_PHONE, phoneE164: "201009990002",
+        consentTextVersion: "checkout-v2", consentLocale: "en", consentText: "x", required: false, mode: "live", source: "checkout",
+        consentedAt: new Date(now.getTime() - ageDays * day),
+      });
+      return o.id;
+    };
+    const old = await ev(400);
+    const mid = await ev(100);
+    const fresh = await ev(1);
+    const count = async () => (await db.select({ id: schema.waCheckoutConsent.id }).from(schema.waCheckoutConsent)).length;
+    expect(await count()).toBe(3);
+
+    // Unset (the default): the scheduler and a direct call delete nothing.
+    expect((await store.runScheduler(db, { mode: "live", config: config(), now })).consentPurged).toBe(0);
+    expect(await purgeExpiredConsentEvidence(db, { retentionDays: null, now })).toEqual({ eligible: 0, deleted: 0 });
+    // A refused value (under 30 days) is treated as unset.
+    expect(cfgMod.readWhatsAppConfirmConfig({ ...ENV, WHATSAPP_CONSENT_RETENTION_DAYS: "7" }).consentRetentionDays).toBeNull();
+    expect(await count()).toBe(3);
+
+    // Dry run with 365 days: counts the 400-day-old row, deletes nothing.
+    expect(await purgeExpiredConsentEvidence(db, { retentionDays: 365, now, dryRun: true })).toEqual({ eligible: 1, deleted: 0 });
+    expect(await count()).toBe(3);
+
+    // Configured: the scheduler deletes exactly the rows past the period.
+    const cfg365 = cfgMod.readWhatsAppConfirmConfig({ ...ENV, WHATSAPP_CONSENT_RETENTION_DAYS: "365" });
+    expect((await store.runScheduler(db, { mode: "live", config: cfg365, now })).consentPurged).toBe(1);
+    const left = (await db.select({ o: schema.waCheckoutConsent.orderId }).from(schema.waCheckoutConsent)).map((r) => r.o).sort();
+    expect(left).toEqual([mid, fresh].sort());
+    expect(left).not.toContain(old);
+    // Orders themselves are never touched by the purge.
+    expect(await orderRow(old)).toBeDefined();
+  });
+
+  it("migration 0074 rollback safety: without wa_checkout_consent the feature stays off (checkout asks nothing)", async () => {
+    const { initWhatsAppConfirm } = await import("../readiness");
+    const saved = process.env.WHATSAPP_CONFIRM_MODE;
+    await db.execute(sql`ALTER TABLE wa_checkout_consent RENAME TO wa_checkout_consent_rollback_test`);
+    try {
+      process.env.WHATSAPP_CONFIRM_MODE = "shadow";
+      const status = await initWhatsAppConfirm(db);
+      expect(status).toMatchObject({ requestedMode: "shadow", effectiveMode: "off", tablesReady: false });
+      expect(status.problems.join(" ")).toMatch(/0074/);
+      expect(cfgMod.effectiveWhatsAppConfirmMode()).toBe("off");
+    } finally {
+      await db.execute(sql`ALTER TABLE wa_checkout_consent_rollback_test RENAME TO wa_checkout_consent`);
+      cfgMod.setWhatsAppConfirmBootStatus(null);
+      if (saved === undefined) Reflect.deleteProperty(process.env, "WHATSAPP_CONFIRM_MODE");
+      else process.env.WHATSAPP_CONFIRM_MODE = saved;
+    }
+    // With the table back, shadow is effective again.
+    process.env.WHATSAPP_CONFIRM_MODE = "shadow";
+    try {
+      expect((await initWhatsAppConfirm(db)).effectiveMode).toBe("shadow");
+    } finally {
+      cfgMod.setWhatsAppConfirmBootStatus(null);
+      if (saved === undefined) Reflect.deleteProperty(process.env, "WHATSAPP_CONFIRM_MODE");
+      else process.env.WHATSAPP_CONFIRM_MODE = saved;
+    }
   });
 
   // ─── STOP / opt-out: nothing is ever sent after a STOP (hotfix) ────────────

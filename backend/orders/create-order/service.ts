@@ -1,6 +1,6 @@
 import { query } from "#root/shared/database/drizzle/db";
 import { queueWhatsAppConfirmation } from "#root/backend/whatsapp-confirmation/enqueue";
-import { planCheckoutConsent, recordCheckoutConsentInTx } from "#root/backend/whatsapp-confirmation/consent";
+import { consentRequestDetails, planCheckoutConsent, recordCheckoutConsentInTx } from "#root/backend/whatsapp-confirmation/consent";
 import { effectiveWhatsAppConfirmMode, readWhatsAppConfirmConfig } from "#root/shared/config/whatsapp-confirmation";
 import { WHATSAPP_CONSENT_REQUIRED_MESSAGE } from "#root/shared/whatsapp/consent-text";
 import {
@@ -185,9 +185,10 @@ export const createOrderSchema = z.object({
   buildingNumber: z.string().trim().optional(),
   apartment: z.string().trim().optional(),
   /**
-   * The shopper ticked the WhatsApp acknowledgment (never pre-ticked). For a
-   * COD order the current mode would really message (live, or pilot for an
-   * allow-listed number) it is REQUIRED: the order is refused without it.
+   * The shopper ticked the WhatsApp acknowledgment (never pre-ticked). With
+   * WHATSAPP_CHECKOUT_CONSENT_REQUIRED=true, for a COD order the current mode
+   * would really message (live, or pilot for an allow-listed number) it is
+   * REQUIRED: the order is refused without it. Otherwise it is optional.
    * Recorded as consent evidence (wa_checkout_consent) in the order's
    * transaction; not stored on the order row.
    */
@@ -526,9 +527,10 @@ export const createOrder = (
     const ga4Owner = effectiveGa4PurchaseOwner();
     // WhatsApp acknowledgment (backend/whatsapp-confirmation/consent.ts):
     // decided once, from the boot-fixed mode, before anything is written.
+    const waConfig = readWhatsAppConfirmConfig();
     const waConsent = planCheckoutConsent({
       mode: effectiveWhatsAppConfirmMode(),
-      config: readWhatsAppConfirmConfig(),
+      config: waConfig,
       customerPhone: input.customerPhone,
       paymentMethod: input.paymentMethod,
       whatsappOptIn: input.whatsappOptIn === true,
@@ -1290,8 +1292,8 @@ export const createOrder = (
               ...waConsent.evidence,
               orderId: newOrder.id,
               orderNumber: newOrder.orderNumber ?? null,
-              ipAddress: request?.ipAddress ?? null,
-              userAgent: request?.userAgent ?? null,
+              // WHATSAPP_CONSENT_REQUEST_DETAILS (default: anonymised IP, no user agent).
+              ...consentRequestDetails(waConfig.consentRequestDetails, request),
               consentedAt: new Date(),
             });
           }

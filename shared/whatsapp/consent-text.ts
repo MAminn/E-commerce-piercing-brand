@@ -41,13 +41,16 @@ export function whatsappConsentText(version: WhatsAppConsentVersion, locale: Con
 
 /**
  * The server's refusal when a COD order that must carry the acknowledgment
- * arrives without it. Checkout recognises this exact text, shows the box
- * and points the shopper at it. A browser still running the old build also
- * shows this message next to its (then optional) box, which works the same.
+ * arrives without it. Current checkout recognises it (by the English part),
+ * shows the box and replaces it with its own translated message. A browser
+ * still running an older build shows the raw text next to its (then optional)
+ * box, so the text carries both languages.
  */
-export const WHATSAPP_CONSENT_REQUIRED_MESSAGE =
+const CONSENT_REQUIRED_EN =
   "Please tick the box agreeing to receive your order confirmation on WhatsApp to place a cash-on-delivery order.";
+const CONSENT_REQUIRED_AR = "يرجى تحديد مربع الموافقة على استلام تأكيد طلبك عبر واتساب لإتمام الطلب بالدفع عند الاستلام.";
+export const WHATSAPP_CONSENT_REQUIRED_MESSAGE = `${CONSENT_REQUIRED_EN} — ${CONSENT_REQUIRED_AR}`;
 
 export function isWhatsAppConsentRequiredError(message: string | null | undefined): boolean {
-  return typeof message === "string" && message.includes(WHATSAPP_CONSENT_REQUIRED_MESSAGE);
+  return typeof message === "string" && message.includes(CONSENT_REQUIRED_EN);
 }
