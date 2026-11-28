@@ -747,6 +747,104 @@ describeIfDb("WhatsApp order confirmation (integration)", () => {
     expect(f).not.toHaveBeenCalled();
   });
 
+  it("Black Friday: a discounted COD order through the real order.create is queued exactly once, at the discounted total, only with the shopper's tick", async () => {
+    const { t } = await import("#root/shared/trpc/server");
+    const { createOrderProcedure } = await import("#root/backend/orders/create-order/trpc");
+    const caller = t
+      .router({ create: createOrderProcedure })
+      .createCaller({ db, clientSession: null, emailService: { sendEmail: async () => undefined }, ipAddress: "198.51.100.9", userAgent: "UA" } as never);
+    // A sale product: 200 regular, 150 on sale (25% off).
+    const [salePiece] = await db
+      .insert(schema.product)
+      .values({ name: `${TAG}bf-piece`, description: "bf", imageId: seeded.fileId, categoryId: seeded.categoryId, price: "200.00", discountPrice: "150.00", vendorId: seeded.storeOwner, stock: 50 })
+      .returning();
+    const placedIds: string[] = [];
+    const savedAllowlist = process.env.WHATSAPP_PILOT_ALLOWLIST;
+    const savedRequired = process.env.WHATSAPP_CHECKOUT_CONSENT_REQUIRED;
+    process.env.WHATSAPP_PILOT_ALLOWLIST = ENV.WHATSAPP_PILOT_ALLOWLIST;
+    const boot = (mode: "shadow" | "live") =>
+      cfgMod.setWhatsAppConfirmBootStatus({ requestedMode: mode, effectiveMode: mode, tablesReady: true, problems: [], checkedAt: new Date().toISOString() });
+    const place = async (whatsappOptIn: boolean | undefined) => {
+      const res = (await caller.create({
+        customerName: "منى اختبار",
+        customerEmail: `${TAG}bf-${Date.now()}-${Math.random().toString(16).slice(2)}@wa.test`,
+        customerPhone: OTHER_PHONE,
+        shippingAddress: "1 Fixture Street",
+        shippingCity: "Cairo",
+        shippingState: "Cairo",
+        shippingPostalCode: "11511",
+        shippingCountry: "Egypt",
+        items: [{ productId: salePiece?.id as string, quantity: 2 }],
+        bundles: [],
+        paymentMethod: "cod",
+        whatsappConsentVersion: "checkout-v2",
+        whatsappConsentLocale: "ar",
+        ...(whatsappOptIn === undefined ? {} : { whatsappOptIn }),
+      } as never)) as { success: boolean; result?: { id: string; total: string }; error?: unknown };
+      if (res.success) {
+        placedIds.push(res.result?.id as string);
+        createdOrders.push(res.result?.id as string);
+      }
+      return res;
+    };
+    try {
+      boot("live");
+      // Switch OFF (default): no tick → accepted, never queued, never sent.
+      Reflect.deleteProperty(process.env, "WHATSAPP_CHECKOUT_CONSENT_REQUIRED");
+      const noTick = await place(false);
+      expect(noTick.success).toBe(true);
+      expect(await conf(noTick.result?.id as string)).toMatchObject({ state: "ineligible", ineligibleReason: "no_consent" });
+      expect(await db.select().from(schema.waOutbox).where(eq(schema.waOutbox.orderId, noTick.result?.id as string))).toHaveLength(0);
+
+      // Ticked: the order is priced at the sale price, and the confirmation is
+      // queued exactly once with that total.
+      const ticked = await place(true);
+      expect(ticked.success).toBe(true);
+      const id = ticked.result?.id as string;
+      const row = await orderRow(id);
+      expect(Number(row?.subtotal)).toBe(300); // 2 × 150, not 2 × 200
+      const boxes = await db.select().from(schema.waOutbox).where(eq(schema.waOutbox.orderId, id));
+      expect(boxes).toHaveLength(1);
+      expect(boxes[0]).toMatchObject({ kind: "confirm", status: "pending", dedupeKey: `wa:confirm:${id}` });
+      const totalParam = JSON.stringify(boxes[0]?.payload);
+      expect(totalParam).toContain(`"${Number(row?.total).toLocaleString("en-US", { maximumFractionDigits: 2 })}"`);
+      // A repeated enqueue (e.g. the backfill) never adds a second message.
+      expect((await store.enqueueConfirmation(db, { orderId: id, whatsappOptIn: true, mode: "live", config: config() })).outcome).toBe("exists");
+      expect((await store.runScheduler(db, { mode: "live", config: config(), now: new Date(Date.now() + 5 * 60_000) })).backfilled).toBe(0);
+      expect(await db.select().from(schema.waOutbox).where(eq(schema.waOutbox.orderId, id))).toHaveLength(1);
+      // The worker sends it once; a second tick sends nothing more.
+      const f = okFetch();
+      await tick(f, "live");
+      await tick(f, "live");
+      expect(f.mock.calls.filter((c) => JSON.parse((c as unknown as [string, { body: string }])[1].body).to === "201009990002")).toHaveLength(1);
+
+      // Switch ON: the same sale order without the tick is refused before anything is written.
+      process.env.WHATSAPP_CHECKOUT_CONSENT_REQUIRED = "true";
+      const refused = await place(false);
+      expect(refused.success).toBe(false);
+      // Shadow: never sent, whatever the tick.
+      boot("shadow");
+      const shadowOrder = await place(undefined);
+      expect(await conf(shadowOrder.result?.id as string)).toMatchObject({ state: "shadow" });
+    } finally {
+      cfgMod.setWhatsAppConfirmBootStatus(null);
+      if (savedAllowlist === undefined) Reflect.deleteProperty(process.env, "WHATSAPP_PILOT_ALLOWLIST");
+      else process.env.WHATSAPP_PILOT_ALLOWLIST = savedAllowlist;
+      if (savedRequired === undefined) Reflect.deleteProperty(process.env, "WHATSAPP_CHECKOUT_CONSENT_REQUIRED");
+      else process.env.WHATSAPP_CHECKOUT_CONSENT_REQUIRED = savedRequired;
+      if (placedIds.length) {
+        await db.delete(schema.scheduledEmail).where(
+          inArray(schema.scheduledEmail.dedupeKey, placedIds.flatMap((x) => [`order_confirmation:${x}`, `order_admin_notification:${x}`])),
+        );
+        await db.delete(schema.orderLog).where(inArray(schema.orderLog.orderId, placedIds));
+        await db.delete(schema.orderItem).where(inArray(schema.orderItem.orderId, placedIds));
+        await db.delete(schema.order).where(inArray(schema.order.id, placedIds));
+        placedIds.length = 0;
+      }
+      if (salePiece) await db.delete(schema.product).where(eq(schema.product.id, salePiece.id));
+    }
+  });
+
   it("backfill: a consented order whose enqueue was lost is queued by the scheduler; orders without evidence (e.g. #10280–#10282) never are", async () => {
     const outbox = async (orderId: string) => db.select().from(schema.waOutbox).where(eq(schema.waOutbox.orderId, orderId));
     const now = new Date();
