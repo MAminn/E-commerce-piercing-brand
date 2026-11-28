@@ -3,6 +3,7 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { DatabaseClient } from "#root/shared/database/drizzle/db";
 import {
   order,
+  waCheckoutConsent,
   waInboundEvent,
   waOptOut,
   waOrderConfirmation,
@@ -18,6 +19,7 @@ import { decideResponse } from "./decide";
 import { isOptOutText, type ParsedEvent } from "./webhook-parse";
 import { CONSENT_SOURCE_CHECKOUT, CONSENT_SOURCE_SHADOW_NOT_ASKED, hasCheckoutConsent, maySendTo } from "./eligibility";
 import { isOptedOut, recordOptOut } from "./opt-out";
+import { purgeExpiredConsentEvidence } from "./consent";
 import { CONSENT_TEXT_VERSION, WA_AWAITING_STATES, WA_STATUS_NOTE_PREFIX, type WaReviewType, type WaState } from "./types";
 
 /**
@@ -67,6 +69,8 @@ export interface EnqueueInput {
   whatsappOptIn: boolean;
   mode: WhatsAppConfirmMode;
   config: WhatsAppConfirmConfig;
+  /** Consent text version the shopper saw, when the caller knows it. */
+  consentTextVersion?: string | null;
   now?: Date;
 }
 
@@ -94,6 +98,16 @@ export async function enqueueConfirmation(db: DatabaseClient, input: EnqueueInpu
     .where(eq(order.id, input.orderId));
   if (!o) return { outcome: "ineligible", reason: "order_missing" };
 
+  // Consent evidence written with the order (wa_checkout_consent). It IS the
+  // shopper's tick, so it counts as consent on its own: that is how the
+  // scheduler's backfill (orders whose post-commit enqueue was lost) still
+  // gets consent. Without it, only this request's own tick counts.
+  const [evidence] = await db
+    .select({ consentedAt: waCheckoutConsent.consentedAt, consentTextVersion: waCheckoutConsent.consentTextVersion })
+    .from(waCheckoutConsent)
+    .where(eq(waCheckoutConsent.orderId, o.id))
+    .limit(1);
+
   // The pause flag is NOT applied here: while paused the worker sends
   // nothing, and these rows wait in the outbox (the scheduler retires any
   // whose order staff handled meanwhile). Applying it here would turn every
@@ -106,7 +120,7 @@ export async function enqueueConfirmation(db: DatabaseClient, input: EnqueueInpu
   // so it needs no consent (see eligibility.ts). The allow-list decides who
   // MAY be messaged; it never counts as consent.
   const realRecipient = maySendTo(mode, input.config, phone);
-  const consented = input.whatsappOptIn === true;
+  const consented = input.whatsappOptIn === true || evidence !== undefined;
   let ineligible: string | null = null;
   if (o.paymentMethod !== "cod") ineligible = "not_cod";
   else if (o.status !== "pending") ineligible = "not_pending";
@@ -134,9 +148,9 @@ export async function enqueueConfirmation(db: DatabaseClient, input: EnqueueInpu
         phoneE164: phone,
         ineligibleReason: ineligible,
         token,
-        consentAt: consented ? now : null,
+        consentAt: consented ? (evidence?.consentedAt ?? now) : null,
         consentSource,
-        consentTextVersion: consented ? CONSENT_TEXT_VERSION : null,
+        consentTextVersion: consented ? (evidence?.consentTextVersion ?? input.consentTextVersion ?? CONSENT_TEXT_VERSION) : null,
       })
       .onConflictDoNothing()
       .returning({ id: waOrderConfirmation.id });
@@ -439,12 +453,45 @@ export interface ScheduleReport {
   superseded: number;
   reminders: number;
   followUps: number;
+  /** Consented orders whose confirmation row was missing, now enqueued. */
+  backfilled: number;
+  /** Consent evidence rows deleted (only with WHATSAPP_CONSENT_RETENTION_DAYS set). */
+  consentPurged: number;
 }
+
+/** Evidence older than this with no confirmation row is backfilled... */
+const BACKFILL_MIN_AGE_MS = 2 * 60_000;
+/** ...unless older than this (staff have long confirmed it by hand). */
+const BACKFILL_MAX_AGE_MS = 24 * 3_600_000;
 
 export async function runScheduler(db: DatabaseClient, ctx: InboundContext): Promise<ScheduleReport> {
   const now = ctx.now ?? new Date();
-  const report: ScheduleReport = { superseded: 0, reminders: 0, followUps: 0 };
+  const report: ScheduleReport = { superseded: 0, reminders: 0, followUps: 0, backfilled: 0, consentPurged: 0 };
   const mode = await runtimeMode(db, ctx.mode);
+
+  // 0. Every consented order gets its confirmation: an order whose
+  //    post-commit enqueue was lost (process restart, database blip) has its
+  //    consent evidence but no confirmation row. Driven ONLY by evidence rows,
+  //    so an order placed without the tick is never picked up here. Uses the
+  //    configured mode, not the pause (same rule as enqueue).
+  if (ctx.mode !== "off") {
+    const missing = await rows<{ order_id: string }>(
+      db,
+      sql`SELECT c.order_id FROM wa_checkout_consent c
+          LEFT JOIN wa_order_confirmation w ON w.order_id = c.order_id
+          WHERE w.id IS NULL
+            AND c.consented_at < ${new Date(now.getTime() - BACKFILL_MIN_AGE_MS).toISOString()}::timestamptz
+            AND c.consented_at > ${new Date(now.getTime() - BACKFILL_MAX_AGE_MS).toISOString()}::timestamptz
+          ORDER BY c.consented_at
+          LIMIT 50`,
+    );
+    for (const m of missing) {
+      // whatsappOptIn false: consent comes from the evidence row alone, which
+      // enqueueConfirmation reads itself; nothing here can stand in for it.
+      const r = await enqueueConfirmation(db, { orderId: m.order_id, whatsappOptIn: false, mode: ctx.mode, config: ctx.config, now });
+      if (r.outcome !== "exists") report.backfilled++;
+    }
+  }
 
   // 1. Orders that left `pending` (staff confirmed/cancelled by hand) stop being chased.
   const gone = await rows<{ id: string; order_id: string }>(
@@ -527,6 +574,13 @@ export async function runScheduler(db: DatabaseClient, ctx: InboundContext): Pro
     await db.update(waOrderConfirmation).set({ state: "follow_up", followUpAt: now, updatedAt: now }).where(eq(waOrderConfirmation.id, c.id));
     await openReviewItem(db, { orderId: c.orderId, type: "no_reply_48h", detail: "No reply on WhatsApp — follow up manually" });
     report.followUps++;
+  }
+
+  // 4. Consent evidence past its retention period. Only when
+  //    WHATSAPP_CONSENT_RETENTION_DAYS is set (unset by default): nothing is
+  //    deleted until an approved period is configured.
+  if (ctx.config.consentRetentionDays !== null) {
+    report.consentPurged = (await purgeExpiredConsentEvidence(db, { retentionDays: ctx.config.consentRetentionDays, now })).deleted;
   }
   return report;
 }

@@ -3172,3 +3172,44 @@ export const waOptOut = pgTable("wa_opt_out", {
   source: text("source").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
 });
+
+/**
+ * Consent evidence: one row per order whose shopper ticked the WhatsApp
+ * acknowledgment at checkout, written in the SAME transaction as the order
+ * (migration 0074). It is never written without the tick and never updated.
+ * It records what the shopper agreed to (the exact text and its version and
+ * language), for which number (as typed, plus the normalised recipient),
+ * when, and from which request (IP address, user agent). Like every wa_*
+ * table it has no foreign key to "order".
+ */
+export const waCheckoutConsent = pgTable(
+  "wa_checkout_consent",
+  {
+    id: uuid("id")
+      .$defaultFn(() => v7())
+      .primaryKey(),
+    orderId: uuid("order_id").notNull(),
+    orderNumber: integer("order_number"),
+    /** The phone number as the shopper typed it on the order. */
+    phoneRaw: text("phone_raw").notNull(),
+    /** Normalised recipient (201xxxxxxxxx); null when not a mobile number. */
+    phoneE164: text("phone_e164"),
+    /** shared/whatsapp/consent-text.ts version, e.g. checkout-v2. */
+    consentTextVersion: text("consent_text_version").notNull(),
+    consentLocale: text("consent_locale").notNull(),
+    /** The exact sentence shown next to the ticked box. */
+    consentText: text("consent_text").notNull(),
+    /** Was the tick required for this order (live / allow-listed pilot COD)? */
+    required: boolean("required").notNull(),
+    /** Effective WHATSAPP_CONFIRM_MODE when the order was placed. */
+    mode: text("mode").notNull(),
+    source: text("source").notNull(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    consentedAt: timestamp("consented_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("wa_checkout_consent_order_idx").on(table.orderId),
+    index("wa_checkout_consent_at_idx").on(table.consentedAt),
+  ],
+);

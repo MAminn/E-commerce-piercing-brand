@@ -46,16 +46,20 @@ const requireSuperadmin = t.middleware(({ ctx, next }) => {
 export const whatsappConfirmationRouter = t.router({
   /**
    * Public: should checkout show the WhatsApp opt-in for the phone typed so
-   * far? Returns only { enabled } and never touches the database.
-   * off / shadow → false; live → true; pilot → true only for an allow-listed
-   * mobile number (see eligibility.ts). Showing the box is not consent — only
-   * the shopper's tick is.
+   * far, and must it be ticked? Returns only { enabled, required } and never
+   * touches the database. enabled: off / shadow → false; live → true; pilot →
+   * true only for an allow-listed mobile number (see eligibility.ts).
+   * required: enabled AND WHATSAPP_CHECKOUT_CONSENT_REQUIRED=true (a global
+   * switch, so it reveals nothing more about the number than enabled does).
+   * Showing the box is not consent — only the shopper's tick is.
    */
   checkoutOptIn: publicProcedure
     .input(z.object({ phone: z.string().max(40).optional() }).optional())
-    .query(({ input }) => ({
-      enabled: checkoutOptInVisible(effectiveWhatsAppConfirmMode(), readWhatsAppConfirmConfig(), input?.phone),
-    })),
+    .query(({ input }) => {
+      const cfg = readWhatsAppConfirmConfig();
+      const enabled = checkoutOptInVisible(effectiveWhatsAppConfirmMode(), cfg, input?.phone);
+      return { enabled, required: enabled && cfg.checkoutConsent === "required" };
+    }),
 
   overview: adminProcedure.query(async ({ ctx }) => {
     return await getOverview(effectiveWhatsAppConfirmMode() === "off" ? null : ctx.db);

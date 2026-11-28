@@ -24,6 +24,28 @@
  * A DB pause flag (wa_settings.paused) turns pilot/live back into shadow at
  * runtime without a restart.
  *
+ * WHATSAPP_CHECKOUT_CONSENT_REQUIRED — is the checkout box REQUIRED?
+ *   false (DEFAULT; anything but "true") — the box is shown wherever the
+ *          mode would message the number, never pre-ticked, and the shopper
+ *          may leave it unticked (the order is then confirmed by hand). This
+ *          is the behaviour before mandatory consent.
+ *   true   — the same box must be ticked to place a cash-on-delivery order
+ *          that would be messaged; the server refuses the order without it.
+ *   It only decides whether the tick is required: turning it off never turns
+ *   the confirmation system off, and WHATSAPP_CONFIRM_MODE is unaffected.
+ *
+ * WHATSAPP_CONSENT_REQUEST_DETAILS — what of the order request is kept with
+ * the consent evidence (wa_checkout_consent):
+ *   anonymized (DEFAULT) — the IP address with its host part zeroed; no
+ *          user agent.
+ *   none   — neither.
+ *   full   — the full IP address and the user agent (truncated).
+ *
+ * WHATSAPP_CONSENT_RETENTION_DAYS — consent evidence older than this many
+ * days is deleted by the scheduler. UNSET (default) = nothing is ever
+ * deleted. Values under 30 are refused (treated as unset, boot warns), so a
+ * typo cannot wipe recent evidence.
+ *
  * Dependency-free on purpose (like abs-tracking.ts).
  */
 export type WhatsAppConfirmMode = "off" | "shadow" | "pilot" | "live";
@@ -41,6 +63,10 @@ export const SUPPORT_WABA_ID = "1576999750297285";
 export const WA_REMINDER_AFTER_HOURS_DEFAULT = 24;
 export const WA_FOLLOWUP_AFTER_HOURS_DEFAULT = 48;
 export const WA_DAILY_CAP_DEFAULT = 200;
+export const WA_CONSENT_RETENTION_MIN_DAYS = 30;
+
+export type CheckoutConsentPolicy = "optional" | "required";
+export type ConsentRequestDetails = "none" | "anonymized" | "full";
 
 export interface WhatsAppConfirmConfig {
   requestedMode: WhatsAppConfirmMode;
@@ -57,6 +83,14 @@ export interface WhatsAppConfirmConfig {
   pilotAllowlist: ReadonlySet<string>;
   reminderAfterHours: number;
   followUpAfterHours: number;
+  /** WHATSAPP_CHECKOUT_CONSENT_REQUIRED=true → "required"; default "optional". */
+  checkoutConsent: CheckoutConsentPolicy;
+  /** WHATSAPP_CONSENT_REQUEST_DETAILS (default anonymized). */
+  consentRequestDetails: ConsentRequestDetails;
+  /** WHATSAPP_CONSENT_RETENTION_DAYS; null = never delete (default). */
+  consentRetentionDays: number | null;
+  /** The raw WHATSAPP_CONSENT_RETENTION_DAYS when it was set but refused. */
+  consentRetentionRejected: string | null;
 }
 
 type Env = Record<string, string | undefined>;
@@ -85,7 +119,27 @@ export function parsePilotAllowlist(raw: string | undefined): Set<string> {
   return out;
 }
 
+/** Only an explicit "true" requires the tick; anything else (unset, typo) keeps it optional. */
+export function parseCheckoutConsentPolicy(raw: string | undefined): CheckoutConsentPolicy {
+  return (raw ?? "").trim().toLowerCase() === "true" ? "required" : "optional";
+}
+
+export function parseConsentRequestDetails(raw: string | undefined): ConsentRequestDetails {
+  const v = (raw ?? "").trim().toLowerCase();
+  return v === "none" || v === "full" ? v : "anonymized";
+}
+
+/** null unless a whole number of days ≥ WA_CONSENT_RETENTION_MIN_DAYS. */
+export function parseConsentRetentionDays(raw: string | undefined): number | null {
+  const v = (raw ?? "").trim();
+  if (!/^\d+$/.test(v)) return null;
+  const n = Number(v);
+  return Number.isSafeInteger(n) && n >= WA_CONSENT_RETENTION_MIN_DAYS ? n : null;
+}
+
 export function readWhatsAppConfirmConfig(env: Env = process.env): WhatsAppConfirmConfig {
+  const retentionRaw = env.WHATSAPP_CONSENT_RETENTION_DAYS?.trim() || null;
+  const consentRetentionDays = parseConsentRetentionDays(retentionRaw ?? undefined);
   return {
     requestedMode: parseWhatsAppConfirmMode(env.WHATSAPP_CONFIRM_MODE),
     graphApiVersion: str(env, "WHATSAPP_GRAPH_API_VERSION"),
@@ -100,6 +154,10 @@ export function readWhatsAppConfirmConfig(env: Env = process.env): WhatsAppConfi
     pilotAllowlist: parsePilotAllowlist(env.WHATSAPP_PILOT_ALLOWLIST),
     reminderAfterHours: positiveInt(env, "WHATSAPP_REMINDER_AFTER_HOURS", WA_REMINDER_AFTER_HOURS_DEFAULT),
     followUpAfterHours: positiveInt(env, "WHATSAPP_FOLLOWUP_AFTER_HOURS", WA_FOLLOWUP_AFTER_HOURS_DEFAULT),
+    checkoutConsent: parseCheckoutConsentPolicy(env.WHATSAPP_CHECKOUT_CONSENT_REQUIRED),
+    consentRequestDetails: parseConsentRequestDetails(env.WHATSAPP_CONSENT_REQUEST_DETAILS),
+    consentRetentionDays,
+    consentRetentionRejected: retentionRaw !== null && consentRetentionDays === null ? retentionRaw : null,
   };
 }
 

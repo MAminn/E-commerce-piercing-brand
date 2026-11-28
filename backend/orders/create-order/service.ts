@@ -1,5 +1,8 @@
 import { query } from "#root/shared/database/drizzle/db";
 import { queueWhatsAppConfirmation } from "#root/backend/whatsapp-confirmation/enqueue";
+import { consentRequestDetails, planCheckoutConsent, recordCheckoutConsentInTx } from "#root/backend/whatsapp-confirmation/consent";
+import { effectiveWhatsAppConfirmMode, readWhatsAppConfirmConfig } from "#root/shared/config/whatsapp-confirmation";
+import { WHATSAPP_CONSENT_REQUIRED_MESSAGE } from "#root/shared/whatsapp/consent-text";
 import {
   order,
   orderItem,
@@ -182,11 +185,18 @@ export const createOrderSchema = z.object({
   buildingNumber: z.string().trim().optional(),
   apartment: z.string().trim().optional(),
   /**
-   * The shopper ticked "send my order confirmation on WhatsApp" (never
-   * pre-ticked). Consumed only by backend/whatsapp-confirmation after the
-   * order commits; not stored on the order row.
+   * The shopper ticked the WhatsApp acknowledgment (never pre-ticked). With
+   * WHATSAPP_CHECKOUT_CONSENT_REQUIRED=true, for a COD order the current mode
+   * would really message (live, or pilot for an allow-listed number) it is
+   * REQUIRED: the order is refused without it. Otherwise it is optional.
+   * Recorded as consent evidence (wa_checkout_consent) in the order's
+   * transaction; not stored on the order row.
    */
   whatsappOptIn: z.boolean().optional().default(false),
+  /** Version of the acknowledgment text the browser showed (shared/whatsapp/consent-text.ts). */
+  whatsappConsentVersion: z.string().trim().max(40).optional(),
+  /** Language the acknowledgment was shown in. */
+  whatsappConsentLocale: z.enum(["en", "ar"]).optional(),
 }).refine((data) => data.items.length + data.bundles.length > 0, {
   message: "An order needs at least one item",
   path: ["items"],
@@ -508,14 +518,39 @@ export const createOrder = (
   session?: ClientSession,
   /** GA4 cookies of the order request (server-owned GA4 purchase only). */
   analytics?: { cookies: Ga4CookieInput },
+  /** The order request, kept with WhatsApp consent evidence only. */
+  request?: { ipAddress?: string | null; userAgent?: string | null },
 ) =>
   Effect.gen(function* ($) {
     // GA4_PURCHASE_OWNER (backend/pixel-tracking/ga4-purchase): one mode for
     // the whole request. In the default `browser` mode nothing below runs.
     const ga4Owner = effectiveGa4PurchaseOwner();
+    // WhatsApp acknowledgment (backend/whatsapp-confirmation/consent.ts):
+    // decided once, from the boot-fixed mode, before anything is written.
+    const waConfig = readWhatsAppConfirmConfig();
+    const waConsent = planCheckoutConsent({
+      mode: effectiveWhatsAppConfirmMode(),
+      config: waConfig,
+      customerPhone: input.customerPhone,
+      paymentMethod: input.paymentMethod,
+      whatsappOptIn: input.whatsappOptIn === true,
+      consentVersion: input.whatsappConsentVersion,
+      consentLocale: input.whatsappConsentLocale,
+    });
     // We no longer require a session for ordering
     const result = yield* $(
       query(async (db) => {
+        // A COD order this mode would message must carry the shopper's own
+        // tick. Refused before the transaction: nothing is written, nothing
+        // is reserved, and checkout shows the box with this message.
+        if (waConsent.kind === "refuse") {
+          throw new ServerError({
+            tag: "WhatsAppConsentRequired",
+            message: "COD order without the required WhatsApp acknowledgment",
+            statusCode: 400,
+            clientMessage: WHATSAPP_CONSENT_REQUIRED_MESSAGE,
+          });
+        }
         // Read before the transaction (cached); only picks which `_ga_<id>`
         // session cookie belongs to the store's GA4 property.
         let ga4MeasurementId: string | null = null;
@@ -1248,6 +1283,21 @@ export const createOrder = (
             }
           }
 
+          // ─── WhatsApp consent evidence ──────────────────────────────────
+          // Same transaction as the order, so a placed order and the proof of
+          // its shopper's tick are committed together. Savepointed: it can
+          // never fail the order (the post-commit enqueue still has the tick).
+          if (waConsent.kind === "record") {
+            await recordCheckoutConsentInTx(tx, {
+              ...waConsent.evidence,
+              orderId: newOrder.id,
+              orderNumber: newOrder.orderNumber ?? null,
+              // WHATSAPP_CONSENT_REQUEST_DETAILS (default: anonymised IP, no user agent).
+              ...consentRequestDetails(waConfig.consentRequestDetails, request),
+              consentedAt: new Date(),
+            });
+          }
+
           // ─── GA4 server-owned purchase (shadow / server mode only) ─────
           // Same transaction as the order: the GA4 ids from this request's
           // cookies (the only request that carries them), and for COD — a
@@ -1329,7 +1379,8 @@ export const createOrder = (
         Effect.promise(() =>
           queueWhatsAppConfirmation({
             orderId: result.id,
-            whatsappOptIn: input.whatsappOptIn === true,
+            whatsappOptIn: waConsent.kind === "record",
+            consentTextVersion: waConsent.kind === "record" ? waConsent.evidence.consentTextVersion : null,
           }),
         ),
       );

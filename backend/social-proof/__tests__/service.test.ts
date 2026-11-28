@@ -107,7 +107,8 @@ describe("getPublicSocialProofFeed — feature gating", () => {
     const feed = await run(db);
 
     expect(feed.events).toHaveLength(1);
-    expect(feed.events[0]!.displayName).toBe("Ahmed M.");
+    // First name only (b29a804: "prevent repeated social proof names" dropped the initial).
+    expect(feed.events[0]!.displayName).toBe("Ahmed");
     expect(feed.events[0]!.location).toBe("Cairo");
     expect(feed.events[0]!.productName).toBe("Seamless Ring 8mm");
     expect(feed.events[0]!.productImageUrl).toBe("/uploads/whey.jpg");

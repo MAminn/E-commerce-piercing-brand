@@ -297,9 +297,11 @@ export function startWhatsAppConfirmWorker(deps: WaWorkerDeps): WaWorkerHandle |
       const replayed = await reprocessStaleInbound(deps.db, ctx);
       if (replayed) console.info(`[WhatsApp confirm] re-processed ${replayed} stored webhook event(s)`);
       const r = await runScheduler(deps.db, ctx);
-      if (r.reminders || r.followUps || r.superseded) {
-        console.info(`[WhatsApp confirm] scheduler reminders=${r.reminders} followUps=${r.followUps} superseded=${r.superseded}`);
-        if (r.reminders) void tick();
+      if (r.reminders || r.followUps || r.superseded || r.backfilled || r.consentPurged) {
+        console.info(
+          `[WhatsApp confirm] scheduler reminders=${r.reminders} followUps=${r.followUps} superseded=${r.superseded} backfilled=${r.backfilled} consentPurged=${r.consentPurged}`,
+        );
+        if (r.reminders || r.backfilled) void tick();
       }
     } catch (err) {
       console.error(`[WhatsApp confirm] scheduler failed: ${String((err as Error)?.message ?? err).slice(0, 200)}`);

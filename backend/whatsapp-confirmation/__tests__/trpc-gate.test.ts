@@ -61,7 +61,7 @@ describe("whatsappConfirmation superadmin-only procedures", () => {
   });
 
   it("checkoutOptIn is public and reports off without a boot status", async () => {
-    expect(await caller(null).whatsappConfirmation.checkoutOptIn()).toEqual({ enabled: false });
+    expect(await caller(null).whatsappConfirmation.checkoutOptIn()).toEqual({ enabled: false, required: false });
   });
 });
 
@@ -69,6 +69,7 @@ describe("whatsappConfirmation.checkoutOptIn — per effective mode (anonymous c
   const ALLOWED = "01009990001";
   const OTHER = "01009990002";
   const saved = process.env.WHATSAPP_PILOT_ALLOWLIST;
+  const savedRequired = process.env.WHATSAPP_CHECKOUT_CONSENT_REQUIRED;
   let cfg: typeof import("#root/shared/config/whatsapp-confirmation");
 
   const boot = (mode: "off" | "shadow" | "pilot" | "live") =>
@@ -79,10 +80,14 @@ describe("whatsappConfirmation.checkoutOptIn — per effective mode (anonymous c
     cfg = await import("#root/shared/config/whatsapp-confirmation");
     process.env.WHATSAPP_PILOT_ALLOWLIST = "201009990001";
   });
-  afterEach(() => cfg.setWhatsAppConfirmBootStatus(null));
+  afterEach(() => {
+    cfg.setWhatsAppConfirmBootStatus(null);
+    Reflect.deleteProperty(process.env, "WHATSAPP_CHECKOUT_CONSENT_REQUIRED");
+  });
   afterAll(() => {
     if (saved === undefined) Reflect.deleteProperty(process.env, "WHATSAPP_PILOT_ALLOWLIST");
     else process.env.WHATSAPP_PILOT_ALLOWLIST = saved;
+    if (savedRequired !== undefined) process.env.WHATSAPP_CHECKOUT_CONSENT_REQUIRED = savedRequired;
   });
 
   it("off: hidden, with or without a number", async () => {
@@ -105,9 +110,21 @@ describe("whatsappConfirmation.checkoutOptIn — per effective mode (anonymous c
     expect([await ask(), await ask(ALLOWED), await ask(OTHER)]).toEqual([true, true, true]);
   });
 
-  it("returns only { enabled } and rejects an oversized phone", async () => {
+  it("required: only with WHATSAPP_CHECKOUT_CONSENT_REQUIRED=true, and only where the box is shown", async () => {
+    const req = async (phone?: string) => (await caller(null).whatsappConfirmation.checkoutOptIn(phone === undefined ? undefined : { phone })).required;
     boot("live");
-    expect(Object.keys(await caller(null).whatsappConfirmation.checkoutOptIn({ phone: ALLOWED }))).toEqual(["enabled"]);
+    expect([await req(ALLOWED), await req(OTHER)]).toEqual([false, false]);
+    process.env.WHATSAPP_CHECKOUT_CONSENT_REQUIRED = "true";
+    expect([await req(ALLOWED), await req(OTHER)]).toEqual([true, true]);
+    boot("pilot");
+    expect([await req(ALLOWED), await req(OTHER)]).toEqual([true, false]);
+    boot("shadow");
+    expect([await req(ALLOWED), await req(OTHER)]).toEqual([false, false]);
+  });
+
+  it("returns only { enabled, required } and rejects an oversized phone", async () => {
+    boot("live");
+    expect(Object.keys(await caller(null).whatsappConfirmation.checkoutOptIn({ phone: ALLOWED })).sort()).toEqual(["enabled", "required"]);
     expect(await codeOf(caller(null).whatsappConfirmation.checkoutOptIn({ phone: "1".repeat(41) }))).toBe("BAD_REQUEST");
   });
 });

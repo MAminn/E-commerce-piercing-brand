@@ -72,6 +72,18 @@ Orders placed while paused are queued, not dropped. On **Resume** the backlog is
 `pending` with no reply), so after a long pause the first messages can be hours old — consider checking the
 "Awaiting reply" tab before resuming.
 
+## Mandatory checkout consent (rollout switch)
+`WHATSAPP_CHECKOUT_CONSENT_REQUIRED=true` + restart makes the checkout tick mandatory for COD orders that
+would be messaged. Remove it (or set `false`) + restart to return to the optional box; confirmations keep
+running either way. Do not turn it on without owner approval (legal basis for bundled consent under
+Egyptian law is not established).
+
+## Consent data
+`WHATSAPP_CONSENT_REQUEST_DETAILS` (default `anonymized`) decides what of the request is kept with the
+evidence. `WHATSAPP_CONSENT_RETENTION_DAYS` is unset by default (nothing deleted); set it only to an
+owner-approved period (≥ 30 days).
+
 ## Rollback
 Dashboard **Pause** (instant) → `WHATSAPP_CONFIRM_MODE=shadow` or `off` + restart. Tables are additive;
-nothing to undo in orders, ERP or ABS.
+nothing to undo in orders, ERP or ABS. Migration 0074 (`wa_checkout_consent`) can stay after a code
+rollback (older code ignores it); if it is dropped, the feature runs `off` until it is back.
