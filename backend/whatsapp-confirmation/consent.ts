@@ -8,6 +8,7 @@ import {
   type ConsentLocale,
   isWhatsAppConsentVersion,
   LEGACY_WHATSAPP_CONSENT_VERSION,
+  MANDATORY_CHOICE_CONSENT_VERSION,
   type WhatsAppConsentVersion,
   whatsappConsentText,
 } from "#root/shared/whatsapp/consent-text";
@@ -30,6 +31,8 @@ export interface CheckoutConsentInput {
   /** Which consent text the browser showed (absent from older builds). */
   consentVersion?: string | null;
   consentLocale?: string | null;
+  /** checkout-v3 required choice: "whatsapp" (opt-in) or "phone" (no WhatsApp). */
+  confirmationChannel?: string | null;
 }
 
 export type CheckoutConsentPlan =
@@ -37,6 +40,8 @@ export type CheckoutConsentPlan =
   | { kind: "refuse" }
   /** Nothing to record (no tick, and none needed; or the feature is off). */
   | { kind: "none" }
+  /** The shopper chose a phone call (required choice): no WhatsApp, no consent; staff call. */
+  | { kind: "phone" }
   /** Ticked: write this evidence with the order. */
   | { kind: "record"; evidence: CheckoutConsentEvidence };
 
@@ -46,17 +51,27 @@ export interface CheckoutConsentEvidence {
   consentTextVersion: WhatsAppConsentVersion;
   consentLocale: ConsentLocale;
   consentText: string;
+  /**
+   * Was the WhatsApp opt-in itself a condition of ordering? True only for a
+   * tick given where it was required with no alternative (an older page under
+   * the switch). The checkout-v3 choice always offers a phone call, so an
+   * opt-in given there is false: freely chosen.
+   */
   required: boolean;
   mode: WhatsAppConfirmMode;
 }
 
 export function planCheckoutConsent(input: CheckoutConsentInput): CheckoutConsentPlan {
   if (input.mode === "off") return { kind: "none" };
-  // The tick is REQUIRED only when the rollout switch is on AND this order
-  // would really be messaged. Switch off: the box stays optional (the
-  // behaviour before mandatory consent) and nothing is ever refused.
+  // A confirmation-channel CHOICE is required only when the rollout switch is
+  // on AND this order would really be messaged. Switch off: the box stays an
+  // optional opt-in (the behaviour before mandatory consent), nothing is ever
+  // refused and a channel, if sent, is ignored.
   const required =
     input.config.checkoutConsent === "required" && checkoutConsentRequired(input.mode, input.config, input.customerPhone, input.paymentMethod);
+  // Phone call chosen: no WhatsApp at all, whatever else the request says
+  // (a contradictory request is read the conservative way).
+  if (required && input.confirmationChannel === "phone") return { kind: "phone" };
   if (input.whatsappOptIn !== true) return required ? { kind: "refuse" } : { kind: "none" };
   // A tick on an online-payment order means nothing: no message is ever sent
   // for one, so nothing is recorded as if it were consent to one.
@@ -73,7 +88,8 @@ export function planCheckoutConsent(input: CheckoutConsentInput): CheckoutConsen
       consentTextVersion: version,
       consentLocale: locale,
       consentText: whatsappConsentText(version, locale),
-      required,
+      // v3 always offered "by phone call" instead: the opt-in was not a condition.
+      required: required && version !== MANDATORY_CHOICE_CONSENT_VERSION,
       mode: input.mode,
     },
   };

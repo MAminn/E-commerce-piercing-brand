@@ -8,12 +8,16 @@ for any other phone number id are ignored.
 
 ## Flow
 
-0. Checkout (COD, live — or pilot for an allow-listed number): the WhatsApp box is shown,
-   never pre-ticked. With `WHATSAPP_CHECKOUT_CONSENT_REQUIRED=true` the tick is
-   **required**: checkout will not submit without it, and `order.create` refuses the order
-   without it (nothing written). Otherwise (the default) it is optional, as before. A tick
-   is stored as consent evidence in `wa_checkout_consent`, in the order's own transaction
-   (`consent.ts`).
+0. Checkout (COD, live — or pilot for an allow-listed number):
+   - default (switch off): an optional opt-in checkbox (checkout-v2), never pre-ticked;
+   - `WHATSAPP_CHECKOUT_CONSENT_REQUIRED=true` (checkout-v3, PROPOSED, pending legal
+     review): a **required choice of how the order is confirmed** — "On WhatsApp" (the
+     explicit WhatsApp opt-in) or "By phone call" (no WhatsApp at all) — nothing
+     preselected. Checkout will not submit without a choice and `order.create` refuses an
+     order without one (nothing written).
+   A ticked box / WhatsApp choice is stored as consent evidence in `wa_checkout_consent`, in
+   the order's own transaction (`consent.ts`). A phone choice is never consent: the order
+   is listed `ineligible: phone_requested` with a staff "call to confirm" item.
 1. Order committed (COD) → `queueWhatsAppConfirmation` (create-order service, after the
    order-email queue). Writes `wa_order_confirmation` + `wa_outbox` once
    (unique `order_id` / `dedupe_key`). Never throws, never calls Meta. If this step is
@@ -40,19 +44,35 @@ for any other phone number id are ignored.
 |---|---|---|---|---|
 | `off` (default) | hidden | nothing (no query at all) | no | no |
 | `shadow` | hidden | every eligible COD order, without asking (`consent_source = 'shadow_not_asked'`), payload stored as `shadow_skipped` | no | no (records `would_apply`) |
-| `pilot` | shown (COD only) once the shopper types an allow-listed mobile number; **required** only with the switch on | allow-listed + ticked → queued; not ticked → refused (switch on) or `ineligible: no_consent` (switch off); any other number → shadow record | only to allow-listed numbers that **ticked** the box | only for those |
-| `live` | shown to everyone paying COD, never pre-ticked; **required** only with the switch on | ticked → queued; not ticked → refused (switch on) or `ineligible: no_consent` (switch off) | only to orders whose box was **ticked** | yes (confirm only) |
+| `pilot` | shown (COD only) once the shopper types an allow-listed mobile number: optional box (switch off) or required WhatsApp/phone choice (switch on) | allow-listed + WhatsApp → queued; phone → `ineligible: phone_requested` + staff call item; no choice → refused (switch on) / `ineligible: no_consent` (switch off); any other number → shadow record | only to allow-listed numbers that **opted in** | only for those |
+| `live` | shown to everyone paying COD: optional box (switch off) or required WhatsApp/phone choice (switch on) | WhatsApp → queued; phone → `ineligible: phone_requested` + staff call item; no choice → refused (switch on) / `ineligible: no_consent` (switch off) | only to orders that **opted in** | yes (confirm only) |
 
-**Required acknowledgment — rollout switch `WHATSAPP_CHECKOUT_CONSENT_REQUIRED`**
-(default off; only the exact value `true` turns it on). On: wherever the box is shown for a
-cash-on-delivery order, the order cannot be placed without the tick
-(`checkoutConsentRequired`). Off: the box is optional exactly as before. The switch never
-turns the confirmation system off (that is `WHATSAPP_CONFIRM_MODE`). Never required, and
-not shown, for card payments (no message is sent for them) or in off / shadow. A landline
-is never refused (staff confirm it by hand). The server's refusal text is bilingual; current
-checkout replaces it with its own message in the checkout language (EN/AR) and shows the
-box; an older cached page shows the bilingual text next to its own box.
-**Turning the switch on needs owner approval** (legal basis for bundled consent).
+**Rollout switch `WHATSAPP_CHECKOUT_CONSENT_REQUIRED` — checkout-v3 (PROPOSED)** (default
+off; only the exact value `true` turns it on). On, for a cash-on-delivery order that would be
+messaged, checkout shows a required block (`shared/whatsapp/consent-text.ts`,
+`CONFIRMATION_CHOICE_TEXT`) that keeps two things apart:
+- a **contractual order-processing notice** ("Percé confirms every cash-on-delivery order
+  with you before it ships") — information, not consent;
+- the **recipient opt-in Meta requires**, only in the "On WhatsApp" option (names Percé,
+  WhatsApp, the number, the messages, how to STOP). Choosing it is the opt-in; "By phone
+  call" is always offered, so the WhatsApp opt-in is never a condition of buying (evidence
+  column `required` = false for v3).
+
+Off: the optional box exactly as before. The switch never turns the confirmation system off
+(that is `WHATSAPP_CONFIRM_MODE`). Never required, and not shown, for card payments or in
+off / shadow; a landline is never refused. The server's refusal text is bilingual; current
+checkout replaces it with its own message (EN/AR) and shows the choice; an older cached page
+shows the text next to its own box (a tick there is accepted and recorded as `checkout-v2`,
+`required` = true). **Turning the switch on needs owner approval** of the wording and the
+legal basis.
+
+**Phone-confirmation fallback** — staff call to confirm (review queue / "Not sent") when:
+the shopper chose a phone call (`phone_requested`), did not opt in (`no_consent`, switch
+off), has a landline (`invalid_phone`), opted out (`opted_out`, or STOP later), the message
+failed (`failed_send`), or there is no reply after 48 h (`no_reply_48h`). See the runbook.
+
+There is no marketing opt-in at checkout (the mailing list is separate). WhatsApp consent
+here covers order messages only and is never used for marketing templates.
 
 **Consent evidence (`wa_checkout_consent`, migration 0074):** one row per ticked order,
 written in the order's transaction and never updated. It holds the phone number as typed,

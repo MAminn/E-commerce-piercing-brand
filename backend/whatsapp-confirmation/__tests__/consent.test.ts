@@ -8,8 +8,10 @@ import {
   WA_MODES,
 } from "#root/shared/config/whatsapp-confirmation";
 import {
+  CONFIRMATION_CHOICE_TEXT,
   CURRENT_WHATSAPP_CONSENT_VERSION,
   isWhatsAppConsentRequiredError,
+  MANDATORY_CHOICE_CONSENT_VERSION,
   isWhatsAppConsentVersion,
   WHATSAPP_CONSENT_REQUIRED_MESSAGE,
   WHATSAPP_CONSENT_TEXTS,
@@ -182,6 +184,51 @@ describe("consent retention (C5)", () => {
   });
 });
 
+describe("checkout-v3: required confirmation-channel choice (switch on)", () => {
+  const base = { config: cfg, customerPhone: OTHER, paymentMethod: "cod", consentLocale: "en", mode: "live" as const };
+  it("phone call chosen → no WhatsApp, no consent, never refused", () => {
+    expect(planCheckoutConsent({ ...base, whatsappOptIn: false, confirmationChannel: "phone" })).toEqual({ kind: "phone" });
+    // Contradictory request (phone + tick) is read the conservative way.
+    expect(planCheckoutConsent({ ...base, whatsappOptIn: true, confirmationChannel: "phone", consentVersion: "checkout-v3" })).toEqual({ kind: "phone" });
+  });
+  it("WhatsApp chosen → v3 evidence with the exact option text; the opt-in was NOT a condition (phone offered)", () => {
+    const r = planCheckoutConsent({ ...base, whatsappOptIn: true, confirmationChannel: "whatsapp", consentVersion: "checkout-v3", consentLocale: "ar" });
+    expect(r.kind === "record" && r.evidence).toMatchObject({
+      consentTextVersion: "checkout-v3",
+      consentText: WHATSAPP_CONSENT_TEXTS["checkout-v3"].ar,
+      required: false,
+    });
+  });
+  it("no choice → refused; an older page's plain tick under the switch is still accepted and marked as required", () => {
+    expect(planCheckoutConsent({ ...base, whatsappOptIn: false })).toEqual({ kind: "refuse" });
+    const legacy = planCheckoutConsent({ ...base, whatsappOptIn: true, consentVersion: "checkout-v2" });
+    expect(legacy.kind === "record" && legacy.evidence).toMatchObject({ consentTextVersion: "checkout-v2", required: true });
+  });
+  it("switch off: a channel, if sent, is ignored (optional box rules)", () => {
+    expect(planCheckoutConsent({ ...base, config: optionalCfg, whatsappOptIn: false, confirmationChannel: "phone" })).toEqual({ kind: "none" });
+  });
+  it("not required for this order (card, landline, shadow): phone channel ignored, nothing refused", () => {
+    expect(planCheckoutConsent({ ...base, paymentMethod: "paymob", whatsappOptIn: false, confirmationChannel: "phone" })).toEqual({ kind: "none" });
+    expect(planCheckoutConsent({ ...base, customerPhone: LANDLINE, whatsappOptIn: false })).toEqual({ kind: "none" });
+    expect(planCheckoutConsent({ ...base, mode: "shadow", whatsappOptIn: false })).toEqual({ kind: "none" });
+  });
+  it("the wording: the WhatsApp option is the v3 consent text; it names Percé, WhatsApp, the number, STOP; the phone option names no WhatsApp opt-in", () => {
+    for (const loc of ["en", "ar"] as const) {
+      const c = CONFIRMATION_CHOICE_TEXT[loc];
+      expect(c.whatsapp).toBe(WHATSAPP_CONSENT_TEXTS["checkout-v3"][loc]);
+      expect(c.whatsapp).toMatch(/Percé/);
+      expect(c.notice).toMatch(/Percé/);
+      expect(c.phone).toMatch(/Percé/);
+    }
+    expect(CONFIRMATION_CHOICE_TEXT.en.whatsapp).toMatch(/WhatsApp.*phone number above.*STOP/);
+    expect(CONFIRMATION_CHOICE_TEXT.ar.whatsapp).toMatch(/واتساب.*رقم الهاتف أعلاه.*إيقاف/);
+    // The notice is information, not consent: it never says "I agree".
+    expect(CONFIRMATION_CHOICE_TEXT.en.notice).not.toMatch(/agree|understand/i);
+    expect(CONFIRMATION_CHOICE_TEXT.en.phone).toMatch(/No WhatsApp/);
+    expect(MANDATORY_CHOICE_CONSENT_VERSION).toBe("checkout-v3");
+  });
+});
+
 describe("consent text", () => {
   it("every version has both languages, names the business and WhatsApp", () => {
     for (const [v, t] of Object.entries(WHATSAPP_CONSENT_TEXTS)) {
@@ -198,7 +245,7 @@ describe("consent text", () => {
     expect(whatsappConsentText("checkout-v2", "ar")).toBe(cur.ar);
   });
   it("rejects prototype keys and junk as versions", () => {
-    for (const v of ["toString", "__proto__", "", null, 2, "checkout-v3"]) expect(isWhatsAppConsentVersion(v), String(v)).toBe(false);
+    for (const v of ["toString", "__proto__", "", null, 2, "checkout-v4"]) expect(isWhatsAppConsentVersion(v), String(v)).toBe(false);
   });
   it("the refusal message is recognisable by checkout, and readable in both languages on an older page", () => {
     expect(isWhatsAppConsentRequiredError(WHATSAPP_CONSENT_REQUIRED_MESSAGE)).toBe(true);

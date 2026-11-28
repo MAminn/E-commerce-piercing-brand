@@ -3199,7 +3199,11 @@ export const waCheckoutConsent = pgTable(
     consentLocale: text("consent_locale").notNull(),
     /** The exact sentence shown next to the ticked box. */
     consentText: text("consent_text").notNull(),
-    /** Was the tick required for this order (live / allow-listed pilot COD)? */
+    /**
+     * Was the WhatsApp opt-in a condition of ordering? True only for a tick
+     * given where it was required with no alternative; an opt-in chosen in the
+     * checkout-v3 channel choice (phone call offered) is false.
+     */
     required: boolean("required").notNull(),
     /** Effective WHATSAPP_CONFIRM_MODE when the order was placed. */
     mode: text("mode").notNull(),

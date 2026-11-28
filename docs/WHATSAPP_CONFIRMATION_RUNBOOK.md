@@ -72,11 +72,27 @@ Orders placed while paused are queued, not dropped. On **Resume** the backlog is
 `pending` with no reply), so after a long pause the first messages can be hours old — consider checking the
 "Awaiting reply" tab before resuming.
 
-## Mandatory checkout consent (rollout switch)
-`WHATSAPP_CHECKOUT_CONSENT_REQUIRED=true` + restart makes the checkout tick mandatory for COD orders that
-would be messaged. Remove it (or set `false`) + restart to return to the optional box; confirmations keep
-running either way. Do not turn it on without owner approval (legal basis for bundled consent under
-Egyptian law is not established).
+## Mandatory order confirmation (rollout switch, checkout-v3 — PROPOSED)
+`WHATSAPP_CHECKOUT_CONSENT_REQUIRED=true` + restart makes COD checkout ask, as a required choice, how the
+order is confirmed: **On WhatsApp** (the customer's WhatsApp opt-in) or **By phone call** (no WhatsApp).
+Remove it (or set `false`) + restart to return to the optional checkbox; confirmations keep running either
+way. Do not turn it on until the owner has approved the wording and the legal basis (Egyptian law) and the
+opt-in method against Meta's requirements.
+
+## Phone-confirmation fallback (staff)
+Every COD order is still confirmed. WhatsApp is only one channel; staff call the customer when:
+
+| Why | Where it shows | What staff do |
+|---|---|---|
+| Customer chose "By phone call" | Review queue: "chose a phone call to confirm"; list `phone_requested` | Call, confirm or cancel the order as usual |
+| No WhatsApp opt-in (switch off, box not ticked) | "Not sent" list, `no_consent` | Confirm by phone as before the feature |
+| Landline / not a mobile | "Not sent" list, `invalid_phone` | Call |
+| Opted out (STOP, now or earlier) | Review queue: "opted out … confirm manually"; `opted_out` | Call; never message them on WhatsApp |
+| Customer without WhatsApp / undeliverable | Review queue: "could not be delivered … confirm manually" (`failed_send`) | Call |
+| No reply after 48 h | Review queue: "No reply on WhatsApp" (`no_reply_48h`) | Call |
+
+Customers who opted out are not messaged again automatically, even if they tick or choose WhatsApp on a
+later order (staff get an item instead).
 
 ## Consent data
 `WHATSAPP_CONSENT_REQUEST_DETAILS` (default `anonymized`) decides what of the request is kept with the

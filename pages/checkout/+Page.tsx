@@ -11,7 +11,11 @@ import { getTemplateComponent } from "#root/components/template-system/templateC
 import { resolveTemplateId } from "#root/shared/config/storefront";
 import { trpc } from "#root/shared/trpc/client";
 import { useMinimalI18n } from "#root/lib/i18n/MinimalI18nContext";
-import { CURRENT_WHATSAPP_CONSENT_VERSION, isWhatsAppConsentRequiredError } from "#root/shared/whatsapp/consent-text";
+import {
+  CURRENT_WHATSAPP_CONSENT_VERSION,
+  isWhatsAppConsentRequiredError,
+  MANDATORY_CHOICE_CONSENT_VERSION,
+} from "#root/shared/whatsapp/consent-text";
 import { formatSelectedOptionValues } from "#root/shared/products/options";
 import type {
   CheckoutPageModernTemplateProps,
@@ -117,14 +121,15 @@ export default function CheckoutPage() {
   >([]);
   const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true);
 
-  // WhatsApp acknowledgment: the server decides per mode (live: shown;
-  // pilot: shown only for an allow-listed number; off/shadow: hidden), so it
-  // is asked again (debounced) as the phone number changes. It also says
-  // whether the tick is REQUIRED (WHATSAPP_CHECKOUT_CONSENT_REQUIRED): then
-  // the template will not submit a cash-on-delivery order without it, and the
-  // server refuses one. A failed lookup hides it; if the server then refuses
-  // the order for a missing tick, the box is shown (forced, required) so the
-  // shopper can tick it and resubmit, with the error in their language.
+  // WhatsApp: the server decides per mode (live: shown; pilot: shown only for
+  // an allow-listed number; off/shadow: hidden), so it is asked again
+  // (debounced) as the phone number changes. It also says whether a choice is
+  // REQUIRED (WHATSAPP_CHECKOUT_CONSENT_REQUIRED, checkout-v3): then the
+  // template shows "confirm on WhatsApp / by phone call" and will not submit a
+  // cash-on-delivery order without a choice, and the server refuses one.
+  // Otherwise it is the optional opt-in checkbox. A failed lookup hides it;
+  // if the server then refuses the order, the choice is shown (forced) so the
+  // shopper can pick and resubmit, with the error in their language.
   // A synchronous throw while building the call is turned into a rejection
   // by the Promise.resolve() wrapper, never a render crash.
   const { locale, t } = useMinimalI18n();
@@ -333,6 +338,9 @@ export default function CheckoutPage() {
     setErrorMessage(undefined);
 
     const selectedPaymentMethod = formValues.paymentMethod || "cod";
+    const whatsAppBlockApplies = showWhatsAppOptIn && selectedPaymentMethod === "cod";
+    const whatsappChannelChosen =
+      formValues.whatsappChannel === "whatsapp" || formValues.whatsappChannel === "phone" ? formValues.whatsappChannel : undefined;
     const isOnlinePayment =
       selectedPaymentMethod === "stripe" || selectedPaymentMethod === "paymob";
 
@@ -393,10 +401,14 @@ export default function CheckoutPage() {
         paymentMethod: selectedPaymentMethod as "cod" | "stripe" | "paymob",
         buildingNumber: formValues.buildingNumber || undefined,
         apartment: formValues.apartment || undefined,
-        // Only a visible box the shopper ticked, on a COD order, is consent.
+        // Only a visible, explicit action on a COD order is consent: the ticked
+        // optional box, or choosing WhatsApp in the required choice (v3).
+        // Choosing a phone call is sent as such and is never consent.
         whatsappOptIn:
-          showWhatsAppOptIn && selectedPaymentMethod === "cod" && formValues.whatsappOptIn === "true",
-        whatsappConsentVersion: CURRENT_WHATSAPP_CONSENT_VERSION,
+          whatsAppBlockApplies &&
+          (whatsAppConsentRequired ? whatsappChannelChosen === "whatsapp" : formValues.whatsappOptIn === "true"),
+        whatsappConfirmationChannel: whatsAppBlockApplies && whatsAppConsentRequired ? whatsappChannelChosen : undefined,
+        whatsappConsentVersion: whatsAppConsentRequired ? MANDATORY_CHOICE_CONSENT_VERSION : CURRENT_WHATSAPP_CONSENT_VERSION,
         whatsappConsentLocale: locale === "ar" ? "ar" : "en",
       });
 
@@ -497,7 +509,7 @@ export default function CheckoutPage() {
       // so in the checkout's own language rather than the server's wording.
       if (isWhatsAppConsentRequiredError(message)) {
         setForceWhatsAppOptIn(true);
-        setErrorMessage(t("checkout.whatsapp_consent_required"));
+        setErrorMessage(t("checkout.whatsapp_channel_required"));
       } else {
         setErrorMessage(message);
       }

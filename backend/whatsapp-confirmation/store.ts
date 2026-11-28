@@ -71,6 +71,8 @@ export interface EnqueueInput {
   config: WhatsAppConfirmConfig;
   /** Consent text version the shopper saw, when the caller knows it. */
   consentTextVersion?: string | null;
+  /** "phone": the shopper chose a phone call at checkout (never messaged; staff call). */
+  confirmationChannel?: "phone" | null;
   now?: Date;
 }
 
@@ -124,6 +126,8 @@ export async function enqueueConfirmation(db: DatabaseClient, input: EnqueueInpu
   let ineligible: string | null = null;
   if (o.paymentMethod !== "cod") ineligible = "not_cod";
   else if (o.status !== "pending") ineligible = "not_pending";
+  // The shopper chose "by phone call": no WhatsApp message, ever, for this order.
+  else if (input.confirmationChannel === "phone") ineligible = "phone_requested";
   else if (mode === "live" && !consented) ineligible = "no_consent";
   else if (!phone) ineligible = "invalid_phone";
   else if (realRecipient && !consented) ineligible = "no_consent";
@@ -163,7 +167,13 @@ export async function enqueueConfirmation(db: DatabaseClient, input: EnqueueInpu
       // invalid_phone / opted_out need a staff item only when the shopper
       // actually asked for WhatsApp (ticked the box) and will not get it; a
       // shadow record made without asking is just listed.
-      if (consented && (ineligible === "invalid_phone" || ineligible === "opted_out")) {
+      if (ineligible === "phone_requested") {
+        await openReviewItem(tx, {
+          orderId: o.id,
+          type: "ineligible",
+          detail: `${mode === "shadow" ? "[SHADOW] " : ""}Customer chose a phone call to confirm (no WhatsApp) — call to confirm`,
+        });
+      } else if (consented && (ineligible === "invalid_phone" || ineligible === "opted_out")) {
         await openReviewItem(tx, {
           orderId: o.id,
           type: "ineligible",

@@ -15,7 +15,13 @@ export function setWhatsAppWorkerKick(fn: () => void): void {
  * scheduler enqueues the order later from its consent evidence
  * (store.runScheduler, step 0). In `off` mode it returns immediately without a query.
  */
-export async function queueWhatsAppConfirmation(params: { orderId: string; whatsappOptIn: boolean; consentTextVersion?: string | null }): Promise<void> {
+export async function queueWhatsAppConfirmation(params: {
+  orderId: string;
+  whatsappOptIn: boolean;
+  consentTextVersion?: string | null;
+  /** "phone": the shopper chose a phone call (checkout-v3) — listed for staff, never messaged. */
+  confirmationChannel?: "phone" | null;
+}): Promise<void> {
   const mode = effectiveWhatsAppConfirmMode();
   if (mode === "off") return;
   try {
@@ -23,6 +29,7 @@ export async function queueWhatsAppConfirmation(params: { orderId: string; whats
       orderId: params.orderId,
       whatsappOptIn: params.whatsappOptIn,
       consentTextVersion: params.consentTextVersion ?? null,
+      confirmationChannel: params.confirmationChannel ?? null,
       mode,
       config: readWhatsAppConfirmConfig(),
     });

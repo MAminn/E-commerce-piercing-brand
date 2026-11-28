@@ -197,6 +197,12 @@ export const createOrderSchema = z.object({
   whatsappConsentVersion: z.string().trim().max(40).optional(),
   /** Language the acknowledgment was shown in. */
   whatsappConsentLocale: z.enum(["en", "ar"]).optional(),
+  /**
+   * checkout-v3 (switch on): the shopper's required choice of how the order
+   * is confirmed. "whatsapp" comes with whatsappOptIn=true (the opt-in);
+   * "phone" means no WhatsApp message at all — staff call to confirm.
+   */
+  whatsappConfirmationChannel: z.enum(["whatsapp", "phone"]).optional(),
 }).refine((data) => data.items.length + data.bundles.length > 0, {
   message: "An order needs at least one item",
   path: ["items"],
@@ -536,6 +542,7 @@ export const createOrder = (
       whatsappOptIn: input.whatsappOptIn === true,
       consentVersion: input.whatsappConsentVersion,
       consentLocale: input.whatsappConsentLocale,
+      confirmationChannel: input.whatsappConfirmationChannel,
     });
     // We no longer require a session for ordering
     const result = yield* $(
@@ -1381,6 +1388,7 @@ export const createOrder = (
             orderId: result.id,
             whatsappOptIn: waConsent.kind === "record",
             consentTextVersion: waConsent.kind === "record" ? waConsent.evidence.consentTextVersion : null,
+            confirmationChannel: waConsent.kind === "phone" ? "phone" : null,
           }),
         ),
       );

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { CURRENT_WHATSAPP_CONSENT_VERSION, whatsappConsentText } from "#root/shared/whatsapp/consent-text";
+import { CONFIRMATION_CHOICE_TEXT, CURRENT_WHATSAPP_CONSENT_VERSION, whatsappConsentText } from "#root/shared/whatsapp/consent-text";
 import { Button } from "#root/components/ui/button";
 import { Input } from "#root/components/ui/input";
 import { GovernorateSelect } from "#root/components/checkout/GovernorateSelect";
@@ -118,6 +118,8 @@ export function CheckoutPageEditorialTemplate({
     notes: "",
     // "true" only when the shopper ticks the box; never pre-ticked.
     whatsappOptIn: "",
+    // checkout-v3 required choice: "whatsapp" | "phone"; nothing preselected.
+    whatsappChannel: "",
   });
 
   const updateField = (key: string, value: string) => {
@@ -138,7 +140,8 @@ export function CheckoutPageEditorialTemplate({
     onPhoneChange?.(formValues.phoneNumber ?? "");
   }, [formValues.phoneNumber, onPhoneChange]);
   useEffect(() => {
-    if (!whatsAppConsentShown) setFormValues((prev) => (prev.whatsappOptIn ? { ...prev, whatsappOptIn: "" } : prev));
+    if (!whatsAppConsentShown)
+      setFormValues((prev) => (prev.whatsappOptIn || prev.whatsappChannel ? { ...prev, whatsappOptIn: "", whatsappChannel: "" } : prev));
   }, [whatsAppConsentShown]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -154,9 +157,9 @@ export function CheckoutPageEditorialTemplate({
       return;
     }
     setGovernorateError(null);
-    if (whatsAppConsentShown && whatsAppConsentRequired && formValues.whatsappOptIn !== "true") {
-      setWhatsAppConsentError(t("checkout.whatsapp_consent_required"));
-      document.getElementById("checkout-whatsapp-opt-in")?.focus();
+    if (whatsAppConsentShown && whatsAppConsentRequired && formValues.whatsappChannel !== "whatsapp" && formValues.whatsappChannel !== "phone") {
+      setWhatsAppConsentError(t("checkout.whatsapp_channel_required"));
+      document.getElementById("checkout-whatsapp-channel")?.focus();
       return;
     }
     setWhatsAppConsentError(null);
@@ -449,31 +452,67 @@ export function CheckoutPageEditorialTemplate({
                             className={inputCls}
                             placeholder='Phone Number'
                           />
-                          {whatsAppConsentShown && (
+                          {whatsAppConsentShown && whatsAppConsentRequired && (
                           <>
+                          <fieldset
+                            data-testid='whatsapp-confirmation-choice'
+                            aria-describedby='checkout-whatsapp-channel-notice checkout-whatsapp-channel-error'
+                            className='mt-4 rounded-2xl border border-stone-200 p-4'>
+                            <legend className='px-1 text-sm font-medium text-stone-700'>{CONFIRMATION_CHOICE_TEXT[locale === "ar" ? "ar" : "en"].legend}</legend>
+                            <p id='checkout-whatsapp-channel-notice' className='text-xs text-stone-500'>{CONFIRMATION_CHOICE_TEXT[locale === "ar" ? "ar" : "en"].notice}</p>
+                            <label htmlFor='checkout-whatsapp-channel' className='mt-3 flex cursor-pointer items-start gap-2 text-sm leading-snug'>
+                              <input
+                                id='checkout-whatsapp-channel'
+                                name='whatsappChannel'
+                                type='radio'
+                                value='whatsapp'
+                                className='mt-0.5 h-4 w-4 shrink-0 accent-current'
+                                aria-invalid={!!whatsAppConsentError || undefined}
+                                checked={formValues.whatsappChannel === "whatsapp"}
+                                onChange={() => {
+                                  updateField("whatsappChannel", "whatsapp");
+                                  setWhatsAppConsentError(null);
+                                }}
+                              />
+                              <span>{CONFIRMATION_CHOICE_TEXT[locale === "ar" ? "ar" : "en"].whatsapp}</span>
+                            </label>
+                            <label htmlFor='checkout-whatsapp-channel-phone' className='mt-2 flex cursor-pointer items-start gap-2 text-sm leading-snug'>
+                              <input
+                                id='checkout-whatsapp-channel-phone'
+                                name='whatsappChannel'
+                                type='radio'
+                                value='phone'
+                                className='mt-0.5 h-4 w-4 shrink-0 accent-current'
+                                aria-invalid={!!whatsAppConsentError || undefined}
+                                checked={formValues.whatsappChannel === "phone"}
+                                onChange={() => {
+                                  updateField("whatsappChannel", "phone");
+                                  setWhatsAppConsentError(null);
+                                }}
+                              />
+                              <span>{CONFIRMATION_CHOICE_TEXT[locale === "ar" ? "ar" : "en"].phone}</span>
+                            </label>
+                            <p className='mt-3 text-xs text-stone-400'>{CONFIRMATION_CHOICE_TEXT[locale === "ar" ? "ar" : "en"].fallback}</p>
+                          </fieldset>
+                          {whatsAppConsentError && (
+                            <p id='checkout-whatsapp-channel-error' role='alert' className='mt-1.5 text-xs text-red-600'>
+                              {whatsAppConsentError}
+                            </p>
+                          )}
+                          </>
+                          )}
+                          {whatsAppConsentShown && !whatsAppConsentRequired && (
                           <label htmlFor='checkout-whatsapp-opt-in' className='mt-3 flex cursor-pointer items-start gap-2 text-sm leading-snug'>
                             <input
                               id='checkout-whatsapp-opt-in'
                               name='whatsappOptIn'
                               type='checkbox'
                               className='mt-0.5 h-4 w-4 shrink-0 accent-current'
-                              aria-required={whatsAppConsentRequired ? "true" : undefined}
-                              aria-invalid={!!whatsAppConsentError || undefined}
-                              aria-describedby='checkout-whatsapp-opt-in-error'
                               checked={formValues.whatsappOptIn === "true"}
-                              onChange={(e) => {
-                                updateField("whatsappOptIn", e.target.checked ? "true" : "");
-                                if (e.target.checked) setWhatsAppConsentError(null);
-                              }}
+                              onChange={(e) => updateField("whatsappOptIn", e.target.checked ? "true" : "")}
                             />
                             <span>{whatsappConsentText(CURRENT_WHATSAPP_CONSENT_VERSION, locale)}</span>
                           </label>
-                          {whatsAppConsentError && (
-                            <p id='checkout-whatsapp-opt-in-error' role='alert' className='mt-1.5 text-xs text-red-600'>
-                              {whatsAppConsentError}
-                            </p>
-                          )}
-                          </>
                           )}
                         </div>
                       </div>
